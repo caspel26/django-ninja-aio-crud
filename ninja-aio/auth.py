@@ -18,7 +18,7 @@ class AsyncJwtBearer(HttpBearer):
 
     async def authenticate(self, request: HttpRequest, token: str):
         try:
-            dcd = jwt.decode(token, self.jwt_public, algorithms=self.algorithms)
+            self.dcd = jwt.decode(token, self.jwt_public, algorithms=self.algorithms)
         except (
             errors.BadSignatureError,
             ValueError,
@@ -28,11 +28,10 @@ class AsyncJwtBearer(HttpBearer):
         jwt_claims = self.get_claims()
 
         try:
-            jwt_claims.validate(dcd.claims)
+            jwt_claims.validate(self.dcd.claims)
         except (
             errors.InvalidClaimError,
             errors.MissingClaimError,
             errors.ExpiredTokenError,
         ):
             return None
-        return dcd
