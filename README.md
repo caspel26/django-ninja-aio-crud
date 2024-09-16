@@ -150,7 +150,9 @@ class CustomJWTBearer(AsyncJWTBearer):
     claims = {"foo_id": {"required": True}}
 
     async def authenticate(self, request, token):
-      super().authenticate(self, request, token)
+      dcd = super().authenticate(self, request, token)
+      if dcd is None:
+        return None
       try:
         request.user = await Foo.objects.aget(id=dcd.claims["foo_id"])
       except Foo.DoesNotExist:
