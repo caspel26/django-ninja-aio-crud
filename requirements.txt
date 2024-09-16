@@ -1,0 +1,13 @@
+annotated-types==0.7.0
+asgiref==3.8.1
+cffi==1.17.1
+cryptography==43.0.1
+Django==5.1.1
+django-ninja==1.3.0
+joserfc==1.0.0
+orjson==3.10.7
+pycparser==2.22
+pydantic==2.9.1
+pydantic_core==2.23.3
+sqlparse==0.5.1
+typing_extensions==4.12.2
