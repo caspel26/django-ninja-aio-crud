@@ -10,13 +10,13 @@ class ORJSONRenderer(BaseRenderer):
 
     def render(self, request: HttpRequest, data: dict | list, *, response_status):
         if isinstance(data, list):
-            return orjson.dumps(self.render_list(data))        
+            return orjson.dumps(self.render_list(data))
         return orjson.dumps(self.render_dict(data))
 
     @classmethod
     def render_list(cls, data: list[dict]) -> list[dict]:
         return [cls.parse_data(d) for d in data]
-    
+
     @classmethod
     def render_dict(cls, data: dict):
         return cls.parse_data(data)

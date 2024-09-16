@@ -14,7 +14,7 @@ class AsyncJwtBearer(HttpBearer):
     algorithms: list[str] = ["RS256"]
 
     def get_claims(self):
-       return jwt.JWTClaimsRegistry(**self.claims)  
+        return jwt.JWTClaimsRegistry(**self.claims)
 
     async def authenticate(self, request: HttpRequest, token: str):
         try:

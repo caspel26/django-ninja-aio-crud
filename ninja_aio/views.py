@@ -92,7 +92,10 @@ class APIViewSet:
         @self.router.get(
             self.path,
             auth=self.auths,
-            response={200: List[self.schema_out], self.error_codes: GenericMessageSchema},
+            response={
+                200: List[self.schema_out],
+                self.error_codes: GenericMessageSchema,
+            },
         )
         async def list(request: HttpRequest):
             qs = await self.model.queryset_request(request)
@@ -157,7 +160,7 @@ class APIViewSet:
         @self.router.post(some_path, response=some_schema)
         async def some_method(request, *args, **kwargs):
             pass
-        
+
         If you provided a list of auths you can chose which of your views
         should be authenticated:
 
