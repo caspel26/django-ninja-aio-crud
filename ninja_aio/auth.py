@@ -25,7 +25,7 @@ class AsyncJwtBearer(HttpBearer):
             errors.MissingClaimError,
             errors.ExpiredTokenError,
         ):
-            raise AuthError
+            raise AuthError()
 
     async def auth_handler(self):
         """
