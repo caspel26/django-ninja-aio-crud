@@ -1,4 +1,5 @@
 import base64
+from typing import Literal
 
 from ninja.schema import Schema
 from ninja.orm import create_schema
@@ -14,6 +15,8 @@ from django.db.models.fields.related_descriptors import (
 
 from .exceptions import SerializeError
 
+S_TYPES = Literal["read", "create", "update"]
+
 
 class ModelSerializer(models.Model):
     class Meta:
@@ -22,12 +25,15 @@ class ModelSerializer(models.Model):
     class CreateSerializer:
         fields: list[str] = []
         optionals: list[str] = []
+        customs: list[str] = []
 
     class ReadSerializer:
         fields: list[str] = []
+        customs: list[str] = []
 
     class UpdateSerializer:
         fields: list[str] = []
+        customs: list[str] = []
 
     def has_changed(self, field: str) -> bool:
         """
@@ -162,14 +168,29 @@ class ModelSerializer(models.Model):
         return payload
 
     @classmethod
+    def get_custom_fields(cls, s_type: type[S_TYPES]):
+        try:
+            match s_type:
+                case "read":
+                    customs = cls.ReadSerializer.customs
+                case "create":
+                    customs = cls.CreateSerializer.customs
+                case "update":
+                    customs = cls.UpdateSerializer.customs
+        except AttributeError:
+            return None
+        return customs
+
+    @classmethod
     def generate_read_s(cls, depth: int = 1) -> Schema:
         fields, reverse_rels = cls.get_schema_out_data()
+        customs = [custom for custom in reverse_rels + cls.get_custom_fields("read")]
         return create_schema(
             model=cls,
             name=f"{cls._meta.model_name}SchemaOut",
             depth=depth,
             fields=fields,
-            custom_fields=reverse_rels,
+            custom_fields=customs,
         )
 
     @classmethod
@@ -183,6 +204,7 @@ class ModelSerializer(models.Model):
             name=f"{cls._meta.model_name}SchemaIn",
             fields=cls.CreateSerializer.fields,
             optional_fields=optional_fields,
+            custom_fields=cls.get_custom_fields("create"),
         )
 
     @classmethod
@@ -192,6 +214,7 @@ class ModelSerializer(models.Model):
             name=f"{cls._meta.model_name}SchemaPatch",
             fields=cls.UpdateSerializer.fields,
             optional_fields=cls.UpdateSerializer.fields,
+            custom_fields=cls.get_custom_fields("update"),
         )
 
     @classmethod
