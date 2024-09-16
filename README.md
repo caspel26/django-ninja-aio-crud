@@ -89,8 +89,8 @@ class ExampleSchemaIn(Schema):
 
 
 class FooAPI(APIViewSet):
-model = Foo
-api = api
+  model = Foo
+  api = api
 
   def views(self):
     @self.router.post("numbers-sum/", response={200: ExampleSchemaOut)
