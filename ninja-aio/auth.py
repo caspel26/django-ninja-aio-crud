@@ -16,7 +16,7 @@ class AsyncJwtBearer(HttpBearer):
     def get_claims(self):
        return jwt.JWTClaimsRegistry(**self.claims)  
 
-    async def authenticate(self, request: HttpRequest, token: str) -> None:
+    async def authenticate(self, request: HttpRequest, token: str):
         try:
             dcd = jwt.decode(token, self.jwt_public, algorithms=self.algorithms)
         except (
@@ -35,3 +35,4 @@ class AsyncJwtBearer(HttpBearer):
             errors.ExpiredTokenError,
         ):
             return None
+        return dcd
