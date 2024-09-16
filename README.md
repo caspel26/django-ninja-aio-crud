@@ -36,7 +36,7 @@ pip install -r requirements.txt
 ### ModelSerializer
 - You can serialize your models using ModelSerializer and made them inherit from it. In your models.py import ModelSerializer
 ```Python
-from ninja-aio.models import ModelSerializer
+from ninja_aio.models import ModelSerializer
 
 
 class Foo(ModelSerializer):
@@ -55,12 +55,12 @@ class Foo(ModelSerializer):
 - ReadSerializer, CreateSerializer, UpdateSerializer are used to define which fields would be included in runtime schemas creation.
 
 ### APIViewSet
-- View class used to automatically generate CRUD views. in your views.py import APIViewSet and define your api using NinjaAPI class. As Parser and Render of the API you must use ninja-aio built-in classes which will serialize data using orjson.
+- View class used to automatically generate CRUD views. in your views.py import APIViewSet and define your api using NinjaAPI class. As Parser and Render of the API you must use ninja_aio built-in classes which will serialize data using orjson.
 ```Python
 from ninja import NinjAPI
-from ninja-aio.views import APIViewSet
-from ninja-aio.parsers import ORJSONParser
-from ninja-aio.renders import ORJSONRender
+from ninja_aio.views import APIViewSet
+from ninja_aio.parsers import ORJSONParser
+from ninja_aio.renders import ORJSONRender
 
 from .models import Foo
 
@@ -77,9 +77,9 @@ FooAPI().add_views_route()
 - and that's it, your model CRUD will be automatically created. You can also add custom views to CRUD overriding the built-in method "views".
 ```Python
 from ninja import NinjAPI, Schema
-from ninja-aio.views import APIViewSet
-from ninja-aio.parsers import ORJSONParser
-from ninja-aio.renders import ORJSONRender
+from ninja_aio.views import APIViewSet
+from ninja_aio.parsers import ORJSONParser
+from ninja_aio.renders import ORJSONRender
 
 from .models import Foo
 
@@ -112,9 +112,9 @@ FooAPI().add_views_route()
 - View class to code generic views class based. In your views.py import APIView class.
 ```Python
 from ninja import NinjAPI, Schema
-from ninja-aio.views import APIView
-from ninja-aio.parsers import ORJSONParser
-from ninja-aio.renders import ORJSONRender
+from ninja_aio.views import APIView
+from ninja_aio.parsers import ORJSONParser
+from ninja_aio.renders import ORJSONRender
 
 api = NinjaAPI(renderer=ORJSONRenderer(), parser=ORJSONParser())
 
@@ -146,7 +146,7 @@ SumView().add_views_route()
 ### Jwt
 - AsyncJWTBearer built-in class is an authenticator class which use joserfc module. It cames out with authenticate method which validate given claims. Extend it to write your own authentication method. Default algorithms used is RS256.
 ```Python
-from ninja-aio.auth import AsyncJWTBearer
+from ninja_aio.auth import AsyncJWTBearer
 from django.conf import settings
 
 from .models import Foo
@@ -167,9 +167,9 @@ class CustomJWTBearer(AsyncJWTBearer):
 - Then add it to views.
 ```Python
 from ninja import NinjAPI, Schema
-from ninja-aio.views import APIViewSet, APIView
-from ninja-aio.parsers import ORJSONParser
-from ninja-aio.renders import ORJSONRender
+from ninja_aio.views import APIViewSet, APIView
+from ninja_aio.parsers import ORJSONParser
+from ninja_aio.renders import ORJSONRender
 
 from .models import Foo
 
