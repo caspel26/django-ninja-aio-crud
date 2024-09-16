@@ -166,7 +166,7 @@ class CustomJWTBearer(AsyncJWTBearer):
 ```
 - Then add it to views.
 ```Python
-from ninja import NinjAPI
+from ninja import NinjAPI, Schema
 from ninja-aio.views import APIViewSet, APIView
 from ninja-aio.parsers import ORJSONParser
 from ninja-aio.renders import ORJSONRender
