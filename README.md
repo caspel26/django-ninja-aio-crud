@@ -25,13 +25,13 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-### 🚀 Usage
+## 🚀 Usage
 
 > [!TIP]
 > If you find **NinjaAioCRUD** useful, consider :star: this project
 > and why not ... [Buy me a coffee](https://buymeacoffee.com/caspel26)
 
-## ModelSerializer
+### ModelSerializer
 - You can serialize your models using ModelSerializer and made them inherit from it. In your models.py import ModelSerializer
 ```Python
 from ninja-aio.models import ModelSerializer
@@ -52,7 +52,7 @@ class Foo(ModelSerializer):
 ```
 - ReadSerializer, CreateSerializer, UpdateSerializer are used to define which fields would be included in runtime schemas creation.
 
-## APIViewSet
+### APIViewSet
 - View class used to automatically generate CRUD views. in your views.py import APIViewSet and define your api using NinjaAPI class. As Parser and Render of the API you must use ninja-aio built-in classes which will serialize data using orjson.
 ```Python
 from ninja import NinjAPI
@@ -106,7 +106,7 @@ class FooAPI(APIViewSet):
 FooAPI().add_views_route()
 ```
 
-## APIView
+### APIView
 - View class to code generic views class based. In your views.py import APIView class.
 ```Python
 from ninja import NinjAPI, Schema
@@ -132,7 +132,7 @@ class SumView(APIView):
   router_tag = "Sum"
 
   def views(self):
-    @self.router.post("numbers-sum/", response={200: ExampleSchemaOut)
+    @self.router.post(self.api_router_path, response={200: ExampleSchemaOut)
     async def sum(request: HttpRequest, data: ExampleSchemaIn):
         return 200, {sum: data.n1 + data.n2}
 
@@ -140,8 +140,8 @@ class SumView(APIView):
 SumView().add_views_route()
 ```
 
-### 🔒 Authentication
-## Jwt
+## 🔒 Authentication
+### Jwt
 - AsyncJWTBearer built-in class is an authenticator class which use joserfc module. It cames out with authenticate method which validate given claims. Extend it to write your own authentication method. Default algorithms used is RS256.
 ```Python
 from ninja-aio.auth import AsyncJWTBearer
@@ -196,7 +196,7 @@ class SumView(APIView):
   auths = CustomJWTBearer()
 
   def views(self):
-    @self.router.post("numbers-sum/", response={200: ExampleSchemaOut, auth=self.auths)
+    @self.router.post(self.api_router_path, response={200: ExampleSchemaOut, auth=self.auths)
     async def sum(request: HttpRequest, data: ExampleSchemaIn):
         return 200, {sum: data.n1 + data.n2}
 
