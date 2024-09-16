@@ -291,3 +291,4 @@ docker_script.sh
 .devops/.*
 *.eb
 migrations
+django-test/*
