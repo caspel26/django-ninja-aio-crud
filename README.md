@@ -154,7 +154,7 @@ class CustomJWTBearer(AsyncJWTBearer):
       super().authenticate(self, request, token)
       try:
         request.user = await Foo.objects.aget(id=dcd.claims["foo_id"])
-      except User.DoesNotExist:
+      except Foo.DoesNotExist:
         return None
       return request.user
 ```
