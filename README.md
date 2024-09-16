@@ -144,7 +144,7 @@ SumView().add_views_route()
 
 ## 🔒 Authentication
 ### Jwt
-- AsyncJWTBearer built-in class is an authenticator class which use joserfc module. It cames out with authenticate method which validate given claims. Extend it to write your own authentication method. Default algorithms used is RS256.
+- AsyncJWTBearer built-in class is an authenticator class which use joserfc module. It cames out with authenticate method which validate given claims. Override auth handler method to write your own authentication method. Default algorithms used is RS256. a jwt Token istance is set as class atribute so you can use it by self.dcd.  
 ```Python
 from ninja_aio.auth import AsyncJWTBearer
 from django.conf import settings
@@ -156,8 +156,7 @@ class CustomJWTBearer(AsyncJWTBearer):
     jwt_public = settings.JWT_PUBLIC
     claims = {"foo_id": {"required": True}}
 
-    async def authenticate(self, request, token):
-      super().authenticate(request, token)
+    async def auth_handler(self, request, token):
       try:
         request.user = await Foo.objects.aget(id=self.dcd.claims["foo_id"])
       except Foo.DoesNotExist:
