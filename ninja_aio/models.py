@@ -21,6 +21,7 @@ class ModelSerializer(models.Model):
 
     class CreateSerializer:
         fields: list[str] = []
+        optionals: list[str] = []
 
     class ReadSerializer:
         fields: list[str] = []
@@ -173,10 +174,15 @@ class ModelSerializer(models.Model):
 
     @classmethod
     def generate_create_s(cls) -> Schema:
+        try:
+            optional_fields = cls.CreateSerializer.optionals
+        except AttributeError:
+            optional_fields = None
         return create_schema(
             model=cls,
             name=f"{cls._meta.model_name}SchemaIn",
             fields=cls.CreateSerializer.fields,
+            optional_fields=optional_fields,
         )
 
     @classmethod
