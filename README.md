@@ -25,13 +25,12 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
+### 🚀 Usage
 
 > [!TIP]
-> If you find **NinjaAioCruf** useful, consider :star: this project
+> If you find **NinjaAioCruD** useful, consider :star: this project
 > and why not ... [Buy me a coffee](https://buymeacoffee.com/caspel26)
 
-
-### 🚀 Usage
 ## ModelSerializer
 - You can serialize your models using ModelSerializer and made them inherit from it. In your models.py import ModelSerializer
 ```Python
