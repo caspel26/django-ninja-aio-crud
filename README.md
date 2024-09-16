@@ -37,13 +37,13 @@ class Foo(ModelSerializer):
   bar = models.CharField()
 
   class ReadSerializer:
-    fields = ["id", "name". "bar"]
+    fields = ["id", "name", "bar"]
 
   class CreateSerializer:
-    fields = ["name". "bar"]
+    fields = ["name", "bar"]
 
   class UpdaeSerializer:
-    fields = ["name". "bar"]
+    fields = ["name", "bar"]
 ```
 - ReadSerializer, CreateSerializer, UpdateSerializer are used to define which fields would be included in runtime schemas creation.
 
