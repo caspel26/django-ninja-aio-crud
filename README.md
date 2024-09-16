@@ -141,7 +141,6 @@ SumView().add_views_route()
 ```Python
 from ninja-aio.auth import AsyncJWTBearer
 from django.conf import settings
-from django.contrib.auth.models import User
 
 from .models import Foo
 
