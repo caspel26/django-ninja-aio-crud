@@ -53,7 +53,7 @@ class Foo(ModelSerializer):
 - ReadSerializer, CreateSerializer, UpdateSerializer are used to define which fields would be included in runtime schemas creation.
 
 ## APIViewSet
-- View class used to automatically generate CRUD views. in your views.py import APIViewSet and define your api using NinjaAPI class. As Parser and Render of the API you must ninja-aio built-in classes which will serialize data using orjson.
+- View class used to automatically generate CRUD views. in your views.py import APIViewSet and define your api using NinjaAPI class. As Parser and Render of the API you must use ninja-aio built-in classes which will serialize data using orjson.
 ```Python
 from ninja import NinjAPI
 from ninja-aio.views import APIViewSet
