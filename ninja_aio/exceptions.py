@@ -18,3 +18,7 @@ class BaseException(Exception):
 
 class SerializeError(BaseException):
     pass
+
+
+class AuthError(BaseException):
+    pass

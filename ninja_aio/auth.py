@@ -1,11 +1,9 @@
 from joserfc import jwt, jwk, errors
-
-from django.conf import settings
 from django.http.request import HttpRequest
-
 from ninja.security.http import HttpBearer
 
-JWT_PUBLIC = settings.JWT_PUBLIC
+from .exceptions import AuthError
+
 
 
 class AsyncJwtBearer(HttpBearer):
@@ -13,8 +11,27 @@ class AsyncJwtBearer(HttpBearer):
     claims: dict[str, dict]
     algorithms: list[str] = ["RS256"]
 
-    def get_claims(self):
-        return jwt.JWTClaimsRegistry(**self.claims)
+    @classmethod
+    def get_claims(cls):
+        return jwt.JWTClaimsRegistry(**cls.claims)
+
+    def validate_claims(self, claims: jwt.Claims):
+        jwt_claims = self.get_claims()
+
+        try:
+            jwt_claims.validate(claims)
+        except (
+            errors.InvalidClaimError,
+            errors.MissingClaimError,
+            errors.ExpiredTokenError,
+        ):
+            raise AuthError
+
+    async def auth_handler(self):
+        """
+        Override this method to make your own authentication
+        """
+        pass
 
     async def authenticate(self, request: HttpRequest, token: str):
         try:
@@ -25,13 +42,9 @@ class AsyncJwtBearer(HttpBearer):
         ):
             return None
 
-        jwt_claims = self.get_claims()
-
         try:
-            jwt_claims.validate(self.dcd.claims)
-        except (
-            errors.InvalidClaimError,
-            errors.MissingClaimError,
-            errors.ExpiredTokenError,
-        ):
+            self.validate_claims(self.dcd.claims)
+        except AuthError:
             return None
+
+        return await self.auth_handler()
