@@ -92,10 +92,10 @@ class FooAPI(APIViewSet):
 model = Foo
 api = api
 
-def views(self):
-  @self.router.post("numbers-sum/", response={200: ExampleSchemaOut)
-  async def sum(request: HttpRequest, data: ExampleSchemaIn):
-      return 200, {sum: data.n1 + data.n2}
+  def views(self):
+    @self.router.post("numbers-sum/", response={200: ExampleSchemaOut)
+    async def sum(request: HttpRequest, data: ExampleSchemaIn):
+        return 200, {sum: data.n1 + data.n2}
 
 
 FooAPI().add_views_route()
