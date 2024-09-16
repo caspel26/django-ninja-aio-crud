@@ -42,7 +42,7 @@ class Foo(ModelSerializer):
   class CreateSerializer:
     fields = ["name", "bar"]
 
-  class UpdaeSerializer:
+  class UpdateSerializer:
     fields = ["name", "bar"]
 ```
 - ReadSerializer, CreateSerializer, UpdateSerializer are used to define which fields would be included in runtime schemas creation.
