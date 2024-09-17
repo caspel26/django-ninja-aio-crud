@@ -26,7 +26,7 @@ class ModelSerializer(models.Model):
     class CreateSerializer:
         fields: list[str] = []
         optionals: list[str] = []
-        customs: list[str] = []
+        customs: list[tuple[str, type, Any]] = []
 
     class ReadSerializer:
         fields: list[str] = []
@@ -34,7 +34,19 @@ class ModelSerializer(models.Model):
     class UpdateSerializer:
         fields: list[str] = []
         optionals: list[str] = []
-        customs: list[str] = []
+        customs: list[tuple[str, type, Any]] = []
+
+    @property
+    def has_custom_fields_create(self):
+        return hasattr(self.CreateSerializer, "customs")
+
+    @property
+    def has_custom_fields_update(self):
+        return hasattr(self.UpdateSerializer, "customs")
+
+    @property
+    def has_custom_fields(self):
+        return self.has_custom_fields_create or self.has_custom_fields_update
 
     def has_changed(self, field: str) -> bool:
         """
@@ -125,10 +137,24 @@ class ModelSerializer(models.Model):
         return fields, reverse_rels
 
     @classmethod
+    def is_custom(cls, field: str):
+        customs = []
+        if hasattr(cls.CreateSerializer, "customs"):
+            customs = cls.CreateSerializer.customs
+        if hasattr(cls.UpdateSerializer, "customs"):
+            customs.extend(cls.UpdateSerializer.customs)
+        for custom_f in customs:
+            if field in custom_f:
+                return True
+        return False
+
+    @classmethod
     async def parse_input_data(cls, request: HttpRequest, data: Schema):
+        customs = {}
         payload = data.model_dump()
         for k, v in payload.items():
-            if k in cls.UpdateSerializer.customs or k in cls.CreateSerializer.customs:
+            if cls.is_custom(k):
+                customs |= {k: v}
                 continue
             field_obj = getattr(cls, k).field
             if isinstance(field_obj, models.BinaryField):
@@ -143,7 +169,8 @@ class ModelSerializer(models.Model):
                 except ObjectDoesNotExist:
                     raise SerializeError({k: "not found"}, 404)
                 payload |= {k: rel}
-        return payload
+        new_payload = {k: v for k, v in payload.items() if k not in customs}
+        return new_payload, customs
 
     @classmethod
     async def parse_output_data(cls, request: HttpRequest, data: Schema):
@@ -188,9 +215,6 @@ class ModelSerializer(models.Model):
 
     @classmethod
     def get_optional_fields(cls, s_type: type[S_TYPES]) -> list[str] | None:
-        customs = cls.get_custom_fields(s_type)
-        if customs is None:
-            customs = []
         try:
             match s_type:
                 case "create":
@@ -198,8 +222,8 @@ class ModelSerializer(models.Model):
                 case "update":
                     optionals = cls.UpdateSerializer.optionals
         except AttributeError:
-            return None if not customs else customs
-        return optionals + customs
+            return None
+        return optionals
 
     @classmethod
     def generate_read_s(cls, depth: int = 1) -> Schema:
@@ -248,12 +272,13 @@ class ModelSerializer(models.Model):
 
     @classmethod
     async def create_s(cls, request: HttpRequest, data: Schema):
-        payload = await cls.parse_input_data(request, data)
+        payload, customs = await cls.parse_input_data(request, data)
         try:
             pk = (await cls.objects.acreate(**payload)).pk
             obj = await cls.get_object(request, pk)
         except SerializeError as e:
             return e.status_code, e.error
+        payload |= customs
         await obj.custom_actions(payload)
         await obj.post_create()
         return await cls.read_s(request, obj)
@@ -270,10 +295,11 @@ class ModelSerializer(models.Model):
         except SerializeError as e:
             return e.status_code, e.error
 
-        payload = await cls.parse_input_data(request, data)
+        payload, customs = await cls.parse_input_data(request, data)
         for k, v in payload.items():
             if v is not None:
                 setattr(obj, k, v)
+        payload |= customs
         await obj.custom_actions(payload)
         await obj.asave()
         return await cls.read_s(request, obj)
