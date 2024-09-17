@@ -33,6 +33,7 @@ class ModelSerializer(models.Model):
 
     class UpdateSerializer:
         fields: list[str] = []
+        optionals: list[str] = []
         customs: list[str] = []
 
     def has_changed(self, field: str) -> bool:
@@ -186,6 +187,21 @@ class ModelSerializer(models.Model):
         return customs
 
     @classmethod
+    def get_optional_fields(cls, s_type: type[S_TYPES]) -> list[str] | None:
+        customs = cls.get_custom_fields(s_type)
+        if customs is None:
+            customs = []
+        try:
+            match s_type:
+                case "create":
+                    optionals = cls.CreateSerializer.optionals
+                case "update":
+                    optionals = cls.UpdateSerializer.optionals
+        except AttributeError:
+            return None if not customs else customs
+        return optionals + customs
+
+    @classmethod
     def generate_read_s(cls, depth: int = 1) -> Schema:
         fields, reverse_rels = cls.get_schema_out_data()
         customs = [custom for custom in reverse_rels]
@@ -199,15 +215,11 @@ class ModelSerializer(models.Model):
 
     @classmethod
     def generate_create_s(cls) -> Schema:
-        try:
-            optional_fields = cls.CreateSerializer.optionals
-        except AttributeError:
-            optional_fields = None
         return create_schema(
             model=cls,
             name=f"{cls._meta.model_name}SchemaIn",
             fields=cls.CreateSerializer.fields,
-            optional_fields=optional_fields,
+            optional_fields=cls.get_optional_fields("create"),
             custom_fields=cls.get_custom_fields("create"),
         )
 
@@ -217,7 +229,7 @@ class ModelSerializer(models.Model):
             model=cls,
             name=f"{cls._meta.model_name}SchemaPatch",
             fields=cls.UpdateSerializer.fields,
-            optional_fields=cls.UpdateSerializer.fields,
+            optional_fields=cls.get_optional_fields("update"),
             custom_fields=cls.get_custom_fields("update"),
         )
 
