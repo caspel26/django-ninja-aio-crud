@@ -197,7 +197,7 @@ class SumView(APIView):
   auths = CustomJWTBearer()
 
   def views(self):
-    @self.router.post(self.api_router_path, response={200: ExampleSchemaOut, auth=self.auths)
+    @self.router.post(self.api_router_path, response={200: ExampleSchemaOut}, auth=self.auths)
     async def sum(request: HttpRequest, data: ExampleSchemaIn):
         return 200, {sum: data.n1 + data.n2}
 
