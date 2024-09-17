@@ -156,7 +156,7 @@ class CustomJWTBearer(AsyncJWTBearer):
     jwt_public = settings.JWT_PUBLIC
     claims = {"foo_id": {"required": True}}
 
-    async def auth_handler(self, request, token):
+    async def auth_handler(self):
       try:
         request.user = await Foo.objects.aget(id=self.dcd.claims["foo_id"])
       except Foo.DoesNotExist:
