@@ -1,5 +1,5 @@
 import base64
-from typing import Literal
+from typing import Any, Literal
 
 from ninja.schema import Schema
 from ninja.orm import create_schema
@@ -15,7 +15,8 @@ from django.db.models.fields.related_descriptors import (
 
 from .exceptions import SerializeError
 
-S_TYPES = Literal["read", "create", "update"]
+S_TYPES = Literal["create", "update"]
+REL_TYPES = Literal["many", "one"]
 
 
 class ModelSerializer(models.Model):
@@ -29,7 +30,6 @@ class ModelSerializer(models.Model):
 
     class ReadSerializer:
         fields: list[str] = []
-        customs: list[str] = []
 
     class UpdateSerializer:
         fields: list[str] = []
@@ -63,6 +63,13 @@ class ModelSerializer(models.Model):
         """
         pass
 
+    async def custom_actions(self, payload: dict[str, Any]):
+        """
+        Override this method to execute custom actions based on
+        custom given fields. It could be useful for post create method.
+        """
+        pass
+
     @classmethod
     def get_reverse_relations(cls):
         reverse_rels = []
@@ -78,14 +85,14 @@ class ModelSerializer(models.Model):
 
     @classmethod
     def get_reverse_relation_schema(
-        cls, obj: "ModelSerializer", s_type: str, field: str
+        cls, obj: type["ModelSerializer"], rel_type: type[REL_TYPES], field: str
     ):
         for index, rel_f in enumerate(obj.ReadSerializer.fields):
             if rel_f == cls._meta.model_name:
                 obj.ReadSerializer.fields.pop(index)
                 break
         rel_schema = obj.generate_read_s(depth=0)
-        if s_type == "many":
+        if rel_type == "many":
             rel_schema = list[rel_schema]
         rel_data = (
             field,
@@ -99,21 +106,18 @@ class ModelSerializer(models.Model):
     def get_schema_out_data(cls):
         fields = []
         reverse_rels = []
-        s_type = ""
         for f in cls.ReadSerializer.fields:
             field_obj = getattr(cls, f)
             if isinstance(field_obj, ReverseManyToOneDescriptor):
                 rel_obj: ModelSerializer = field_obj.field.__dict__.get("model")
-                s_type = "many"
-                rel_data = cls.get_reverse_relation_schema(rel_obj, s_type, f)
+                rel_data = cls.get_reverse_relation_schema(rel_obj, "many", f)
                 reverse_rels.append(rel_data)
                 continue
             if isinstance(field_obj, ReverseOneToOneDescriptor):
                 rel_obj: ModelSerializer = list(field_obj.__dict__.values())[
                     0
                 ].__dict__.get("related_model")
-                s_type = "one"
-                rel_data = cls.get_reverse_relation_schema(rel_obj, s_type, f)
+                rel_data = cls.get_reverse_relation_schema(rel_obj, "one", f)
                 reverse_rels.append(rel_data)
                 continue
             fields.append(f)
@@ -123,6 +127,8 @@ class ModelSerializer(models.Model):
     async def parse_input_data(cls, request: HttpRequest, data: Schema):
         payload = data.model_dump()
         for k, v in payload.items():
+            if k in cls.UpdateSerializer.customs or k in cls.CreateSerializer.customs:
+                continue
             field_obj = getattr(cls, k).field
             if isinstance(field_obj, models.BinaryField):
                 if not v.endswith(b"=="):
@@ -171,8 +177,6 @@ class ModelSerializer(models.Model):
     def get_custom_fields(cls, s_type: type[S_TYPES]):
         try:
             match s_type:
-                case "read":
-                    customs = cls.ReadSerializer.customs
                 case "create":
                     customs = cls.CreateSerializer.customs
                 case "update":
@@ -184,7 +188,7 @@ class ModelSerializer(models.Model):
     @classmethod
     def generate_read_s(cls, depth: int = 1) -> Schema:
         fields, reverse_rels = cls.get_schema_out_data()
-        customs = [custom for custom in reverse_rels + cls.get_custom_fields("read")]
+        customs = [custom for custom in reverse_rels]
         return create_schema(
             model=cls,
             name=f"{cls._meta.model_name}SchemaOut",
@@ -232,18 +236,18 @@ class ModelSerializer(models.Model):
 
     @classmethod
     async def create_s(cls, request: HttpRequest, data: Schema):
+        payload = await cls.parse_input_data(request, data)
         try:
-            pk = (
-                await cls.objects.acreate(**await cls.parse_input_data(request, data))
-            ).pk
+            pk = (await cls.objects.acreate(**payload)).pk
             obj = await cls.get_object(request, pk)
         except SerializeError as e:
             return e.status_code, e.error
+        await obj.custom_actions(payload)
         await obj.post_create()
         return await cls.read_s(request, obj)
 
     @classmethod
-    async def read_s(cls, request: HttpRequest, obj: "ModelSerializer"):
+    async def read_s(cls, request: HttpRequest, obj: type["ModelSerializer"]):
         schema = cls.generate_read_s().from_orm(obj)
         return await cls.parse_output_data(request, schema)
 
@@ -258,6 +262,7 @@ class ModelSerializer(models.Model):
         for k, v in payload.items():
             if v is not None:
                 setattr(obj, k, v)
+        await obj.custom_actions(payload)
         await obj.asave()
         return await cls.read_s(request, obj)
 
