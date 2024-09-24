@@ -272,8 +272,8 @@ class ModelSerializer(models.Model):
 
     @classmethod
     async def create_s(cls, request: HttpRequest, data: Schema):
-        payload, customs = await cls.parse_input_data(request, data)
         try:
+            payload, customs = await cls.parse_input_data(request, data)
             pk = (await cls.objects.acreate(**payload)).pk
             obj = await cls.get_object(request, pk)
         except SerializeError as e:
