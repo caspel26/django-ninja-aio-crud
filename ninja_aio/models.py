@@ -144,11 +144,10 @@ class ModelSerializer(models.Model):
 
     @classmethod
     async def parse_input_data(cls, request: HttpRequest, data: Schema):
-        customs = {}
         payload = data.model_dump()
+        customs = {k: v for k, v in payload.items() if cls.is_custom(k)}
         for k, v in payload.items():
             if cls.is_custom(k):
-                customs |= {k: v}
                 continue
             field_obj = getattr(cls, k).field
             if isinstance(field_obj, models.BinaryField):
