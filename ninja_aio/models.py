@@ -138,15 +138,9 @@ class ModelSerializer(models.Model):
 
     @classmethod
     def is_custom(cls, field: str):
-        customs = []
-        if hasattr(cls.CreateSerializer, "customs"):
-            customs = cls.CreateSerializer.customs
-        if hasattr(cls.UpdateSerializer, "customs"):
-            customs.extend(cls.UpdateSerializer.customs)
-        for custom_f in customs:
-            if field in custom_f:
-                return True
-        return False
+        customs = cls.get_custom_fields("create") or []
+        customs.extend(cls.get_custom_fields("update") or [])
+        return any(field in custom_f for custom_f in customs)
 
     @classmethod
     async def parse_input_data(cls, request: HttpRequest, data: Schema):
