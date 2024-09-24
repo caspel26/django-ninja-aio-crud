@@ -52,7 +52,39 @@ class Foo(ModelSerializer):
   class UpdateSerializer:
     fields = ["name", "bar"]
 ```
-- ReadSerializer, CreateSerializer, UpdateSerializer are used to define which fields would be included in runtime schemas creation.
+- ReadSerializer, CreateSerializer, UpdateSerializer are used to define which fields would be included in runtime schemas creation. You can also specify custom fields and handle their function by overriding custom_actions ModelSerializer's method(custom fields are only available for Create and Update serializers).
+```Python
+from ninja_aio.models import ModelSerializer
+
+
+class Foo(ModelSerializer):
+  name = mdoels.CharField()
+  bar = models.CharField()
+  active = models.BooleanField(default=False)
+
+  class ReadSerializer:
+    fields = ["id", "name", "bar"]
+
+  class CreateSerializer:
+    customs = ["force_activation"]
+    fields = ["name", "bar"]
+
+  class UpdateSerializer:
+    fields = ["name", "bar"]
+
+  async def custom_actions(self, payload: dict[str, Any]):
+      if not payload.get("force_activation"):
+          return
+      setattr(self, "force_activation", True)
+  
+  async def post_create(self) -> None:
+      if not hasattr(self, "force_activation") or not getattr(self, "force_activation"):
+          return
+      self.active = True
+      await self.asave()
+```
+- post create method is a custom method that comes out to handle actions which will be excuted after that the object is created. It can be used, indeed, for example to handle custom fields' actions.
+
 
 ### APIViewSet
 - View class used to automatically generate CRUD views. in your views.py import APIViewSet and define your api using NinjaAPI class. As Parser and Render of the API you must use ninja_aio built-in classes which will serialize data using orjson.
@@ -72,7 +104,7 @@ class FooAPI(APIViewSet):
   api = api
 
   
-FooAPI().add_views_route()
+FooAPI().add_views_to_route()
 ```
 - and that's it, your model CRUD will be automatically created. You can also add custom views to CRUD overriding the built-in method "views".
 ```Python
@@ -105,7 +137,7 @@ class FooAPI(APIViewSet):
         return 200, {sum: data.n1 + data.n2}
 
 
-FooAPI().add_views_route()
+FooAPI().add_views_to_route()
 ```
 
 ### APIView
@@ -139,7 +171,7 @@ class SumView(APIView):
         return 200, {sum: data.n1 + data.n2}
 
 
-SumView().add_views_route()
+SumView().add_views_to_route()
 ```
 
 ## 🔒 Authentication
@@ -202,8 +234,8 @@ class SumView(APIView):
         return 200, {sum: data.n1 + data.n2}
 
 
-FooAPI().add_views_route()
-SumView().add_views_route()
+FooAPI().add_views_to_route()
+SumView().add_views_to_route()
 ```
 
 ## 📌 Notes
