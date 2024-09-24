@@ -59,7 +59,7 @@ class APIView:
         self.views()
         return self.router
 
-    def add_views_route(self):
+    def add_views_to_route(self):
         return self.api.add_router(f"{self.api_route_path}/", self.add_views())
 
 
@@ -187,7 +187,7 @@ class APIViewSet:
         self.views()
         return self.router
 
-    def add_views_route(self):
+    def add_views_to_route(self):
         return self.api.add_router(
             f"{self.model._meta.verbose_name_plural}/",
             self.add_views(),

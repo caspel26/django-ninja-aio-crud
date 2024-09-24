@@ -25,7 +25,6 @@ class ModelSerializer(models.Model):
 
     class CreateSerializer:
         fields: list[str] = []
-        optionals: list[str] = []
         customs: list[tuple[str, type, Any]] = []
 
     class ReadSerializer:
@@ -33,7 +32,6 @@ class ModelSerializer(models.Model):
 
     class UpdateSerializer:
         fields: list[str] = []
-        optionals: list[str] = []
         customs: list[tuple[str, type, Any]] = []
 
     @property
