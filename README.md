@@ -1,4 +1,4 @@
-# 🥷 NinjaAioCRUD
+# 🥷 django-ninja-aio-crud
 > [!NOTE]
 > NinjaAioCRUD framework is based on **<a href="https://django-ninja.dev/">Django Ninja framework</a>**. It comes out with built-in views and models which are able to make automatic async CRUD operations and codes views class based making the developers' life easier and the code cleaner.
 
