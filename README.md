@@ -66,7 +66,7 @@ class Foo(ModelSerializer):
     fields = ["id", "name", "bar"]
 
   class CreateSerializer:
-    customs = ["force_activation"]
+    customs = [("force_activation", bool, False)]
     fields = ["name", "bar"]
 
   class UpdateSerializer:
