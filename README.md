@@ -30,7 +30,7 @@ pip install -r requirements.txt
 ## 🚀 Usage
 
 > [!TIP]
-> If you find **NinjaAioCRUD** useful, consider :star: this project
+> If you find **django ninja aio crud** useful, consider :star: this project
 > and why not ... [Buy me a coffee](https://buymeacoffee.com/caspel26)
 
 ### ModelSerializer
