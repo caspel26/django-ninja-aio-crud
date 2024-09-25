@@ -180,15 +180,16 @@ SumView().add_views_to_route()
 ```Python
 from ninja_aio.auth import AsyncJWTBearer
 from django.conf import settings
+from django.http import HttpRequest
 
 from .models import Foo
 
 
 class CustomJWTBearer(AsyncJWTBearer):
     jwt_public = settings.JWT_PUBLIC
-    claims = {"foo_id": {"required": True}}
+    claims = {"foo_id": {"essential": True}}
 
-    async def auth_handler(self):
+    async def auth_handler(self, request: HttpRequest):
       try:
         request.user = await Foo.objects.aget(id=self.dcd.claims["foo_id"])
       except Foo.DoesNotExist:
