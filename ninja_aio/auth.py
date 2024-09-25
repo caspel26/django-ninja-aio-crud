@@ -27,7 +27,7 @@ class AsyncJwtBearer(HttpBearer):
         ):
             raise AuthError()
 
-    async def auth_handler(self):
+    async def auth_handler(self, request: HttpRequest):
         """
         Override this method to make your own authentication
         """
@@ -47,4 +47,4 @@ class AsyncJwtBearer(HttpBearer):
         except AuthError:
             return None
 
-        return await self.auth_handler()
+        return await self.auth_handler(request)
