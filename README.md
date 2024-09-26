@@ -22,7 +22,7 @@ python -m venv .venv
 . .venv/Scripts/activate
 ```
 
-### 📥 Install requirements
+### 📥 Install package
 ```bash
 pip install django-ninja-aio-crud
 ```
