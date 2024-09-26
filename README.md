@@ -24,7 +24,7 @@ python -m venv .venv
 
 ### 📥 Install requirements
 ```bash
-pip install django-ninja-aio
+pip install django-ninja-aio-crud
 ```
 
 ## 🚀 Usage
