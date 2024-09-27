@@ -2,6 +2,7 @@ from typing import List
 
 from ninja import NinjaAPI, Router
 from ninja.constants import NOT_SET
+from ninja.pagination import paginate, AsyncPaginationBase, PageNumberPagination
 from django.http import HttpRequest
 
 from .models import ModelSerializer
@@ -67,6 +68,7 @@ class APIViewSet:
     model: ModelSerializer
     api: NinjaAPI
     auths: list | None = NOT_SET
+    pagination_class: type[AsyncPaginationBase] = PageNumberPagination
 
     def __init__(self) -> None:
         self.router = Router(tags=[self.model._meta.model_name.capitalize()])
@@ -97,6 +99,7 @@ class APIViewSet:
                 self.error_codes: GenericMessageSchema,
             },
         )
+        @paginate(self.pagination_class)
         async def list(request: HttpRequest):
             qs = await self.model.queryset_request(request)
             rels = self.model.get_reverse_relations()
