@@ -53,6 +53,8 @@ class Foo(ModelSerializer):
     fields = ["name", "bar"]
 ```
 - ReadSerializer, CreateSerializer, UpdateSerializer are used to define which fields would be included in runtime schemas creation. You can also specify custom fields and handle their function by overriding custom_actions ModelSerializer's method(custom fields are only available for Create and Update serializers).
+> [!WARNING]
+> Only ForeignKey and OneToOne relations are supported for serialization, ManyToMany relations are not supported yet.
 ```Python
 from ninja_aio.models import ModelSerializer
 
