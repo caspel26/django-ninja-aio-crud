@@ -205,18 +205,6 @@ class ModelSerializer(models.Model):
         return customs
 
     @classmethod
-    def get_optional_fields(cls, s_type: type[S_TYPES]) -> list[str] | None:
-        try:
-            match s_type:
-                case "create":
-                    optionals = cls.CreateSerializer.optionals
-                case "update":
-                    optionals = cls.UpdateSerializer.optionals
-        except AttributeError:
-            return None
-        return optionals
-
-    @classmethod
     def generate_read_s(cls, depth: int = 1) -> Schema:
         fields, reverse_rels = cls.get_schema_out_data()
         customs = [custom for custom in reverse_rels]
@@ -234,7 +222,6 @@ class ModelSerializer(models.Model):
             model=cls,
             name=f"{cls._meta.model_name}SchemaIn",
             fields=cls.CreateSerializer.fields,
-            optional_fields=cls.get_optional_fields("create"),
             custom_fields=cls.get_custom_fields("create"),
         )
 
@@ -244,7 +231,6 @@ class ModelSerializer(models.Model):
             model=cls,
             name=f"{cls._meta.model_name}SchemaPatch",
             fields=cls.UpdateSerializer.fields,
-            optional_fields=cls.get_optional_fields("update"),
             custom_fields=cls.get_custom_fields("update"),
         )
 
