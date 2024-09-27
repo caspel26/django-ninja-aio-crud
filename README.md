@@ -246,10 +246,10 @@ BarAPI().add_views_to_route()
 - Now run your server and go to /docs url:
 ### Docs
 - Foo Schemas
-![Swagger UI](docs/images/foo-swagger.png)
+![Swagger UI](ninja_aio/docs/images/foo-swagger.png)
 
 - Bar Schemas with reverse relation
-![Swagger UI](docs/images/bar-swagger.png)
+![Swagger UI](ninja_aio/docs/images/bar-swagger.png)
 
 ## 🔒 Authentication
 ### Jwt
