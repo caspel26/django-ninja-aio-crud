@@ -36,12 +36,14 @@ pip install django-ninja-aio-crud
 ### ModelSerializer
 - You can serialize your models using ModelSerializer and made them inherit from it. In your models.py import ModelSerializer
 ```Python
+# models.py
+from django.db import models
 from ninja_aio.models import ModelSerializer
 
 
 class Foo(ModelSerializer):
-  name = mdoels.CharField()
-  bar = models.CharField()
+  name = models.CharField(max_length=30)
+  bar = models.CharField(max_length=30)
 
   class ReadSerializer:
     fields = ["id", "name", "bar"]
@@ -53,15 +55,15 @@ class Foo(ModelSerializer):
     fields = ["name", "bar"]
 ```
 - ReadSerializer, CreateSerializer, UpdateSerializer are used to define which fields would be included in runtime schemas creation. You can also specify custom fields and handle their function by overriding custom_actions ModelSerializer's method(custom fields are only available for Create and Update serializers).
-> [!WARNING]
-> Only ForeignKey and OneToOne relations are supported for serialization, ManyToMany relations are not supported yet.
 ```Python
+# models.py
+from django.db import models
 from ninja_aio.models import ModelSerializer
 
 
 class Foo(ModelSerializer):
-  name = mdoels.CharField()
-  bar = models.CharField()
+  name = models.CharField(max_length=30)
+  bar = models.CharField(max_length=30)
   active = models.BooleanField(default=False)
 
   class ReadSerializer:
@@ -91,6 +93,7 @@ class Foo(ModelSerializer):
 ### APIViewSet
 - View class used to automatically generate CRUD views. in your views.py import APIViewSet and define your api using NinjaAPI class. As Parser and Render of the API you must use ninja_aio built-in classes which will serialize data using orjson.
 ```Python
+# views.py
 from ninja import NinjAPI
 from ninja_aio.views import APIViewSet
 from ninja_aio.parsers import ORJSONParser
@@ -110,6 +113,7 @@ FooAPI().add_views_to_route()
 ```
 - and that's it, your model CRUD will be automatically created. You can also add custom views to CRUD overriding the built-in method "views".
 ```Python
+# views.py
 from ninja import NinjAPI, Schema
 from ninja_aio.views import APIViewSet
 from ninja_aio.parsers import ORJSONParser
@@ -134,7 +138,7 @@ class FooAPI(APIViewSet):
   api = api
 
   def views(self):
-    @self.router.post("numbers-sum/", response={200: ExampleSchemaOut)
+    @self.router.post("numbers-sum/", response={200: ExampleSchemaOut})
     async def sum(request: HttpRequest, data: ExampleSchemaIn):
         return 200, {sum: data.n1 + data.n2}
 
@@ -145,6 +149,7 @@ FooAPI().add_views_to_route()
 ### APIView
 - View class to code generic views class based. In your views.py import APIView class.
 ```Python
+# views.py
 from ninja import NinjAPI, Schema
 from ninja_aio.views import APIView
 from ninja_aio.parsers import ORJSONParser
@@ -168,13 +173,83 @@ class SumView(APIView):
   router_tag = "Sum"
 
   def views(self):
-    @self.router.post("/", response={200: ExampleSchemaOut)
+    @self.router.post("/", response={200: ExampleSchemaOut})
     async def sum(request: HttpRequest, data: ExampleSchemaIn):
         return 200, {sum: data.n1 + data.n2}
 
 
 SumView().add_views_to_route()
 ```
+### Relations
+- You can also set ForeignKey and OneToOne relations into serialization(reverse relations are supported too). Django ninja aio crud will serialize every of these relation automatically.
+
+> [!WARNING]
+> Only ForeignKey and OneToOne relations are supported for serialization, ManyToMany relations are not supported yet.
+
+- Define models:
+```Python
+# models.py
+class Bar(ModelSerializer):
+    name = models.CharField(max_length=30)
+    description = models.TextField(max_length=30)
+
+    # ReadSerializer with reverse OneToMany relation (foos)
+    class ReadSerializer:
+        fields = ["id", "name", "description", "foos"]
+
+    class CreateSerializer:
+        fields = ["name", "description"]
+
+    class UpdateSerializer:
+        fields = ["name", "description"]
+
+
+class Foo(ModelSerializer):
+    name = models.CharField(max_length=30)
+    bar = models.ForeignKey(Bar, on_delete=models.CASCADE, related_name="foos")
+
+    class ReadSerializer:
+        fields = ["id", "name", "bar"]
+
+    class CreateSerializer:
+        fields = ["name", "bar"]
+
+    class UpdateSerializer:
+        fields = ["name"]
+```
+- Define views:
+```Python
+# views.py
+from ninja import NinjAPI
+from ninja_aio.views import APIViewSet
+from ninja_aio.parsers import ORJSONParser
+from ninja_aio.renders import ORJSONRender
+
+from .models import Foo, Bar
+
+api = NinjaAPI(renderer=ORJSONRenderer(), parser=ORJSONParser())
+
+
+class FooAPI(APIViewSet):
+  model = Foo
+  api = api
+
+
+class BarAPI(APIViewSet):
+  model = Bar
+  api = api
+
+
+FooAPI().add_views_to_route()
+BarAPI().add_views_to_route()
+```
+- Now run your server and go to /docs url:
+### Docs
+- Foo Schemas
+![Swagger UI](docs/images/foo-swagger.png)
+
+- Bar Schemas with reverse relation
+![Swagger UI](docs/images/bar-swagger.png)
 
 ## 🔒 Authentication
 ### Jwt
@@ -200,6 +275,7 @@ class CustomJWTBearer(AsyncJWTBearer):
 ```
 - Then add it to views.
 ```Python
+# views.py
 from ninja import NinjAPI, Schema
 from ninja_aio.views import APIViewSet, APIView
 from ninja_aio.parsers import ORJSONParser
@@ -239,6 +315,18 @@ class SumView(APIView):
 
 FooAPI().add_views_to_route()
 SumView().add_views_to_route()
+```
+
+## 📝 Pagination
+- By default APIViewSet list view uses Django Ninja built-in AsyncPagination class "PageNumberPagination". You can customize and assign it to APIViewSet class. To make your custom pagination consult **<a href="https://django-ninja.dev/guides/response/pagination/#async-pagination">Django Ninja pagination documentation<\a>**.
+```Python
+# views.py
+
+class FooAPI(APIViewSet):
+  model = Foo
+  api = api
+  pagination_class = CustomPaginationClass
+
 ```
 
 ## 📌 Notes
