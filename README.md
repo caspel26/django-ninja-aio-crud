@@ -5,24 +5,32 @@
 ## 📝 Instructions
 
 ### 📚 Prerequisites
+
 - Install Python from the [official website](https://www.python.org/) (latest version) and ensure it is added to the system Path and environment variables.
 
 ### 💻 Setup your environment
+
 - Create a virtual environment
 ```bash
 python -m venv .venv
 ```
+
 ### ✅ Activate it
+
 - If you are from linux activate it with
+
 ```bash
 . .venv/bin/activate
 ```
+
 - If you are from windows activate it with
+
 ```bash
 . .venv/Scripts/activate
 ```
 
 ### 📥 Install package
+
 ```bash
 pip install django-ninja-aio-crud
 ```
@@ -34,6 +42,7 @@ pip install django-ninja-aio-crud
 > and why not ... [Buy me a coffee](https://buymeacoffee.com/caspel26)
 
 ### ModelSerializer
+
 - You can serialize your models using ModelSerializer and made them inherit from it. In your models.py import ModelSerializer
 ```Python
 # models.py
@@ -54,7 +63,9 @@ class Foo(ModelSerializer):
   class UpdateSerializer:
     fields = ["name", "bar"]
 ```
+
 - ReadSerializer, CreateSerializer, UpdateSerializer are used to define which fields would be included in runtime schemas creation. You can also specify custom fields and handle their function by overriding custom_actions ModelSerializer's method(custom fields are only available for Create and Update serializers).
+
 ```Python
 # models.py
 from django.db import models
@@ -87,11 +98,13 @@ class Foo(ModelSerializer):
       self.active = True
       await self.asave()
 ```
+
 - post create method is a custom method that comes out to handle actions which will be excuted after that the object is created. It can be used, indeed, for example to handle custom fields' actions.
 
-
 ### APIViewSet
+
 - View class used to automatically generate CRUD views. in your views.py import APIViewSet and define your api using NinjaAPI class. As Parser and Render of the API you must use ninja_aio built-in classes which will serialize data using orjson.
+
 ```Python
 # views.py
 from ninja import NinjAPI
@@ -111,7 +124,9 @@ class FooAPI(APIViewSet):
   
 FooAPI().add_views_to_route()
 ```
+
 - and that's it, your model CRUD will be automatically created. You can also add custom views to CRUD overriding the built-in method "views".
+
 ```Python
 # views.py
 from ninja import NinjAPI, Schema
@@ -147,7 +162,9 @@ FooAPI().add_views_to_route()
 ```
 
 ### APIView
+
 - View class to code generic views class based. In your views.py import APIView class.
+
 ```Python
 # views.py
 from ninja import NinjAPI, Schema
@@ -180,6 +197,7 @@ class SumView(APIView):
 
 SumView().add_views_to_route()
 ```
+
 ### Relations
 - You can also set ForeignKey and OneToOne relations into serialization(reverse relations are supported too). Django ninja aio crud will serialize every of these relation automatically.
 
@@ -187,6 +205,7 @@ SumView().add_views_to_route()
 > Only ForeignKey and OneToOne relations are supported for serialization, ManyToMany relations are not supported yet.
 
 - Define models:
+
 ```Python
 # models.py
 class Bar(ModelSerializer):
@@ -217,7 +236,9 @@ class Foo(ModelSerializer):
     class UpdateSerializer:
         fields = ["name"]
 ```
+
 - Define views:
+
 ```Python
 # views.py
 from ninja import NinjAPI
@@ -243,17 +264,25 @@ class BarAPI(APIViewSet):
 FooAPI().add_views_to_route()
 BarAPI().add_views_to_route()
 ```
+
 - Now run your server and go to /docs url:
+
 ### Docs
+
 - Foo Schemas
+
 ![Swagger UI](ninja_aio/docs/images/foo-swagger.png)
 
 - Bar Schemas with reverse relation
+
 ![Swagger UI](ninja_aio/docs/images/bar-swagger.png)
 
 ## 🔒 Authentication
+
 ### Jwt
+
 - AsyncJWTBearer built-in class is an authenticator class which use joserfc module. It cames out with authenticate method which validate given claims. Override auth handler method to write your own authentication method. Default algorithms used is RS256. a jwt Token istance is set as class atribute so you can use it by self.dcd.  
+
 ```Python
 from ninja_aio.auth import AsyncJWTBearer
 from django.conf import settings
@@ -273,7 +302,9 @@ class CustomJWTBearer(AsyncJWTBearer):
         return None
       return request.user
 ```
+
 - Then add it to views.
+
 ```Python
 # views.py
 from ninja import NinjAPI, Schema
@@ -318,7 +349,9 @@ SumView().add_views_to_route()
 ```
 
 ## 📝 Pagination
+
 - By default APIViewSet list view uses Django Ninja built-in AsyncPagination class "PageNumberPagination". You can customize and assign it to APIViewSet class. To make your custom pagination consult **<a href="https://django-ninja.dev/guides/response/pagination/#async-pagination">Django Ninja pagination documentation<\a>**.
+
 ```Python
 # views.py
 
