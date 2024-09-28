@@ -8,9 +8,11 @@ from ninja.renderers import BaseRenderer
 class ORJSONRenderer(BaseRenderer):
     media_type = "application/json"
 
-    def render(self, request: HttpRequest, data: dict | list, *, response_status):
-        if isinstance(data, list):
-            return orjson.dumps(self.render_list(data))
+    def render(self, request: HttpRequest, data: dict, *, response_status):
+        old_d = data
+        for k, v in old_d.items():
+            if isinstance(v, list):
+                data |= {k: self.render_list(v)}
         return orjson.dumps(self.render_dict(data))
 
     @classmethod
@@ -33,7 +35,7 @@ class ORJSONRenderer(BaseRenderer):
                     v |= {k_rel: base64.b64encode(v_rel).decode()}
                 data |= {k: v}
             if isinstance(v, list):
-                for f_rel, index_rel in enumerate(v):
+                for index_rel, f_rel in enumerate(v):
                     for k_rel, v_rel in f_rel.items():
                         if isinstance(v_rel, bytes):
                             v[index_rel] |= {k_rel: base64.b64encode(v_rel).decode()}
