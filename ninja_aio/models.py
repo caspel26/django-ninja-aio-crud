@@ -11,6 +11,7 @@ from django.db.models.fields.related import OneToOneRel
 from django.db.models.fields.related_descriptors import (
     ReverseManyToOneDescriptor,
     ReverseOneToOneDescriptor,
+    ForwardManyToOneDescriptor,
 )
 
 from .exceptions import SerializeError
@@ -99,7 +100,10 @@ class ModelSerializer(models.Model):
         cls_f = []
         for rel_f in obj.ReadSerializer.fields:
             rel_f_obj = getattr(obj, rel_f)
-            if isinstance(rel_f_obj, cls):
+            if (
+                isinstance(rel_f_obj, ForwardManyToOneDescriptor)
+                and rel_f_obj.field.related_model == cls
+            ):
                 cls_f.append(rel_f)
                 obj.ReadSerializer.fields.remove(rel_f)
                 break
@@ -111,7 +115,8 @@ class ModelSerializer(models.Model):
             rel_schema | None,
             None,
         )
-        obj.ReadSerializer.fields.append(*cls_f)
+        if len(cls_f) > 0:
+            obj.ReadSerializer.fields.append(*cls_f)
         return rel_data
 
     @classmethod
