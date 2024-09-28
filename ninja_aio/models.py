@@ -149,9 +149,10 @@ class ModelSerializer(models.Model):
                 continue
             field_obj = getattr(cls, k).field
             if isinstance(field_obj, models.BinaryField):
-                if not v.endswith(b"=="):
-                    v = v + b"=="
-                payload |= {k: base64.b64decode(v)}
+                try:
+                    payload |= {k: base64.b64decode(v)}
+                except Exception as exc:
+                    raise SerializeError({k: ". ".join(exc.args)}, 400)
             if isinstance(field_obj, models.ForeignKey):
                 try:
                     rel: ModelSerializer = await field_obj.related_model.get_object(
