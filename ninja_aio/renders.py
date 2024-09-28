@@ -33,11 +33,9 @@ class ORJSONRenderer(BaseRenderer):
                     v |= {k_rel: base64.b64encode(v_rel).decode()}
                 data |= {k: v}
             if isinstance(v, list):
-                index_rel = 0
-                for f_rel in v:
+                for f_rel, index_rel in enumerate(v):
                     for k_rel, v_rel in f_rel.items():
                         if isinstance(v_rel, bytes):
                             v[index_rel] |= {k_rel: base64.b64encode(v_rel).decode()}
-                    index_rel += 1
                 data |= {k: v}
         return data
