@@ -87,20 +87,24 @@ class ModelSerializer(models.Model):
         for f in cls.ReadSerializer.fields:
             field_obj = getattr(cls, f)
             if isinstance(field_obj, ReverseManyToOneDescriptor):
-                reverse_rels.append(field_obj.field.__dict__.get("_related_name"))
+                reverse_rels.append(field_obj.field._related_name)
             if isinstance(field_obj, ReverseOneToOneDescriptor):
-                reverse_rels.append(
-                    list(field_obj.__dict__.values())[0].__dict__.get("related_name")
-                )
+                reverse_rels.append(list(field_obj[0].related_name))
         return reverse_rels
 
     @classmethod
     def get_reverse_relation_schema(
         cls, obj: type["ModelSerializer"], rel_type: type[REL_TYPES], field: str
     ):
-        for index, rel_f in enumerate(obj.ReadSerializer.fields):
-            if rel_f == cls._meta.model_name:
-                obj.ReadSerializer.fields.pop(index)
+        cls_f = []
+        for rel_f in obj.ReadSerializer.fields:
+            rel_f_obj = getattr(obj, rel_f).field
+            if (
+                isinstance(rel_f_obj, (models.ForeignKey, models.OneToOneField))
+                and rel_f_obj.related_model == cls
+            ):
+                cls_f.append(rel_f)
+                obj.ReadSerializer.fields.remove(rel_f)
                 break
         rel_schema = obj.generate_read_s(depth=0)
         if rel_type == "many":
@@ -110,7 +114,8 @@ class ModelSerializer(models.Model):
             rel_schema | None,
             None,
         )
-        obj.ReadSerializer.fields.append(cls._meta.model_name)
+        if len(cls_f) > 0:
+            obj.ReadSerializer.fields.append(*cls_f)
         return rel_data
 
     @classmethod
@@ -120,14 +125,12 @@ class ModelSerializer(models.Model):
         for f in cls.ReadSerializer.fields:
             field_obj = getattr(cls, f)
             if isinstance(field_obj, ReverseManyToOneDescriptor):
-                rel_obj: ModelSerializer = field_obj.field.__dict__.get("model")
+                rel_obj: ModelSerializer = field_obj.field.model
                 rel_data = cls.get_reverse_relation_schema(rel_obj, "many", f)
                 reverse_rels.append(rel_data)
                 continue
             if isinstance(field_obj, ReverseOneToOneDescriptor):
-                rel_obj: ModelSerializer = list(field_obj.__dict__.values())[
-                    0
-                ].__dict__.get("related_model")
+                rel_obj: ModelSerializer = list(field_obj)[0].related_model
                 rel_data = cls.get_reverse_relation_schema(rel_obj, "one", f)
                 reverse_rels.append(rel_data)
                 continue
