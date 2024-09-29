@@ -302,10 +302,10 @@ class ModelSerializer(models.Model):
         for k, v in payload.items():
             if v is not None:
                 setattr(obj, k, v)
-        payload |= customs
-        await obj.custom_actions(payload)
+        await obj.custom_actions(customs)
         await obj.asave()
-        return await cls.read_s(request, obj)
+        updated_object = await cls.get_object(request, pk)
+        return await cls.read_s(request, updated_object)
 
     @classmethod
     async def delete_s(cls, request: HttpRequest, pk: int | str):
