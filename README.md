@@ -271,11 +271,11 @@ BarAPI().add_views_to_route()
 
 - Foo Schemas
 
-![Swagger UI](ninja_aio/docs/images/foo-swagger.png)
+![Swagger UI](docs/images/foo-swagger.png)
 
 - Bar Schemas with reverse relation
 
-![Swagger UI](ninja_aio/docs/images/bar-swagger.png)
+![Swagger UI](docs/images/bar-swagger.png)
 
 ## 🔒 Authentication
 
