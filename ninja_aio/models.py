@@ -11,6 +11,7 @@ from django.db.models.fields.related import OneToOneRel
 from django.db.models.fields.related_descriptors import (
     ReverseManyToOneDescriptor,
     ReverseOneToOneDescriptor,
+    ManyToManyDescriptor,
 )
 
 from .exceptions import SerializeError
@@ -86,8 +87,12 @@ class ModelSerializer(models.Model):
         reverse_rels = []
         for f in cls.ReadSerializer.fields:
             field_obj = getattr(cls, f)
+            if isinstance(field_obj, ManyToManyDescriptor):
+                reverse_rels.append(f)
+                continue
             if isinstance(field_obj, ReverseManyToOneDescriptor):
                 reverse_rels.append(field_obj.field._related_name)
+                continue
             if isinstance(field_obj, ReverseOneToOneDescriptor):
                 reverse_rels.append(list(field_obj[0].related_name))
         return reverse_rels
@@ -98,14 +103,26 @@ class ModelSerializer(models.Model):
     ):
         cls_f = []
         for rel_f in obj.ReadSerializer.fields:
-            rel_f_obj = getattr(obj, rel_f).field
+            rel_f_obj = getattr(obj, rel_f)
             if (
-                isinstance(rel_f_obj, (models.ForeignKey, models.OneToOneField))
-                and rel_f_obj.related_model == cls
+                isinstance(
+                    rel_f_obj.field,
+                    (
+                        models.ForeignKey,
+                        models.OneToOneField,
+                    ),
+                )
+                and rel_f_obj.field.related_model == cls
             ):
                 cls_f.append(rel_f)
                 obj.ReadSerializer.fields.remove(rel_f)
-                break
+                continue
+            if (
+                isinstance(rel_f_obj.field, models.ManyToManyField)
+                and rel_f_obj.reverse
+            ):
+                cls_f.append(rel_f)
+                obj.ReadSerializer.fields.remove(rel_f)
         rel_schema = obj.generate_read_s(depth=0)
         if rel_type == "many":
             rel_schema = list[rel_schema]
@@ -124,6 +141,11 @@ class ModelSerializer(models.Model):
         reverse_rels = []
         for f in cls.ReadSerializer.fields:
             field_obj = getattr(cls, f)
+            if isinstance(field_obj, ManyToManyDescriptor):
+                rel_obj: ModelSerializer = field_obj.field.related_model
+                rel_data = cls.get_reverse_relation_schema(rel_obj, "many", f)
+                reverse_rels.append(rel_data)
+                continue
             if isinstance(field_obj, ReverseManyToOneDescriptor):
                 rel_obj: ModelSerializer = field_obj.field.model
                 rel_data = cls.get_reverse_relation_schema(rel_obj, "many", f)
