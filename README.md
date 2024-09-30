@@ -199,10 +199,7 @@ SumView().add_views_to_route()
 ```
 
 ### Relations
-- You can also set ForeignKey and OneToOne relations into serialization(reverse relations are supported too). Django ninja aio crud will serialize every of these relation automatically.
-
-> [!WARNING]
-> Only ForeignKey and OneToOne relations are supported for serialization, ManyToMany relations are not supported yet.
+- You can also set ForeignKey, OneToOne and ManyToMany relations into serialization(reverse relations are supported too). Django ninja aio crud will serialize every of these relation automatically.
 
 - Define models:
 
