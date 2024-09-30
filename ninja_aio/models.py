@@ -47,6 +47,10 @@ class ModelSerializer(models.Model):
     def has_custom_fields(self):
         return self.has_custom_fields_create or self.has_custom_fields_update
 
+    @classmethod
+    def verbose_name_path_resolver(cls) -> str:
+        return "-".join(cls._meta.verbose_name_plural.split(" "))
+
     def has_changed(self, field: str) -> bool:
         """
         Check if a model field has changed
