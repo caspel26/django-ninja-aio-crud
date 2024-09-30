@@ -7,7 +7,6 @@ from ninja.orm import create_schema
 from django.db import models
 from django.http import HttpResponse, HttpRequest
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models.fields.related import OneToOneRel
 from django.db.models.fields.related_descriptors import (
     ReverseManyToOneDescriptor,
     ReverseOneToOneDescriptor,
@@ -121,12 +120,10 @@ class ModelSerializer(models.Model):
                 cls_f.append(rel_f)
                 obj.ReadSerializer.fields.remove(rel_f)
                 continue
-            if (
-                isinstance(rel_f_obj.field, models.ManyToManyField)
-                and rel_f_obj.reverse
-            ):
+            if isinstance(rel_f_obj.field, models.ManyToManyField):
                 cls_f.append(rel_f)
                 obj.ReadSerializer.fields.remove(rel_f)
+
         rel_schema = obj.generate_read_s(depth=0)
         if rel_type == "many":
             rel_schema = list[rel_schema]
@@ -147,6 +144,8 @@ class ModelSerializer(models.Model):
             field_obj = getattr(cls, f)
             if isinstance(field_obj, ManyToManyDescriptor):
                 rel_obj: ModelSerializer = field_obj.field.related_model
+                if field_obj.reverse:
+                    rel_obj: ModelSerializer = field_obj.field.model
                 rel_data = cls.get_reverse_relation_schema(rel_obj, "many", f)
                 reverse_rels.append(rel_data)
                 continue
@@ -204,7 +203,7 @@ class ModelSerializer(models.Model):
                 field_obj = getattr(cls, k).related
             if isinstance(v, dict) and (
                 isinstance(field_obj, models.ForeignKey)
-                or isinstance(field_obj, OneToOneRel)
+                or isinstance(field_obj, models.OneToOneField)
             ):
                 rel: ModelSerializer = await field_obj.related_model.get_object(
                     request, list(v.values())[0]
