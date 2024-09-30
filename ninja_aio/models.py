@@ -97,7 +97,7 @@ class ModelSerializer(models.Model):
                 reverse_rels.append(field_obj.field._related_name)
                 continue
             if isinstance(field_obj, ReverseOneToOneDescriptor):
-                reverse_rels.append(list(field_obj[0].related_name))
+                reverse_rels.append(field_obj.related.name)
         return reverse_rels
 
     @classmethod
@@ -155,7 +155,7 @@ class ModelSerializer(models.Model):
                 reverse_rels.append(rel_data)
                 continue
             if isinstance(field_obj, ReverseOneToOneDescriptor):
-                rel_obj: ModelSerializer = list(field_obj)[0].related_model
+                rel_obj: ModelSerializer = field_obj.related.related_model
                 rel_data = cls.get_reverse_relation_schema(rel_obj, "one", f)
                 reverse_rels.append(rel_data)
                 continue
