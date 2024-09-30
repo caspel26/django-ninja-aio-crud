@@ -192,6 +192,6 @@ class APIViewSet:
 
     def add_views_to_route(self):
         return self.api.add_router(
-            f"{self.model._meta.verbose_name_plural}/",
+            f"{self.model.verbose_name_path_resolver()}/",
             self.add_views(),
         )
