@@ -7,10 +7,10 @@ from ninja.orm import create_schema
 from django.db import models
 from django.http import HttpResponse, HttpRequest
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models.fields.related import OneToOneRel
 from django.db.models.fields.related_descriptors import (
     ReverseManyToOneDescriptor,
     ReverseOneToOneDescriptor,
+    ManyToManyDescriptor,
 )
 
 from .exceptions import SerializeError
@@ -45,6 +45,10 @@ class ModelSerializer(models.Model):
     @property
     def has_custom_fields(self):
         return self.has_custom_fields_create or self.has_custom_fields_update
+
+    @classmethod
+    def verbose_name_path_resolver(cls) -> str:
+        return "-".join(cls._meta.verbose_name_plural.split(" "))
 
     def has_changed(self, field: str) -> bool:
         """
@@ -86,10 +90,14 @@ class ModelSerializer(models.Model):
         reverse_rels = []
         for f in cls.ReadSerializer.fields:
             field_obj = getattr(cls, f)
+            if isinstance(field_obj, ManyToManyDescriptor):
+                reverse_rels.append(f)
+                continue
             if isinstance(field_obj, ReverseManyToOneDescriptor):
                 reverse_rels.append(field_obj.field._related_name)
+                continue
             if isinstance(field_obj, ReverseOneToOneDescriptor):
-                reverse_rels.append(list(field_obj[0].related_name))
+                reverse_rels.append(field_obj.related.name)
         return reverse_rels
 
     @classmethod
@@ -98,14 +106,24 @@ class ModelSerializer(models.Model):
     ):
         cls_f = []
         for rel_f in obj.ReadSerializer.fields:
-            rel_f_obj = getattr(obj, rel_f).field
+            rel_f_obj = getattr(obj, rel_f)
             if (
-                isinstance(rel_f_obj, (models.ForeignKey, models.OneToOneField))
-                and rel_f_obj.related_model == cls
+                isinstance(
+                    rel_f_obj.field,
+                    (
+                        models.ForeignKey,
+                        models.OneToOneField,
+                    ),
+                )
+                and rel_f_obj.field.related_model == cls
             ):
                 cls_f.append(rel_f)
                 obj.ReadSerializer.fields.remove(rel_f)
-                break
+                continue
+            if isinstance(rel_f_obj.field, models.ManyToManyField):
+                cls_f.append(rel_f)
+                obj.ReadSerializer.fields.remove(rel_f)
+
         rel_schema = obj.generate_read_s(depth=0)
         if rel_type == "many":
             rel_schema = list[rel_schema]
@@ -124,13 +142,20 @@ class ModelSerializer(models.Model):
         reverse_rels = []
         for f in cls.ReadSerializer.fields:
             field_obj = getattr(cls, f)
+            if isinstance(field_obj, ManyToManyDescriptor):
+                rel_obj: ModelSerializer = field_obj.field.related_model
+                if field_obj.reverse:
+                    rel_obj: ModelSerializer = field_obj.field.model
+                rel_data = cls.get_reverse_relation_schema(rel_obj, "many", f)
+                reverse_rels.append(rel_data)
+                continue
             if isinstance(field_obj, ReverseManyToOneDescriptor):
                 rel_obj: ModelSerializer = field_obj.field.model
                 rel_data = cls.get_reverse_relation_schema(rel_obj, "many", f)
                 reverse_rels.append(rel_data)
                 continue
             if isinstance(field_obj, ReverseOneToOneDescriptor):
-                rel_obj: ModelSerializer = list(field_obj)[0].related_model
+                rel_obj: ModelSerializer = field_obj.related.related_model
                 rel_data = cls.get_reverse_relation_schema(rel_obj, "one", f)
                 reverse_rels.append(rel_data)
                 continue
@@ -178,7 +203,7 @@ class ModelSerializer(models.Model):
                 field_obj = getattr(cls, k).related
             if isinstance(v, dict) and (
                 isinstance(field_obj, models.ForeignKey)
-                or isinstance(field_obj, OneToOneRel)
+                or isinstance(field_obj, models.OneToOneField)
             ):
                 rel: ModelSerializer = await field_obj.related_model.get_object(
                     request, list(v.values())[0]
@@ -280,10 +305,10 @@ class ModelSerializer(models.Model):
         for k, v in payload.items():
             if v is not None:
                 setattr(obj, k, v)
-        payload |= customs
-        await obj.custom_actions(payload)
+        await obj.custom_actions(customs)
         await obj.asave()
-        return await cls.read_s(request, obj)
+        updated_object = await cls.get_object(request, pk)
+        return await cls.read_s(request, updated_object)
 
     @classmethod
     async def delete_s(cls, request: HttpRequest, pk: int | str):
