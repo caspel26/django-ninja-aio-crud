@@ -101,20 +101,21 @@ class Foo(ModelSerializer):
 
 - post create method is a custom method that comes out to handle actions which will be excuted after that the object is created. It can be used, indeed, for example to handle custom fields' actions.
 
+
 ### APIViewSet
 
-- View class used to automatically generate CRUD views. in your views.py import APIViewSet and define your api using NinjaAPI class. As Parser and Render of the API you must use ninja_aio built-in classes which will serialize data using orjson.
+- View class used to automatically generate CRUD views. in your views.py import APIViewSet and define your api using NinjaAIO class. NinjaAIO class uses built-in parser and renderer which use orjson for data serialization.
 
 ```Python
 # views.py
-from ninja import NinjAPI
+from ninja_aio import NinjaAIO
 from ninja_aio.views import APIViewSet
 from ninja_aio.parsers import ORJSONParser
 from ninja_aio.renders import ORJSONRender
 
 from .models import Foo
 
-api = NinjaAPI(renderer=ORJSONRenderer(), parser=ORJSONParser())
+api = NinjaAIO()
 
 
 class FooAPI(APIViewSet):
@@ -129,14 +130,15 @@ FooAPI().add_views_to_route()
 
 ```Python
 # views.py
-from ninja import NinjAPI, Schema
+from ninja import Schema
+from ninja_aio import NinjaAIO
 from ninja_aio.views import APIViewSet
 from ninja_aio.parsers import ORJSONParser
 from ninja_aio.renders import ORJSONRender
 
 from .models import Foo
 
-api = NinjaAPI(renderer=ORJSONRenderer(), parser=ORJSONParser())
+api = NinjaAIO()
 
 
 class ExampleSchemaOut(Schema):
@@ -167,12 +169,13 @@ FooAPI().add_views_to_route()
 
 ```Python
 # views.py
-from ninja import NinjAPI, Schema
+from ninja import Schema
+from ninja_aio import NinjaAIO
 from ninja_aio.views import APIView
 from ninja_aio.parsers import ORJSONParser
 from ninja_aio.renders import ORJSONRender
 
-api = NinjaAPI(renderer=ORJSONRenderer(), parser=ORJSONParser())
+api = NinjaAIO()
 
 
 class ExampleSchemaOut(Schema):
@@ -199,10 +202,7 @@ SumView().add_views_to_route()
 ```
 
 ### Relations
-- You can also set ForeignKey and OneToOne relations into serialization(reverse relations are supported too). Django ninja aio crud will serialize every of these relation automatically.
-
-> [!WARNING]
-> Only ForeignKey and OneToOne relations are supported for serialization, ManyToMany relations are not supported yet.
+- You can also set ForeignKey, OneToOne and ManyToMany relations into serialization(reverse relations are supported too). Django ninja aio crud will serialize every of these relation automatically.
 
 - Define models:
 
@@ -241,14 +241,14 @@ class Foo(ModelSerializer):
 
 ```Python
 # views.py
-from ninja import NinjAPI
+from ninja_aio import NinjaAIO
 from ninja_aio.views import APIViewSet
 from ninja_aio.parsers import ORJSONParser
 from ninja_aio.renders import ORJSONRender
 
 from .models import Foo, Bar
 
-api = NinjaAPI(renderer=ORJSONRenderer(), parser=ORJSONParser())
+api = NinjaAIO()
 
 
 class FooAPI(APIViewSet):
@@ -307,14 +307,15 @@ class CustomJWTBearer(AsyncJWTBearer):
 
 ```Python
 # views.py
-from ninja import NinjAPI, Schema
+from ninja import Schema
+from ninja_aio import NinjaAIO
 from ninja_aio.views import APIViewSet, APIView
 from ninja_aio.parsers import ORJSONParser
 from ninja_aio.renders import ORJSONRender
 
 from .models import Foo
 
-api = NinjaAPI(renderer=ORJSONRenderer(), parser=ORJSONParser())
+api = NinjaAIO()
 
 
 class FooAPI(APIViewSet):
