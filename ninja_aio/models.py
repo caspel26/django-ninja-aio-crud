@@ -182,12 +182,9 @@ class ModelSerializer(models.Model):
                 except Exception as exc:
                     raise SerializeError({k: ". ".join(exc.args)}, 400)
             if isinstance(field_obj, models.ForeignKey):
-                try:
-                    rel: ModelSerializer = await field_obj.related_model.get_object(
-                        request, v
-                    )
-                except ObjectDoesNotExist:
-                    raise SerializeError({k: "not found"}, 404)
+                rel: ModelSerializer = await field_obj.related_model.get_object(
+                    request, v
+                )
                 payload |= {k: rel}
         new_payload = {k: v for k, v in payload.items() if k not in customs}
         return new_payload, customs
@@ -292,7 +289,11 @@ class ModelSerializer(models.Model):
     @classmethod
     async def read_s(cls, request: HttpRequest, obj: type["ModelSerializer"]):
         schema = cls.generate_read_s().from_orm(obj)
-        return await cls.parse_output_data(request, schema)
+        try:
+            data = await cls.parse_output_data(request, schema)
+        except SerializeError as e:
+            return e.status_code, e.error
+        return data
 
     @classmethod
     async def update_s(cls, request: HttpRequest, data: Schema, pk: int | str):
