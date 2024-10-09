@@ -99,7 +99,7 @@ class APIViewSet:
             response={201: self.schema_out, self.error_codes: GenericMessageSchema},
         )
         async def create(request: HttpRequest, data: self.schema_in):
-            return await self.model_util.create_s(request, data)
+            return await self.model_util.create_s(request, data, self.schema_out)
 
         create.__name__ = f"create_{self.model._meta.model_name}"
 
@@ -115,13 +115,15 @@ class APIViewSet:
         @paginate(self.pagination_class)
         async def list(request: HttpRequest):
             qs = self.model.objects.select_related()
-            if isinstance(self.model, ModelSerializer):
+            if isinstance(self.model, ModelSerializerMeta):
                 qs = await self.model.queryset_request(request)
             rels = self.model_util.get_reverse_relations()
+            print(rels)
             if len(rels) > 0:
                 qs = qs.prefetch_related(*rels)
             objs = [
-                await self.model_util.read_s(request, obj) async for obj in qs.all()
+                await self.model_util.read_s(request, obj, self.schema_out)
+                async for obj in qs.all()
             ]
             return objs
 
@@ -138,7 +140,7 @@ class APIViewSet:
                 obj = await self.model_util.get_object(request, pk)
             except SerializeError as e:
                 return e.status_code, e.error
-            return await self.model_util.read_s(request, obj)
+            return await self.model_util.read_s(request, obj, self.schema_out)
 
         retrieve.__name__ = f"retrieve_{self.model._meta.model_name}"
 
@@ -149,7 +151,7 @@ class APIViewSet:
             response={200: self.schema_out, self.error_codes: GenericMessageSchema},
         )
         async def update(request: HttpRequest, data: self.schema_update, pk: int | str):
-            return await self.model_util.update_s(request, data, pk)
+            return await self.model_util.update_s(request, data, pk, self.schema_out)
 
         update.__name__ = f"update_{self.model._meta.model_name}"
 
@@ -209,6 +211,6 @@ class APIViewSet:
 
     def add_views_to_route(self):
         return self.api.add_router(
-            f"{self.model.verbose_name_path_resolver()}/",
+            f"{self.model_util.verbose_name_path_resolver()}/",
             self.add_views(),
         )

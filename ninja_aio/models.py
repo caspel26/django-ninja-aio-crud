@@ -25,7 +25,9 @@ class ModelUtil:
     def serializable_fields(self):
         if isinstance(self.model, ModelSerializerMeta):
             return self.model.ReadSerializer.fields
-        return [field.name for field in self.model._meta.fields]
+        return [field.name for field in self.model._meta.fields] + list(
+            self.model._meta.fields_map.keys()
+        )
 
     def verbose_name_path_resolver(self) -> str:
         return "-".join(self.model._meta.verbose_name_plural.split(" "))
@@ -44,6 +46,7 @@ class ModelUtil:
     def get_reverse_relations(self):
         reverse_rels = []
         for f in self.serializable_fields:
+            print(self.serializable_fields)
             field_obj = getattr(self.model, f)
             if isinstance(field_obj, ManyToManyDescriptor):
                 reverse_rels.append(f)
@@ -105,7 +108,7 @@ class ModelUtil:
                 payload |= {k: rel}
         return payload
 
-    async def create_s(self, request: HttpRequest, data: Schema):
+    async def create_s(self, request: HttpRequest, data: Schema, obj_schema: Schema):
         try:
             payload, customs = await self.parse_input_data(request, data)
             pk = (await self.model.objects.acreate(**payload)).pk
@@ -115,24 +118,21 @@ class ModelUtil:
         if isinstance(self.model, ModelSerializerMeta):
             await obj.custom_actions(customs)
             await obj.post_create()
-        return 201, await self.read_s(request, obj)
+        return 201, await self.read_s(request, obj, obj_schema)
 
     async def read_s(
         self,
         request: HttpRequest,
         obj: type["ModelSerializer"],
-        obj_schema: Schema = None,
+        obj_schema: Schema,
     ):
-        schema = (
-            self.model.generate_read_s()
-            if isinstance(self.model, ModelSerializerMeta)
-            else obj_schema
-        )
-        if schema is None:
+        if obj_schema is None:
             raise SerializeError({"obj_schema": "must be provided"}, 400)
-        return await self.parse_output_data(request, schema.from_orm(obj))
+        return await self.parse_output_data(request, obj_schema.from_orm(obj))
 
-    async def update_s(self, request: HttpRequest, data: Schema, pk: int | str):
+    async def update_s(
+        self, request: HttpRequest, data: Schema, pk: int | str, obj_schema: Schema
+    ):
         try:
             obj = await self.get_object(request, pk)
         except SerializeError as e:
@@ -146,7 +146,7 @@ class ModelUtil:
             await obj.custom_actions(customs)
         await obj.asave()
         updated_object = await self.get_object(request, pk)
-        return await self.read_s(request, updated_object)
+        return await self.read_s(request, updated_object, obj_schema)
 
     async def delete_s(self, request: HttpRequest, pk: int | str):
         try:
