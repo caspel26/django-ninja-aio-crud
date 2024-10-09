@@ -25,9 +25,7 @@ class ModelUtil:
     def serializable_fields(self):
         if isinstance(self.model, ModelSerializerMeta):
             return self.model.ReadSerializer.fields
-        return [field.name for field in self.model._meta.fields] + list(
-            self.model._meta.fields_map.keys()
-        )
+        return [field.name for field in self.model._meta.get_fields()]
 
     def verbose_name_path_resolver(self) -> str:
         return "-".join(self.model._meta.verbose_name_plural.split(" "))
@@ -46,7 +44,6 @@ class ModelUtil:
     def get_reverse_relations(self):
         reverse_rels = []
         for f in self.serializable_fields:
-            print(self.serializable_fields)
             field_obj = getattr(self.model, f)
             if isinstance(field_obj, ManyToManyDescriptor):
                 reverse_rels.append(f)
