@@ -1,5 +1,5 @@
 import base64
-from typing import Any, Literal
+from typing import Any
 
 from ninja.schema import Schema
 from ninja.orm import create_schema
@@ -14,12 +14,150 @@ from django.db.models.fields.related_descriptors import (
 )
 
 from .exceptions import SerializeError
-
-S_TYPES = Literal["create", "update"]
-REL_TYPES = Literal["many", "one"]
+from .types import S_TYPES, REL_TYPES, ModelSerializerMeta
 
 
-class ModelSerializer(models.Model):
+class ModelUtil:
+    def __init__(self, model: type["ModelSerializer"] | models.Model):
+        self.model = model
+
+    @property
+    def serializable_fields(self):
+        if isinstance(self.model, ModelSerializerMeta):
+            return self.model.ReadSerializer.fields
+        return [field.name for field in self.model._meta.fields]
+
+    def verbose_name_path_resolver(self) -> str:
+        return "-".join(self.model._meta.verbose_name_plural.split(" "))
+
+    async def get_object(self, request: HttpRequest, pk: int | str):
+        q = {self.model._meta.pk.attname: pk}
+        obj_qs = self.model.objects.select_related()
+        if isinstance(self.model, ModelSerializerMeta):
+            obj_qs = await self.model.queryset_request(request)
+        try:
+            obj = await obj_qs.prefetch_related(*self.get_reverse_relations()).aget(**q)
+        except ObjectDoesNotExist:
+            raise SerializeError({self.model._meta.model_name: "not found"}, 404)
+        return obj
+
+    def get_reverse_relations(self):
+        reverse_rels = []
+        for f in self.serializable_fields:
+            field_obj = getattr(self.model, f)
+            if isinstance(field_obj, ManyToManyDescriptor):
+                reverse_rels.append(f)
+                continue
+            if isinstance(field_obj, ReverseManyToOneDescriptor):
+                reverse_rels.append(field_obj.field._related_name)
+                continue
+            if isinstance(field_obj, ReverseOneToOneDescriptor):
+                reverse_rels.append(field_obj.related.name)
+        return reverse_rels
+
+    async def parse_input_data(self, request: HttpRequest, data: Schema):
+        payload = data.model_dump()
+        customs = {}
+        if isinstance(self.model, ModelSerializerMeta):
+            customs = {k: v for k, v in payload.items() if self.model.is_custom(k)}
+        for k, v in payload.items():
+            if isinstance(self.model, ModelSerializerMeta) and self.model.is_custom(k):
+                continue
+            field_obj = getattr(self.model, k).field
+            if isinstance(field_obj, models.BinaryField):
+                try:
+                    payload |= {k: base64.b64decode(v)}
+                except Exception as exc:
+                    raise SerializeError({k: ". ".join(exc.args)}, 400)
+            if isinstance(field_obj, models.ForeignKey):
+                rel_util = ModelUtil(field_obj.related_model)
+                rel: ModelSerializer = await rel_util.get_object(request, v)
+                payload |= {k: rel}
+        new_payload = {k: v for k, v in payload.items() if k not in customs}
+        return new_payload, customs
+
+    async def parse_output_data(self, request: HttpRequest, data: Schema):
+        olds_k: list[dict] = []
+        payload = data.model_dump()
+        for k, v in payload.items():
+            try:
+                field_obj = getattr(self.model, k).field
+            except AttributeError:
+                field_obj = getattr(self.model, k).related
+            if isinstance(v, dict) and (
+                isinstance(field_obj, models.ForeignKey)
+                or isinstance(field_obj, models.OneToOneField)
+            ):
+                rel_util = ModelUtil(field_obj.related_model)
+                rel: ModelSerializer = await rel_util.get_object(
+                    request, list(v.values())[0]
+                )
+                if isinstance(field_obj, models.ForeignKey):
+                    for rel_k, rel_v in v.items():
+                        field_rel_obj = getattr(rel, rel_k)
+                        if isinstance(field_rel_obj, models.ForeignKey):
+                            olds_k.append({rel_k: rel_v})
+                    for obj in olds_k:
+                        for old_k, old_v in obj.items():
+                            v.pop(old_k)
+                            v |= {f"{old_k}_id": old_v}
+                    olds_k = []
+                payload |= {k: rel}
+        return payload
+
+    async def create_s(self, request: HttpRequest, data: Schema):
+        try:
+            payload, customs = await self.parse_input_data(request, data)
+            pk = (await self.model.objects.acreate(**payload)).pk
+            obj = await self.get_object(request, pk)
+        except SerializeError as e:
+            return e.status_code, e.error
+        if isinstance(self.model, ModelSerializerMeta):
+            await obj.custom_actions(customs)
+            await obj.post_create()
+        return 201, await self.read_s(request, obj)
+
+    async def read_s(
+        self,
+        request: HttpRequest,
+        obj: type["ModelSerializer"],
+        obj_schema: Schema = None,
+    ):
+        schema = (
+            self.model.generate_read_s()
+            if isinstance(self.model, ModelSerializerMeta)
+            else obj_schema
+        )
+        if schema is None:
+            raise SerializeError({"obj_schema": "must be provided"}, 400)
+        return await self.parse_output_data(request, schema.from_orm(obj))
+
+    async def update_s(self, request: HttpRequest, data: Schema, pk: int | str):
+        try:
+            obj = await self.get_object(request, pk)
+        except SerializeError as e:
+            return e.status_code, e.error
+
+        payload, customs = await self.parse_input_data(request, data)
+        for k, v in payload.items():
+            if v is not None:
+                setattr(obj, k, v)
+        if isinstance(self.model, ModelSerializerMeta):
+            await obj.custom_actions(customs)
+        await obj.asave()
+        updated_object = await self.get_object(request, pk)
+        return await self.read_s(request, updated_object)
+
+    async def delete_s(self, request: HttpRequest, pk: int | str):
+        try:
+            obj = await self.get_object(request, pk)
+        except SerializeError as e:
+            return e.status_code, e.error
+        await obj.adelete()
+        return HttpResponse(status=204)
+
+
+class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
     class Meta:
         abstract = True
 

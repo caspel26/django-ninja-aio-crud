@@ -1,13 +1,15 @@
 from typing import List
 
-from ninja import NinjaAPI, Router
+from ninja import NinjaAPI, Router, Schema
 from ninja.constants import NOT_SET
 from ninja.pagination import paginate, AsyncPaginationBase, PageNumberPagination
 from django.http import HttpRequest
+from django.db.models import Model
 
-from .models import ModelSerializer
+from .models import ModelSerializer, ModelUtil
 from .schemas import GenericMessageSchema
 from .exceptions import SerializeError
+from .types import ModelSerializerMeta
 
 ERROR_CODES = frozenset({400, 401, 404, 428})
 
@@ -65,28 +67,39 @@ class APIView:
 
 
 class APIViewSet:
-    model: ModelSerializer
+    model: ModelSerializer | Model
     api: NinjaAPI
+    schema_in: Schema | None = None
+    schema_out: Schema | None = None
+    schema_update: Schema | None = None
     auths: list | None = NOT_SET
     pagination_class: type[AsyncPaginationBase] = PageNumberPagination
 
     def __init__(self) -> None:
         self.router = Router(tags=[self.model._meta.model_name.capitalize()])
-        self.schema_in = self.model.generate_create_s()
-        self.schema_out = self.model.generate_read_s()
-        self.schema_update = self.model.generate_update_s()
         self.path = "/"
         self.path_retrieve = f"{self.model._meta.pk.attname}/"
         self.error_codes = ERROR_CODES
+        self.model_util = ModelUtil(self.model)
+        self.schema_out, self.schema_update, self.schema_in = self.get_schemas()
+
+    def get_schemas(self):
+        if isinstance(self.model, ModelSerializerMeta):
+            return (
+                self.model.generate_read_s(),
+                self.model.generate_update_s(),
+                self.model.generate_create_s(),
+            )
+        return self.schema_out, self.schema_update, self.schema_in
 
     def create_view(self):
         @self.router.post(
             self.path,
             auth=self.auths,
-            response={200: self.schema_out, self.error_codes: GenericMessageSchema},
+            response={201: self.schema_out, self.error_codes: GenericMessageSchema},
         )
         async def create(request: HttpRequest, data: self.schema_in):
-            return await self.model.create_s(request, data)
+            return await self.model_util.create_s(request, data)
 
         create.__name__ = f"create_{self.model._meta.model_name}"
 
@@ -101,11 +114,15 @@ class APIViewSet:
         )
         @paginate(self.pagination_class)
         async def list(request: HttpRequest):
-            qs = await self.model.queryset_request(request)
-            rels = self.model.get_reverse_relations()
+            qs = self.model.objects.select_related()
+            if isinstance(self.model, ModelSerializer):
+                qs = await self.model.queryset_request(request)
+            rels = self.model_util.get_reverse_relations()
             if len(rels) > 0:
                 qs = qs.prefetch_related(*rels)
-            objs = [await self.model.read_s(request, obj) async for obj in qs.all()]
+            objs = [
+                await self.model_util.read_s(request, obj) async for obj in qs.all()
+            ]
             return objs
 
         list.__name__ = f"list_{self.model._meta.verbose_name_plural}"
@@ -118,10 +135,10 @@ class APIViewSet:
         )
         async def retrieve(request: HttpRequest, pk: int | str):
             try:
-                obj = await self.model.get_object(request, pk)
+                obj = await self.model_util.get_object(request, pk)
             except SerializeError as e:
                 return e.status_code, e.error
-            return await self.model.read_s(request, obj)
+            return await self.model_util.read_s(request, obj)
 
         retrieve.__name__ = f"retrieve_{self.model._meta.model_name}"
 
@@ -132,7 +149,7 @@ class APIViewSet:
             response={200: self.schema_out, self.error_codes: GenericMessageSchema},
         )
         async def update(request: HttpRequest, data: self.schema_update, pk: int | str):
-            return await self.model.update_s(request, data, pk)
+            return await self.model_util.update_s(request, data, pk)
 
         update.__name__ = f"update_{self.model._meta.model_name}"
 
@@ -143,7 +160,7 @@ class APIViewSet:
             response={204: None, self.error_codes: GenericMessageSchema},
         )
         async def delete(request: HttpRequest, pk: int | str):
-            return await self.model.delete_s(request, pk)
+            return await self.model_util.delete_s(request, pk)
 
         delete.__name__ = f"delete_{self.model._meta.model_name}"
 
