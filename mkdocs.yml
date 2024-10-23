@@ -1,7 +1,24 @@
 site_name: Django Ninja Aio CRUD
+site_url: https://caspel26.github.io/django-ninja-aio-crud/
+repo_name: caspel26/django-ninja-aio-crud
+repo_url: https://github.com/caspel26/django-ninja-aio-crud
 
 nav:
   - Home: index.md
+  - 'Tutorial':
+    - 'Getting Started': 'tutorial/getting_started.md'
+    - 'Defining Model': 'tutorial/model.md'
+    - 'Defining CRUD Views': 'tutorial/crud.md'
+    - 'Authenticating Views': 'tutorial/authentication.md'
+  - Documentation:
+      - 'Models':
+        - 'Model Serializer': 'models/model_serializer.md'
+        - 'Model Util': 'models/model_util.md'
+      - 'Views':
+        - 'API View': 'views/api_view.md'
+        - 'API View Set': 'views/api_view_set.md'
+      - 'Authentication': 'authentication.md'
+      - 'Pagination': 'pagination.md'
 
 theme:
   name: material
@@ -26,7 +43,6 @@ theme:
   logo: images/logo.png
   features:
     - navigation.tabs
-    - navigation.top
     - toc.integrate
 
 markdown_extensions:
@@ -35,7 +51,7 @@ markdown_extensions:
   - footnotes
   - meta
   - toc:
-      permalink: true
+      anchorlink: true
   - pymdownx.highlight:
       anchor_linenums: true
       line_spans: __span
