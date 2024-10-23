@@ -1,6 +1,8 @@
 site_name: Django Ninja Aio CRUD
+
 nav:
   - Home: index.md
+
 theme:
   name: material
   palette:
@@ -15,13 +17,18 @@ theme:
       toggle:
         icon: material/weather-night
         name: Switch to dark mode
-    - media: "(prefers-color-scheme: dark)" 
+    - media: "(prefers-color-scheme: dark)"
       scheme: slate
       primary: dark-purple
       toggle:
         icon: material/weather-sunny
         name: Switch to light mode
   logo: images/logo.png
+  features:
+    - navigation.tabs
+    - navigation.top
+    - toc.integrate
+
 markdown_extensions:
   - admonition
   - codehilite
@@ -36,5 +43,6 @@ markdown_extensions:
   - pymdownx.inlinehilite
   - pymdownx.snippets
   - pymdownx.superfences
+
 extra_css:
   - extra.css
