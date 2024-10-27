@@ -2,23 +2,23 @@ Model Util class is a NinjaAIO built-in utility class. It gives a lot of utiliti
 
 ## get_object
 
-#### Parameters:
+Parameters:
 
     request: HttpRequest
     pk: int | str
 
-#### Return:
+Return:
 
     Model | ModelSerializer
 
-#### Raise:
+Raise:
 
     SerializerError(error={model_name: 'not found'}, status_code=404)
 
-#### What it does
-This method prepares the object query and excutes it asynchronously. If the model is an instance of ModelSerializer it will execute actions defined into **queryset_request** method. It prepares queries also with prefetched relations using Model Util method **get_reverse_relations**, that is usefull to retrieve also the reverse relations and work with them asynchronously.
+What it does
+    This method prepares the object query and excutes it asynchronously. If the model is an instance of ModelSerializer it will execute actions defined into **queryset_request** method. It prepares queries also with prefetched relations using Model Util method **get_reverse_relations**, that is usefull to retrieve also the reverse relations and work with them asynchronously.
 
-#### Example
+Example
 
 ```Python
 # views.py
@@ -61,3 +61,4 @@ class FooRetrieveView(APIView):
 FooRetrieveView().add_views_to_route()
 ```
 
+## get_reverse_relations
