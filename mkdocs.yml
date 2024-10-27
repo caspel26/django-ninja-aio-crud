@@ -24,19 +24,19 @@ theme:
   name: material
   palette:
     - media: "(prefers-color-scheme)"
-      primary: dark-purple
+      primary: deep-purple
       toggle:
         icon: material/brightness-auto
         name: Switch to light mode
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: dark-purple
+      primary: deep-purple
       toggle:
         icon: material/weather-night
         name: Switch to dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: dark-purple
+      primary: deep-purple
       toggle:
         icon: material/weather-sunny
         name: Switch to light mode
