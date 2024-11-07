@@ -41,7 +41,7 @@ class ModelUtil:
             raise SerializeError({self.model._meta.model_name: "not found"}, 404)
         return obj
 
-    def get_reverse_relations(self):
+    def get_reverse_relations(self) -> list[str]:
         reverse_rels = []
         for f in self.serializable_fields:
             field_obj = getattr(self.model, f)

@@ -9,11 +9,14 @@ class ORJSONRenderer(BaseRenderer):
     media_type = "application/json"
 
     def render(self, request: HttpRequest, data: dict, *, response_status):
-        old_d = data
-        for k, v in old_d.items():
-            if isinstance(v, list):
-                data |= {k: self.render_list(v)}
-        return orjson.dumps(self.render_dict(data))
+        try:
+            old_d = data
+            for k, v in old_d.items():
+                if isinstance(v, list):
+                    data |= {k: self.render_list(v)}
+            return orjson.dumps(self.render_dict(data))
+        except AttributeError:
+            return orjson.dumps(data)
 
     @classmethod
     def render_list(cls, data: list[dict]) -> list[dict]:
