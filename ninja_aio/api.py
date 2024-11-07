@@ -6,8 +6,8 @@ from ninja import NinjaAPI
 from ninja.openapi.docs import DocsBase, Swagger
 from ninja.constants import NOT_SET, NOT_SET_TYPE
 
-from ninja_aio.parsers import ORJSONParser
-from ninja_aio.renders import ORJSONRenderer
+from .parsers import ORJSONParser
+from .renders import ORJSONRenderer
 
 
 class NinjaAIO(NinjaAPI):
