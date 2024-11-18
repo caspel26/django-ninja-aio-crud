@@ -19,14 +19,14 @@ class NinjaAIO(NinjaAPI):
         openapi_url: str | None = "/openapi.json",
         docs: DocsBase = Swagger(),
         docs_url: str | None = "/docs",
-        docs_decorator = None,
+        docs_decorator=None,
         servers: list[dict[str, Any]] | None = None,
         urls_namespace: str | None = None,
         csrf: bool = False,
-        auth: Sequence[Any]| NOT_SET_TYPE = NOT_SET,
+        auth: Sequence[Any] | NOT_SET_TYPE = NOT_SET,
         throttle: BaseThrottle | list[BaseThrottle] | NOT_SET_TYPE = NOT_SET,
         default_router: Router | None = None,
-        openapi_extra: dict[str, Any] | None = None
+        openapi_extra: dict[str, Any] | None = None,
     ):
         super().__init__(
             title=title,
