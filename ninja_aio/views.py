@@ -102,6 +102,7 @@ class APIViewSet:
             return await self.model_util.create_s(request, data, self.schema_out)
 
         create.__name__ = f"create_{self.model._meta.model_name}"
+        return create
 
     def list_view(self):
         @self.router.get(
@@ -128,6 +129,7 @@ class APIViewSet:
             return objs
 
         list.__name__ = f"list_{self.model_util.verbose_name_view_resolver()}"
+        return list
 
     def retrieve_view(self):
         @self.router.get(
@@ -143,6 +145,7 @@ class APIViewSet:
             return await self.model_util.read_s(request, obj, self.schema_out)
 
         retrieve.__name__ = f"retrieve_{self.model._meta.model_name}"
+        return retrieve
 
     def update_view(self):
         @self.router.patch(
@@ -154,6 +157,7 @@ class APIViewSet:
             return await self.model_util.update_s(request, data, pk, self.schema_out)
 
         update.__name__ = f"update_{self.model._meta.model_name}"
+        return update
 
     def delete_view(self):
         @self.router.delete(
@@ -165,6 +169,7 @@ class APIViewSet:
             return await self.model_util.delete_s(request, pk)
 
         delete.__name__ = f"delete_{self.model._meta.model_name}"
+        return delete
 
     def views(self):
         """
