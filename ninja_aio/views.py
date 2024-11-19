@@ -127,7 +127,7 @@ class APIViewSet:
             ]
             return objs
 
-        list.__name__ = f"list_{self.model._meta.verbose_name_plural}"
+        list.__name__ = f"list_{self.model._meta.verbose_name_plural.replace(' ', '')}"
 
     def retrieve_view(self):
         @self.router.get(
