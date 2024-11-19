@@ -81,16 +81,16 @@ class APIViewSet:
         self.path_retrieve = f"{self.model._meta.pk.attname}/"
         self.error_codes = ERROR_CODES
         self.model_util = ModelUtil(self.model)
-        self.schema_out, self.schema_update, self.schema_in = self.get_schemas()
+        self.schema_out, self.schema_in, self.schema_update = self.get_schemas()
 
     def get_schemas(self):
         if isinstance(self.model, ModelSerializerMeta):
             return (
                 self.model.generate_read_s(),
-                self.model.generate_update_s(),
                 self.model.generate_create_s(),
+                self.model.generate_update_s(),
             )
-        return self.schema_out, self.schema_update, self.schema_in
+        return self.schema_out, self.schema_in, self.schema_update
 
     def create_view(self):
         @self.router.post(

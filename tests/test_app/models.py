@@ -13,4 +13,9 @@ class TestModelSerializer(ModelSerializer):
         fields = ["name", "description"]
 
     class UpdateSerializer:
-        fields = ["name", "description"]
+        fields = ["description"]
+
+
+class TestModel(models.Model):
+    name = models.CharField(max_length=30)
+    description = models.TextField(max_length=255)
