@@ -30,6 +30,9 @@ class ModelUtil:
     def verbose_name_path_resolver(self) -> str:
         return "-".join(self.model._meta.verbose_name_plural.split(" "))
 
+    def verbose_name_view_resolver(self) -> str:
+        return self.model._meta.verbose_name_plural.replace(" ", "")
+
     async def get_object(self, request: HttpRequest, pk: int | str):
         q = {self.model._meta.pk.attname: pk}
         obj_qs = self.model.objects.select_related()
