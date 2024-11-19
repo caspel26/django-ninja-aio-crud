@@ -1,4 +1,5 @@
 from django.test import TestCase, tag
+from django.test.client import AsyncRequestFactory
 from django.db import models
 
 from ninja_aio import NinjaAIO
@@ -32,6 +33,7 @@ class Tests:
 
         @classmethod
         def setUpTestData(cls):
+            cls.afactory = AsyncRequestFactory()
             cls.api = NinjaAIO(urls_namespace=cls.namespace)
             cls.test_util = ModelUtil(cls.model)
             cls.viewset.api = cls.api
@@ -40,13 +42,13 @@ class Tests:
             cls.detail_path = f"{cls.path}{cls.model._meta.pk.attname}/"
 
         @property
-        def urls_data(self):
+        def path_names(self):
             return [
-                (self.path, f"create_{self.model._meta.model_name}"),
-                (self.path, f"list_{self.test_util.verbose_name_view_resolver()}"),
-                (self.detail_path, f"retrieve_{self.model._meta.model_name}"),
-                (self.detail_path, f"update_{self.model._meta.model_name}"),
-                (self.detail_path, f"delete_{self.model._meta.model_name}"),
+                f"create_{self.model._meta.model_name}",
+                f"list_{self.test_util.verbose_name_view_resolver()}",
+                f"retrieve_{self.model._meta.model_name}",
+                f"update_{self.model._meta.model_name}",
+                f"delete_{self.model._meta.model_name}",
             ]
 
         @property
@@ -55,20 +57,46 @@ class Tests:
             Should be implemented into the child class
             """
 
+        @property
+        def payload_create(self):
+            return {
+                "name": f"test_name_{self.model._meta.model_name}",
+                "description": f"test_description_{self.model._meta.model_name}",
+            }
+
+        @property
+        def create_data(self):
+            return self.viewset.schema_in(**self.payload_create)
+
         def test_crud_routes(self):
             self.assertEqual(len(self.api._routers), 2)
             test_router_path = self.api._routers[1][0]
             test_router = self.api._routers[1][1]
             self.assertEqual(self.path, test_router_path)
-            for index, path in enumerate(test_router.urls_paths(self.path)):
-                url_data = self.urls_data[index]
-                self.assertEqual(str(path.pattern), url_data[0])
-                self.assertEqual(path.name, url_data[1])
+            paths = [str(route.pattern) for route in test_router.urls_paths(self.path)]
+            path_names = list(
+                dict.fromkeys(
+                    [route.name for route in test_router.urls_paths(self.path)]
+                )
+            )
+            self.assertIn(self.path, paths)
+            self.assertIn(self.detail_path, paths)
+            self.assertEqual(self.path_names, path_names)
 
         def test_get_schemas(self):
             schemas = self.viewset.get_schemas()
             self.assertEqual(len(schemas), 3)
             self.assertEqual(schemas, self.schemas)
+
+        async def test_create(self):
+            view = self.viewset.create_view()
+            request = self.afactory.post(self.path)
+            status, content = await view(request, self.create_data)
+            pk = self.model._meta.pk.attname
+            self.assertEqual(status, 201)
+            self.assertIn(pk, content)
+            content.pop(pk)
+            self.assertEqual(content, self.payload_create)
 
 
 @tag("model_serializer_viewset")
