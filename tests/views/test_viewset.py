@@ -58,6 +58,10 @@ class Tests:
             """
 
         @property
+        def pagination_kwargs(self):
+            return {"ninja_pagination": self.viewset.pagination_class.Input(page=1)}
+
+        @property
         def payload_create(self):
             return {
                 "name": f"test_name_{self.model._meta.model_name}",
@@ -67,6 +71,12 @@ class Tests:
         @property
         def create_data(self):
             return self.viewset.schema_in(**self.payload_create)
+
+        async def _create_view(self):
+            view = self.viewset.create_view()
+            request = self.afactory.post(self.path)
+            status, content = await view(request, self.create_data)
+            return status, content
 
         def test_crud_routes(self):
             self.assertEqual(len(self.api._routers), 2)
@@ -89,14 +99,23 @@ class Tests:
             self.assertEqual(schemas, self.schemas)
 
         async def test_create(self):
-            view = self.viewset.create_view()
-            request = self.afactory.post(self.path)
-            status, content = await view(request, self.create_data)
+            status, content = await self._create_view()
             pk = self.model._meta.pk.attname
             self.assertEqual(status, 201)
             self.assertIn(pk, content)
             content.pop(pk)
             self.assertEqual(content, self.payload_create)
+
+        async def test_list(self):
+            await self._create_view()
+            view = self.viewset.list_view()
+            request = self.afactory.get(self.path)
+            content: dict = await view(request, **self.pagination_kwargs)
+            self.assertEqual(["items", "count"], list(content.keys()))
+            items = content["items"]
+            count = content["count"]
+            self.assertEqual(1, count)
+            self.assertEqual([self.payload_create | {"id": 1}], items)
 
 
 @tag("model_serializer_viewset")
