@@ -44,7 +44,7 @@ pip install django-ninja-aio-crud
 ### ModelSerializer
 
 - You can serialize your models using ModelSerializer and made them inherit from it. In your models.py import ModelSerializer
-```Python
+```python
 # models.py
 from django.db import models
 from ninja_aio.models import ModelSerializer
