@@ -119,7 +119,6 @@ class APIViewSet:
             if isinstance(self.model, ModelSerializerMeta):
                 qs = await self.model.queryset_request(request)
             rels = self.model_util.get_reverse_relations()
-            print(rels)
             if len(rels) > 0:
                 qs = qs.prefetch_related(*rels)
             objs = [
