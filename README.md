@@ -66,7 +66,7 @@ class Foo(ModelSerializer):
 
 - ReadSerializer, CreateSerializer, UpdateSerializer are used to define which fields would be included in runtime schemas creation. You can also specify custom fields and handle their function by overriding custom_actions ModelSerializer's method(custom fields are only available for Create and Update serializers).
 
-```Python
+```python
 # models.py
 from django.db import models
 from ninja_aio.models import ModelSerializer
@@ -106,7 +106,7 @@ class Foo(ModelSerializer):
 
 - View class used to automatically generate CRUD views. in your views.py import APIViewSet and define your api using NinjaAIO class. NinjaAIO class uses built-in parser and renderer which use orjson for data serialization.
 
-```Python
+```python
 # views.py
 from ninja_aio import NinjaAIO
 from ninja_aio.views import APIViewSet
@@ -128,7 +128,7 @@ FooAPI().add_views_to_route()
 
 - and that's it, your model CRUD will be automatically created. You can also add custom views to CRUD overriding the built-in method "views".
 
-```Python
+```python
 # views.py
 from ninja import Schema
 from ninja_aio import NinjaAIO
@@ -167,7 +167,7 @@ FooAPI().add_views_to_route()
 
 - View class to code generic views class based. In your views.py import APIView class.
 
-```Python
+```python
 # views.py
 from ninja import Schema
 from ninja_aio import NinjaAIO
@@ -206,7 +206,7 @@ SumView().add_views_to_route()
 
 - Define models:
 
-```Python
+```python
 # models.py
 class Bar(ModelSerializer):
     name = models.CharField(max_length=30)
@@ -239,7 +239,7 @@ class Foo(ModelSerializer):
 
 - Define views:
 
-```Python
+```python
 # views.py
 from ninja_aio import NinjaAIO
 from ninja_aio.views import APIViewSet
@@ -283,7 +283,7 @@ BarAPI().add_views_to_route()
 
 - AsyncJWTBearer built-in class is an authenticator class which use joserfc module. It cames out with authenticate method which validate given claims. Override auth handler method to write your own authentication method. Default algorithms used is RS256. a jwt Token istance is set as class atribute so you can use it by self.dcd.  
 
-```Python
+```python
 from ninja_aio.auth import AsyncJWTBearer
 from django.conf import settings
 from django.http import HttpRequest
@@ -305,7 +305,7 @@ class CustomJWTBearer(AsyncJWTBearer):
 
 - Then add it to views.
 
-```Python
+```python
 # views.py
 from ninja import Schema
 from ninja_aio import NinjaAIO
@@ -353,7 +353,7 @@ SumView().add_views_to_route()
 
 - By default APIViewSet list view uses Django Ninja built-in AsyncPagination class "PageNumberPagination". You can customize and assign it to APIViewSet class. To make your custom pagination consult **<a href="https://django-ninja.dev/guides/response/pagination/#async-pagination">Django Ninja pagination documentation</a>**.
 
-```Python
+```python
 # views.py
 
 class FooAPI(APIViewSet):
