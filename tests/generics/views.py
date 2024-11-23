@@ -189,6 +189,7 @@ class Tests:
 
     class GenericRelationViewSetTestCase(GenericViewSetTestCase):
         relation_viewset: GenericAPI
+        relation_related_name: str
 
         @classmethod
         def setUpTestData(cls):
@@ -208,5 +209,4 @@ class Tests:
             _, content = await view(
                 cls.post_request, cls.relation_viewset.schema_in(**data)
             )
-
             return content[cls.relation_pk_att]

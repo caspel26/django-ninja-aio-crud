@@ -1,24 +1,55 @@
-from ninja import ModelSchema, Schema
-
-from tests.test_app.models import TestModel
+from ninja import Schema
 
 
-class TestModelSchemaIn(ModelSchema):
-    class Meta:
-        model = TestModel
-        fields = ["name", "description"]
+class BaseSchemaIn(Schema):
+    name: str
+    description: str
 
 
-class TestModelSchemaOut(ModelSchema):
-    class Meta:
-        model = TestModel
-        fields = ["id", "name", "description"]
+class BaseSchemaOut(Schema):
+    id: int | str
+    name: str
+    description: str
 
 
-class TestModelSchemaPatch(ModelSchema):
-    class Meta:
-        model = TestModel
-        fields = ["description"]
+class BaseSchemaPatch(Schema):
+    description: str
+
+
+class TestModelSchemaIn(BaseSchemaIn):
+    pass
+
+
+class TestModelSchemaOut(BaseSchemaOut):
+    pass
+
+
+class TestModelSchemaPatch(BaseSchemaPatch):
+    pass
+
+
+class TestModelForeignKeySchemaIn(BaseSchemaIn):
+    test_model_serializer: int
+
+
+class TestModelForeignKeyRelated(BaseSchemaOut):
+    pass
+
+
+class TestModelForeignKeySchemaOut(TestModelForeignKeyRelated):
+    test_model_serializer: "TestModelReverseForeignKeyRelated"
+
+
+class TestModelReverseForeignKeySchemaIn(BaseSchemaIn):
+    pass
+
+
+class TestModelReverseForeignKeyRelated(BaseSchemaOut):
+    pass
+
+
+class TestModelReverseForeignKeySchemaOut(TestModelReverseForeignKeyRelated):
+    test_model_foreign_keys: list[TestModelForeignKeyRelated]
 
 
 class SumSchemaIn(Schema):
