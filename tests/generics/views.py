@@ -78,6 +78,12 @@ class Tests:
             """
 
         @property
+        def response_data(self):
+            """
+            Should be implemented into the child class
+            """
+
+        @property
         def create_data(self):
             return self.viewset.schema_in(**self.payload_create)
 
@@ -106,7 +112,7 @@ class Tests:
             status, content = await view(self.post_request, self.create_data)
             self.assertEqual(status, 201)
             self.assertIn(self.pk_att, content)
-            self.assertEqual(self.payload_create | {self.pk_att: 1}, content)
+            self.assertEqual(self.response_data | {self.pk_att: 1}, content)
             return content
 
         def test_crud_routes(self):
@@ -141,14 +147,14 @@ class Tests:
             count = content["count"]
             pk = create_content[self.pk_att]
             self.assertEqual(1, count)
-            self.assertEqual([self.payload_create | {self.pk_att: pk}], items)
+            self.assertEqual([self.response_data | {self.pk_att: pk}], items)
 
         async def test_retrieve(self):
             create_content = await self._create_view()
             view = self.viewset.retrieve_view()
             pk = create_content[self.pk_att]
             content = await view(self.get_request, pk)
-            self.assertEqual(self.payload_create | {self.pk_att: pk}, content)
+            self.assertEqual(self.response_data | {self.pk_att: pk}, content)
 
         async def test_retrieve_object_not_found(self):
             view = self.viewset.retrieve_view()
@@ -162,7 +168,7 @@ class Tests:
             pk = create_content[self.pk_att]
             content = await view(self.patch_request, self.update_data, pk)
             self.assertEqual(
-                self.payload_create | self.payload_update | {self.pk_att: pk}, content
+                self.response_data | self.payload_update | {self.pk_att: pk}, content
             )
 
         async def test_delete(self):

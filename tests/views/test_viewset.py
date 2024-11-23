@@ -35,6 +35,10 @@ class BaseTests:
                 "description": f"test_description_{self.model._meta.model_name}_update",
             }
 
+        @property
+        def response_data(self):
+            return self.payload_create
+
 
 @tag("model_serializer_viewset")
 class ApiViewSetModelSerializerTestCase(BaseTests.ApiViewSetTestCaseBase):
