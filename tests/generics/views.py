@@ -3,6 +3,7 @@ import asyncio
 from django.test import TestCase, tag
 from django.test.client import AsyncRequestFactory
 from django.db import models
+from asgiref.sync import async_to_sync
 
 from tests.test_app import schema
 from ninja_aio import NinjaAIO
@@ -185,3 +186,27 @@ class Tests:
                 self.viewset.additional_view_path, schema.SumSchemaIn(a=1, b=2)
             )
             self.assertEqual({"result": 3}, content)
+
+    class GenericRelationViewSetTestCase(GenericViewSetTestCase):
+        relation_viewset: GenericAPI
+
+        @classmethod
+        def setUpTestData(cls):
+            super().setUpTestData()
+            cls.relation_pk_att = cls.relation_viewset.model._meta.pk.attname
+            cls.relation_model_name = cls.relation_viewset.model._meta.model_name
+            cls.relation_pk = async_to_sync(cls._create_relation)(cls.relation_data)
+            cls.relation_util = ModelUtil(cls.relation_viewset.model)
+            cls.relation_request = cls.afactory.get(cls.relation_viewset.path)
+            cls.relation_obj = async_to_sync(cls.relation_util.get_object)(
+                cls.relation_request, cls.relation_pk
+            )
+
+        @classmethod
+        async def _create_relation(cls, data: dict) -> int:
+            view = cls.relation_viewset.create_view()
+            _, content = await view(
+                cls.post_request, cls.relation_viewset.schema_in(**data)
+            )
+
+            return content[cls.relation_pk_att]
