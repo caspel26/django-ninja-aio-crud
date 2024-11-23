@@ -56,7 +56,6 @@ class APIView:
         async def some_method(request, *args, **kwargs):
             pass
         """
-        pass
 
     def add_views(self):
         self.views()
@@ -202,7 +201,6 @@ class APIViewSet:
         async def some_method(request, *args, **kwargs):
             pass
         """
-        pass
 
     def add_views(self):
         self.create_view()
