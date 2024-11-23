@@ -154,7 +154,7 @@ class ModelUtil:
         except SerializeError as e:
             return e.status_code, e.error
         await obj.adelete()
-        return HttpResponse(status=204)
+        return 204, None
 
 
 class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
