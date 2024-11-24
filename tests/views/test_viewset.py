@@ -40,11 +40,23 @@ class BaseTests:
     class ApiViewSetForeignKeyTestCaseBase(
         ApiViewSetTestCaseBase, Tests.GenericRelationViewSetTestCase
     ):
+        @classmethod
+        def setUpTestData(cls):
+            cls.relation_data = {
+                "name": f"test_name_{cls.relation_viewset.model._meta.model_name}",
+                "description": f"test_description_{cls.relation_viewset.model._meta.model_name}",
+            }
+            super().setUpTestData()
+
         @property
         def payload_create(self):
             return super().payload_create | {
                 "test_model_serializer_id": self.relation_pk
             }
+
+        @property
+        def response_data(self):
+            return super().response_data | {"test_model_serializer": self.relation_obj}
 
 
 """
@@ -68,18 +80,6 @@ class ApiViewSetModelSerializerForeignKeyTestCase(
     model = models.TestModelSerializerForeignKey
     viewset = views.TestModelSerializerForeignKeyAPI()
     relation_viewset = views.TestModelSerializerReverseForeignKeyAPI()
-
-    @classmethod
-    def setUpTestData(cls):
-        cls.relation_data = {
-            "name": f"test_name_{cls.relation_viewset.model._meta.model_name}",
-            "description": f"test_description_{cls.relation_viewset.model._meta.model_name}",
-        }
-        super().setUpTestData()
-
-    @property
-    def response_data(self):
-        return super().response_data | {"test_model_serializer": self.relation_obj}
 
 
 """
@@ -117,20 +117,8 @@ class ApiViewSetModelForeignKeyTestCase(BaseTests.ApiViewSetForeignKeyTestCaseBa
             schema.TestModelSchemaPatch,
         )
 
-    @classmethod
-    def setUpTestData(cls):
-        cls.relation_data = {
-            "name": f"test_name_{cls.relation_viewset.model._meta.model_name}",
-            "description": f"test_description_{cls.relation_viewset.model._meta.model_name}",
-        }
-        super().setUpTestData()
-
     @property
     def payload_create(self):
         payload = super().payload_create
         payload.pop("test_model_serializer_id")
         return payload | {"test_model_serializer": self.relation_pk}
-
-    @property
-    def response_data(self):
-        return super().response_data | {"test_model_serializer": self.relation_obj}
