@@ -65,7 +65,7 @@ class TestModelSerializerForeignKey(BaseTestModelSerializer):
 
 
 class TestModelForeignKey(BaseTestModel):
-    test_model_serializer = models.ForeignKey(
+    test_model = models.ForeignKey(
         TestModelReverseForeignKey,
         on_delete=models.CASCADE,
         related_name="test_model_foreign_keys",

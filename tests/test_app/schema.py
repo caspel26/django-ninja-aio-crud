@@ -29,7 +29,7 @@ class TestModelSchemaPatch(BaseSchemaPatch):
 
 
 class TestModelForeignKeySchemaIn(BaseSchemaIn):
-    test_model_serializer: int
+    test_model: int
 
 
 class TestModelForeignKeyRelated(BaseSchemaOut):
@@ -37,7 +37,7 @@ class TestModelForeignKeyRelated(BaseSchemaOut):
 
 
 class TestModelForeignKeySchemaOut(TestModelForeignKeyRelated):
-    test_model_serializer: "TestModelReverseForeignKeyRelated"
+    test_model: "TestModelReverseForeignKeyRelated"
 
 
 class TestModelReverseForeignKeySchemaIn(BaseSchemaIn):

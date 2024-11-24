@@ -27,6 +27,10 @@ class BaseTests:
         def response_data(self):
             return self._payload
 
+        @property
+        def create_response_data(self):
+            return self.response_data
+
     class ModelSerializerViewSetTestCaseBase(ApiViewSetTestCaseBase):
         @property
         def schemas(self):
@@ -36,10 +40,9 @@ class BaseTests:
                 self.model.generate_update_s(),
             )
 
-    @tag("viewset_foreign_key")
-    class ApiViewSetForeignKeyTestCaseBase(
-        ApiViewSetTestCaseBase, Tests.GenericRelationViewSetTestCase
-    ):
+    class ApiViewSetSetUpRelation(ApiViewSetTestCaseBase):
+        relation_viewset: views.GenericAPI
+
         @classmethod
         def setUpTestData(cls):
             cls.relation_data = {
@@ -48,6 +51,10 @@ class BaseTests:
             }
             super().setUpTestData()
 
+    @tag("viewset_foreign_key")
+    class ApiViewSetForeignKeyTestCaseBase(
+        ApiViewSetSetUpRelation, Tests.GenericRelationViewSetTestCase
+    ):
         @property
         def payload_create(self):
             return super().payload_create | {
@@ -56,7 +63,23 @@ class BaseTests:
 
         @property
         def response_data(self):
-            return super().response_data | {"test_model_serializer": self.relation_obj}
+            return super().response_data | {
+                self.relation_related_name: self.relation_obj
+            }
+
+    @tag("viewset_reverse_foreign_key")
+    class ApiViewSetReverseForeignKeyTestCaseBase(
+        ApiViewSetSetUpRelation, Tests.GenericReverseRelationViewSetTestCase
+    ):
+        @property
+        def response_data(self):
+            return super().response_data | {
+                self.relation_related_name: [self.relation_schema_data]
+            }
+
+        @property
+        def create_response_data(self):
+            return super().response_data | {self.relation_related_name: []}
 
 
 """
@@ -80,6 +103,20 @@ class ApiViewSetModelSerializerForeignKeyTestCase(
     model = models.TestModelSerializerForeignKey
     viewset = views.TestModelSerializerForeignKeyAPI()
     relation_viewset = views.TestModelSerializerReverseForeignKeyAPI()
+    relation_related_name = "test_model_serializer"
+
+
+@tag("model_serializer_reverse_foreign_key_viewset")
+class ApiViewSetModelSerializerReverseForeignKeyTestCase(
+    BaseTests.ModelSerializerViewSetTestCaseBase,
+    BaseTests.ApiViewSetReverseForeignKeyTestCaseBase,
+):
+    namespace = "test_model_serializer_reverse_foreign_key_viewset"
+    model = models.TestModelSerializerReverseForeignKey
+    viewset = views.TestModelSerializerReverseForeignKeyAPI()
+    relation_viewset = views.TestModelSerializerForeignKeyAPI()
+    relation_related_name = "test_model_serializer_foreign_keys"
+    foreign_key_field = "test_model_serializer"
 
 
 """
@@ -108,6 +145,7 @@ class ApiViewSetModelForeignKeyTestCase(BaseTests.ApiViewSetForeignKeyTestCaseBa
     model = models.TestModelForeignKey
     viewset = views.TestModelForeignKeyAPI()
     relation_viewset = views.TestModelReverseForeignKeyAPI()
+    relation_related_name = "test_model"
 
     @property
     def schemas(self):
@@ -121,4 +159,23 @@ class ApiViewSetModelForeignKeyTestCase(BaseTests.ApiViewSetForeignKeyTestCaseBa
     def payload_create(self):
         payload = super().payload_create
         payload.pop("test_model_serializer_id")
-        return payload | {"test_model_serializer": self.relation_pk}
+        return payload | {self.relation_related_name: self.relation_pk}
+
+
+class ApiViewSetModelReverseForeignKeyTestCase(
+    BaseTests.ApiViewSetReverseForeignKeyTestCaseBase
+):
+    namespace = "test_model_reverse_foreign_key_viewset"
+    model = models.TestModelReverseForeignKey
+    viewset = views.TestModelReverseForeignKeyAPI()
+    relation_viewset = views.TestModelForeignKeyAPI()
+    relation_related_name = "test_model_foreign_keys"
+    foreign_key_field = "test_model"
+
+    @property
+    def schemas(self):
+        return (
+            schema.TestModelReverseForeignKeySchemaOut,
+            schema.TestModelReverseForeignKeySchemaIn,
+            schema.TestModelSchemaPatch,
+        )

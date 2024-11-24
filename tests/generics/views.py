@@ -3,8 +3,10 @@ import asyncio
 from django.test import TestCase, tag
 from django.test.client import AsyncRequestFactory
 from django.db import models
+from django.db.models.base import ModelBase
 from asgiref.sync import async_to_sync
 
+from ninja_aio.types import ModelSerializerMeta
 from tests.test_app import schema
 from ninja_aio import NinjaAIO
 from ninja_aio.views import APIViewSet
@@ -85,6 +87,12 @@ class Tests:
             """
 
         @property
+        def create_response_data(self):
+            """
+            Should be implemented into the child class
+            """
+
+        @property
         def create_data(self):
             return self.viewset.schema_in(**self.payload_create)
 
@@ -113,7 +121,9 @@ class Tests:
             status, content = await view(self.post_request, self.create_data)
             self.assertEqual(status, 201)
             self.assertIn(self.pk_att, content)
-            self.assertEqual(self.response_data | {self.pk_att: 1}, content)
+            self.assertEqual(
+                self.create_response_data | {self.pk_att: content[self.pk_att]}, content
+            )
             return content
 
         def test_crud_routes(self):
@@ -140,37 +150,37 @@ class Tests:
             await self._create_view()
 
         async def test_list(self):
-            create_content = await self._create_view()
+            await self._create_view()
             view = self.viewset.list_view()
             content: dict = await view(self.get_request, **self.pagination_kwargs)
             self.assertEqual(["items", "count"], list(content.keys()))
             items = content["items"]
             count = content["count"]
-            pk = create_content[self.pk_att]
-            self.assertEqual(1, count)
-            self.assertEqual([self.response_data | {self.pk_att: pk}], items)
+            obj_count = await self.model.objects.select_related().acount()
+            self.assertEqual(obj_count, count)
+            item = items[0]
+            item.pop(self.pk_att)
+            self.assertEqual(self.response_data, item)
 
         async def test_retrieve(self):
-            create_content = await self._create_view()
+            await self._create_view()
             view = self.viewset.retrieve_view()
-            pk = create_content[self.pk_att]
-            content = await view(self.get_request, pk)
-            self.assertEqual(self.response_data | {self.pk_att: pk}, content)
+            content = await view(self.get_request, 1)
+            content.pop(self.pk_att)
+            self.assertEqual(self.response_data, content)
 
         async def test_retrieve_object_not_found(self):
             view = self.viewset.retrieve_view()
-            status, content = await view(self.get_request, 1)
+            status, content = await view(self.get_request, 100)
             self.assertEqual(status, 404)
             self.assertEqual(content, {self.model._meta.model_name: "not found"})
 
         async def test_update(self):
-            create_content = await self._create_view()
+            await self._create_view()
             view = self.viewset.update_view()
-            pk = create_content[self.pk_att]
-            content = await view(self.patch_request, self.update_data, pk)
-            self.assertEqual(
-                self.response_data | self.payload_update | {self.pk_att: pk}, content
-            )
+            content = await view(self.patch_request, self.update_data, 1)
+            content.pop(self.pk_att)
+            self.assertEqual(self.response_data | self.payload_update, content)
 
         async def test_delete(self):
             create_content = await self._create_view()
@@ -195,13 +205,20 @@ class Tests:
         def setUpTestData(cls):
             super().setUpTestData()
             cls.relation_pk_att = cls.relation_viewset.model._meta.pk.attname
-            cls.relation_model_name = cls.relation_viewset.model._meta.model_name
+            cls.relation_model = cls.relation_viewset.model
+            cls.relation_model_name = cls.relation_model._meta.model_name
             cls.relation_pk = async_to_sync(cls._create_relation)(cls.relation_data)
             cls.relation_util = ModelUtil(cls.relation_viewset.model)
             cls.relation_request = cls.afactory.get(cls.relation_viewset.path)
             cls.relation_obj = async_to_sync(cls.relation_util.get_object)(
                 cls.relation_request, cls.relation_pk
             )
+            cls.relation_read_s = async_to_sync(cls.relation_util.read_s)(
+                cls.relation_request, cls.relation_obj, cls.relation_viewset.schema_out
+            )
+            cls.relation_schema_data = cls.relation_viewset.schema_out(
+                **cls.relation_read_s
+            ).model_dump()
 
         @classmethod
         async def _create_relation(cls, data: dict) -> int:
@@ -210,3 +227,37 @@ class Tests:
                 cls.post_request, cls.relation_viewset.schema_in(**data)
             )
             return content[cls.relation_pk_att]
+
+    class GenericReverseRelationViewSetTestCase(GenericRelationViewSetTestCase):
+        foreign_key_field: str
+
+        @classmethod
+        def setUpTestData(cls):
+            super().setUpTestData()
+            cls.relation_schema_data.pop(cls.foreign_key_field)
+
+        @classmethod
+        def _update_data(cls, data: dict, pk: int | str):
+            if isinstance(cls.model, ModelSerializerMeta):
+                data |= {f"{cls.foreign_key_field}_id": pk}
+            if isinstance(cls.model, ModelBase):
+                data |= {cls.foreign_key_field: pk}
+            return data
+
+        @classmethod
+        async def _create_relation(cls, data: dict) -> int:
+            obj = await cls.model.objects.select_related().acreate(
+                **cls().payload_create
+            )
+            return await super()._create_relation(cls._update_data(data, obj.pk))
+
+        async def _create_view(self):
+            create_content = await super()._create_view()
+            rel_view = self.relation_viewset.create_view()
+            await rel_view(
+                self.post_request,
+                self.relation_viewset.schema_in(
+                    **self._update_data(self.relation_data, create_content[self.pk_att])
+                ),
+            )
+            return create_content
