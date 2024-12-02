@@ -5,7 +5,7 @@ from tests.test_app import schema, models, views
 
 
 class BaseTests:
-    class ApiViewSetTestCaseBase(Tests.GenericViewSetTestCase):
+    class ApiViewSetTestCaseBase(Tests.ViewSetTestCase):
         @property
         def _payload(self):
             return {
@@ -53,7 +53,7 @@ class BaseTests:
 
     @tag("viewset_foreign_key")
     class ApiViewSetForeignKeyTestCaseBase(
-        ApiViewSetSetUpRelation, Tests.GenericRelationViewSetTestCase
+        ApiViewSetSetUpRelation, Tests.RelationViewSetTestCase
     ):
         @property
         def payload_create(self):
@@ -69,7 +69,7 @@ class BaseTests:
 
     @tag("viewset_reverse_foreign_key")
     class ApiViewSetReverseForeignKeyTestCaseBase(
-        ApiViewSetSetUpRelation, Tests.GenericReverseRelationViewSetTestCase
+        ApiViewSetSetUpRelation, Tests.ReverseRelationViewSetTestCase
     ):
         @property
         def response_data(self):
@@ -82,9 +82,9 @@ class BaseTests:
             return super().response_data | {self.relation_related_name: []}
 
 
-"""
-MODEL SERIALIZER VIEWSET TESTS
-"""
+# ==========================================================
+#             MODEL SERIALIZER VIEWSET TESTS
+# ==========================================================
 
 
 @tag("model_serializer_viewset")
@@ -119,9 +119,9 @@ class ApiViewSetModelSerializerReverseForeignKeyTestCase(
     foreign_key_field = "test_model_serializer"
 
 
-"""
-MODEL VIEWSET TESTS
-"""
+# ==========================================================
+#                      MODEL VIEWSET TESTS
+# ==========================================================
 
 
 @tag("model_viewset")

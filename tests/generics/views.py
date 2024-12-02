@@ -150,7 +150,6 @@ class Tests:
             await self._create_view()
 
         async def test_list(self):
-            await self._create_view()
             view = self.viewset.list_view()
             content: dict = await view(self.get_request, **self.pagination_kwargs)
             self.assertEqual(["items", "count"], list(content.keys()))
@@ -163,29 +162,27 @@ class Tests:
             self.assertEqual(self.response_data, item)
 
         async def test_retrieve(self):
-            await self._create_view()
             view = self.viewset.retrieve_view()
             content = await view(self.get_request, 1)
             content.pop(self.pk_att)
             self.assertEqual(self.response_data, content)
 
         async def test_retrieve_object_not_found(self):
+            await self.model.objects.select_related().all().adelete()
             view = self.viewset.retrieve_view()
-            status, content = await view(self.get_request, 100)
+            status, content = await view(self.get_request, 1)
             self.assertEqual(status, 404)
             self.assertEqual(content, {self.model._meta.model_name: "not found"})
 
         async def test_update(self):
-            await self._create_view()
             view = self.viewset.update_view()
             content = await view(self.patch_request, self.update_data, 1)
             content.pop(self.pk_att)
             self.assertEqual(self.response_data | self.payload_update, content)
 
         async def test_delete(self):
-            create_content = await self._create_view()
             view = self.viewset.delete_view()
-            pk = create_content[self.pk_att]
+            pk = self.obj_content[self.pk_att]
             status, content = await view(self.delete_request, pk)
             self.assertEqual(status, 204)
             self.assertEqual(content, None)
@@ -197,7 +194,13 @@ class Tests:
             )
             self.assertEqual({"result": 3}, content)
 
-    class GenericRelationViewSetTestCase(GenericViewSetTestCase):
+    class ViewSetTestCase(GenericViewSetTestCase):
+        @classmethod
+        def setUpTestData(cls):
+            super().setUpTestData()
+            cls.obj_content = async_to_sync(cls()._create_view)()
+
+    class RelationViewSetTestCase(GenericViewSetTestCase):
         relation_viewset: GenericAPI
         relation_related_name: str
 
@@ -219,6 +222,7 @@ class Tests:
             cls.relation_schema_data = cls.relation_viewset.schema_out(
                 **cls.relation_read_s
             ).model_dump()
+            cls.obj_content = async_to_sync(cls()._create_view)()
 
         @classmethod
         async def _create_relation(cls, data: dict) -> int:
@@ -228,7 +232,7 @@ class Tests:
             )
             return content[cls.relation_pk_att]
 
-    class GenericReverseRelationViewSetTestCase(GenericRelationViewSetTestCase):
+    class ReverseRelationViewSetTestCase(RelationViewSetTestCase):
         foreign_key_field: str
 
         @classmethod
