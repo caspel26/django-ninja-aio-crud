@@ -1,3 +1,5 @@
+from unittest import mock
+
 from ninja_aio.models import ModelUtil
 from ninja_aio.types import ModelSerializerMeta
 from ninja_aio.exceptions import SerializeError
@@ -78,9 +80,16 @@ class Tests:
             )
             self.assertEqual(exc.exception.status_code, 404)
 
-        async def test_get_object(self):
+        @mock.patch(
+            "ninja_aio.models.ModelSerializer.queryset_request",
+            new_callable=mock.AsyncMock,
+        )
+        async def test_get_object(self, mock_queryset_request: mock.AsyncMock):
+            mock_queryset_request.return_value = self.model.objects.select_related()
             obj = await self.model_util.get_object(self.get_request, self.obj.pk)
             self.assertEqual(obj, self.obj)
+            if isinstance(self.model, ModelSerializerMeta):
+                mock_queryset_request.assert_awaited_once()
 
         def test_get_reverse_relations(self):
             self.assertEqual(
