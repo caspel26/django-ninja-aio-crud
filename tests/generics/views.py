@@ -9,11 +9,11 @@ from asgiref.sync import async_to_sync
 from ninja_aio.types import ModelSerializerMeta
 from tests.test_app import schema
 from ninja_aio import NinjaAIO
-from ninja_aio.views import APIViewSet
+from ninja_aio.views import APIViewSet, APIView
 from ninja_aio.models import ModelSerializer, ModelUtil
 
 
-class GenericAPI(APIViewSet):
+class GenericAdditionalView:
     additional_view_path = "sum"
 
     def views(self):
@@ -29,12 +29,22 @@ class GenericAPI(APIViewSet):
         return "sum"
 
 
+class GenericAPIView(GenericAdditionalView, APIView):
+    router_tag = "test_api_view"
+    api_route_path = "sum"
+    additional_view_path = "/"
+
+
+class GenericAPIViewSet(GenericAdditionalView, APIViewSet):
+    pass
+
+
 class Tests:
     @tag("viewset")
     class GenericViewSetTestCase(TestCase):
         namespace: str
         model: ModelSerializer | models.Model
-        viewset: GenericAPI
+        viewset: GenericAPIViewSet
 
         @classmethod
         def setUpTestData(cls):
@@ -202,7 +212,7 @@ class Tests:
             cls.obj_content = async_to_sync(cls()._create_view)()
 
     class RelationViewSetTestCase(GenericViewSetTestCase):
-        relation_viewset: GenericAPI
+        relation_viewset: GenericAPIViewSet
         relation_related_name: str
 
         @classmethod

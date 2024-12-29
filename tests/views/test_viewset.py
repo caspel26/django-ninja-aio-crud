@@ -41,7 +41,7 @@ class BaseTests:
             )
 
     class ApiViewSetSetUpRelation(SetUpViewSetTestCase):
-        relation_viewset: views.GenericAPI
+        relation_viewset: views.GenericAPIViewSet
 
         @classmethod
         def setUpTestData(cls):
