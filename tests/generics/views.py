@@ -147,6 +147,7 @@ class Tests:
             self.assertEqual(schemas, self.schemas)
 
         async def test_create(self):
+            await self.model.objects.select_related().all().adelete()
             await self._create_view()
 
         async def test_list(self):

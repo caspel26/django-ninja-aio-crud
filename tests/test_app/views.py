@@ -2,9 +2,9 @@ from tests.generics.views import GenericAPI
 from tests.test_app import models
 from tests.test_app import schema
 
-"""
-MODEL SERIALIZER APIS
-"""
+# ==========================================================
+#                  MODEL SERIALIZERS APIS
+# ==========================================================
 
 
 class TestModelSerializerAPI(GenericAPI):
@@ -19,9 +19,17 @@ class TestModelSerializerForeignKeyAPI(GenericAPI):
     model = models.TestModelSerializerForeignKey
 
 
-"""
-MODEL APIS
-"""
+class TestModelSerializerOneToOneAPI(GenericAPI):
+    model = models.TestModelSerializerOneToOne
+
+
+class TestModelSerializerReverseOneToOneAPI(GenericAPI):
+    model = models.TestModelSerializerReverseOneToOne
+
+
+# ==========================================================
+#                       MODEL APIS
+# ==========================================================
 
 
 class TestModelAPI(GenericAPI):
@@ -40,6 +48,20 @@ class TestModelReverseForeignKeyAPI(GenericAPI):
 
 class TestModelForeignKeyAPI(GenericAPI):
     model = models.TestModelForeignKey
+    schema_in = schema.TestModelForeignKeySchemaIn
+    schema_out = schema.TestModelForeignKeySchemaOut
+    schema_update = schema.TestModelSchemaPatch
+
+
+class TestModelReverseOneToOneAPI(GenericAPI):
+    model = models.TestModelReverseOneToOne
+    schema_in = schema.TestModelReverseForeignKeySchemaIn
+    schema_out = schema.TestModelReverseOneToOneSchemaOut
+    schema_update = schema.TestModelSchemaPatch
+
+
+class TestModelOneToOneAPI(GenericAPI):
+    model = models.TestModelOneToOne
     schema_in = schema.TestModelForeignKeySchemaIn
     schema_out = schema.TestModelForeignKeySchemaOut
     schema_update = schema.TestModelSchemaPatch

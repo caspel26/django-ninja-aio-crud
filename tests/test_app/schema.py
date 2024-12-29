@@ -52,6 +52,10 @@ class TestModelReverseForeignKeySchemaOut(TestModelReverseForeignKeyRelated):
     test_model_foreign_keys: list[TestModelForeignKeyRelated]
 
 
+class TestModelReverseOneToOneSchemaOut(TestModelReverseForeignKeyRelated):
+    test_model_one_to_one: TestModelForeignKeyRelated | None = None
+
+
 class SumSchemaIn(Schema):
     a: int
     b: int

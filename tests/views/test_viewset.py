@@ -5,7 +5,7 @@ from tests.test_app import schema, models, views
 
 
 class BaseTests:
-    class ApiViewSetTestCaseBase(Tests.ViewSetTestCase):
+    class SetUpViewSetTestCase:
         @property
         def _payload(self):
             return {
@@ -31,7 +31,7 @@ class BaseTests:
         def create_response_data(self):
             return self.response_data
 
-    class ModelSerializerViewSetTestCaseBase(ApiViewSetTestCaseBase):
+    class ModelSerializerViewSetTestCaseBase(SetUpViewSetTestCase):
         @property
         def schemas(self):
             return (
@@ -40,7 +40,7 @@ class BaseTests:
                 self.model.generate_update_s(),
             )
 
-    class ApiViewSetSetUpRelation(ApiViewSetTestCaseBase):
+    class ApiViewSetSetUpRelation(SetUpViewSetTestCase):
         relation_viewset: views.GenericAPI
 
         @classmethod
@@ -88,7 +88,10 @@ class BaseTests:
 
 
 @tag("model_serializer_viewset")
-class ApiViewSetModelSerializerTestCase(BaseTests.ModelSerializerViewSetTestCaseBase):
+class ApiViewSetModelSerializerTestCase(
+    BaseTests.ModelSerializerViewSetTestCaseBase,
+    Tests.ViewSetTestCase,
+):
     namespace = "test_model_serializer_viewset"
     model = models.TestModelSerializer
     viewset = views.TestModelSerializerAPI()
@@ -119,13 +122,49 @@ class ApiViewSetModelSerializerReverseForeignKeyTestCase(
     foreign_key_field = "test_model_serializer"
 
 
+@tag("model_serializer_one_to_one_viewset")
+class ApiViewSetModelSerializerOneToOneTestCase(
+    BaseTests.ModelSerializerViewSetTestCaseBase,
+    BaseTests.ApiViewSetForeignKeyTestCaseBase,
+):
+    namespace = "test_model_serializer_one_to_one_viewset"
+    model = models.TestModelSerializerOneToOne
+    viewset = views.TestModelSerializerOneToOneAPI()
+    relation_viewset = views.TestModelSerializerReverseOneToOneAPI()
+    relation_related_name = "test_model_serializer"
+
+
+@tag("model_serializer_reverse_one_to_one_viewset")
+class ApiViewSetModelSerializerReverseOneToOneTestCase(
+    ApiViewSetModelSerializerReverseForeignKeyTestCase
+):
+    namespace = "test_model_serializer_reverse_one_to_one_viewset"
+    model = models.TestModelSerializerReverseOneToOne
+    viewset = views.TestModelSerializerReverseOneToOneAPI()
+    relation_viewset = views.TestModelSerializerOneToOneAPI()
+    relation_related_name = "test_model_serializer_one_to_one"
+
+    @property
+    def response_data(self):
+        return super().response_data | {
+            self.relation_related_name: self.relation_schema_data
+        }
+
+    @property
+    def create_response_data(self):
+        return super().response_data | {self.relation_related_name: None}
+
+
 # ==========================================================
 #                      MODEL VIEWSET TESTS
 # ==========================================================
 
 
 @tag("model_viewset")
-class ApiViewSetModelTestCase(BaseTests.ApiViewSetTestCaseBase):
+class ApiViewSetModelTestCase(
+    BaseTests.SetUpViewSetTestCase,
+    Tests.ViewSetTestCase,
+):
     namespace = "test_model_viewset"
     model = models.TestModel
     viewset = views.TestModelAPI()
@@ -179,3 +218,46 @@ class ApiViewSetModelReverseForeignKeyTestCase(
             schema.TestModelReverseForeignKeySchemaIn,
             schema.TestModelSchemaPatch,
         )
+
+
+@tag("model_one_to_one_viewset")
+class ApiViewSetModelOneToOneTestCase(ApiViewSetModelForeignKeyTestCase):
+    namespace = "test_model_one_to_one_viewset"
+    model = models.TestModelOneToOne
+    viewset = views.TestModelOneToOneAPI()
+    relation_viewset = views.TestModelReverseOneToOneAPI()
+
+    @property
+    def schemas(self):
+        return (
+            schema.TestModelForeignKeySchemaOut,
+            schema.TestModelForeignKeySchemaIn,
+            schema.TestModelSchemaPatch,
+        )
+
+
+@tag("model_reverse_one_to_one_viewset")
+class ApiViewSetModelReverseOneToOneTestCase(ApiViewSetModelReverseForeignKeyTestCase):
+    namespace = "test_model_reverse_one_to_one_viewset"
+    model = models.TestModelReverseOneToOne
+    viewset = views.TestModelReverseOneToOneAPI()
+    relation_viewset = views.TestModelOneToOneAPI()
+    relation_related_name = "test_model_one_to_one"
+
+    @property
+    def schemas(self):
+        return (
+            schema.TestModelReverseOneToOneSchemaOut,
+            schema.TestModelReverseForeignKeySchemaIn,
+            schema.TestModelSchemaPatch,
+        )
+
+    @property
+    def response_data(self):
+        return super().response_data | {
+            self.relation_related_name: self.relation_schema_data
+        }
+
+    @property
+    def create_response_data(self):
+        return super().response_data | {self.relation_related_name: None}

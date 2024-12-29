@@ -2,6 +2,52 @@ from ninja_aio.models import ModelSerializer
 from django.db import models
 
 
+# ==========================================================
+#                       MODELS
+# ==========================================================
+
+
+class BaseTestModel(models.Model):
+    name = models.CharField(max_length=255)
+    description = models.TextField(max_length=255)
+
+    class Meta:
+        abstract = True
+
+
+class TestModel(BaseTestModel):
+    pass
+
+
+class TestModelReverseForeignKey(BaseTestModel):
+    pass
+
+
+class TestModelForeignKey(BaseTestModel):
+    test_model = models.ForeignKey(
+        TestModelReverseForeignKey,
+        on_delete=models.CASCADE,
+        related_name="test_model_foreign_keys",
+    )
+
+
+class TestModelReverseOneToOne(BaseTestModel):
+    pass
+
+
+class TestModelOneToOne(BaseTestModel):
+    test_model = models.OneToOneField(
+        TestModelReverseOneToOne,
+        on_delete=models.CASCADE,
+        related_name="test_model_one_to_one",
+    )
+
+
+# ==========================================================
+#                    MODEL SERIALIZERS
+# ==========================================================
+
+
 class BaseTestModelSerializer(ModelSerializer):
     name = models.CharField(max_length=255)
     description = models.TextField(max_length=255)
@@ -19,19 +65,7 @@ class BaseTestModelSerializer(ModelSerializer):
         fields = ["description"]
 
 
-class BaseTestModel(models.Model):
-    name = models.CharField(max_length=255)
-    description = models.TextField(max_length=255)
-
-    class Meta:
-        abstract = True
-
-
 class TestModelSerializer(BaseTestModelSerializer):
-    pass
-
-
-class TestModel(BaseTestModel):
     pass
 
 
@@ -40,10 +74,6 @@ class TestModelSerializerReverseForeignKey(BaseTestModelSerializer):
         fields = BaseTestModelSerializer.ReadSerializer.fields + [
             "test_model_serializer_foreign_keys"
         ]
-
-
-class TestModelReverseForeignKey(BaseTestModel):
-    pass
 
 
 class TestModelSerializerForeignKey(BaseTestModelSerializer):
@@ -64,9 +94,26 @@ class TestModelSerializerForeignKey(BaseTestModelSerializer):
         ]
 
 
-class TestModelForeignKey(BaseTestModel):
-    test_model = models.ForeignKey(
-        TestModelReverseForeignKey,
+class TestModelSerializerReverseOneToOne(BaseTestModelSerializer):
+    class ReadSerializer:
+        fields = BaseTestModelSerializer.ReadSerializer.fields + [
+            "test_model_serializer_one_to_one"
+        ]
+
+
+class TestModelSerializerOneToOne(BaseTestModelSerializer):
+    test_model_serializer = models.OneToOneField(
+        TestModelSerializerReverseOneToOne,
         on_delete=models.CASCADE,
-        related_name="test_model_foreign_keys",
+        related_name="test_model_serializer_one_to_one",
     )
+
+    class ReadSerializer:
+        fields = BaseTestModelSerializer.ReadSerializer.fields + [
+            "test_model_serializer"
+        ]
+
+    class CreateSerializer:
+        fields = BaseTestModelSerializer.CreateSerializer.fields + [
+            "test_model_serializer"
+        ]
