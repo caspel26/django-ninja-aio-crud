@@ -43,6 +43,17 @@ class TestModelOneToOne(BaseTestModel):
     )
 
 
+class TestModelReverseManyToMany(BaseTestModel):
+    pass
+
+
+class TestModelManyToMany(BaseTestModel):
+    test_models = models.ManyToManyField(
+        TestModelReverseManyToMany,
+        related_name="test_model_serializer_many_to_many",
+    )
+
+
 # ==========================================================
 #                    MODEL SERIALIZERS
 # ==========================================================
@@ -117,3 +128,25 @@ class TestModelSerializerOneToOne(BaseTestModelSerializer):
         fields = BaseTestModelSerializer.CreateSerializer.fields + [
             "test_model_serializer"
         ]
+
+
+class TestModelSerializerReverseManyToMany(BaseTestModelSerializer):
+    class ReadSerializer:
+        fields = BaseTestModelSerializer.ReadSerializer.fields + [
+            "test_model_serializer_many_to_many"
+        ]
+
+
+class TestModelSerializerManyToMany(BaseTestModelSerializer):
+    test_model_serializers = models.ManyToManyField(
+        TestModelSerializerReverseManyToMany,
+        related_name="test_model_serializer_many_to_many",
+    )
+
+    class ReadSerializer:
+        fields = BaseTestModelSerializer.ReadSerializer.fields + [
+            "test_model_serializers"
+        ]
+
+    class CreateSerializer:
+        fields = BaseTestModelSerializer.CreateSerializer.fields

@@ -81,6 +81,28 @@ class BaseTests:
         def create_response_data(self):
             return super().response_data | {self.relation_related_name: []}
 
+    @tag("viewset_many_to_many")
+    class ApiViewSetManyToManyTestCaseBase(
+        ApiViewSetSetUpRelation, Tests.RelationViewSetTestCase
+    ):
+        @classmethod
+        def setUpTestData(cls):
+            super().setUpTestData()
+            obj = cls.model.objects.get(pk=cls.obj_content[cls.pk_att])
+            getattr(obj, cls.relation_related_name).add(cls.relation_obj)
+            obj.save()
+            cls.relation_schema_data.pop(cls.foreign_key_reverse_field)
+
+        @property
+        def response_data(self):
+            return super().response_data | {
+                self.relation_related_name: [self.relation_schema_data]
+            }
+
+        @property
+        def create_response_data(self):
+            return super().response_data | {self.relation_related_name: []}
+
 
 # ==========================================================
 #             MODEL SERIALIZER VIEWSET TESTS
@@ -153,6 +175,32 @@ class ApiViewSetModelSerializerReverseOneToOneTestCase(
     @property
     def create_response_data(self):
         return super().response_data | {self.relation_related_name: None}
+
+
+@tag("model_serializer_many_to_many_viewset")
+class ApiViewSetModelSerializerManyToManyTestCase(
+    BaseTests.ModelSerializerViewSetTestCaseBase,
+    BaseTests.ApiViewSetManyToManyTestCaseBase,
+):
+    namespace = "test_model_serializer_many_to_many_viewset"
+    model = models.TestModelSerializerManyToMany
+    viewset = views.TestModelSerializerManyToManyAPI()
+    relation_viewset = views.TestModelSerializerReverseManyToManyAPI()
+    relation_related_name = "test_model_serializers"
+    foreign_key_reverse_field = "test_model_serializer_many_to_many"
+
+
+@tag("model_serializer_reverse_many_to_many_viewset")
+class ApiViewSetModelSerializerReverseManyToManyTestCase(
+    BaseTests.ModelSerializerViewSetTestCaseBase,
+    BaseTests.ApiViewSetManyToManyTestCaseBase,
+):
+    namespace = "test_model_serializer_reverse_many_to_many_viewset"
+    model = models.TestModelSerializerReverseManyToMany
+    viewset = views.TestModelSerializerReverseManyToManyAPI()
+    relation_viewset = views.TestModelSerializerManyToManyAPI()
+    relation_related_name = "test_model_serializer_many_to_many"
+    foreign_key_reverse_field = "test_model_serializers"
 
 
 # ==========================================================
@@ -261,3 +309,41 @@ class ApiViewSetModelReverseOneToOneTestCase(ApiViewSetModelReverseForeignKeyTes
     @property
     def create_response_data(self):
         return super().response_data | {self.relation_related_name: None}
+
+
+@tag("model_many_to_many_viewset")
+class ApiViewSetModelManyToManyTestCase(BaseTests.ApiViewSetManyToManyTestCaseBase):
+    namespace = "test_model_many_to_many_viewset"
+    model = models.TestModelManyToMany
+    viewset = views.TestModelManyToManyAPI()
+    relation_viewset = views.TestModelReverseManyToManyAPI()
+    relation_related_name = "test_models"
+    foreign_key_reverse_field = "test_model_serializer_many_to_many"
+
+    @property
+    def schemas(self):
+        return (
+            schema.TestModelManyToManySchemaOut,
+            schema.TestModelSchemaIn,
+            schema.TestModelSchemaPatch,
+        )
+
+
+@tag("model_reverse_many_to_many_viewset")
+class ApiViewSetModelReverseManyToManyTestCase(
+    BaseTests.ApiViewSetManyToManyTestCaseBase
+):
+    namespace = "test_model_reverse_many_to_many_viewset"
+    model = models.TestModelReverseManyToMany
+    viewset = views.TestModelReverseManyToManyAPI()
+    relation_viewset = views.TestModelManyToManyAPI()
+    relation_related_name = "test_model_serializer_many_to_many"
+    foreign_key_reverse_field = "test_models"
+
+    @property
+    def schemas(self):
+        return (
+            schema.TestModelReverseManyToManySchemaOut,
+            schema.TestModelSchemaIn,
+            schema.TestModelSchemaPatch,
+        )

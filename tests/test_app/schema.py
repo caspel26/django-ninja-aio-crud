@@ -56,6 +56,14 @@ class TestModelReverseOneToOneSchemaOut(TestModelReverseForeignKeyRelated):
     test_model_one_to_one: TestModelForeignKeyRelated | None = None
 
 
+class TestModelManyToManySchemaOut(BaseSchemaOut):
+    test_models: list[TestModelForeignKeyRelated]
+
+
+class TestModelReverseManyToManySchemaOut(BaseSchemaOut):
+    test_model_serializer_many_to_many: list[TestModelForeignKeyRelated]
+
+
 class SumSchemaIn(Schema):
     a: int
     b: int

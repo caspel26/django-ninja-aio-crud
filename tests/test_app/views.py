@@ -27,6 +27,14 @@ class TestModelSerializerReverseOneToOneAPI(GenericAPI):
     model = models.TestModelSerializerReverseOneToOne
 
 
+class TestModelSerializerManyToManyAPI(GenericAPI):
+    model = models.TestModelSerializerManyToMany
+
+
+class TestModelSerializerReverseManyToManyAPI(GenericAPI):
+    model = models.TestModelSerializerReverseManyToMany
+
+
 # ==========================================================
 #                       MODEL APIS
 # ==========================================================
@@ -64,4 +72,18 @@ class TestModelOneToOneAPI(GenericAPI):
     model = models.TestModelOneToOne
     schema_in = schema.TestModelForeignKeySchemaIn
     schema_out = schema.TestModelForeignKeySchemaOut
+    schema_update = schema.TestModelSchemaPatch
+
+
+class TestModelManyToManyAPI(GenericAPI):
+    model = models.TestModelManyToMany
+    schema_in = schema.TestModelSchemaIn
+    schema_out = schema.TestModelManyToManySchemaOut
+    schema_update = schema.TestModelSchemaPatch
+
+
+class TestModelReverseManyToManyAPI(GenericAPI):
+    model = models.TestModelReverseManyToMany
+    schema_in = schema.TestModelSchemaIn
+    schema_out = schema.TestModelReverseManyToManySchemaOut
     schema_update = schema.TestModelSchemaPatch
