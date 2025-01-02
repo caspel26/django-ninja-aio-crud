@@ -1,13 +1,13 @@
 import asyncio
 
 from django.test import TestCase, tag
-from django.test.client import AsyncRequestFactory
 from django.db import models
 from django.db.models.base import ModelBase
 from asgiref.sync import async_to_sync
 
 from ninja_aio.types import ModelSerializerMeta
 from tests.test_app import schema
+from tests.generics.request import Request
 from ninja_aio import NinjaAIO
 from ninja_aio.views import APIViewSet, APIView
 from ninja_aio.models import ModelSerializer, ModelUtil
@@ -48,7 +48,6 @@ class Tests:
 
         @classmethod
         def setUpTestData(cls):
-            cls.afactory = AsyncRequestFactory()
             cls.api = NinjaAIO(urls_namespace=cls.namespace)
             cls.test_util = ModelUtil(cls.model)
             cls.viewset.api = cls.api
@@ -56,6 +55,7 @@ class Tests:
             cls.pk_att = cls.model._meta.pk.attname
             cls.path = f"{cls.test_util.verbose_name_path_resolver()}/"
             cls.detail_path = f"{cls.path}{cls.pk_att}/"
+            cls.request = Request(cls.path)
 
         @property
         def path_names(self):
@@ -112,19 +112,19 @@ class Tests:
 
         @property
         def get_request(self):
-            return self.afactory.get(self.path)
+            return self.request.get()
 
         @property
         def post_request(self):
-            return self.afactory.post(self.path)
+            return self.request.post()
 
         @property
         def patch_request(self):
-            return self.afactory.patch(self.path)
+            return self.request.patch()
 
         @property
         def delete_request(self):
-            return self.afactory.delete(self.path)
+            return self.request.delete()
 
         async def _create_view(self):
             view = self.viewset.create_view()
@@ -223,7 +223,7 @@ class Tests:
             cls.relation_model_name = cls.relation_model._meta.model_name
             cls.relation_pk = async_to_sync(cls._create_relation)(cls.relation_data)
             cls.relation_util = ModelUtil(cls.relation_viewset.model)
-            cls.relation_request = cls.afactory.get(cls.relation_viewset.path)
+            cls.relation_request = cls.request.get(cls.relation_viewset.path)
             cls.relation_obj = async_to_sync(cls.relation_util.get_object)(
                 cls.relation_request, cls.relation_pk
             )

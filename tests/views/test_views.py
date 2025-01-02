@@ -1,8 +1,8 @@
 from ninja_aio import NinjaAIO
 from django.test import TestCase, tag
-from django.test.client import AsyncRequestFactory
 
 from tests.test_app import schema
+from tests.generics.request import Request
 from tests.generics.views import GenericAPIView
 
 
@@ -13,11 +13,11 @@ class APIViewTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.afactory = AsyncRequestFactory()
         cls.api = NinjaAIO(urls_namespace=cls.namespace)
         cls.view.api = cls.api
         cls.view.add_views_to_route()
         cls.path = f"{cls.view.path_name}/"
+        cls.request = Request(cls.path)
 
     @property
     def path_names(self):
@@ -53,5 +53,5 @@ class APIViewTestCase(TestCase):
 
     async def test_view(self):
         view = self.view.views()
-        response = await view(self.afactory.post(self.path), self.request_data)
+        response = await view(self.request.post(), self.request_data)
         self.assertEqual(response, self.response_data)
