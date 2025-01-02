@@ -118,7 +118,7 @@ class ModelUtil:
         if isinstance(self.model, ModelSerializerMeta):
             await obj.custom_actions(customs)
             await obj.post_create()
-        return 201, await self.read_s(request, obj, obj_schema)
+        return await self.read_s(request, obj, obj_schema)
 
     async def read_s(
         self,
@@ -154,7 +154,7 @@ class ModelUtil:
         except SerializeError as e:
             return e.status_code, e.error
         await obj.adelete()
-        return 204, None
+        return None
 
 
 class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):

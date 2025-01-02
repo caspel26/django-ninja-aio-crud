@@ -98,7 +98,7 @@ class APIViewSet:
             response={201: self.schema_out, self.error_codes: GenericMessageSchema},
         )
         async def create(request: HttpRequest, data: self.schema_in):
-            return await self.model_util.create_s(request, data, self.schema_out)
+            return 201, await self.model_util.create_s(request, data, self.schema_out)
 
         create.__name__ = f"create_{self.model._meta.model_name}"
         return create
@@ -164,7 +164,7 @@ class APIViewSet:
             response={204: None, self.error_codes: GenericMessageSchema},
         )
         async def delete(request: HttpRequest, pk: int | str):
-            return await self.model_util.delete_s(request, pk)
+            return 204, await self.model_util.delete_s(request, pk)
 
         delete.__name__ = f"delete_{self.model._meta.model_name}"
         return delete
