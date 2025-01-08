@@ -4,6 +4,7 @@ from django.db.models import Model
 
 S_TYPES = Literal["create", "update"]
 REL_TYPES = Literal["many", "one"]
+F_TYPES = Literal["customs", "optionals"]
 
 
 class ModelSerializerType(type):

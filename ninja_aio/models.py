@@ -14,7 +14,7 @@ from django.db.models.fields.related_descriptors import (
 )
 
 from .exceptions import SerializeError
-from .types import S_TYPES, REL_TYPES, ModelSerializerMeta
+from .types import S_TYPES, REL_TYPES, F_TYPES, ModelSerializerMeta
 
 
 class ModelUtil:
@@ -58,11 +58,18 @@ class ModelUtil:
     async def parse_input_data(self, request: HttpRequest, data: Schema):
         payload = data.model_dump()
         customs = {}
+        optionals = []
         if isinstance(self.model, ModelSerializerMeta):
             customs = {k: v for k, v in payload.items() if self.model.is_custom(k)}
+            optionals = [
+                k for k, v in payload.items() if self.model.is_optional(k) and v is None
+            ]
         for k, v in payload.items():
-            if isinstance(self.model, ModelSerializerMeta) and self.model.is_custom(k):
-                continue
+            if isinstance(self.model, ModelSerializerMeta):
+                if self.model.is_custom(k):
+                    continue
+                if self.model.is_optional(k) and k is None:
+                    continue
             field_obj = getattr(self.model, k).field
             if isinstance(field_obj, models.BinaryField):
                 try:
@@ -73,7 +80,9 @@ class ModelUtil:
                 rel_util = ModelUtil(field_obj.related_model)
                 rel: ModelSerializer = await rel_util.get_object(request, v)
                 payload |= {k: rel}
-        new_payload = {k: v for k, v in payload.items() if k not in customs}
+        new_payload = {
+            k: v for k, v in payload.items() if k not in (customs.keys() or optionals)
+        }
         return new_payload, customs
 
     async def parse_output_data(self, request: HttpRequest, data: Schema):
@@ -161,6 +170,7 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
     class CreateSerializer:
         fields: list[str] = []
         customs: list[tuple[str, type, Any]] = []
+        optionals: list[str] = []
 
     class ReadSerializer:
         fields: list[str] = []
@@ -168,6 +178,7 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
     class UpdateSerializer:
         fields: list[str] = []
         customs: list[tuple[str, type, Any]] = []
+        optionals: list[str] = []
 
     @property
     def has_custom_fields_create(self):
@@ -180,6 +191,25 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
     @property
     def has_custom_fields(self):
         return self.has_custom_fields_create or self.has_custom_fields_update
+
+    @classmethod
+    def _get_special_fields(cls, s_type: type[S_TYPES], f_type: type[F_TYPES]):
+        try:
+            match s_type:
+                case "create":
+                    fields = getattr(cls.CreateSerializer, f_type)
+                case "update":
+                    fields = getattr(cls.UpdateSerializer, f_type)
+        except AttributeError:
+            return []
+        return fields
+
+    @classmethod
+    def _is_special_field(
+        cls, s_type: type[S_TYPES], field: str, f_type: type[F_TYPES]
+    ):
+        special_fields = cls._get_special_fields(s_type, f_type)
+        return any(field in special_f for special_f in special_fields)
 
     @classmethod
     def verbose_name_path_resolver(cls) -> str:
@@ -284,9 +314,15 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
 
     @classmethod
     def is_custom(cls, field: str):
-        customs = cls.get_custom_fields("create") or []
-        customs.extend(cls.get_custom_fields("update") or [])
-        return any(field in custom_f for custom_f in customs)
+        return cls._is_special_field(
+            "create", field, "customs"
+        ) or cls._is_special_field("update", field, "customs")
+
+    @classmethod
+    def is_optional(cls, field: str):
+        return cls._is_special_field(
+            "create", field, "optionals"
+        ) or cls._is_special_field("update", field, "optionals")
 
     @classmethod
     async def parse_input_data(cls, request: HttpRequest, data: Schema):
@@ -340,15 +376,14 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
 
     @classmethod
     def get_custom_fields(cls, s_type: type[S_TYPES]):
-        try:
-            match s_type:
-                case "create":
-                    customs = cls.CreateSerializer.customs
-                case "update":
-                    customs = cls.UpdateSerializer.customs
-        except AttributeError:
-            return None
-        return customs
+        return cls._get_special_fields(s_type, "customs")
+
+    @classmethod
+    def get_optional_fields(cls, s_type: type[S_TYPES]):
+        return [
+            (field, field_type, None)
+            for field, field_type in cls._get_special_fields(s_type, "optionals")
+        ]
 
     @classmethod
     def generate_read_s(cls, depth: int = 1) -> Schema:
@@ -364,20 +399,28 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
 
     @classmethod
     def generate_create_s(cls) -> Schema:
+        fields = getattr(cls.CreateSerializer, "fields", []) + [
+            field[0] for field in cls.get_optional_fields("create")
+        ]
+        customs = cls.get_custom_fields("create") + cls.get_optional_fields("create")
         return create_schema(
             model=cls,
             name=f"{cls._meta.model_name}SchemaIn",
-            fields=cls.CreateSerializer.fields,
-            custom_fields=cls.get_custom_fields("create"),
+            fields=fields,
+            custom_fields=customs,
         )
 
     @classmethod
     def generate_update_s(cls) -> Schema:
+        fields = getattr(cls.UpdateSerializer, "fields", []) + [
+            field[0] for field in cls.get_optional_fields("update")
+        ]
+        customs = cls.get_custom_fields("update") + cls.get_optional_fields("update")
         return create_schema(
             model=cls,
             name=f"{cls._meta.model_name}SchemaPatch",
-            fields=cls.UpdateSerializer.fields,
-            custom_fields=cls.get_custom_fields("update"),
+            fields=fields,
+            custom_fields=customs,
         )
 
     @classmethod
