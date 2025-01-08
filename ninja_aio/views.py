@@ -8,7 +8,6 @@ from django.db.models import Model
 
 from .models import ModelSerializer, ModelUtil
 from .schemas import GenericMessageSchema
-from .exceptions import SerializeError
 from .types import ModelSerializerMeta
 
 ERROR_CODES = frozenset({400, 401, 404, 428})
@@ -136,10 +135,7 @@ class APIViewSet:
             response={200: self.schema_out, self.error_codes: GenericMessageSchema},
         )
         async def retrieve(request: HttpRequest, pk: int | str):
-            try:
-                obj = await self.model_util.get_object(request, pk)
-            except SerializeError as e:
-                return e.status_code, e.error
+            obj = await self.model_util.get_object(request, pk)
             return await self.model_util.read_s(request, obj, self.schema_out)
 
         retrieve.__name__ = f"retrieve_{self.model._meta.model_name}"

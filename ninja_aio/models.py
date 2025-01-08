@@ -115,12 +115,9 @@ class ModelUtil:
         return payload
 
     async def create_s(self, request: HttpRequest, data: Schema, obj_schema: Schema):
-        try:
-            payload, customs = await self.parse_input_data(request, data)
-            pk = (await self.model.objects.acreate(**payload)).pk
-            obj = await self.get_object(request, pk)
-        except SerializeError as e:
-            return e.status_code, e.error
+        payload, customs = await self.parse_input_data(request, data)
+        pk = (await self.model.objects.acreate(**payload)).pk
+        obj = await self.get_object(request, pk)
         if isinstance(self.model, ModelSerializerMeta):
             await obj.custom_actions(customs)
             await obj.post_create()
@@ -139,11 +136,7 @@ class ModelUtil:
     async def update_s(
         self, request: HttpRequest, data: Schema, pk: int | str, obj_schema: Schema
     ):
-        try:
-            obj = await self.get_object(request, pk)
-        except SerializeError as e:
-            return e.status_code, e.error
-
+        obj = await self.get_object(request, pk)
         payload, customs = await self.parse_input_data(request, data)
         for k, v in payload.items():
             if v is not None:
@@ -155,10 +148,7 @@ class ModelUtil:
         return await self.read_s(request, updated_object, obj_schema)
 
     async def delete_s(self, request: HttpRequest, pk: int | str):
-        try:
-            obj = await self.get_object(request, pk)
-        except SerializeError as e:
-            return e.status_code, e.error
+        obj = await self.get_object(request, pk)
         await obj.adelete()
         return HttpResponse(status=204)
 

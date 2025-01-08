@@ -1,3 +1,8 @@
+from functools import partial
+from ninja import NinjaAPI
+from django.http import HttpRequest, HttpResponse
+
+
 class BaseException(Exception):
     error: str | dict = ""
     status_code: int = 400
@@ -22,3 +27,15 @@ class SerializeError(BaseException):
 
 class AuthError(BaseException):
     pass
+
+
+def _default_serialize_error(
+    request: HttpRequest, exc: SerializeError, api: "NinjaAPI"
+) -> HttpResponse:
+    return api.create_response(request, exc.error, status=exc.status_code)
+
+
+def set_api_exception_handlers(api: type[NinjaAPI]) -> None:
+    api.add_exception_handler(
+        SerializeError, partial(_default_serialize_error, api=api)
+    )
