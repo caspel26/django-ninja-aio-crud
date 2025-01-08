@@ -8,6 +8,7 @@ from ninja.constants import NOT_SET, NOT_SET_TYPE
 
 from .parsers import ORJSONParser
 from .renders import ORJSONRenderer
+from .exceptions import set_api_exception_handlers
 
 
 class NinjaAIO(NinjaAPI):
@@ -46,3 +47,7 @@ class NinjaAIO(NinjaAPI):
             renderer=ORJSONRenderer(),
             parser=ORJSONParser(),
         )
+
+    def set_default_exception_handlers(self):
+        set_api_exception_handlers(self)
+        super().set_default_exception_handlers()
