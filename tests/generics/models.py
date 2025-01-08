@@ -169,11 +169,14 @@ class Tests:
             self.assertEqual(response, self.read_data)
 
         async def test_update_s_object_not_found(self):
-            status_code, responst = await self.model_util.update_s(
-                self.request.patch(), self.data_patch, 0, self.schema_out
+            with self.assertRaises(SerializeError) as exc:
+                await self.model_util.update_s(
+                    self.request.patch(), self.data_patch, 0, self.schema_out
+                )
+            self.assertEqual(exc.exception.status_code, 404)
+            self.assertEqual(
+                exc.exception.error, {self.model._meta.model_name: "not found"}
             )
-            self.assertEqual(status_code, 404)
-            self.assertEqual(responst, {self.model._meta.model_name: "not found"})
 
         async def test_update_s(self):
             response = await self.model_util.update_s(
@@ -182,11 +185,12 @@ class Tests:
             self.assertEqual(response, self.read_data)
 
         async def test_delete_s_object_not_found(self):
-            status_code, response = await self.model_util.delete_s(
-                self.request.delete(), 0
+            with self.assertRaises(SerializeError) as exc:
+                await self.model_util.delete_s(self.request.delete(), 0)
+            self.assertEqual(exc.exception.status_code, 404)
+            self.assertEqual(
+                exc.exception.error, {self.model._meta.model_name: "not found"}
             )
-            self.assertEqual(status_code, 404)
-            self.assertEqual(response, {self.model._meta.model_name: "not found"})
 
         async def test_delete_s(self):
             response = await self.model_util.delete_s(
