@@ -101,6 +101,28 @@ class Foo(ModelSerializer):
 
 - post create method is a custom method that comes out to handle actions which will be excuted after that the object is created. It can be used, indeed, for example to handle custom fields' actions.
 
+- You can also define optional fields for you Create and Update serializers (remember to give your optional fields a default). To declare an optional fields you have to give the field type too.
+```python
+# models.py
+from django.db import models
+from ninja_aio.models import ModelSerializer
+
+
+class Foo(ModelSerializer):
+  name = models.CharField(max_length=30)
+  bar = models.CharField(max_length=30, default="")
+  active = models.BooleanField(default=False)
+
+  class ReadSerializer:
+    fields = ["id", "name", "bar"]
+
+  class CreateSerializer:
+    fields = ["name"]
+    optionals = [("bar", str), ("active", bool)]
+
+  class UpdateSerializer:
+    optionals = [[("bar", str), ("active", bool)]
+```
 
 ### APIViewSet
 
