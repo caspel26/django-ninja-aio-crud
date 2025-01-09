@@ -45,6 +45,3 @@ dev-dependencies = [
 [project.urls]
 Repository = "https://github.com/caspel26/django-ninja-aio-crud"
 Documentation = "https://caspel26.github.io/django-ninja-aio-crud/"
-
-[tool.flit.metadata.urls]
-
