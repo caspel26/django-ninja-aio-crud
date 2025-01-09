@@ -2,13 +2,10 @@
 requires = ["flit_core >=2,<4"]
 build-backend = "flit_core.buildapi"
 
-[project]
-name = "django-ninja-aio-crud"
-version = "0.5.0"
+[tool.flit.metadata]
 module = "ninja_aio"
 dist-name = "django-ninja-aio-crud"
 author = "Giuseppe Casillo"
-description = "Based on Django Ninja, Django ninja aio crud is a framework which implement an Async dynamic Model CRUD. It comes out with built-in authentication classes, class based views and dynamic CRUD, fast and async."
 classifiers = [
     "Operating System :: OS Independent",
     "Topic :: Internet",
@@ -33,16 +30,6 @@ requires = ["django-ninja >=1.3.0", "joserfc >=1.0.0", "orjson >= 3.10.7"]
 description-file = "README.md"
 requires-python = ">=3.10"
 
-[tool.uv]
-dev-dependencies = [
-    "coverage>=7.6.0,<8.0",
-    "pre-commit>=3.5.0,<4.0",
-    "pydoc-markdown>=4.8.2,<5.0",
-    "pyyaml>=6.0.1,<7.0",
-    "python-frontmatter>=1.1.0,<2.0",
-    "django-ninja-aio-crud>=0.5.0",
-]
 
-[project.urls]
+[tool.flit.metadata.urls]
 Repository = "https://github.com/caspel26/django-ninja-aio-crud"
-Documentation = "https://caspel26.github.io/django-ninja-aio-crud/"
