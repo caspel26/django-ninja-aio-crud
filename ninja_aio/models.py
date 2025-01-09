@@ -24,7 +24,7 @@ class ModelUtil:
     @property
     def serializable_fields(self):
         if isinstance(self.model, ModelSerializerMeta):
-            return self.model.ReadSerializer.fields
+            return self.model.get_fields("read")
         return [field.name for field in self.model._meta.get_fields()]
 
     def verbose_name_path_resolver(self) -> str:
@@ -164,14 +164,17 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
         fields: list[str] = []
         customs: list[tuple[str, type, Any]] = []
         optionals: list[tuple[str, type]] = []
+        excludes: list[str] = []
 
     class ReadSerializer:
         fields: list[str] = []
+        excludes: list[str] = []
 
     class UpdateSerializer:
         fields: list[str] = []
         customs: list[tuple[str, type, Any]] = []
         optionals: list[tuple[str, type]] = []
+        excludes: list[str] = []
 
     @property
     def has_custom_fields_create(self):
@@ -204,6 +207,8 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
                 fields = getattr(cls.CreateSerializer, f_type, [])
             case "update":
                 fields = getattr(cls.UpdateSerializer, f_type, [])
+            case "read":
+                fields = getattr(cls.ReadSerializer, f_type, [])
         return fields
 
     @classmethod
@@ -225,8 +230,8 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
             case "Patch":
                 s_type = "update"
             case "Out":
-                fields, reverse_rels = cls.get_schema_out_data()
-                if not fields and not reverse_rels:
+                fields, reverse_rels, excludes = cls.get_schema_out_data()
+                if not fields and not reverse_rels and not excludes:
                     return None
                 return create_schema(
                     model=cls,
@@ -234,19 +239,20 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
                     depth=depth,
                     fields=fields,
                     custom_fields=reverse_rels,
+                    exclude=excludes,
                 )
-        fields = cls._get_fields(s_type, "fields") + [
-            fields[0] for fields in cls.get_optional_fields(s_type)
-        ]
+        fields = cls.get_fields(s_type)
         customs = cls.get_custom_fields(s_type) + cls.get_optional_fields(s_type)
+        excludes = cls.get_excluded_fields(s_type)
         return (
             create_schema(
                 model=cls,
                 name=f"{cls._meta.model_name}Schema{schema_type}",
                 fields=fields,
                 custom_fields=customs,
+                exclude=excludes,
             )
-            if fields or customs
+            if fields or customs or excludes
             else None
         )
 
@@ -329,7 +335,7 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
     def get_schema_out_data(cls):
         fields = []
         reverse_rels = []
-        for f in cls.ReadSerializer.fields:
+        for f in cls.get_fields("read"):
             field_obj = getattr(cls, f)
             if isinstance(field_obj, ManyToManyDescriptor):
                 rel_obj: ModelSerializer = field_obj.field.related_model
@@ -349,7 +355,7 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
                 reverse_rels.append(rel_data)
                 continue
             fields.append(f)
-        return fields, reverse_rels
+        return fields, reverse_rels, cls.get_excluded_fields("read")
 
     @classmethod
     def is_custom(cls, field: str):
@@ -373,6 +379,14 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
             (field, field_type, None)
             for field, field_type in cls._get_fields(s_type, "optionals")
         ]
+    
+    @classmethod
+    def get_excluded_fields(cls, s_type: type[S_TYPES]):
+        return cls._get_fields(s_type, "excludes")
+    
+    @classmethod
+    def get_fields(cls, s_type: type[S_TYPES]):
+        return cls._get_fields(s_type, "fields")
 
     @classmethod
     def generate_read_s(cls, depth: int = 1) -> Schema:
