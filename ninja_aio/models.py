@@ -163,7 +163,7 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
     class CreateSerializer:
         fields: list[str] = []
         customs: list[tuple[str, type, Any]] = []
-        optionals: list[str] = []
+        optionals: list[tuple[str, type]] = []
 
     class ReadSerializer:
         fields: list[str] = []
@@ -171,7 +171,7 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
     class UpdateSerializer:
         fields: list[str] = []
         customs: list[tuple[str, type, Any]] = []
-        optionals: list[str] = []
+        optionals: list[tuple[str, type]] = []
 
     @property
     def has_custom_fields_create(self):
