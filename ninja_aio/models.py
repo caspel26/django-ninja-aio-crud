@@ -14,7 +14,7 @@ from django.db.models.fields.related_descriptors import (
 )
 
 from .exceptions import SerializeError
-from .types import S_TYPES, REL_TYPES, F_TYPES, ModelSerializerMeta
+from .types import S_TYPES, REL_TYPES, F_TYPES, SCHEMA_TYPES, ModelSerializerMeta
 
 
 class ModelUtil:
@@ -198,23 +198,57 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
         return self.has_optional_fields_create or self.has_optional_fields_update
 
     @classmethod
-    def _get_special_fields(cls, s_type: type[S_TYPES], f_type: type[F_TYPES]):
-        try:
-            match s_type:
-                case "create":
-                    fields = getattr(cls.CreateSerializer, f_type)
-                case "update":
-                    fields = getattr(cls.UpdateSerializer, f_type)
-        except AttributeError:
-            return []
+    def _get_fields(cls, s_type: type[S_TYPES], f_type: type[F_TYPES]):
+        match s_type:
+            case "create":
+                fields = getattr(cls.CreateSerializer, f_type, [])
+            case "update":
+                fields = getattr(cls.UpdateSerializer, f_type, [])
         return fields
 
     @classmethod
     def _is_special_field(
         cls, s_type: type[S_TYPES], field: str, f_type: type[F_TYPES]
     ):
-        special_fields = cls._get_special_fields(s_type, f_type)
+        special_fields = cls._get_fields(s_type, f_type)
         return any(field in special_f for special_f in special_fields)
+
+    @classmethod
+    def _generate_model_schema(
+        cls,
+        schema_type: type[SCHEMA_TYPES],
+        depth: int = None,
+    ) -> Schema:
+        match schema_type:
+            case "In":
+                s_type = "create"
+            case "Patch":
+                s_type = "update"
+            case "Out":
+                fields, reverse_rels = cls.get_schema_out_data()
+                if not fields and not reverse_rels:
+                    return None
+                return create_schema(
+                    model=cls,
+                    name=f"{cls._meta.model_name}SchemaOut",
+                    depth=depth,
+                    fields=fields,
+                    custom_fields=reverse_rels,
+                )
+        fields = cls._get_fields(s_type, "fields") + [
+            fields[0] for fields in cls.get_optional_fields(s_type)
+        ]
+        customs = cls.get_custom_fields(s_type) + cls.get_optional_fields(s_type)
+        return (
+            create_schema(
+                model=cls,
+                name=f"{cls._meta.model_name}Schema{schema_type}",
+                fields=fields,
+                custom_fields=customs,
+            )
+            if fields or customs
+            else None
+        )
 
     @classmethod
     def verbose_name_path_resolver(cls) -> str:
@@ -331,49 +365,23 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
 
     @classmethod
     def get_custom_fields(cls, s_type: type[S_TYPES]):
-        return cls._get_special_fields(s_type, "customs")
+        return cls._get_fields(s_type, "customs")
 
     @classmethod
     def get_optional_fields(cls, s_type: type[S_TYPES]):
         return [
             (field, field_type, None)
-            for field, field_type in cls._get_special_fields(s_type, "optionals")
+            for field, field_type in cls._get_fields(s_type, "optionals")
         ]
 
     @classmethod
     def generate_read_s(cls, depth: int = 1) -> Schema:
-        fields, reverse_rels = cls.get_schema_out_data()
-        customs = [custom for custom in reverse_rels]
-        return create_schema(
-            model=cls,
-            name=f"{cls._meta.model_name}SchemaOut",
-            depth=depth,
-            fields=fields,
-            custom_fields=customs,
-        )
+        return cls._generate_model_schema("Out", depth)
 
     @classmethod
     def generate_create_s(cls) -> Schema:
-        fields = getattr(cls.CreateSerializer, "fields", []) + [
-            field[0] for field in cls.get_optional_fields("create")
-        ]
-        customs = cls.get_custom_fields("create") + cls.get_optional_fields("create")
-        return create_schema(
-            model=cls,
-            name=f"{cls._meta.model_name}SchemaIn",
-            fields=fields,
-            custom_fields=customs,
-        )
+        return cls._generate_model_schema("In")
 
     @classmethod
     def generate_update_s(cls) -> Schema:
-        fields = getattr(cls.UpdateSerializer, "fields", []) + [
-            field[0] for field in cls.get_optional_fields("update")
-        ]
-        customs = cls.get_custom_fields("update") + cls.get_optional_fields("update")
-        return create_schema(
-            model=cls,
-            name=f"{cls._meta.model_name}SchemaPatch",
-            fields=fields,
-            custom_fields=customs,
-        )
+        return cls._generate_model_schema("Patch")
