@@ -2,7 +2,7 @@
 requires = ["flit_core >=2,<4"]
 build-backend = "flit_core.buildapi"
 
-[tool.flit.metadata]
+[project]
 module = "ninja_aio"
 dist-name = "django-ninja-aio-crud"
 author = "Giuseppe Casillo"
