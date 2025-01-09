@@ -5,7 +5,7 @@ from ninja.schema import Schema
 from ninja.orm import create_schema
 
 from django.db import models
-from django.http import HttpResponse, HttpRequest
+from django.http import HttpRequest
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models.fields.related_descriptors import (
     ReverseManyToOneDescriptor,
@@ -29,6 +29,9 @@ class ModelUtil:
 
     def verbose_name_path_resolver(self) -> str:
         return "-".join(self.model._meta.verbose_name_plural.split(" "))
+
+    def verbose_name_view_resolver(self) -> str:
+        return self.model._meta.verbose_name_plural.replace(" ", "")
 
     async def get_object(self, request: HttpRequest, pk: int | str):
         q = {self.model._meta.pk.attname: pk}
@@ -121,7 +124,7 @@ class ModelUtil:
         if isinstance(self.model, ModelSerializerMeta):
             await obj.custom_actions(customs)
             await obj.post_create()
-        return 201, await self.read_s(request, obj, obj_schema)
+        return await self.read_s(request, obj, obj_schema)
 
     async def read_s(
         self,
@@ -150,7 +153,7 @@ class ModelUtil:
     async def delete_s(self, request: HttpRequest, pk: int | str):
         obj = await self.get_object(request, pk)
         await obj.adelete()
-        return HttpResponse(status=204)
+        return None
 
 
 class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):

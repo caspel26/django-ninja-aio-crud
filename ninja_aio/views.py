@@ -55,7 +55,6 @@ class APIView:
         async def some_method(request, *args, **kwargs):
             pass
         """
-        pass
 
     def add_views(self):
         self.views()
@@ -80,16 +79,16 @@ class APIViewSet:
         self.path_retrieve = f"{self.model._meta.pk.attname}/"
         self.error_codes = ERROR_CODES
         self.model_util = ModelUtil(self.model)
-        self.schema_out, self.schema_update, self.schema_in = self.get_schemas()
+        self.schema_out, self.schema_in, self.schema_update = self.get_schemas()
 
     def get_schemas(self):
         if isinstance(self.model, ModelSerializerMeta):
             return (
                 self.model.generate_read_s(),
-                self.model.generate_update_s(),
                 self.model.generate_create_s(),
+                self.model.generate_update_s(),
             )
-        return self.schema_out, self.schema_update, self.schema_in
+        return self.schema_out, self.schema_in, self.schema_update
 
     def create_view(self):
         @self.router.post(
@@ -98,9 +97,10 @@ class APIViewSet:
             response={201: self.schema_out, self.error_codes: GenericMessageSchema},
         )
         async def create(request: HttpRequest, data: self.schema_in):
-            return await self.model_util.create_s(request, data, self.schema_out)
+            return 201, await self.model_util.create_s(request, data, self.schema_out)
 
         create.__name__ = f"create_{self.model._meta.model_name}"
+        return create
 
     def list_view(self):
         @self.router.get(
@@ -117,7 +117,6 @@ class APIViewSet:
             if isinstance(self.model, ModelSerializerMeta):
                 qs = await self.model.queryset_request(request)
             rels = self.model_util.get_reverse_relations()
-            print(rels)
             if len(rels) > 0:
                 qs = qs.prefetch_related(*rels)
             objs = [
@@ -126,7 +125,8 @@ class APIViewSet:
             ]
             return objs
 
-        list.__name__ = f"list_{self.model._meta.verbose_name_plural}"
+        list.__name__ = f"list_{self.model_util.verbose_name_view_resolver()}"
+        return list
 
     def retrieve_view(self):
         @self.router.get(
@@ -139,6 +139,7 @@ class APIViewSet:
             return await self.model_util.read_s(request, obj, self.schema_out)
 
         retrieve.__name__ = f"retrieve_{self.model._meta.model_name}"
+        return retrieve
 
     def update_view(self):
         @self.router.patch(
@@ -150,6 +151,7 @@ class APIViewSet:
             return await self.model_util.update_s(request, data, pk, self.schema_out)
 
         update.__name__ = f"update_{self.model._meta.model_name}"
+        return update
 
     def delete_view(self):
         @self.router.delete(
@@ -158,9 +160,10 @@ class APIViewSet:
             response={204: None, self.error_codes: GenericMessageSchema},
         )
         async def delete(request: HttpRequest, pk: int | str):
-            return await self.model_util.delete_s(request, pk)
+            return 204, await self.model_util.delete_s(request, pk)
 
         delete.__name__ = f"delete_{self.model._meta.model_name}"
+        return delete
 
     def views(self):
         """
@@ -194,7 +197,6 @@ class APIViewSet:
         async def some_method(request, *args, **kwargs):
             pass
         """
-        pass
 
     def add_views(self):
         self.create_view()
