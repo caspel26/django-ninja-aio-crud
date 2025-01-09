@@ -8,7 +8,7 @@ from django.db.models import Model
 
 from .models import ModelSerializer, ModelUtil
 from .schemas import GenericMessageSchema
-from .types import ModelSerializerMeta
+from .types import ModelSerializerMeta, VIEW_TYPES
 
 ERROR_CODES = frozenset({400, 401, 404, 428})
 
@@ -72,6 +72,7 @@ class APIViewSet:
     schema_update: Schema | None = None
     auths: list | None = NOT_SET
     pagination_class: type[AsyncPaginationBase] = PageNumberPagination
+    disable: list[type[VIEW_TYPES]] = []
 
     def __init__(self) -> None:
         self.router = Router(tags=[self.model._meta.model_name.capitalize()])
@@ -80,6 +81,20 @@ class APIViewSet:
         self.error_codes = ERROR_CODES
         self.model_util = ModelUtil(self.model)
         self.schema_out, self.schema_in, self.schema_update = self.get_schemas()
+
+    @property
+    def _crud_views(self):
+        """
+        key: view type (create, list, retrieve, update, delete or all)
+        value: tuple with schema and view method
+        """
+        return {
+            "create": (self.schema_in, self.create_view),
+            "list": (self.schema_out, self.list_view),
+            "retrieve": (self.schema_out, self.retrieve_view),
+            "update": (self.schema_update, self.update_view),
+            "delete": (None, self.delete_view),
+        }
 
     def get_schemas(self):
         if isinstance(self.model, ModelSerializerMeta):
@@ -199,11 +214,16 @@ class APIViewSet:
         """
 
     def add_views(self):
-        self.create_view()
-        self.list_view()
-        self.retrieve_view()
-        self.update_view()
-        self.delete_view()
+        if "all" in self.disable:
+            self.views()
+            return self.router
+
+        for views_type, (schema, view) in self._crud_views.items():
+            if views_type not in self.disable and (
+                schema is not None or views_type == "delete"
+            ):
+                view()
+
         self.views()
         return self.router
 
