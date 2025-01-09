@@ -8,6 +8,7 @@ version = "0.5.0"
 module = "ninja_aio"
 dist-name = "django-ninja-aio-crud"
 author = "Giuseppe Casillo"
+description = "Based on Django Ninja, Django ninja aio crud is a framework which implement an Async dynamic Model CRUD. It comes out with built-in authentication classes, class based views and dynamic CRUD, fast and async."
 classifiers = [
     "Operating System :: OS Independent",
     "Topic :: Internet",
