@@ -46,6 +46,7 @@ class Tests:
         namespace: str
         model: ModelSerializer | models.Model
         viewset: GenericAPIViewSet
+        excluded_views: list[str] = []
 
         @classmethod
         def setUpTestData(cls):
@@ -55,19 +56,42 @@ class Tests:
             cls.viewset.add_views_to_route()
             cls.pk_att = cls.model._meta.pk.attname
             cls.path = f"{cls.test_util.verbose_name_path_resolver()}/"
-            cls.detail_path = f"{cls.path}{cls.pk_att}/"
+            cls.detail_path = f"{cls.path}<{cls.pk_att}>/"
             cls.request = Request(cls.path)
 
         @property
-        def path_names(self):
+        def create_view_path_name(self):
+            return f"create_{self.model._meta.model_name}"
+        
+        @property
+        def list_view_path_name(self):
+            return f"list_{self.test_util.verbose_name_view_resolver()}"
+        
+        @property
+        def retrieve_view_path_name(self):
+            return f"retrieve_{self.model._meta.model_name}"
+        
+        @property
+        def update_view_path_name(self):
+            return f"update_{self.model._meta.model_name}"
+        
+        @property
+        def delete_view_path_name(self):
+            return f"delete_{self.model._meta.model_name}"
+
+        @property
+        def view_path_names(self):
             return [
-                f"create_{self.model._meta.model_name}",
-                f"list_{self.test_util.verbose_name_view_resolver()}",
-                f"retrieve_{self.model._meta.model_name}",
-                f"update_{self.model._meta.model_name}",
-                f"delete_{self.model._meta.model_name}",
-                self.viewset.path_name,
+                self.create_view_path_name,
+                self.list_view_path_name,
+                self.retrieve_view_path_name,
+                self.update_view_path_name,
+                self.delete_view_path_name,
             ]
+
+        @property
+        def path_names(self):
+            return self.view_path_names + [self.viewset.path_name]
 
         @property
         def schemas(self):
@@ -127,6 +151,19 @@ class Tests:
         def delete_request(self):
             return self.request.delete()
 
+        def _get_routes(self):
+            self.assertEqual(len(self.api._routers), 2)
+            test_router_path = self.api._routers[1][0]
+            test_router = self.api._routers[1][1]
+            self.assertEqual(self.path, test_router_path)
+            paths = [str(route.pattern) for route in test_router.urls_paths(self.path)]
+            path_names = list(
+                dict.fromkeys(
+                    [route.name for route in test_router.urls_paths(self.path)]
+                )
+            )
+            return paths, path_names
+
         async def _create_view(self):
             view = self.viewset.create_view()
             status, content = await view(self.post_request, self.create_data)
@@ -138,19 +175,29 @@ class Tests:
             return content
 
         def test_crud_routes(self):
-            self.assertEqual(len(self.api._routers), 2)
-            test_router_path = self.api._routers[1][0]
-            test_router = self.api._routers[1][1]
-            self.assertEqual(self.path, test_router_path)
-            paths = [str(route.pattern) for route in test_router.urls_paths(self.path)]
-            path_names = list(
-                dict.fromkeys(
-                    [route.name for route in test_router.urls_paths(self.path)]
-                )
-            )
-            self.assertIn(self.path, paths)
-            self.assertIn(self.detail_path, paths)
-            self.assertEqual(self.path_names, path_names)
+            paths, path_names = self._get_routes()
+            if not self.excluded_views:
+                self.assertIn(self.path, paths)
+                self.assertIn(self.detail_path, paths)
+                self.assertEqual(self.path_names, path_names)
+            if "all" in self.excluded_views:
+                self.assertNotIn(self.path, paths)
+                self.assertNotIn(self.detail_path, paths)
+                self.assertNotIn(self.create_view_path_name, path_names)
+                self.assertNotIn(self.list_view_path_name, path_names)
+                self.assertNotIn(self.retrieve_view_path_name, path_names)
+                self.assertNotIn(self.update_view_path_name, path_names)
+                self.assertNotIn(self.delete_view_path_name, path_names)
+            if "create" in self.excluded_views:
+                self.assertNotIn(self.create_view_path_name, path_names)
+            if "list" in self.excluded_views:
+                self.assertNotIn(self.list_view_path_name, path_names)
+            if "retrieve" in self.excluded_views:
+                self.assertNotIn(self.retrieve_view_path_name, path_names)
+            if "update" in self.excluded_views:
+                self.assertNotIn(self.update_view_path_name, path_names)
+            if "delete" in self.excluded_views:
+                self.assertNotIn(self.delete_view_path_name, path_names)
 
         def test_get_schemas(self):
             schemas = self.viewset.get_schemas()

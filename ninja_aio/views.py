@@ -1,10 +1,11 @@
 from typing import List
 
-from ninja import NinjaAPI, Router, Schema
+from ninja import NinjaAPI, Router, Schema, Path
 from ninja.constants import NOT_SET
 from ninja.pagination import paginate, AsyncPaginationBase, PageNumberPagination
 from django.http import HttpRequest
 from django.db.models import Model
+from pydantic import create_model
 
 from .models import ModelSerializer, ModelUtil
 from .schemas import GenericMessageSchema
@@ -77,10 +78,11 @@ class APIViewSet:
     def __init__(self) -> None:
         self.router = Router(tags=[self.model._meta.model_name.capitalize()])
         self.path = "/"
-        self.path_retrieve = f"{self.model._meta.pk.attname}/"
+        self.path_retrieve = f"{{{self.model._meta.pk.attname}}}/"
         self.error_codes = ERROR_CODES
         self.model_util = ModelUtil(self.model)
         self.schema_out, self.schema_in, self.schema_update = self.get_schemas()
+        self.path_schema = self._create_path_schema()
 
     @property
     def _crud_views(self):
@@ -95,6 +97,12 @@ class APIViewSet:
             "update": (self.schema_update, self.update_view),
             "delete": (None, self.delete_view),
         }
+
+    def _create_path_schema(self):
+        fields = {
+            self.model._meta.pk.attname: (str | int , ...),
+        }
+        return create_model(f"{self.model._meta.model_name}PathSchema", **fields)
 
     def get_schemas(self):
         if isinstance(self.model, ModelSerializerMeta):
@@ -149,7 +157,7 @@ class APIViewSet:
             auth=self.auths,
             response={200: self.schema_out, self.error_codes: GenericMessageSchema},
         )
-        async def retrieve(request: HttpRequest, pk: int | str):
+        async def retrieve(request: HttpRequest, pk: Path[self.path_schema]):
             obj = await self.model_util.get_object(request, pk)
             return await self.model_util.read_s(request, obj, self.schema_out)
 
@@ -162,7 +170,7 @@ class APIViewSet:
             auth=self.auths,
             response={200: self.schema_out, self.error_codes: GenericMessageSchema},
         )
-        async def update(request: HttpRequest, data: self.schema_update, pk: int | str):
+        async def update(request: HttpRequest, data: self.schema_update, pk: Path[self.path_schema]):
             return await self.model_util.update_s(request, data, pk, self.schema_out)
 
         update.__name__ = f"update_{self.model._meta.model_name}"
@@ -174,7 +182,7 @@ class APIViewSet:
             auth=self.auths,
             response={204: None, self.error_codes: GenericMessageSchema},
         )
-        async def delete(request: HttpRequest, pk: int | str):
+        async def delete(request: HttpRequest, pk: Path[self.path_schema]):
             return 204, await self.model_util.delete_s(request, pk)
 
         delete.__name__ = f"delete_{self.model._meta.model_name}"
