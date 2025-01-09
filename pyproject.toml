@@ -4,6 +4,7 @@ build-backend = "flit_core.buildapi"
 
 [project]
 name = "django-ninja-aio-crud"
+version = "0.5.0"
 module = "ninja_aio"
 dist-name = "django-ninja-aio-crud"
 author = "Giuseppe Casillo"
