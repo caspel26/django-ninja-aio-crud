@@ -32,7 +32,7 @@ class AuthError(BaseException):
 
 
 def _default_error(
-    request: HttpRequest, exc: BaseException, api: "NinjaAPI"
+    request: HttpRequest, exc: BaseException, api: type[NinjaAPI]
 ) -> HttpResponse:
     return api.create_response(request, exc.error, status=exc.status_code)
 
