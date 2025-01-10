@@ -2,7 +2,7 @@ from joserfc import jwt, jwk, errors
 from django.http.request import HttpRequest
 from ninja.security.http import HttpBearer
 
-from .exceptions import AuthError
+from .exceptions import AuthError, parse_jose_error
 
 
 class AsyncJwtBearer(HttpBearer):
@@ -23,8 +23,8 @@ class AsyncJwtBearer(HttpBearer):
             errors.InvalidClaimError,
             errors.MissingClaimError,
             errors.ExpiredTokenError,
-        ):
-            raise AuthError()
+        ) as exc:
+            raise AuthError(parse_jose_error(exc), 401)
 
     async def auth_handler(self, request: HttpRequest):
         """
@@ -35,15 +35,11 @@ class AsyncJwtBearer(HttpBearer):
     async def authenticate(self, request: HttpRequest, token: str):
         try:
             self.dcd = jwt.decode(token, self.jwt_public, algorithms=self.algorithms)
-        except (
-            errors.BadSignatureError,
-            ValueError,
-        ):
-            return None
+        except errors.BadSignatureError as exc:
+            raise AuthError(parse_jose_error(exc), 401)
+        except ValueError as exc:
+            raise AuthError(", ".join(exc.args), 401)
 
-        try:
-            self.validate_claims(self.dcd.claims)
-        except AuthError:
-            return None
+        self.validate_claims(self.dcd.claims)
 
         return await self.auth_handler(request)
