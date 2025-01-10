@@ -13,11 +13,14 @@ class BaseException(Exception):
         self,
         error: str | dict = None,
         status_code: int | None = None,
-        is_critical: bool = False,
+        details: str | None = None,
     ) -> None:
-        self.error = error or self.error
+        if isinstance(error, str):
+            self.error = {"error": error}
+        if isinstance(error, dict):
+            self.error = error
+        self.error |= {"details": details} if details else {}
         self.status_code = status_code or self.status_code
-        self.is_critical = is_critical
 
     def get_error(self):
         return self.error, self.status_code

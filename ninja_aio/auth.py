@@ -24,7 +24,7 @@ class AsyncJwtBearer(HttpBearer):
             errors.MissingClaimError,
             errors.ExpiredTokenError,
         ) as exc:
-            raise AuthError(parse_jose_error(exc), 401)
+            raise AuthError(**parse_jose_error(exc), status_code=401)
 
     async def auth_handler(self, request: HttpRequest):
         """
@@ -36,7 +36,7 @@ class AsyncJwtBearer(HttpBearer):
         try:
             self.dcd = jwt.decode(token, self.jwt_public, algorithms=self.algorithms)
         except errors.BadSignatureError as exc:
-            raise AuthError(parse_jose_error(exc), 401)
+            raise AuthError(**parse_jose_error(exc), status_code=401)
         except ValueError as exc:
             raise AuthError(", ".join(exc.args), 401)
 
