@@ -214,6 +214,10 @@ FooAPI().add_views_to_route()
 
 - You can also choose to disable any operation from crud by declaring "disbale" attribute. You can give "all" to disable every crud operation except for additional views.
 
+> [!TIP]
+> You can exclude by default an endpoint without declaring the serializer.
+> For example if you don't want to give update method to a CRUD just do not declare UpdateSerializer into model.
+
 ```python
 # views.py
 from ninja_aio import NinjaAIO
