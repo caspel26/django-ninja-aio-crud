@@ -5,7 +5,7 @@ from ninja.schema import Schema
 from ninja.orm import create_schema
 
 from django.db import models
-from django.http import HttpResponse, HttpRequest
+from django.http import HttpRequest
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models.fields.related_descriptors import (
     ReverseManyToOneDescriptor,
@@ -14,7 +14,7 @@ from django.db.models.fields.related_descriptors import (
 )
 
 from .exceptions import SerializeError
-from .types import S_TYPES, REL_TYPES, ModelSerializerMeta
+from .types import S_TYPES, REL_TYPES, F_TYPES, SCHEMA_TYPES, ModelSerializerMeta
 
 
 class ModelUtil:
@@ -24,11 +24,14 @@ class ModelUtil:
     @property
     def serializable_fields(self):
         if isinstance(self.model, ModelSerializerMeta):
-            return self.model.ReadSerializer.fields
+            return self.model.get_fields("read")
         return [field.name for field in self.model._meta.get_fields()]
 
     def verbose_name_path_resolver(self) -> str:
         return "-".join(self.model._meta.verbose_name_plural.split(" "))
+
+    def verbose_name_view_resolver(self) -> str:
+        return self.model._meta.verbose_name_plural.replace(" ", "")
 
     async def get_object(self, request: HttpRequest, pk: int | str):
         q = {self.model._meta.pk.attname: pk}
@@ -58,11 +61,18 @@ class ModelUtil:
     async def parse_input_data(self, request: HttpRequest, data: Schema):
         payload = data.model_dump()
         customs = {}
+        optionals = []
         if isinstance(self.model, ModelSerializerMeta):
             customs = {k: v for k, v in payload.items() if self.model.is_custom(k)}
+            optionals = [
+                k for k, v in payload.items() if self.model.is_optional(k) and v is None
+            ]
         for k, v in payload.items():
-            if isinstance(self.model, ModelSerializerMeta) and self.model.is_custom(k):
-                continue
+            if isinstance(self.model, ModelSerializerMeta):
+                if self.model.is_custom(k):
+                    continue
+                if self.model.is_optional(k) and k is None:
+                    continue
             field_obj = getattr(self.model, k).field
             if isinstance(field_obj, models.BinaryField):
                 try:
@@ -73,7 +83,9 @@ class ModelUtil:
                 rel_util = ModelUtil(field_obj.related_model)
                 rel: ModelSerializer = await rel_util.get_object(request, v)
                 payload |= {k: rel}
-        new_payload = {k: v for k, v in payload.items() if k not in customs}
+        new_payload = {
+            k: v for k, v in payload.items() if k not in (customs.keys() or optionals)
+        }
         return new_payload, customs
 
     async def parse_output_data(self, request: HttpRequest, data: Schema):
@@ -106,16 +118,13 @@ class ModelUtil:
         return payload
 
     async def create_s(self, request: HttpRequest, data: Schema, obj_schema: Schema):
-        try:
-            payload, customs = await self.parse_input_data(request, data)
-            pk = (await self.model.objects.acreate(**payload)).pk
-            obj = await self.get_object(request, pk)
-        except SerializeError as e:
-            return e.status_code, e.error
+        payload, customs = await self.parse_input_data(request, data)
+        pk = (await self.model.objects.acreate(**payload)).pk
+        obj = await self.get_object(request, pk)
         if isinstance(self.model, ModelSerializerMeta):
             await obj.custom_actions(customs)
             await obj.post_create()
-        return 201, await self.read_s(request, obj, obj_schema)
+        return await self.read_s(request, obj, obj_schema)
 
     async def read_s(
         self,
@@ -130,11 +139,7 @@ class ModelUtil:
     async def update_s(
         self, request: HttpRequest, data: Schema, pk: int | str, obj_schema: Schema
     ):
-        try:
-            obj = await self.get_object(request, pk)
-        except SerializeError as e:
-            return e.status_code, e.error
-
+        obj = await self.get_object(request, pk)
         payload, customs = await self.parse_input_data(request, data)
         for k, v in payload.items():
             if v is not None:
@@ -146,12 +151,9 @@ class ModelUtil:
         return await self.read_s(request, updated_object, obj_schema)
 
     async def delete_s(self, request: HttpRequest, pk: int | str):
-        try:
-            obj = await self.get_object(request, pk)
-        except SerializeError as e:
-            return e.status_code, e.error
+        obj = await self.get_object(request, pk)
         await obj.adelete()
-        return HttpResponse(status=204)
+        return None
 
 
 class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
@@ -161,13 +163,18 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
     class CreateSerializer:
         fields: list[str] = []
         customs: list[tuple[str, type, Any]] = []
+        optionals: list[tuple[str, type]] = []
+        excludes: list[str] = []
 
     class ReadSerializer:
         fields: list[str] = []
+        excludes: list[str] = []
 
     class UpdateSerializer:
         fields: list[str] = []
         customs: list[tuple[str, type, Any]] = []
+        optionals: list[tuple[str, type]] = []
+        excludes: list[str] = []
 
     @property
     def has_custom_fields_create(self):
@@ -180,6 +187,74 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
     @property
     def has_custom_fields(self):
         return self.has_custom_fields_create or self.has_custom_fields_update
+
+    @property
+    def has_optional_fields_create(self):
+        return hasattr(self.CreateSerializer, "optionals")
+
+    @property
+    def has_optional_fields_update(self):
+        return hasattr(self.UpdateSerializer, "optionals")
+
+    @property
+    def has_optional_fields(self):
+        return self.has_optional_fields_create or self.has_optional_fields_update
+
+    @classmethod
+    def _get_fields(cls, s_type: type[S_TYPES], f_type: type[F_TYPES]):
+        match s_type:
+            case "create":
+                fields = getattr(cls.CreateSerializer, f_type, [])
+            case "update":
+                fields = getattr(cls.UpdateSerializer, f_type, [])
+            case "read":
+                fields = getattr(cls.ReadSerializer, f_type, [])
+        return fields
+
+    @classmethod
+    def _is_special_field(
+        cls, s_type: type[S_TYPES], field: str, f_type: type[F_TYPES]
+    ):
+        special_fields = cls._get_fields(s_type, f_type)
+        return any(field in special_f for special_f in special_fields)
+
+    @classmethod
+    def _generate_model_schema(
+        cls,
+        schema_type: type[SCHEMA_TYPES],
+        depth: int = None,
+    ) -> Schema:
+        match schema_type:
+            case "In":
+                s_type = "create"
+            case "Patch":
+                s_type = "update"
+            case "Out":
+                fields, reverse_rels, excludes = cls.get_schema_out_data()
+                if not fields and not reverse_rels and not excludes:
+                    return None
+                return create_schema(
+                    model=cls,
+                    name=f"{cls._meta.model_name}SchemaOut",
+                    depth=depth,
+                    fields=fields,
+                    custom_fields=reverse_rels,
+                    exclude=excludes,
+                )
+        fields = cls.get_fields(s_type)
+        customs = cls.get_custom_fields(s_type) + cls.get_optional_fields(s_type)
+        excludes = cls.get_excluded_fields(s_type)
+        return (
+            create_schema(
+                model=cls,
+                name=f"{cls._meta.model_name}Schema{schema_type}",
+                fields=fields,
+                custom_fields=customs,
+                exclude=excludes,
+            )
+            if fields or customs or excludes
+            else None
+        )
 
     @classmethod
     def verbose_name_path_resolver(cls) -> str:
@@ -260,7 +335,7 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
     def get_schema_out_data(cls):
         fields = []
         reverse_rels = []
-        for f in cls.ReadSerializer.fields:
+        for f in cls.get_fields("read"):
             field_obj = getattr(cls, f)
             if isinstance(field_obj, ManyToManyDescriptor):
                 rel_obj: ModelSerializer = field_obj.field.related_model
@@ -280,115 +355,47 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
                 reverse_rels.append(rel_data)
                 continue
             fields.append(f)
-        return fields, reverse_rels
+        return fields, reverse_rels, cls.get_excluded_fields("read")
 
     @classmethod
     def is_custom(cls, field: str):
-        customs = cls.get_custom_fields("create") or []
-        customs.extend(cls.get_custom_fields("update") or [])
-        return any(field in custom_f for custom_f in customs)
+        return cls._is_special_field(
+            "create", field, "customs"
+        ) or cls._is_special_field("update", field, "customs")
 
     @classmethod
-    async def parse_input_data(cls, request: HttpRequest, data: Schema):
-        payload = data.model_dump()
-        customs = {k: v for k, v in payload.items() if cls.is_custom(k)}
-        for k, v in payload.items():
-            if cls.is_custom(k):
-                continue
-            field_obj = getattr(cls, k).field
-            if isinstance(field_obj, models.BinaryField):
-                try:
-                    payload |= {k: base64.b64decode(v)}
-                except Exception as exc:
-                    raise SerializeError({k: ". ".join(exc.args)}, 400)
-            if isinstance(field_obj, models.ForeignKey):
-                rel: ModelSerializer = await field_obj.related_model.get_object(
-                    request, v
-                )
-                payload |= {k: rel}
-        new_payload = {k: v for k, v in payload.items() if k not in customs}
-        return new_payload, customs
-
-    @classmethod
-    async def parse_output_data(cls, request: HttpRequest, data: Schema):
-        olds_k: list[dict] = []
-        payload = data.model_dump()
-        for k, v in payload.items():
-            try:
-                field_obj = getattr(cls, k).field
-            except AttributeError:
-                field_obj = getattr(cls, k).related
-            if isinstance(v, dict) and (
-                isinstance(field_obj, models.ForeignKey)
-                or isinstance(field_obj, models.OneToOneField)
-            ):
-                rel: ModelSerializer = await field_obj.related_model.get_object(
-                    request, list(v.values())[0]
-                )
-                if isinstance(field_obj, models.ForeignKey):
-                    for rel_k, rel_v in v.items():
-                        field_rel_obj = getattr(rel, rel_k)
-                        if isinstance(field_rel_obj, models.ForeignKey):
-                            olds_k.append({rel_k: rel_v})
-                    for obj in olds_k:
-                        for old_k, old_v in obj.items():
-                            v.pop(old_k)
-                            v |= {f"{old_k}_id": old_v}
-                    olds_k = []
-                payload |= {k: rel}
-        return payload
+    def is_optional(cls, field: str):
+        return cls._is_special_field(
+            "create", field, "optionals"
+        ) or cls._is_special_field("update", field, "optionals")
 
     @classmethod
     def get_custom_fields(cls, s_type: type[S_TYPES]):
-        try:
-            match s_type:
-                case "create":
-                    customs = cls.CreateSerializer.customs
-                case "update":
-                    customs = cls.UpdateSerializer.customs
-        except AttributeError:
-            return None
-        return customs
+        return cls._get_fields(s_type, "customs")
+
+    @classmethod
+    def get_optional_fields(cls, s_type: type[S_TYPES]):
+        return [
+            (field, field_type, None)
+            for field, field_type in cls._get_fields(s_type, "optionals")
+        ]
+
+    @classmethod
+    def get_excluded_fields(cls, s_type: type[S_TYPES]):
+        return cls._get_fields(s_type, "excludes")
+
+    @classmethod
+    def get_fields(cls, s_type: type[S_TYPES]):
+        return cls._get_fields(s_type, "fields")
 
     @classmethod
     def generate_read_s(cls, depth: int = 1) -> Schema:
-        fields, reverse_rels = cls.get_schema_out_data()
-        customs = [custom for custom in reverse_rels]
-        return create_schema(
-            model=cls,
-            name=f"{cls._meta.model_name}SchemaOut",
-            depth=depth,
-            fields=fields,
-            custom_fields=customs,
-        )
+        return cls._generate_model_schema("Out", depth)
 
     @classmethod
     def generate_create_s(cls) -> Schema:
-        return create_schema(
-            model=cls,
-            name=f"{cls._meta.model_name}SchemaIn",
-            fields=cls.CreateSerializer.fields,
-            custom_fields=cls.get_custom_fields("create"),
-        )
+        return cls._generate_model_schema("In")
 
     @classmethod
     def generate_update_s(cls) -> Schema:
-        return create_schema(
-            model=cls,
-            name=f"{cls._meta.model_name}SchemaPatch",
-            fields=cls.UpdateSerializer.fields,
-            custom_fields=cls.get_custom_fields("update"),
-        )
-
-    @classmethod
-    async def get_object(cls, request: HttpRequest, pk: int | str):
-        q = {cls._meta.pk.attname: pk}
-        try:
-            obj = (
-                await (await cls.queryset_request(request))
-                .prefetch_related(*cls.get_reverse_relations())
-                .aget(**q)
-            )
-        except ObjectDoesNotExist:
-            raise SerializeError({cls._meta.model_name: "not found"}, 404)
-        return obj
+        return cls._generate_model_schema("Patch")

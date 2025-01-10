@@ -1,4 +1,9 @@
 # 🥷 django-ninja-aio-crud
+![Test](https://github.com/caspel26/django-ninja-aio-crud/actions/workflows/coverage.yml/badge.svg)
+[![codecov](https://codecov.io/gh/caspel26/django-ninja-aio-crud/graph/badge.svg?token=DZ5WDT3S20)](https://codecov.io/gh/caspel26/django-ninja-aio-crud)
+[![PyPI - Version](https://img.shields.io/pypi/v/django-ninja-aio-crud?color=g&logo=pypi&logoColor=white)](https://pypi.org/project/django-ninja-aio-crud/)
+[![PyPI - License](https://img.shields.io/pypi/l/django-ninja-aio-crud)](https://github.com/caspel26/django-ninja-aio-crud/blob/main/LICENSE)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 > [!NOTE]
 > Django ninja aio crud framework is based on **<a href="https://django-ninja.dev/">Django Ninja framework</a>**. It comes out with built-in views and models which are able to make automatic async CRUD operations and codes views class based making the developers' life easier and the code cleaner.
 
@@ -44,7 +49,7 @@ pip install django-ninja-aio-crud
 ### ModelSerializer
 
 - You can serialize your models using ModelSerializer and made them inherit from it. In your models.py import ModelSerializer
-```Python
+```python
 # models.py
 from django.db import models
 from ninja_aio.models import ModelSerializer
@@ -66,7 +71,7 @@ class Foo(ModelSerializer):
 
 - ReadSerializer, CreateSerializer, UpdateSerializer are used to define which fields would be included in runtime schemas creation. You can also specify custom fields and handle their function by overriding custom_actions ModelSerializer's method(custom fields are only available for Create and Update serializers).
 
-```Python
+```python
 # models.py
 from django.db import models
 from ninja_aio.models import ModelSerializer
@@ -101,17 +106,63 @@ class Foo(ModelSerializer):
 
 - post create method is a custom method that comes out to handle actions which will be excuted after that the object is created. It can be used, indeed, for example to handle custom fields' actions.
 
+- You can also define optional fields for you Create and Update serializers (remember to give your optional fields a default). To declare an optional fields you have to give the field type too.
+```python
+# models.py
+from django.db import models
+from ninja_aio.models import ModelSerializer
+
+
+class Foo(ModelSerializer):
+  name = models.CharField(max_length=30)
+  bar = models.CharField(max_length=30, default="")
+  active = models.BooleanField(default=False)
+
+  class ReadSerializer:
+    fields = ["id", "name", "bar"]
+
+  class CreateSerializer:
+    fields = ["name"]
+    optionals = [("bar", str), ("active", bool)]
+
+  class UpdateSerializer:
+    optionals = [[("bar", str), ("active", bool)]
+```
+
+- Instead of declaring your fields maybe you want to exclude some of them. Declaring "excludes" attribute into serializers will exclude the given fields. (You can declare only one between "fields" and "excludes").
+
+```python
+# models.py
+from django.db import models
+from ninja_aio.models import ModelSerializer
+
+
+class Foo(ModelSerializer):
+  name = models.CharField(max_length=30)
+  bar = models.CharField(max_length=30, default="")
+  active = models.BooleanField(default=False)
+
+  class ReadSerializer:
+    excludes = ["bar"]
+
+  class CreateSerializer:
+    fields = ["name"]
+    optionals = [("bar", str), ("active", bool)]
+
+  class UpdateSerializer:
+    excludes = ["id", "name"]
+    optionals = [[("bar", str), ("active", bool)]
+```
+
 
 ### APIViewSet
 
 - View class used to automatically generate CRUD views. in your views.py import APIViewSet and define your api using NinjaAIO class. NinjaAIO class uses built-in parser and renderer which use orjson for data serialization.
 
-```Python
+```python
 # views.py
 from ninja_aio import NinjaAIO
 from ninja_aio.views import APIViewSet
-from ninja_aio.parsers import ORJSONParser
-from ninja_aio.renders import ORJSONRender
 
 from .models import Foo
 
@@ -128,13 +179,11 @@ FooAPI().add_views_to_route()
 
 - and that's it, your model CRUD will be automatically created. You can also add custom views to CRUD overriding the built-in method "views".
 
-```Python
+```python
 # views.py
 from ninja import Schema
 from ninja_aio import NinjaAIO
 from ninja_aio.views import APIViewSet
-from ninja_aio.parsers import ORJSONParser
-from ninja_aio.renders import ORJSONRender
 
 from .models import Foo
 
@@ -163,17 +212,36 @@ class FooAPI(APIViewSet):
 FooAPI().add_views_to_route()
 ```
 
+- You can also choose to disable any operation from crud by declaring "disbale" attribute. You can give "all" to disable every crud operation except for additional views.
+
+```python
+# views.py
+from ninja_aio import NinjaAIO
+from ninja_aio.views import APIViewSet
+
+from .models import Foo
+
+api = NinjaAIO()
+
+
+class FooAPI(APIViewSet):
+  model = Foo
+  api = api
+  disable = ["retrieve", "update"]
+
+
+FooAPI().add_views_to_route()
+```
+
 ### APIView
 
 - View class to code generic views class based. In your views.py import APIView class.
 
-```Python
+```python
 # views.py
 from ninja import Schema
 from ninja_aio import NinjaAIO
 from ninja_aio.views import APIView
-from ninja_aio.parsers import ORJSONParser
-from ninja_aio.renders import ORJSONRender
 
 api = NinjaAIO()
 
@@ -206,7 +274,7 @@ SumView().add_views_to_route()
 
 - Define models:
 
-```Python
+```python
 # models.py
 class Bar(ModelSerializer):
     name = models.CharField(max_length=30)
@@ -239,12 +307,10 @@ class Foo(ModelSerializer):
 
 - Define views:
 
-```Python
+```python
 # views.py
 from ninja_aio import NinjaAIO
 from ninja_aio.views import APIViewSet
-from ninja_aio.parsers import ORJSONParser
-from ninja_aio.renders import ORJSONRender
 
 from .models import Foo, Bar
 
@@ -283,7 +349,7 @@ BarAPI().add_views_to_route()
 
 - AsyncJWTBearer built-in class is an authenticator class which use joserfc module. It cames out with authenticate method which validate given claims. Override auth handler method to write your own authentication method. Default algorithms used is RS256. a jwt Token istance is set as class atribute so you can use it by self.dcd.  
 
-```Python
+```python
 from ninja_aio.auth import AsyncJWTBearer
 from django.conf import settings
 from django.http import HttpRequest
@@ -305,13 +371,11 @@ class CustomJWTBearer(AsyncJWTBearer):
 
 - Then add it to views.
 
-```Python
+```python
 # views.py
 from ninja import Schema
 from ninja_aio import NinjaAIO
 from ninja_aio.views import APIViewSet, APIView
-from ninja_aio.parsers import ORJSONParser
-from ninja_aio.renders import ORJSONRender
 
 from .models import Foo
 
@@ -353,7 +417,7 @@ SumView().add_views_to_route()
 
 - By default APIViewSet list view uses Django Ninja built-in AsyncPagination class "PageNumberPagination". You can customize and assign it to APIViewSet class. To make your custom pagination consult **<a href="https://django-ninja.dev/guides/response/pagination/#async-pagination">Django Ninja pagination documentation</a>**.
 
-```Python
+```python
 # views.py
 
 class FooAPI(APIViewSet):

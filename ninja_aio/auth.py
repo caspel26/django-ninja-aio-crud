@@ -5,7 +5,6 @@ from ninja.security.http import HttpBearer
 from .exceptions import AuthError
 
 
-
 class AsyncJwtBearer(HttpBearer):
     jwt_public: jwk.RSAKey
     claims: dict[str, dict]

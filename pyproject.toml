@@ -30,6 +30,10 @@ requires = ["django-ninja >=1.3.0", "joserfc >=1.0.0", "orjson >= 3.10.7"]
 description-file = "README.md"
 requires-python = ">=3.10"
 
+[tool.flit.metadata.requires-extra]
+test = [
+    "coverage"
+]
 
 [tool.flit.metadata.urls]
 Repository = "https://github.com/caspel26/django-ninja-aio-crud"
