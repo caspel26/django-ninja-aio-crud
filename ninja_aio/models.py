@@ -1,7 +1,7 @@
 import base64
 from typing import Any
 
-from ninja.schema import Schema
+from ninja import Schema
 from ninja.orm import create_schema
 
 from django.db import models
@@ -27,21 +27,33 @@ class ModelUtil:
             return self.model.get_fields("read")
         return [field.name for field in self.model._meta.get_fields()]
 
+    @property
+    def model_name(self) -> str:
+        return self.model._meta.model_name
+
+    @property
+    def model_pk_name(self) -> str:
+        return self.model._meta.pk.attname
+
+    @property
+    def model_verbose_name_plural(self) -> str:
+        return self.model._meta.verbose_name_plural
+
     def verbose_name_path_resolver(self) -> str:
-        return "-".join(self.model._meta.verbose_name_plural.split(" "))
+        return "-".join(self.model_verbose_name_plural.split(" "))
 
     def verbose_name_view_resolver(self) -> str:
-        return self.model._meta.verbose_name_plural.replace(" ", "")
+        return self.model_verbose_name_plural.replace(" ", "")
 
     async def get_object(self, request: HttpRequest, pk: int | str):
-        q = {self.model._meta.pk.attname: pk}
+        q = {self.model_pk_name: pk}
         obj_qs = self.model.objects.select_related()
         if isinstance(self.model, ModelSerializerMeta):
             obj_qs = await self.model.queryset_request(request)
         try:
             obj = await obj_qs.prefetch_related(*self.get_reverse_relations()).aget(**q)
         except ObjectDoesNotExist:
-            raise SerializeError({self.model._meta.model_name: "not found"}, 404)
+            raise SerializeError({self.model_name: "not found"}, 404)
         return obj
 
     def get_reverse_relations(self) -> list[str]:
@@ -379,11 +391,11 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
             (field, field_type, None)
             for field, field_type in cls._get_fields(s_type, "optionals")
         ]
-    
+
     @classmethod
     def get_excluded_fields(cls, s_type: type[S_TYPES]):
         return cls._get_fields(s_type, "excludes")
-    
+
     @classmethod
     def get_fields(cls, s_type: type[S_TYPES]):
         return cls._get_fields(s_type, "fields")
