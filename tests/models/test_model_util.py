@@ -18,6 +18,14 @@ class BaseTests:
         def read_data(self):
             return {"id": 1, "name": "test", "description": "test"}
 
+        @property
+        def additional_getters(self):
+            return {"description": "test"}
+
+        @property
+        def additional_filters(self):
+            return {"name": "test"}
+
     @tag("model_util_model_serializer")
     class ModelUtilModelSerializerTestCase(ModelUtilTestCaseBase):
         @property
