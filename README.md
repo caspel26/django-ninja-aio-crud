@@ -96,7 +96,7 @@ class Foo(ModelSerializer):
       if not payload.get("force_activation"):
           return
       setattr(self, "force_activation", True)
-  
+
   async def post_create(self) -> None:
       if not hasattr(self, "force_activation") or not getattr(self, "force_activation"):
           return
@@ -173,7 +173,7 @@ class FooAPI(APIViewSet):
   model = Foo
   api = api
 
-  
+
 FooAPI().add_views_to_route()
 ```
 
@@ -232,6 +232,29 @@ class FooAPI(APIViewSet):
   model = Foo
   api = api
   disable = ["retrieve", "update"]
+
+
+FooAPI().add_views_to_route()
+```
+For the list endpoint you can also set query params and handle them. They will be also visible into swagger.
+
+```python
+# views.py
+from ninja_aio import NinjaAIO
+from ninja_aio.views import APIViewSet
+
+from .models import Foo
+
+api = NinjaAIO()
+
+
+class FooAPI(APIViewSet):
+  model = Foo
+  api = api
+  query_params = {"name": (str, None), "active": (bool, None)}
+
+  async def query_params_handler(self, queryset, filters):
+      return queryset.filter(**{k: v for k, v in filters.items() if v is not None})
 
 
 FooAPI().add_views_to_route()
@@ -351,7 +374,7 @@ BarAPI().add_views_to_route()
 
 ### Jwt
 
-- AsyncJWTBearer built-in class is an authenticator class which use joserfc module. It cames out with authenticate method which validate given claims. Override auth handler method to write your own authentication method. Default algorithms used is RS256. a jwt Token istance is set as class atribute so you can use it by self.dcd.  
+- AsyncJWTBearer built-in class is an authenticator class which use joserfc module. It cames out with authenticate method which validate given claims. Override auth handler method to write your own authentication method. Default algorithms used is RS256. a jwt Token istance is set as class atribute so you can use it by self.dcd.
 
 ```python
 from ninja_aio.auth import AsyncJWTBearer
