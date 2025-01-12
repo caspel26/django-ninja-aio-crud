@@ -100,7 +100,7 @@ class APIViewSet:
 
     def _create_path_schema(self):
         fields = {
-            self.model._meta.pk.attname: (str | int , ...),
+            self.model._meta.pk.attname: (str | int, ...),
         }
         return create_model(f"{self.model._meta.model_name}PathSchema", **fields)
 
@@ -170,7 +170,9 @@ class APIViewSet:
             auth=self.auths,
             response={200: self.schema_out, self.error_codes: GenericMessageSchema},
         )
-        async def update(request: HttpRequest, data: self.schema_update, pk: Path[self.path_schema]):
+        async def update(
+            request: HttpRequest, data: self.schema_update, pk: Path[self.path_schema]
+        ):
             return await self.model_util.update_s(request, data, pk, self.schema_out)
 
         update.__name__ = f"update_{self.model._meta.model_name}"
