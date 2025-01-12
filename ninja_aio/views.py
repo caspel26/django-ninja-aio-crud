@@ -1,10 +1,10 @@
 from typing import List
 
-from ninja import NinjaAPI, Router, Schema, Path
+from ninja import NinjaAPI, Router, Schema, Path, Query
 from ninja.constants import NOT_SET
 from ninja.pagination import paginate, AsyncPaginationBase, PageNumberPagination
 from django.http import HttpRequest
-from django.db.models import Model
+from django.db.models import Model, QuerySet
 from pydantic import create_model
 
 from .models import ModelSerializer, ModelUtil
@@ -73,16 +73,19 @@ class APIViewSet:
     schema_update: Schema | None = None
     auths: list | None = NOT_SET
     pagination_class: type[AsyncPaginationBase] = PageNumberPagination
+    query_params: dict[str, tuple[type, ...]] = {}
     disable: list[type[VIEW_TYPES]] = []
 
     def __init__(self) -> None:
-        self.router = Router(tags=[self.model._meta.model_name.capitalize()])
-        self.path = "/"
-        self.path_retrieve = f"{{{self.model._meta.pk.attname}}}/"
         self.error_codes = ERROR_CODES
         self.model_util = ModelUtil(self.model)
         self.schema_out, self.schema_in, self.schema_update = self.get_schemas()
-        self.path_schema = self._create_path_schema()
+        self.path_schema = self._generate_path_schema()
+        self.filters_schema = self._generate_filters_schema()
+        self.router_tag = self.model_util.model_name.capitalize()
+        self.router = Router(tags=[self.router_tag])
+        self.path = "/"
+        self.path_retrieve = f"{{{self.model_util.model_pk_name}}}/"
 
     @property
     def _crud_views(self):
@@ -98,11 +101,16 @@ class APIViewSet:
             "delete": (None, self.delete_view),
         }
 
-    def _create_path_schema(self):
-        fields = {
-            self.model._meta.pk.attname: (str | int, ...),
-        }
-        return create_model(f"{self.model._meta.model_name}PathSchema", **fields)
+    def _generate_schema(self, fields: dict, name: str) -> Schema:
+        return create_model(f"{self.model_util.model_name}{name}", **fields)
+
+    def _generate_path_schema(self):
+        return self._generate_schema(
+            {self.model_util.model_pk_name: (int | str, ...)}, "PathSchema"
+        )
+
+    def _generate_filters_schema(self):
+        return self._generate_schema(self.query_params, "FiltersSchema")
 
     def get_schemas(self):
         if isinstance(self.model, ModelSerializerMeta):
@@ -113,6 +121,16 @@ class APIViewSet:
             )
         return self.schema_out, self.schema_in, self.schema_update
 
+    async def query_params_handler(
+        self, queryset: QuerySet[ModelSerializer], filters: dict
+    ):
+        """
+        Override this method to handle request query params making queries to the database
+        based on filters or any other logic. This method should return a queryset. filters
+        are given already dumped by the schema.
+        """
+        return queryset
+
     def create_view(self):
         @self.router.post(
             self.path,
@@ -122,7 +140,7 @@ class APIViewSet:
         async def create(request: HttpRequest, data: self.schema_in):
             return 201, await self.model_util.create_s(request, data, self.schema_out)
 
-        create.__name__ = f"create_{self.model._meta.model_name}"
+        create.__name__ = f"create_{self.model_util.model_name}"
         return create
 
     def list_view(self):
@@ -135,13 +153,14 @@ class APIViewSet:
             },
         )
         @paginate(self.pagination_class)
-        async def list(request: HttpRequest):
+        async def list(request: HttpRequest, filters: Query[self.filters_schema]):
             qs = self.model.objects.select_related()
             if isinstance(self.model, ModelSerializerMeta):
                 qs = await self.model.queryset_request(request)
             rels = self.model_util.get_reverse_relations()
             if len(rels) > 0:
                 qs = qs.prefetch_related(*rels)
+            qs = await self.query_params_handler(qs, filters.model_dump())
             objs = [
                 await self.model_util.read_s(request, obj, self.schema_out)
                 async for obj in qs.all()
@@ -161,7 +180,7 @@ class APIViewSet:
             obj = await self.model_util.get_object(request, pk)
             return await self.model_util.read_s(request, obj, self.schema_out)
 
-        retrieve.__name__ = f"retrieve_{self.model._meta.model_name}"
+        retrieve.__name__ = f"retrieve_{self.model_util.model_name}"
         return retrieve
 
     def update_view(self):
@@ -175,7 +194,7 @@ class APIViewSet:
         ):
             return await self.model_util.update_s(request, data, pk, self.schema_out)
 
-        update.__name__ = f"update_{self.model._meta.model_name}"
+        update.__name__ = f"update_{self.model_util.model_name}"
         return update
 
     def delete_view(self):
@@ -187,7 +206,7 @@ class APIViewSet:
         async def delete(request: HttpRequest, pk: Path[self.path_schema]):
             return 204, await self.model_util.delete_s(request, pk)
 
-        delete.__name__ = f"delete_{self.model._meta.model_name}"
+        delete.__name__ = f"delete_{self.model_util.model_name}"
         return delete
 
     def views(self):

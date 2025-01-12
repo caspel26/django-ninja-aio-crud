@@ -73,6 +73,18 @@ class Tests:
             """
 
         @property
+        def additional_getters(self) -> dict:
+            """
+            Should be implemented into the child class
+            """
+
+        @property
+        def additional_filters(self) -> dict:
+            """
+            Should be implemented into the child class
+            """
+
+        @property
         def data_in(self):
             return self.schema_in(**self.create_data)
 
@@ -113,6 +125,34 @@ class Tests:
             mock_queryset_request.return_value = self.model.objects.select_related()
             obj = await self.model_util.get_object(self.request.get(), self.obj.pk)
             self.assertEqual(obj, self.obj)
+            if isinstance(self.model, ModelSerializerMeta):
+                mock_queryset_request.assert_awaited_once()
+            else:
+                mock_queryset_request.assert_not_awaited()
+
+        @mock.patch(
+            "ninja_aio.models.ModelSerializer.queryset_request",
+            new_callable=mock.AsyncMock,
+        )
+        async def test_get_object_with_additional_data(
+            self, mock_queryset_request: mock.AsyncMock
+        ):
+            mock_queryset_request.return_value = (
+                self.model.objects.select_related().all()
+            )
+            obj = await self.model_util.get_object(
+                self.request.get(),
+                **{
+                    "filters": self.additional_filters,
+                    "getters": self.additional_getters,
+                },
+            )
+            _obj = (
+                await self.model.objects.select_related()
+                .filter(**self.additional_filters)
+                .aget(**self.additional_getters)
+            )
+            self.assertEqual(obj, _obj)
             if isinstance(self.model, ModelSerializerMeta):
                 mock_queryset_request.assert_awaited_once()
             else:

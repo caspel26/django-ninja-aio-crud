@@ -62,19 +62,19 @@ class Tests:
         @property
         def create_view_path_name(self):
             return f"create_{self.model._meta.model_name}"
-        
+
         @property
         def list_view_path_name(self):
             return f"list_{self.test_util.verbose_name_view_resolver()}"
-        
+
         @property
         def retrieve_view_path_name(self):
             return f"retrieve_{self.model._meta.model_name}"
-        
+
         @property
         def update_view_path_name(self):
             return f"update_{self.model._meta.model_name}"
-        
+
         @property
         def delete_view_path_name(self):
             return f"delete_{self.model._meta.model_name}"
@@ -102,6 +102,14 @@ class Tests:
         @property
         def pagination_kwargs(self):
             return {"ninja_pagination": self.viewset.pagination_class.Input(page=1)}
+
+        @property
+        def filters_kwargs(self):
+            return {"filters": self.viewset.filters_schema()}
+
+        @property
+        def list_kwargs(self):
+            return self.pagination_kwargs | self.filters_kwargs
 
         @property
         def payload_create(self):
@@ -210,7 +218,7 @@ class Tests:
 
         async def test_list(self):
             view = self.viewset.list_view()
-            content: dict = await view(self.get_request, **self.pagination_kwargs)
+            content: dict = await view(self.get_request, **self.list_kwargs)
             self.assertEqual(["items", "count"], list(content.keys()))
             items = content["items"]
             count = content["count"]
