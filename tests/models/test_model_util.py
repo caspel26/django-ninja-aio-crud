@@ -36,10 +36,6 @@ class ModelUtilModelSerializerBaseTestCase(BaseTests.ModelUtilModelSerializerTes
     model = models.TestModelSerializer
 
     @property
-    def serializable_fields(self):
-        return self.model.ReadSerializer.fields
-
-    @property
     def model_verbose_name_path(self):
         return "test-model-serializers"
 
