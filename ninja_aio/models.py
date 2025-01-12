@@ -45,15 +45,30 @@ class ModelUtil:
     def verbose_name_view_resolver(self) -> str:
         return self.model_verbose_name_plural.replace(" ", "")
 
-    async def get_object(self, request: HttpRequest, pk: int | str):
-        q = {self.model_pk_name: pk}
+    async def get_object(
+        self,
+        request: HttpRequest,
+        pk: int | str = None,
+        filters: dict = None,
+        getters: dict = None,
+    ):
+        get_q = {self.model_pk_name: pk} if pk is not None else {}
+        if getters:
+            get_q |= getters
+
         obj_qs = self.model.objects.select_related()
         if isinstance(self.model, ModelSerializerMeta):
             obj_qs = await self.model.queryset_request(request)
+
+        obj_qs = obj_qs.prefetch_related(*self.get_reverse_relations())
+        if filters:
+            obj_qs = obj_qs.filter(**filters)
+
         try:
-            obj = await obj_qs.prefetch_related(*self.get_reverse_relations()).aget(**q)
+            obj = await obj_qs.aget(**get_q)
         except ObjectDoesNotExist:
             raise SerializeError({self.model_name: "not found"}, 404)
+
         return obj
 
     def get_reverse_relations(self) -> list[str]:
