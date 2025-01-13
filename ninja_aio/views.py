@@ -153,14 +153,17 @@ class APIViewSet:
             },
         )
         @paginate(self.pagination_class)
-        async def list(request: HttpRequest, filters: Query[self.filters_schema]):
+        async def list(
+            request: HttpRequest, filters: Query[self.filters_schema] = None
+        ):
             qs = self.model.objects.select_related()
             if isinstance(self.model, ModelSerializerMeta):
                 qs = await self.model.queryset_request(request)
             rels = self.model_util.get_reverse_relations()
             if len(rels) > 0:
                 qs = qs.prefetch_related(*rels)
-            qs = await self.query_params_handler(qs, filters.model_dump())
+            if filters is not None:
+                qs = await self.query_params_handler(qs, filters.model_dump())
             objs = [
                 await self.model_util.read_s(request, obj, self.schema_out)
                 async for obj in qs.all()
