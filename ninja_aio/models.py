@@ -269,8 +269,11 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
                     exclude=excludes,
                 )
         fields = cls.get_fields(s_type)
-        customs = cls.get_custom_fields(s_type) + cls.get_optional_fields(s_type)
+        optionals = cls.get_optional_fields(s_type)
+        customs = cls.get_custom_fields(s_type) + optionals
         excludes = cls.get_excluded_fields(s_type)
+        if not fields and not excludes:
+            fields = [f[0] for f in optionals]
         return (
             create_schema(
                 model=cls,
