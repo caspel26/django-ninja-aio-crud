@@ -112,6 +112,9 @@ class APIViewSet:
     def _generate_filters_schema(self):
         return self._generate_schema(self.query_params, "FiltersSchema")
 
+    def _get_pk(self, data: Schema):
+        return data.model_dump()[self.model_util.model_pk_name]
+
     def get_schemas(self):
         if isinstance(self.model, ModelSerializerMeta):
             return (
@@ -180,7 +183,7 @@ class APIViewSet:
             response={200: self.schema_out, self.error_codes: GenericMessageSchema},
         )
         async def retrieve(request: HttpRequest, pk: Path[self.path_schema]):
-            obj = await self.model_util.get_object(request, pk)
+            obj = await self.model_util.get_object(request, self._get_pk(pk))
             return await self.model_util.read_s(request, obj, self.schema_out)
 
         retrieve.__name__ = f"retrieve_{self.model_util.model_name}"
@@ -195,7 +198,9 @@ class APIViewSet:
         async def update(
             request: HttpRequest, data: self.schema_update, pk: Path[self.path_schema]
         ):
-            return await self.model_util.update_s(request, data, pk, self.schema_out)
+            return await self.model_util.update_s(
+                request, data, self._get_pk(pk), self.schema_out
+            )
 
         update.__name__ = f"update_{self.model_util.model_name}"
         return update
@@ -207,7 +212,7 @@ class APIViewSet:
             response={204: None, self.error_codes: GenericMessageSchema},
         )
         async def delete(request: HttpRequest, pk: Path[self.path_schema]):
-            return 204, await self.model_util.delete_s(request, pk)
+            return 204, await self.model_util.delete_s(request, self._get_pk(pk))
 
         delete.__name__ = f"delete_{self.model_util.model_name}"
         return delete
