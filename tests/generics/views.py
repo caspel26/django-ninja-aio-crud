@@ -159,6 +159,9 @@ class Tests:
         def delete_request(self):
             return self.request.delete()
 
+        def _path_schema(self, pk: int | str):
+            return self.viewset.path_schema(**{self.pk_att: pk})
+
         def _get_routes(self):
             self.assertEqual(len(self.api._routers), 2)
             test_router_path = self.api._routers[1][0]
@@ -230,7 +233,7 @@ class Tests:
 
         async def test_retrieve(self):
             view = self.viewset.retrieve_view()
-            content = await view(self.get_request, 1)
+            content = await view(self.get_request, self._path_schema(1))
             content.pop(self.pk_att)
             self.assertEqual(self.response_data, content)
 
@@ -238,7 +241,7 @@ class Tests:
             with self.assertRaises(SerializeError) as exc:
                 await self.model.objects.select_related().all().adelete()
                 view = self.viewset.retrieve_view()
-                await view(self.get_request, 1)
+                await view(self.get_request, self._path_schema(1))
             self.assertEqual(exc.exception.status_code, 404)
             self.assertEqual(
                 exc.exception.error, {self.model._meta.model_name: "not found"}
@@ -246,14 +249,16 @@ class Tests:
 
         async def test_update(self):
             view = self.viewset.update_view()
-            content = await view(self.patch_request, self.update_data, 1)
+            content = await view(
+                self.patch_request, self.update_data, self._path_schema(1)
+            )
             content.pop(self.pk_att)
             self.assertEqual(self.response_data | self.payload_update, content)
 
         async def test_delete(self):
             view = self.viewset.delete_view()
             pk = self.obj_content[self.pk_att]
-            status, content = await view(self.delete_request, pk)
+            status, content = await view(self.delete_request, self._path_schema(pk))
             self.assertEqual(status, 204)
             self.assertEqual(content, None)
 
