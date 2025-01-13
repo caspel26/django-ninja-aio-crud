@@ -126,7 +126,7 @@ class Foo(ModelSerializer):
     optionals = [("bar", str), ("active", bool)]
 
   class UpdateSerializer:
-    optionals = [[("bar", str), ("active", bool)]
+    optionals = [("bar", str), ("active", bool)]
 ```
 
 - Instead of declaring your fields maybe you want to exclude some of them. Declaring "excludes" attribute into serializers will exclude the given fields. (You can declare only one between "fields" and "excludes").
@@ -151,7 +151,7 @@ class Foo(ModelSerializer):
 
   class UpdateSerializer:
     excludes = ["id", "name"]
-    optionals = [[("bar", str), ("active", bool)]
+    optionals = [("bar", str), ("active", bool)]
 ```
 
 
