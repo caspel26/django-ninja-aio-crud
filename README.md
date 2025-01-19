@@ -69,7 +69,7 @@ class Foo(ModelSerializer):
     fields = ["name", "bar"]
 ```
 
-- ReadSerializer, CreateSerializer, UpdateSerializer are used to define which fields would be included in runtime schemas creation. You can also specify custom fields and handle their function by overriding custom_actions ModelSerializer's method(custom fields are only available for Create and Update serializers).
+- ReadSerializer, CreateSerializer, UpdateSerializer are used to define which fields would be included in runtime schemas creation. You can also specify custom fields and handle their function by overriding custom_actions ModelSerializer's method.
 
 ```python
 # models.py
@@ -153,6 +153,35 @@ class Foo(ModelSerializer):
     excludes = ["id", "name"]
     optionals = [("bar", str), ("active", bool)]
 ```
+- If you want to add into ReadSerializer model properties you must define them as customs.
+```python
+# models.py
+from django.db import models
+from ninja_aio.models import ModelSerializer
+
+
+class Foo(ModelSerializer):
+  name = models.CharField(max_length=30)
+  bar = models.CharField(max_length=30, default="")
+  active = models.BooleanField(default=False)
+
+  @propetry
+  def full_name(self):
+    return f"{self.name} example_full_name"
+
+  class ReadSerializer:
+    excludes = ["bar"]
+    customs = [("full_name", str, "")]
+
+  class CreateSerializer:
+    fields = ["name"]
+    optionals = [("bar", str), ("active", bool)]
+
+  class UpdateSerializer:
+    excludes = ["id", "name"]
+    optionals = [("bar", str), ("active", bool)]
+```
+
 
 
 ### APIViewSet
