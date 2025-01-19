@@ -165,7 +165,7 @@ class Foo(ModelSerializer):
   bar = models.CharField(max_length=30, default="")
   active = models.BooleanField(default=False)
 
-  @propetry
+  @property
   def full_name(self):
     return f"{self.name} example_full_name"
 
