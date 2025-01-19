@@ -53,8 +53,16 @@ def _pydantic_validation_error(
     return api.create_response(request, error.error, status=error.status_code)
 
 
+def _jose_error(
+    request: HttpRequest, exc: JoseError, api: type[NinjaAPI]
+) -> HttpResponse:
+    error = BaseException(**parse_jose_error(exc), status_code=401)
+    return api.create_response(request, error.error, status=error.status_code)
+
+
 def set_api_exception_handlers(api: type[NinjaAPI]) -> None:
     api.add_exception_handler(BaseException, partial(_default_error, api=api))
+    api.add_exception_handler(JoseError, partial(_jose_error, api=api))
     api.add_exception_handler(
         ValidationError, partial(_pydantic_validation_error, api=api)
     )
