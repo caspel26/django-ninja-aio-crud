@@ -122,7 +122,10 @@ class ModelUtil:
             try:
                 field_obj = getattr(self.model, k).field
             except AttributeError:
-                field_obj = getattr(self.model, k).related
+                try:
+                    field_obj = getattr(self.model, k).related
+                except AttributeError:
+                    pass
             if isinstance(v, dict) and (
                 isinstance(field_obj, models.ForeignKey)
                 or isinstance(field_obj, models.OneToOneField)
@@ -196,6 +199,7 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
     class ReadSerializer:
         fields: list[str] = []
         excludes: list[str] = []
+        customs: list[tuple[str, type, Any]] = []
 
     class UpdateSerializer:
         fields: list[str] = []
@@ -257,15 +261,15 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
             case "Patch":
                 s_type = "update"
             case "Out":
-                fields, reverse_rels, excludes = cls.get_schema_out_data()
-                if not fields and not reverse_rels and not excludes:
+                fields, reverse_rels, excludes, customs = cls.get_schema_out_data()
+                if not fields and not reverse_rels and not excludes and not customs:
                     return None
                 return create_schema(
                     model=cls,
                     name=f"{cls._meta.model_name}SchemaOut",
                     depth=depth,
                     fields=fields,
-                    custom_fields=reverse_rels,
+                    custom_fields=reverse_rels + customs,
                     exclude=excludes,
                 )
         fields = cls.get_fields(s_type)
@@ -367,25 +371,36 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
         reverse_rels = []
         for f in cls.get_fields("read"):
             field_obj = getattr(cls, f)
-            if isinstance(field_obj, ManyToManyDescriptor):
-                rel_obj: ModelSerializer = field_obj.field.related_model
-                if field_obj.reverse:
-                    rel_obj: ModelSerializer = field_obj.field.model
-                rel_data = cls.get_reverse_relation_schema(rel_obj, "many", f)
-                reverse_rels.append(rel_data)
-                continue
-            if isinstance(field_obj, ReverseManyToOneDescriptor):
-                rel_obj: ModelSerializer = field_obj.field.model
-                rel_data = cls.get_reverse_relation_schema(rel_obj, "many", f)
-                reverse_rels.append(rel_data)
-                continue
-            if isinstance(field_obj, ReverseOneToOneDescriptor):
-                rel_obj: ModelSerializer = field_obj.related.related_model
-                rel_data = cls.get_reverse_relation_schema(rel_obj, "one", f)
+            if isinstance(
+                field_obj,
+                (
+                    ManyToManyDescriptor,
+                    ReverseManyToOneDescriptor,
+                    ReverseOneToOneDescriptor,
+                ),
+            ):
+                if isinstance(field_obj, ManyToManyDescriptor):
+                    rel_obj: ModelSerializer = field_obj.field.related_model
+                    if field_obj.reverse:
+                        rel_obj = field_obj.field.model
+                    rel_type = "many"
+                elif isinstance(field_obj, ReverseManyToOneDescriptor):
+                    rel_obj = field_obj.field.model
+                    rel_type = "many"
+                else:  # ReverseOneToOneDescriptor
+                    rel_obj = field_obj.related.related_model
+                    rel_type = "one"
+
+                rel_data = cls.get_reverse_relation_schema(rel_obj, rel_type, f)
                 reverse_rels.append(rel_data)
                 continue
             fields.append(f)
-        return fields, reverse_rels, cls.get_excluded_fields("read")
+        return (
+            fields,
+            reverse_rels,
+            cls.get_excluded_fields("read"),
+            cls.get_custom_fields("read"),
+        )
 
     @classmethod
     def is_custom(cls, field: str):
