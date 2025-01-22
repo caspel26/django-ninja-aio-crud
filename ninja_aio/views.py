@@ -18,7 +18,7 @@ class APIView:
     api: NinjaAPI
     router_tag: str
     api_route_path: str
-    auths: list | None = NOT_SET
+    auth: list | None = NOT_SET
 
     def __init__(self) -> None:
         self.router = Router(tags=[self.router_tag])
@@ -71,7 +71,7 @@ class APIViewSet:
     schema_in: Schema | None = None
     schema_out: Schema | None = None
     schema_update: Schema | None = None
-    auths: list | None = NOT_SET
+    auth: list | None = NOT_SET
     pagination_class: type[AsyncPaginationBase] = PageNumberPagination
     query_params: dict[str, tuple[type, ...]] = {}
     disable: list[type[VIEW_TYPES]] = []
@@ -137,7 +137,7 @@ class APIViewSet:
     def create_view(self):
         @self.router.post(
             self.path,
-            auth=self.auths,
+            auth=self.auth,
             response={201: self.schema_out, self.error_codes: GenericMessageSchema},
         )
         async def create(request: HttpRequest, data: self.schema_in):
@@ -149,7 +149,7 @@ class APIViewSet:
     def list_view(self):
         @self.router.get(
             self.path,
-            auth=self.auths,
+            auth=self.auth,
             response={
                 200: List[self.schema_out],
                 self.error_codes: GenericMessageSchema,
@@ -179,7 +179,7 @@ class APIViewSet:
     def retrieve_view(self):
         @self.router.get(
             self.path_retrieve,
-            auth=self.auths,
+            auth=self.auth,
             response={200: self.schema_out, self.error_codes: GenericMessageSchema},
         )
         async def retrieve(request: HttpRequest, pk: Path[self.path_schema]):
@@ -192,7 +192,7 @@ class APIViewSet:
     def update_view(self):
         @self.router.patch(
             self.path_retrieve,
-            auth=self.auths,
+            auth=self.auth,
             response={200: self.schema_out, self.error_codes: GenericMessageSchema},
         )
         async def update(
@@ -208,7 +208,7 @@ class APIViewSet:
     def delete_view(self):
         @self.router.delete(
             self.path_retrieve,
-            auth=self.auths,
+            auth=self.auth,
             response={204: None, self.error_codes: GenericMessageSchema},
         )
         async def delete(request: HttpRequest, pk: Path[self.path_schema]):
