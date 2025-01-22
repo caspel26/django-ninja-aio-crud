@@ -441,7 +441,7 @@ api = NinjaAIO()
 class FooAPI(APIViewSet):
   model = Foo
   api = api
-  auths = CustomJWTBearer()
+  auth = CustomJWTBearer()
 
 
 class ExampleSchemaOut(Schema):
@@ -457,10 +457,10 @@ class SumView(APIView):
   api = api
   api_router_path = "numbers-sum/"
   router_tag = "Sum"
-  auths = CustomJWTBearer()
+  auth = CustomJWTBearer()
 
   def views(self):
-    @self.router.post("/", response={200: ExampleSchemaOut}, auth=self.auths)
+    @self.router.post("/", response={200: ExampleSchemaOut}, auth=self.auth)
     async def sum(request: HttpRequest, data: ExampleSchemaIn):
         return 200, {sum: data.n1 + data.n2}
 
