@@ -51,13 +51,14 @@ class ModelUtil:
         pk: int | str = None,
         filters: dict = None,
         getters: dict = None,
+        with_qs_request=True,
     ):
         get_q = {self.model_pk_name: pk} if pk is not None else {}
         if getters:
             get_q |= getters
 
         obj_qs = self.model.objects.select_related()
-        if isinstance(self.model, ModelSerializerMeta):
+        if isinstance(self.model, ModelSerializerMeta) and with_qs_request:
             obj_qs = await self.model.queryset_request(request)
 
         obj_qs = obj_qs.prefetch_related(*self.get_reverse_relations())
@@ -108,7 +109,9 @@ class ModelUtil:
                     raise SerializeError({k: ". ".join(exc.args)}, 400)
             if isinstance(field_obj, models.ForeignKey):
                 rel_util = ModelUtil(field_obj.related_model)
-                rel: ModelSerializer = await rel_util.get_object(request, v)
+                rel: ModelSerializer = await rel_util.get_object(
+                    request, v, with_qs_request=False
+                )
                 payload |= {k: rel}
         new_payload = {
             k: v for k, v in payload.items() if k not in (customs.keys() or optionals)
@@ -132,7 +135,7 @@ class ModelUtil:
             ):
                 rel_util = ModelUtil(field_obj.related_model)
                 rel: ModelSerializer = await rel_util.get_object(
-                    request, list(v.values())[0]
+                    request, list(v.values())[0], with_qs_request=False
                 )
                 if isinstance(field_obj, models.ForeignKey):
                     for rel_k, rel_v in v.items():
