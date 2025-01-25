@@ -1,9 +1,9 @@
 import base64
-from typing import Any
+from typing import Any, Optional
 
 from ninja import Schema
+from ninja.schema import ResolverMetaclass
 from ninja.orm import create_schema
-
 from django.db import models
 from django.http import HttpRequest
 from django.core.exceptions import ObjectDoesNotExist
@@ -201,8 +201,9 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
 
     class ReadSerializer:
         fields: list[str] = []
-        excludes: list[str] = []
         customs: list[tuple[str, type, Any]] = []
+        optionals: list[tuple[str, type]] = []
+        excludes: list[str] = []
 
     class UpdateSerializer:
         fields: list[str] = []
@@ -264,7 +265,9 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
             case "Patch":
                 s_type = "update"
             case "Out":
-                fields, reverse_rels, excludes, customs = cls.get_schema_out_data()
+                fields, reverse_rels, excludes, customs, optionals = (
+                    cls.get_schema_out_data()
+                )
                 if not fields and not reverse_rels and not excludes and not customs:
                     return None
                 return create_schema(
@@ -272,7 +275,7 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
                     name=f"{cls._meta.model_name}SchemaOut",
                     depth=depth,
                     fields=fields,
-                    custom_fields=reverse_rels + customs,
+                    custom_fields=reverse_rels + customs + optionals,
                     exclude=excludes,
                 )
         fields = cls.get_fields(s_type)
@@ -292,6 +295,14 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
             if fields or customs or excludes
             else None
         )
+
+    @classmethod
+    def _parse_optional_fields(cls):
+        for field in cls._get_fields("read", "optionals"):
+            if isinstance(field, tuple):
+                yield field[0], field[1]
+                continue
+            yield field, Schema
 
     @classmethod
     def verbose_name_path_resolver(cls) -> str:
@@ -364,6 +375,7 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
             rel_schema | None,
             None,
         )
+        print(rel_data)
         if len(cls_f) > 0:
             obj.ReadSerializer.fields.append(*cls_f)
         return rel_data
@@ -393,7 +405,6 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
                 else:  # ReverseOneToOneDescriptor
                     rel_obj = field_obj.related.related_model
                     rel_type = "one"
-
                 rel_data = cls.get_reverse_relation_schema(rel_obj, rel_type, f)
                 reverse_rels.append(rel_data)
                 continue
@@ -403,6 +414,7 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
             reverse_rels,
             cls.get_excluded_fields("read"),
             cls.get_custom_fields("read"),
+            cls.get_optional_fields("read"),
         )
 
     @classmethod
@@ -423,10 +435,28 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
 
     @classmethod
     def get_optional_fields(cls, s_type: type[S_TYPES]):
-        return [
-            (field, field_type, None)
-            for field, field_type in cls._get_fields(s_type, "optionals")
-        ]
+        if s_type != "read":
+            return [
+                (field, field_type, None)
+                for field, field_type in cls._get_fields(s_type, "optionals")
+            ]
+        optionals = []
+        for field, field_type in cls._parse_optional_fields():
+            field_obj = getattr(cls, field).field
+            if not isinstance(
+                field_obj,
+                (models.ForeignKey, models.OneToOneField, models.ManyToManyField),
+            ):
+                optionals.append((field, field_type, None))
+                continue
+            if not isinstance(field_type, ResolverMetaclass):
+                raise SerializeError({field: "must be a Schema type"}, 400)
+            schema = field_obj.related_model.generate_read_s(depth=0)
+            if isinstance(field_obj, models.ManyToManyField):
+                optionals.append((field, Optional[list[schema]], []))
+                continue
+            optionals.append((field, Optional[schema], None))
+        return optionals
 
     @classmethod
     def get_excluded_fields(cls, s_type: type[S_TYPES]):
