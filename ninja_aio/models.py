@@ -11,6 +11,8 @@ from django.db.models.fields.related_descriptors import (
     ReverseManyToOneDescriptor,
     ReverseOneToOneDescriptor,
     ManyToManyDescriptor,
+    ForwardManyToOneDescriptor,
+    ForwardOneToOneDescriptor,
 )
 
 from .exceptions import SerializeError
@@ -99,7 +101,7 @@ class ModelUtil:
             if isinstance(self.model, ModelSerializerMeta):
                 if self.model.is_custom(k):
                     continue
-                if self.model.is_optional(k) and k is None:
+                if self.model.is_optional(k) and v is None:
                     continue
             field_obj = getattr(self.model, k).field
             if isinstance(field_obj, models.BinaryField):
@@ -333,6 +335,41 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
         pass
 
     @classmethod
+    def get_forward_relation_schema(cls, obj: type["ModelSerializer"], field: str):
+        cls_f = []
+        for rel_f in obj.ReadSerializer.fields:
+            rel_f_obj = getattr(obj, rel_f)
+            if isinstance(
+                rel_f_obj,
+                (
+                    ManyToManyDescriptor,
+                    ReverseManyToOneDescriptor,
+                    ReverseOneToOneDescriptor,
+                ),
+            ):
+                if isinstance(rel_f_obj, ManyToManyDescriptor):
+                    rel_obj: ModelSerializer = rel_f_obj.field.related_model
+                    if rel_f_obj.reverse:
+                        rel_obj = rel_f_obj.field.model
+                elif isinstance(rel_f_obj, ReverseManyToOneDescriptor):
+                    rel_obj = rel_f_obj.field.model
+                else:  # ReverseOneToOneDescriptor
+                    rel_obj = rel_f_obj.related.related_model
+                if not rel_obj == cls:
+                    continue
+                cls_f.append(rel_f)
+                obj.ReadSerializer.fields.remove(rel_f)
+        rel_schema = obj.generate_read_s(depth=0)
+        rel_data = (
+            field,
+            rel_schema | None,
+            None,
+        )
+        if len(cls_f) > 0:
+            obj.ReadSerializer.fields.append(*cls_f)
+        return rel_data
+
+    @classmethod
     def get_reverse_relation_schema(
         cls, obj: type["ModelSerializer"], rel_type: type[REL_TYPES], field: str
     ):
@@ -372,6 +409,7 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
     def get_schema_out_data(cls):
         fields = []
         reverse_rels = []
+        rels = []
         for f in cls.get_fields("read"):
             field_obj = getattr(cls, f)
             if isinstance(
@@ -397,12 +435,19 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
                 rel_data = cls.get_reverse_relation_schema(rel_obj, rel_type, f)
                 reverse_rels.append(rel_data)
                 continue
+            if isinstance(
+                field_obj, (ForwardOneToOneDescriptor, ForwardManyToOneDescriptor)
+            ):
+                rel_obj = field_obj.field.related_model
+                rel_data = cls.get_forward_relation_schema(rel_obj, f)
+                rels.append(rel_data)
+                continue
             fields.append(f)
         return (
             fields,
             reverse_rels,
             cls.get_excluded_fields("read"),
-            cls.get_custom_fields("read"),
+            cls.get_custom_fields("read") + rels,
         )
 
     @classmethod
