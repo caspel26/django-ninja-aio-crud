@@ -431,7 +431,8 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
                 else:  # ReverseOneToOneDescriptor
                     rel_obj = field_obj.related.related_model
                     rel_type = "one"
-
+                if not isinstance(rel_obj, ModelSerializerMeta):
+                    continue
                 if not rel_obj.get_fields("read") and not rel_obj.get_custom_fields("read"):
                     continue
                 rel_data = cls.get_reverse_relation_schema(rel_obj, rel_type, f)
@@ -441,6 +442,9 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
                 field_obj, (ForwardOneToOneDescriptor, ForwardManyToOneDescriptor)
             ):
                 rel_obj = field_obj.field.related_model
+                if not isinstance(rel_obj, ModelSerializerMeta):
+                    fields.append(f)
+                    continue
                 if not rel_obj.get_fields("read") and not rel_obj.get_custom_fields("read"):
                     continue
                 rel_data = cls.get_forward_relation_schema(rel_obj, f)
