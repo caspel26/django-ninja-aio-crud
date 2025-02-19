@@ -3,10 +3,10 @@ from typing import Literal
 from django.db.models import Model
 
 S_TYPES = Literal["read", "create", "update"]
-REL_TYPES = Literal["many", "one", "forward", "reverse"]
 F_TYPES = Literal["fields", "customs", "optionals", "excludes"]
-SCHEMA_TYPES = Literal["In", "Out", "Patch"]
+SCHEMA_TYPES = Literal["In", "Out", "Patch", "Related"]
 VIEW_TYPES = Literal["list", "retrieve", "create", "update", "delete", "all"]
+
 
 class ModelSerializerType(type):
     def __repr__(self):

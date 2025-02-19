@@ -1,5 +1,5 @@
 import base64
-from typing import Any, Literal
+from typing import Any
 
 from ninja import Schema
 from ninja.orm import create_schema
@@ -16,7 +16,7 @@ from django.db.models.fields.related_descriptors import (
 )
 
 from .exceptions import SerializeError
-from .types import S_TYPES, REL_TYPES, F_TYPES, SCHEMA_TYPES, ModelSerializerMeta
+from .types import S_TYPES, F_TYPES, SCHEMA_TYPES, ModelSerializerMeta
 
 
 class ModelUtil:
@@ -277,6 +277,17 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
                     custom_fields=reverse_rels + customs,
                     exclude=excludes,
                 )
+            case "Related":
+                fields, customs = cls.get_related_schema_data()
+                if not fields and not customs:
+                    return None
+                return create_schema(
+                    model=cls,
+                    name=f"{cls._meta.model_name}SchemaRelated",
+                    fields=fields,
+                    custom_fields=customs,
+                )
+
         fields = cls.get_fields(s_type)
         optionals = cls.get_optional_fields(s_type)
         customs = cls.get_custom_fields(s_type) + optionals
@@ -294,58 +305,6 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
             if fields or customs or excludes
             else None
         )
-
-    @classmethod
-    def _parse_relation_field(
-        cls,
-        obj: type["ModelSerializer"],
-        field: str,
-        mode: Literal["append", "remove"],
-    ):
-        if field in obj.get_fields("read"):
-            getattr(obj.ReadSerializer.fields, mode)(field)
-            return
-        for custom in obj.get_custom_fields("read"):
-            if field == custom[0]:
-                getattr(obj.ReadSerializer.customs, mode)(custom)
-
-    @classmethod
-    def _parse_relation_schema_data(
-        cls, obj: type["ModelSerializer"], rel_type: type[REL_TYPES]
-    ):
-        match rel_type:
-            case "forward":
-                instances = (
-                    ManyToManyDescriptor,
-                    ReverseManyToOneDescriptor,
-                    ReverseOneToOneDescriptor,
-                    ForwardManyToOneDescriptor,
-                    ForwardOneToOneDescriptor,
-                )
-            case "reverse":
-                instances = (
-                    models.ForeignKey,
-                    models.OneToOneField,
-                    models.ManyToManyField,
-                )
-
-        cls_f = []
-        custom_f = [f[0] for f in obj.get_custom_fields("read")]
-        fields = obj.get_fields("read")
-        for rel_f in fields + custom_f:
-            if rel_type == "forward":
-                rel_f_obj = getattr(obj, rel_f)
-            if rel_type == "reverse":
-                try:
-                    rel_f_obj = getattr(obj, rel_f).field
-                except AttributeError:
-                    continue
-
-            if isinstance(rel_f_obj, instances):
-                cls_f.append(rel_f)
-                cls._parse_relation_field(obj, rel_f, "remove")
-
-        return cls_f
 
     @classmethod
     def verbose_name_path_resolver(cls) -> str:
@@ -387,36 +346,35 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
         pass
 
     @classmethod
-    def get_forward_relation_schema(cls, obj: type["ModelSerializer"], field: str):
-        cls_f = cls._parse_relation_schema_data(obj, "forward")
-        rel_schema = obj.generate_read_s(depth=0)
-        rel_data = (
-            field,
-            rel_schema | None,
-            None,
-        )
-        if len(cls_f) > 0:
-            for f in cls_f:
-                cls._parse_relation_field(obj, f, "append")
-        return rel_data
+    def get_related_schema_data(cls):
+        fields = cls.get_fields("read")
+        custom_f = [f[0] for f in cls.get_custom_fields("read")]
+        related_fields = []
+        for f in fields + custom_f:
+            field_obj = getattr(cls, f)
+            if not isinstance(
+                field_obj,
+                (
+                    ManyToManyDescriptor,
+                    ReverseManyToOneDescriptor,
+                    ReverseOneToOneDescriptor,
+                    ForwardManyToOneDescriptor,
+                    ForwardOneToOneDescriptor,
+                ),
+            ):
+                related_fields.append(f)
 
-    @classmethod
-    def get_reverse_relation_schema(
-        cls, obj: type["ModelSerializer"], rel_type: type[REL_TYPES], field: str
-    ):
-        cls_f = cls._parse_relation_schema_data(obj, "reverse")
-        rel_schema = obj.generate_read_s(depth=0)
-        if rel_type == "many":
-            rel_schema = list[rel_schema]
-        rel_data = (
-            field,
-            rel_schema | None,
-            None,
-        )
-        if len(cls_f) > 0:
-            for f in cls_f:
-                cls._parse_relation_field(obj, f, "append")
-        return rel_data
+        if not related_fields:
+            return None, None
+
+        custom_related_fields = []
+        for f in related_fields:
+            for custom in cls.get_custom_fields("read"):
+                if f == custom[0]:
+                    custom_related_fields.append(custom)
+                    related_fields.remove(f)
+
+        return related_fields, custom_related_fields
 
     @classmethod
     def get_schema_out_data(cls):
@@ -450,7 +408,12 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
                     "read"
                 ):
                     continue
-                rel_data = cls.get_reverse_relation_schema(rel_obj, rel_type, f)
+                rel_schema = (
+                    rel_obj.generate_related_s()
+                    if rel_type != "many"
+                    else list[rel_obj.generate_related_s()]
+                )
+                rel_data = (f, rel_schema | None, None)
                 reverse_rels.append(rel_data)
                 continue
             if isinstance(
@@ -464,7 +427,7 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
                     "read"
                 ):
                     continue
-                rel_data = cls.get_forward_relation_schema(rel_obj, f)
+                rel_data = (f, rel_obj.generate_related_s() | None, None)
                 rels.append(rel_data)
                 continue
             fields.append(f)
@@ -517,3 +480,7 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
     @classmethod
     def generate_update_s(cls) -> Schema:
         return cls._generate_model_schema("Patch")
+
+    @classmethod
+    def generate_related_s(cls) -> Schema:
+        return cls._generate_model_schema("Related")
