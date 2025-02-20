@@ -348,9 +348,9 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
     @classmethod
     def get_related_schema_data(cls):
         fields = cls.get_fields("read")
-        custom_f = [f[0] for f in cls.get_custom_fields("read")]
-        related_fields = []
-        for f in fields + custom_f:
+        custom_f = {name: (value, default) for name, value, default  in cls.get_custom_fields("read")}
+        _related_fields = []
+        for f in fields + list(custom_f.keys()):
             field_obj = getattr(cls, f)
             if not isinstance(
                 field_obj,
@@ -362,18 +362,14 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
                     ForwardOneToOneDescriptor,
                 ),
             ):
-                related_fields.append(f)
+                _related_fields.append(f)
 
-        if not related_fields:
+        if not _related_fields:
             return None, None
 
-        custom_related_fields = []
-        for f in related_fields:
-            for custom in cls.get_custom_fields("read"):
-                if f == custom[0]:
-                    custom_related_fields.append(custom)
-                    related_fields.remove(f)
-
+        
+        custom_related_fields = [(f, *custom_f[f]) for f in _related_fields if f in custom_f]
+        related_fields = [f for f in _related_fields if f not in custom_f]
         return related_fields, custom_related_fields
 
     @classmethod
