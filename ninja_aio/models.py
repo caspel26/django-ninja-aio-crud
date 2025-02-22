@@ -7,6 +7,7 @@ from ninja.orm import create_schema
 from django.db import models
 from django.http import HttpRequest
 from django.core.exceptions import ObjectDoesNotExist
+from asgiref.sync import sync_to_async
 from django.db.models.fields.related_descriptors import (
     ReverseManyToOneDescriptor,
     ReverseOneToOneDescriptor,
@@ -17,6 +18,10 @@ from django.db.models.fields.related_descriptors import (
 
 from .exceptions import SerializeError
 from .types import S_TYPES, F_TYPES, SCHEMA_TYPES, ModelSerializerMeta
+
+
+async def agetattr(obj, name: str, default=None):
+    return await sync_to_async(getattr)(obj, name, default)
 
 
 class ModelUtil:
@@ -103,7 +108,7 @@ class ModelUtil:
                     continue
                 if self.model.is_optional(k) and v is None:
                     continue
-            field_obj = getattr(self.model, k).field
+            field_obj = (await agetattr(self.model, k)).field
             if isinstance(field_obj, models.BinaryField):
                 try:
                     payload |= {k: base64.b64decode(v)}
@@ -125,10 +130,10 @@ class ModelUtil:
         payload = data.model_dump()
         for k, v in payload.items():
             try:
-                field_obj = getattr(self.model, k).field
+                field_obj = (await agetattr(self.model, k)).field
             except AttributeError:
                 try:
-                    field_obj = getattr(self.model, k).related
+                    field_obj = (await agetattr(self.model, k)).related
                 except AttributeError:
                     pass
             if isinstance(v, dict) and (
@@ -141,7 +146,7 @@ class ModelUtil:
                 )
                 if isinstance(field_obj, models.ForeignKey):
                     for rel_k, rel_v in v.items():
-                        field_rel_obj = getattr(rel, rel_k)
+                        field_rel_obj = await agetattr(rel, rel_k)
                         if isinstance(field_rel_obj, models.ForeignKey):
                             olds_k.append({rel_k: rel_v})
                     for obj in olds_k:
