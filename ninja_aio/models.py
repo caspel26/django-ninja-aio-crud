@@ -174,7 +174,9 @@ class ModelUtil:
     ):
         if obj_schema is None:
             raise SerializeError({"obj_schema": "must be provided"}, 400)
-        return await self.parse_output_data(request, obj_schema.from_orm(obj))
+        return await self.parse_output_data(
+            request, await sync_to_async(obj_schema.from_orm)(obj)
+        )
 
     async def update_s(
         self, request: HttpRequest, data: Schema, pk: int | str, obj_schema: Schema
@@ -353,7 +355,10 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
     @classmethod
     def get_related_schema_data(cls):
         fields = cls.get_fields("read")
-        custom_f = {name: (value, default) for name, value, default  in cls.get_custom_fields("read")}
+        custom_f = {
+            name: (value, default)
+            for name, value, default in cls.get_custom_fields("read")
+        }
         _related_fields = []
         for f in fields + list(custom_f.keys()):
             field_obj = getattr(cls, f)
@@ -372,8 +377,9 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
         if not _related_fields:
             return None, None
 
-        
-        custom_related_fields = [(f, *custom_f[f]) for f in _related_fields if f in custom_f]
+        custom_related_fields = [
+            (f, *custom_f[f]) for f in _related_fields if f in custom_f
+        ]
         related_fields = [f for f in _related_fields if f not in custom_f]
         return related_fields, custom_related_fields
 
