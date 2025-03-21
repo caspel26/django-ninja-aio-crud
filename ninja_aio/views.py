@@ -75,6 +75,7 @@ class APIViewSet:
     pagination_class: type[AsyncPaginationBase] = PageNumberPagination
     query_params: dict[str, tuple[type, ...]] = {}
     disable: list[type[VIEW_TYPES]] = []
+    api_route_path: str = ""
 
     def __init__(self) -> None:
         self.error_codes = ERROR_CODES
@@ -86,6 +87,9 @@ class APIViewSet:
         self.router = Router(tags=[self.router_tag])
         self.path = "/"
         self.path_retrieve = f"{{{self.model_util.model_pk_name}}}/"
+        self.api_route_path = (
+            self.api_route_path or self.model_util.verbose_name_path_resolver()
+        )
 
     @property
     def _crud_views(self):
@@ -266,6 +270,6 @@ class APIViewSet:
 
     def add_views_to_route(self):
         return self.api.add_router(
-            f"{self.model_util.verbose_name_path_resolver()}/",
+            f"{self.api_route_path}/",
             self.add_views(),
         )
