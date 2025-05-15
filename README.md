@@ -106,7 +106,7 @@ class Foo(ModelSerializer):
 
 - post create method is a custom method that comes out to handle actions which will be excuted after that the object is created. It can be used, indeed, for example to handle custom fields' actions.
 
-- You can also define optional fields for you Create and Update serializers (remember to give your optional fields a default). To declare an optional fields you have to give the field type too.
+- You can also define optional fields for you Create and Update serializers. To declare an optional fields you have to give the field type too.
 ```python
 # models.py
 from django.db import models
@@ -181,12 +181,13 @@ class Foo(ModelSerializer):
     excludes = ["id", "name"]
     optionals = [("bar", str), ("active", bool)]
 ```
-- ModelSerializer comes out also with methods executed on object save, them are:
+- ModelSerializer comes out also with methods executed on object save and delete, them are:
 
   1. on_create_before_save: code executed on object creation but before saving;
   1. on_create_after_save: code executed on object creation but after saving;
   1. before_save: code executed on every save but before saving;
   1. after_save: code executed on every save but after saving;
+  1. on_delete: code executed after object delete;
 
 
 ### APIViewSet
