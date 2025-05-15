@@ -181,7 +181,12 @@ class Foo(ModelSerializer):
     excludes = ["id", "name"]
     optionals = [("bar", str), ("active", bool)]
 ```
+- ModelSerializer comes out also with methods executed on object save, them are:
 
+  1. on_create_before_save: code executed on object creation but before saving;
+  1. on_create_after_save: code executed on object creation but after saving;
+  1. before_save: code executed on every save but before saving;
+  1. after_save: code executed on every save but after saving;
 
 
 ### APIViewSet
