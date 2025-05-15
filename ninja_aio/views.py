@@ -46,7 +46,7 @@ class APIView:
 
         AUTHENTICATED VIEW:
 
-        @self.router.get(some_path, response=some_schema, auth=self.auths)
+        @self.router.get(some_path, response=some_schema, auth=self.auth)
         async def some_method(request, *args, **kwargs):
             pass
 
@@ -243,7 +243,7 @@ class APIViewSet:
 
         AUTHENTICATED VIEW:
 
-        @self.router.get(some_path, response=some_schema, auth=self.auths)
+        @self.router.get(some_path, response=some_schema, auth=self.auth)
         async def some_method(request, *args, **kwargs):
             pass
 
