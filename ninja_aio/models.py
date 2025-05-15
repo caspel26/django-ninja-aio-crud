@@ -491,3 +491,51 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
     @classmethod
     def generate_related_s(cls) -> Schema:
         return cls._generate_model_schema("Related")
+
+    def after_save(self):
+        """
+        Override this method to execute code after the object
+        has been saved
+        """
+        pass
+
+    def before_save(self):
+        """
+        Override this method to execute code before the object
+        has been saved
+        """
+        pass
+
+    def on_create_after_save(self):
+        """
+        Override this method to execute code after the object
+        has been created
+        """
+        pass
+
+    def on_create_before_save(self):
+        """
+        Override this method to execute code before the object
+        has been created
+        """
+        pass
+
+    def on_delete(self):
+        """
+        Override this method to execute code after the object
+        has been deleted
+        """
+        pass
+
+    def save(self, *args, **kwargs):
+        if self._state.adding:
+            self.on_create_before_save()
+        self.before_save()
+        super().save(*args, **kwargs)
+        if self._state.adding:
+            self.on_create_after_save()
+        self.after_save()
+
+    def delete(self, *args, **kwargs):
+        self.on_delete()
+        return super().delete(*args, **kwargs)
