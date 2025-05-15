@@ -143,7 +143,7 @@ class ModelUtil:
             ):
                 rel_util = ModelUtil(field_obj.related_model)
                 rel: ModelSerializer = await rel_util.get_object(
-                    request, list(v.values())[0]
+                    request, v.get(rel_util.model_pk_name)
                 )
                 if isinstance(field_obj, models.ForeignKey):
                     for rel_k, rel_v in v.items():
