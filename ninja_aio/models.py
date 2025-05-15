@@ -1,3 +1,4 @@
+import asyncio
 import base64
 from typing import Any
 
@@ -142,7 +143,7 @@ class ModelUtil:
             ):
                 rel_util = ModelUtil(field_obj.related_model)
                 rel: ModelSerializer = await rel_util.get_object(
-                    request, list(v.values())[0]
+                    request, v.get(rel_util.model_pk_name)
                 )
                 if isinstance(field_obj, models.ForeignKey):
                     for rel_k, rel_v in v.items():
@@ -162,8 +163,7 @@ class ModelUtil:
         pk = (await self.model.objects.acreate(**payload)).pk
         obj = await self.get_object(request, pk)
         if isinstance(self.model, ModelSerializerMeta):
-            await obj.custom_actions(customs)
-            await obj.post_create()
+            await asyncio.gather(obj.custom_actions(customs), obj.post_create())
         return await self.read_s(request, obj, obj_schema)
 
     async def read_s(
@@ -491,3 +491,52 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
     @classmethod
     def generate_related_s(cls) -> Schema:
         return cls._generate_model_schema("Related")
+
+    def after_save(self):
+        """
+        Override this method to execute code after the object
+        has been saved
+        """
+        pass
+
+    def before_save(self):
+        """
+        Override this method to execute code before the object
+        has been saved
+        """
+        pass
+
+    def on_create_after_save(self):
+        """
+        Override this method to execute code after the object
+        has been created
+        """
+        pass
+
+    def on_create_before_save(self):
+        """
+        Override this method to execute code before the object
+        has been created
+        """
+        pass
+
+    def on_delete(self):
+        """
+        Override this method to execute code after the object
+        has been deleted
+        """
+        pass
+
+    def save(self, *args, **kwargs):
+        if self._state.adding:
+            self.on_create_before_save()
+        self.before_save()
+        super().save(*args, **kwargs)
+        if self._state.adding:
+            self.on_create_after_save()
+        self.after_save()
+
+    def delete(self, *args, **kwargs):
+        res = super().delete(*args, **kwargs)
+        self.on_delete()
+        return res
