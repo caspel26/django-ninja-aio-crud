@@ -1,3 +1,4 @@
+import asyncio
 import base64
 from typing import Any
 
@@ -162,8 +163,7 @@ class ModelUtil:
         pk = (await self.model.objects.acreate(**payload)).pk
         obj = await self.get_object(request, pk)
         if isinstance(self.model, ModelSerializerMeta):
-            await obj.custom_actions(customs)
-            await obj.post_create()
+            await asyncio.gather(obj.custom_actions(customs), obj.post_create())
         return await self.read_s(request, obj, obj_schema)
 
     async def read_s(
