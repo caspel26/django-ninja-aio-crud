@@ -537,5 +537,6 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
         self.after_save()
 
     def delete(self, *args, **kwargs):
+        res = super().delete(*args, **kwargs)
         self.on_delete()
-        return super().delete(*args, **kwargs)
+        return res
