@@ -49,6 +49,10 @@ def _default_error(
 def _pydantic_validation_error(
     request: HttpRequest, exc: ValidationError, api: type[NinjaAPI]
 ) -> HttpResponse:
+    """
+    This handler has been implemented into djano-ninja since version 1.4.0.
+    It is here for compatibility with older versions.
+    """
     error = PydanticValidationError(exc.errors(include_input=False))
     return api.create_response(request, error.error, status=error.status_code)
 
