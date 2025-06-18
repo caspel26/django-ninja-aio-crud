@@ -110,7 +110,8 @@ class APIViewSet:
         }
 
     def _auth_view(self, view_type: str):
-        return getattr(self, f"{view_type}_auth") if self.auth is not NOT_SET else self.auth
+        auth = getattr(self, f"{view_type}_auth", None)
+        return auth if auth is not NOT_SET else self.auth
 
     def get_view_auth(self):
         return self._auth_view("get")
