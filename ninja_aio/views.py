@@ -72,6 +72,10 @@ class APIViewSet:
     schema_out: Schema | None = None
     schema_update: Schema | None = None
     auth: list | None = NOT_SET
+    get_auth: list | None = NOT_SET
+    post_auth: list | None = NOT_SET
+    patch_auth: list | None = NOT_SET
+    delete_auth: list | None = NOT_SET
     pagination_class: type[AsyncPaginationBase] = PageNumberPagination
     query_params: dict[str, tuple[type, ...]] = {}
     disable: list[type[VIEW_TYPES]] = []
@@ -104,6 +108,21 @@ class APIViewSet:
             "update": (self.schema_update, self.update_view),
             "delete": (None, self.delete_view),
         }
+
+    def _auth_view(self, view_type: str):
+        return getattr(self, f"{view_type}_auth") if self.auth is not NOT_SET else self.auth
+
+    def get_view_auth(self):
+        return self._auth_view("get")
+    
+    def post_view_auth(self):
+        return self._auth_view("post")
+    
+    def patch_view_auth(self):
+        return self._auth_view("patch")
+    
+    def delete_view_auth(self):
+        return self._auth_view("delete")
 
     def _generate_schema(self, fields: dict, name: str) -> Schema:
         return create_model(f"{self.model_util.model_name}{name}", **fields)
@@ -141,10 +160,10 @@ class APIViewSet:
     def create_view(self):
         @self.router.post(
             self.path,
-            auth=self.auth,
+            auth=self.post_view_auth(),
             response={201: self.schema_out, self.error_codes: GenericMessageSchema},
         )
-        async def create(request: HttpRequest, data: self.schema_in):
+        async def create(request: HttpRequest, data: self.schema_in): # type: ignore
             return 201, await self.model_util.create_s(request, data, self.schema_out)
 
         create.__name__ = f"create_{self.model_util.model_name}"
@@ -153,7 +172,7 @@ class APIViewSet:
     def list_view(self):
         @self.router.get(
             self.path,
-            auth=self.auth,
+            auth=self.get_view_auth(),
             response={
                 200: List[self.schema_out],
                 self.error_codes: GenericMessageSchema,
@@ -161,7 +180,7 @@ class APIViewSet:
         )
         @paginate(self.pagination_class)
         async def list(
-            request: HttpRequest, filters: Query[self.filters_schema] = None
+            request: HttpRequest, filters: Query[self.filters_schema] = None # type: ignore
         ):
             qs = self.model.objects.select_related()
             if isinstance(self.model, ModelSerializerMeta):
@@ -183,10 +202,10 @@ class APIViewSet:
     def retrieve_view(self):
         @self.router.get(
             self.path_retrieve,
-            auth=self.auth,
+            auth=self.get_view_auth(),
             response={200: self.schema_out, self.error_codes: GenericMessageSchema},
         )
-        async def retrieve(request: HttpRequest, pk: Path[self.path_schema]):
+        async def retrieve(request: HttpRequest, pk: Path[self.path_schema]): # type: ignore
             obj = await self.model_util.get_object(request, self._get_pk(pk))
             return await self.model_util.read_s(request, obj, self.schema_out)
 
@@ -196,11 +215,11 @@ class APIViewSet:
     def update_view(self):
         @self.router.patch(
             self.path_retrieve,
-            auth=self.auth,
+            auth=self.patch_view_auth(),
             response={200: self.schema_out, self.error_codes: GenericMessageSchema},
         )
         async def update(
-            request: HttpRequest, data: self.schema_update, pk: Path[self.path_schema]
+            request: HttpRequest, data: self.schema_update, pk: Path[self.path_schema]  # type: ignore
         ):
             return await self.model_util.update_s(
                 request, data, self._get_pk(pk), self.schema_out
@@ -212,10 +231,10 @@ class APIViewSet:
     def delete_view(self):
         @self.router.delete(
             self.path_retrieve,
-            auth=self.auth,
+            auth=self.delete_view_auth(),
             response={204: None, self.error_codes: GenericMessageSchema},
         )
-        async def delete(request: HttpRequest, pk: Path[self.path_schema]):
+        async def delete(request: HttpRequest, pk: Path[self.path_schema]): # type: ignore
             return 204, await self.model_util.delete_s(request, self._get_pk(pk))
 
         delete.__name__ = f"delete_{self.model_util.model_name}"
