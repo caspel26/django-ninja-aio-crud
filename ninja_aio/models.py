@@ -95,7 +95,7 @@ class ModelUtil:
         return reverse_rels
 
     async def parse_input_data(self, request: HttpRequest, data: Schema):
-        payload = data.model_dump()
+        payload = data.model_dump(mode="json")
         customs = {}
         optionals = []
         if isinstance(self.model, ModelSerializerMeta):
@@ -128,7 +128,7 @@ class ModelUtil:
 
     async def parse_output_data(self, request: HttpRequest, data: Schema):
         olds_k: list[dict] = []
-        payload = data.model_dump()
+        payload = data.model_dump(mode="json")
         for k, v in payload.items():
             try:
                 field_obj = (await agetattr(self.model, k)).field
