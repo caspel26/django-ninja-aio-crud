@@ -87,9 +87,7 @@ class APIViewSet:
         self.schema_out, self.schema_in, self.schema_update = self.get_schemas()
         self.path_schema = self._generate_path_schema()
         self.filters_schema = self._generate_filters_schema()
-        self.router_tag = " ".join(
-            self.model._meta.verbose_name.capitalize().split(" ")
-        )
+        self.router_tag = self.model._meta.verbose_name.capitalize()
         self.router = Router(tags=[self.router_tag])
         self.path = "/"
         self.path_retrieve = f"{{{self.model_util.model_pk_name}}}/"
