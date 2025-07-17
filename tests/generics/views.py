@@ -32,7 +32,7 @@ class GenericAdditionalView:
 
 class GenericAPIView(GenericAdditionalView, APIView):
     router_tag = "test_api_view"
-    api_route_path = "sum"
+    api_route_path = "sum/"
     additional_view_path = "/"
 
 
@@ -55,8 +55,8 @@ class Tests:
             cls.viewset.api = cls.api
             cls.viewset.add_views_to_route()
             cls.pk_att = cls.model._meta.pk.attname
-            cls.path = f"{cls.test_util.verbose_name_path_resolver()}/"
-            cls.detail_path = f"{cls.path}<{cls.pk_att}>/"
+            cls.path = f"{cls.test_util.verbose_name_path_resolver()}"
+            cls.detail_path = f"{cls.path}/<{cls.pk_att}>/"
             cls.request = Request(cls.path)
 
         @property
