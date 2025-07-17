@@ -57,15 +57,67 @@ class APIView:
             pass
         """
 
-    def add_views(self):
+    def _add_views(self):
         self.views()
         return self.router
 
     def add_views_to_route(self):
-        return self.api.add_router(f"{self.api_route_path}/", self.add_views())
+        return self.api.add_router(f"{self.api_route_path}", self._add_views())
 
 
 class APIViewSet:
+    """
+    A base class for creating API views with CRUD operations.
+
+    This class provides methods for creating, listing, retrieving, updating,
+    and deleting objects of a specified model. It supports pagination,
+    authentication, and custom query parameters.
+
+    ## Attributes:
+        - **model** (`ModelSerializer | Model`): The model for CRUD operations.
+        - **api** (`NinjaAPI`): The API instance to which the views are added.
+        - **schema_in** (`Schema | None`): Schema for input data in create/update operations.
+        - **schema_out** (`Schema | None`): Schema for output data in list/retrieve operations.
+        - **schema_update** (`Schema | None`): Schema for update operations.
+        - **auth** (`list | None`): Authentication classes for the views.
+        - **get_auth** (`list | None`): Authentication for GET requests.
+        - **post_auth** (`list | None`): Authentication for POST requests.
+        - **patch_auth** (`list | None`): Authentication for PATCH requests.
+        - **delete_auth** (`list | None`): Authentication for DELETE requests.
+        - **pagination_class** (`type[AsyncPaginationBase]`): Pagination class to use.
+        - **query_params** (`dict[str, tuple[type, ...]]`): Query parameters for filtering.
+        - **disable** (`list[type[VIEW_TYPES]]`): List of view types to disable.
+        - **api_route_path** (`str`): Base path for the API route.
+        - **list_docs** (`str`): Documentation for the list view.
+        - **create_docs** (`str`): Documentation for the create view.
+        - **retrieve_docs** (`str`): Documentation for the retrieve view.
+        - **update_docs** (`str`): Documentation for the update view.
+        - **delete_docs** (`str`): Documentation for the delete view.
+
+    ## Notes:
+        If the model is a ModelSerializer instance, schemas are generated
+        automatically based on Create, Read, and Update serializers.
+        Override the `views` method to add custom views.
+        Override the `query_params_handler` method to handle query params
+        and return a filtered queryset.
+
+    ## Methods:
+        - **create_view**: Creates a new object.
+        - **list_view**: Lists all objects.
+        - **retrieve_view**: Retrieves an object by its primary key.
+        - **update_view**: Updates an object by its primary key.
+        - **delete_view**: Deletes an object by its primary key.
+        - **views**: Override to add custom views.
+        - **add_views_to_route**: Adds the views to the API route.
+
+    ## Example:
+        class MyModelViewSet(APIViewSet):
+            model = MyModel  # Your Django model
+            api = my_api_instance  # Your NinjaAPI instance
+
+        MyModelViewSet().add_views_to_route()
+    """
+
     model: ModelSerializer | Model
     api: NinjaAPI
     schema_in: Schema | None = None
@@ -80,6 +132,11 @@ class APIViewSet:
     query_params: dict[str, tuple[type, ...]] = {}
     disable: list[type[VIEW_TYPES]] = []
     api_route_path: str = ""
+    list_docs = "List all objects."
+    create_docs = "Create a new object."
+    retrieve_docs = "Retrieve a specific object by its primary key."
+    update_docs = "Update an object by its primary key."
+    delete_docs = "Delete an object by its primary key."
 
     def __init__(self) -> None:
         self.error_codes = ERROR_CODES
@@ -87,10 +144,13 @@ class APIViewSet:
         self.schema_out, self.schema_in, self.schema_update = self.get_schemas()
         self.path_schema = self._generate_path_schema()
         self.filters_schema = self._generate_filters_schema()
-        self.router_tag = self.model._meta.verbose_name.capitalize()
+        self.model_verbose_name = self.model._meta.verbose_name.capitalize()
+        self.router_tag = self.model_verbose_name
         self.router = Router(tags=[self.router_tag])
         self.path = "/"
+        self.get_path = ""
         self.path_retrieve = f"{{{self.model_util.model_pk_name}}}/"
+        self.get_path_retrieve = f"/{{{self.model_util.model_pk_name}}}"
         self.api_route_path = (
             self.api_route_path or self.model_util.verbose_name_path_resolver()
         )
@@ -162,6 +222,8 @@ class APIViewSet:
         @self.router.post(
             self.path,
             auth=self.post_view_auth(),
+            summary=f"Create {self.model._meta.verbose_name.capitalize()}",
+            description=self.create_docs,
             response={201: self.schema_out, self.error_codes: GenericMessageSchema},
         )
         async def create(request: HttpRequest, data: self.schema_in):  # type: ignore
@@ -172,8 +234,10 @@ class APIViewSet:
 
     def list_view(self):
         @self.router.get(
-            self.path,
+            self.get_path,
             auth=self.get_view_auth(),
+            summary=f"List {self.model._meta.verbose_name_plural.capitalize()}",
+            description=self.list_docs,
             response={
                 200: List[self.schema_out],
                 self.error_codes: GenericMessageSchema,
@@ -203,8 +267,10 @@ class APIViewSet:
 
     def retrieve_view(self):
         @self.router.get(
-            self.path_retrieve,
+            self.get_path_retrieve,
             auth=self.get_view_auth(),
+            summary=f"Retrieve {self.model._meta.verbose_name.capitalize()}",
+            description=self.retrieve_docs,
             response={200: self.schema_out, self.error_codes: GenericMessageSchema},
         )
         async def retrieve(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
@@ -218,11 +284,13 @@ class APIViewSet:
         @self.router.patch(
             self.path_retrieve,
             auth=self.patch_view_auth(),
+            summary=f"Update {self.model._meta.verbose_name.capitalize()}",
+            description=self.update_docs,
             response={200: self.schema_out, self.error_codes: GenericMessageSchema},
         )
         async def update(
             request: HttpRequest,
-            data: self.schema_update, # type: ignore
+            data: self.schema_update,  # type: ignore
             pk: Path[self.path_schema],  # type: ignore
         ):
             return await self.model_util.update_s(
@@ -236,6 +304,8 @@ class APIViewSet:
         @self.router.delete(
             self.path_retrieve,
             auth=self.delete_view_auth(),
+            summary=f"Delete {self.model._meta.verbose_name.capitalize()}",
+            description=self.delete_docs,
             response={204: None, self.error_codes: GenericMessageSchema},
         )
         async def delete(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
@@ -277,7 +347,7 @@ class APIViewSet:
             pass
         """
 
-    def add_views(self):
+    def _add_views(self):
         if "all" in self.disable:
             self.views()
             return self.router
@@ -293,6 +363,6 @@ class APIViewSet:
 
     def add_views_to_route(self):
         return self.api.add_router(
-            f"{self.api_route_path}/",
-            self.add_views(),
+            f"{self.api_route_path}",
+            self._add_views(),
         )
