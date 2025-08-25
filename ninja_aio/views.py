@@ -150,7 +150,7 @@ class APIViewSet:
         self.path = "/"
         self.get_path = ""
         self.path_retrieve = f"{{{self.model_util.model_pk_name}}}/"
-        self.get_path_retrieve = f"/{{{self.model_util.model_pk_name}}}"
+        self.get_path_retrieve = f"{{{self.model_util.model_pk_name}}}"
         self.api_route_path = (
             self.api_route_path or self.model_util.verbose_name_path_resolver()
         )
@@ -219,12 +219,13 @@ class APIViewSet:
         return queryset
 
     def create_view(self):
-        @self.router.post(
-            self.path,
+        @self.api.post(
+            f"{self.api_route_path}/",
             auth=self.post_view_auth(),
             summary=f"Create {self.model._meta.verbose_name.capitalize()}",
             description=self.create_docs,
             response={201: self.schema_out, self.error_codes: GenericMessageSchema},
+            tags=[self.router_tag],
         )
         async def create(request: HttpRequest, data: self.schema_in):  # type: ignore
             return 201, await self.model_util.create_s(request, data, self.schema_out)
@@ -233,8 +234,8 @@ class APIViewSet:
         return create
 
     def list_view(self):
-        @self.router.get(
-            self.get_path,
+        @self.api.get(
+            self.api_route_path,
             auth=self.get_view_auth(),
             summary=f"List {self.model._meta.verbose_name_plural.capitalize()}",
             description=self.list_docs,
@@ -242,6 +243,7 @@ class APIViewSet:
                 200: List[self.schema_out],
                 self.error_codes: GenericMessageSchema,
             },
+            tags=[self.router_tag],
         )
         @paginate(self.pagination_class)
         async def list(
@@ -266,12 +268,13 @@ class APIViewSet:
         return list
 
     def retrieve_view(self):
-        @self.router.get(
-            self.get_path_retrieve,
+        @self.api.get(
+            f"{self.api_route_path}/{self.get_path_retrieve}",
             auth=self.get_view_auth(),
             summary=f"Retrieve {self.model._meta.verbose_name.capitalize()}",
             description=self.retrieve_docs,
             response={200: self.schema_out, self.error_codes: GenericMessageSchema},
+            tags=[self.router_tag],
         )
         async def retrieve(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
             obj = await self.model_util.get_object(request, self._get_pk(pk))
@@ -281,12 +284,13 @@ class APIViewSet:
         return retrieve
 
     def update_view(self):
-        @self.router.patch(
-            self.path_retrieve,
+        @self.api.patch(
+            f"{self.api_route_path}/{self.path_retrieve}",
             auth=self.patch_view_auth(),
             summary=f"Update {self.model._meta.verbose_name.capitalize()}",
             description=self.update_docs,
             response={200: self.schema_out, self.error_codes: GenericMessageSchema},
+            tags=[self.router_tag],
         )
         async def update(
             request: HttpRequest,
@@ -301,12 +305,13 @@ class APIViewSet:
         return update
 
     def delete_view(self):
-        @self.router.delete(
-            self.path_retrieve,
+        @self.api.delete(
+            f"{self.api_route_path}/{self.path_retrieve}",
             auth=self.delete_view_auth(),
             summary=f"Delete {self.model._meta.verbose_name.capitalize()}",
             description=self.delete_docs,
             response={204: None, self.error_codes: GenericMessageSchema},
+            tags=[self.router_tag],
         )
         async def delete(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
             return 204, await self.model_util.delete_s(request, self._get_pk(pk))
@@ -362,7 +367,5 @@ class APIViewSet:
         return self.router
 
     def add_views_to_route(self):
-        return self.api.add_router(
-            f"{self.api_route_path}",
-            self._add_views(),
-        )
+        self._add_views()
+        return self.api.add_router(f"{self.api_route_path}", self.router, tags=[self.router_tag])
