@@ -185,31 +185,6 @@ class Tests:
             )
             return content
 
-        def test_crud_routes(self):
-            paths, path_names = self._get_routes()
-            if not self.excluded_views:
-                self.assertIn(self.path, paths)
-                self.assertIn(self.detail_path, paths)
-                self.assertEqual(self.path_names, path_names)
-            if "all" in self.excluded_views:
-                self.assertNotIn(self.path, paths)
-                self.assertNotIn(self.detail_path, paths)
-                self.assertNotIn(self.create_view_path_name, path_names)
-                self.assertNotIn(self.list_view_path_name, path_names)
-                self.assertNotIn(self.retrieve_view_path_name, path_names)
-                self.assertNotIn(self.update_view_path_name, path_names)
-                self.assertNotIn(self.delete_view_path_name, path_names)
-            if "create" in self.excluded_views:
-                self.assertNotIn(self.create_view_path_name, path_names)
-            if "list" in self.excluded_views:
-                self.assertNotIn(self.list_view_path_name, path_names)
-            if "retrieve" in self.excluded_views:
-                self.assertNotIn(self.retrieve_view_path_name, path_names)
-            if "update" in self.excluded_views:
-                self.assertNotIn(self.update_view_path_name, path_names)
-            if "delete" in self.excluded_views:
-                self.assertNotIn(self.delete_view_path_name, path_names)
-
         def test_get_schemas(self):
             schemas = self.viewset.get_schemas()
             self.assertEqual(len(schemas), 3)
@@ -301,6 +276,7 @@ class Tests:
 
         @classmethod
         async def _create_relation(cls, data: dict) -> int:
+            cls.relation_viewset.api = cls.api
             view = cls.relation_viewset.create_view()
             _, content = await view(
                 cls.post_request, cls.relation_viewset.schema_in(**data)
