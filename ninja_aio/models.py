@@ -60,6 +60,10 @@ class ModelUtil:
         filters: dict = None,
         getters: dict = None,
         with_qs_request=True,
+    ) -> (
+        type["ModelSerializer"]
+        | models.Model
+        | models.QuerySet["ModelSerializer" | models.Model]
     ):
         get_q = {self.model_pk_name: pk} if pk is not None else {}
         if getters:
@@ -72,6 +76,9 @@ class ModelUtil:
         obj_qs = obj_qs.prefetch_related(*self.get_reverse_relations())
         if filters:
             obj_qs = obj_qs.filter(**filters)
+
+        if not get_q:
+            return obj_qs
 
         try:
             obj = await obj_qs.aget(**get_q)
