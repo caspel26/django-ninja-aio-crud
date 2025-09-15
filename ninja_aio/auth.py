@@ -1,4 +1,4 @@
-from joserfc import jwt, jwk
+from joserfc import jwt, jwk, errors
 from django.http.request import HttpRequest
 from ninja.security.http import HttpBearer
 
@@ -25,11 +25,19 @@ class AsyncJwtBearer(HttpBearer):
         pass
 
     async def authenticate(self, request: HttpRequest, token: str):
+        """
+        Authenticate the request and return the user if authentication is successful.
+        If authentication fails, returns false.
+        """
         try:
             self.dcd = jwt.decode(token, self.jwt_public, algorithms=self.algorithms)
         except ValueError as exc:
-            raise AuthError(", ".join(exc.args), 401)
+            # raise AuthError(", ".join(exc.args), 401)
+            return False
 
-        self.validate_claims(self.dcd.claims)
+        try:
+            self.validate_claims(self.dcd.claims)
+        except errors.JoseError as exc:
+            return False
 
         return await self.auth_handler(request)
