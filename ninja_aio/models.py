@@ -63,7 +63,7 @@ class ModelUtil:
     ) -> (
         type["ModelSerializer"]
         | models.Model
-        | models.QuerySet["ModelSerializer" | models.Model]
+        | models.QuerySet[type["ModelSerializer"] | models.Model]
     ):
         get_q = {self.model_pk_name: pk} if pk is not None else {}
         if getters:

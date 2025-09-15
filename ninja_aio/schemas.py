@@ -1,4 +1,3 @@
-from uuid import UUID
 from ninja import Schema
 from pydantic import RootModel
 
@@ -18,13 +17,13 @@ class M2MSchemaOut(Schema):
 
 
 class M2MAddSchemaIn(Schema):
-    add: list[UUID] = []
+    add: list = []
 
 
 class M2MRemoveSchemaIn(Schema):
-    remove: list[UUID] = []
+    remove: list = []
 
 
 class M2MSchemaIn(Schema):
-    add: list[UUID] = []
-    remove: list[UUID] = []
+    add: list = []
+    remove: list = []
