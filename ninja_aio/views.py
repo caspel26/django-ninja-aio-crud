@@ -100,6 +100,11 @@ class APIViewSet:
         - **retrieve_docs** (`str`): Documentation for the retrieve view.
         - **update_docs** (`str`): Documentation for the update view.
         - **delete_docs** (`str`): Documentation for the delete view.
+        - **m2m_relations** (`tuple[ModelSerializer | Model, str]`): Many-to-many relations to manage.
+        - **m2m_add** (`bool`): Enable add operation for M2M relations.
+        - **m2m_remove** (`bool`): Enable remove operation for M2M relations.
+        - **m2m_get** (`bool`): Enable get operation for M2M relations.
+        - **m2m_auth** (`list | None`): Authentication for M2M views.
 
     ## Notes:
         If the model is a ModelSerializer instance, schemas are generated
