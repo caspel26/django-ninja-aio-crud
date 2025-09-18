@@ -499,3 +499,24 @@ class APIViewSet:
                     manage_related.__name__ = (
                         f"manage_{self.model_util.model_name}_{rel_path}"
                     )
+
+    def _add_views(self):
+        if "all" in self.disable:
+            if self.m2m_relations:
+                self._m2m_views()
+            self.views()
+            return self.router
+
+        for views_type, (schema, view) in self._crud_views.items():
+            if views_type not in self.disable and (
+                schema is not None or views_type == "delete"
+            ):
+                view()
+
+        self.views()
+        if self.m2m_relations:
+            self._m2m_views()
+        return self.router
+
+    def add_views_to_route(self):
+        return self.api.add_router(f"{self.api_route_path}", self._add_views())
