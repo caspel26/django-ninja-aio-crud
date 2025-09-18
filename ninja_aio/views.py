@@ -411,6 +411,7 @@ class APIViewSet:
                     summary=f"Get {rel_util.model._meta.verbose_name_plural.capitalize()}",
                     description=f"Get all related {rel_util.model._meta.verbose_name_plural.capitalize()}",
                 )
+                @paginate(self.pagination_class)
                 async def get_related(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
                     obj = await self.model_util.get_object(request, self._get_pk(pk))
                     related_manager = getattr(obj, related_name)
