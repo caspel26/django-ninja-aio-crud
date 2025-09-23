@@ -33,6 +33,10 @@ class ModelUtil:
     def serializable_fields(self):
         if isinstance(self.model, ModelSerializerMeta):
             return self.model.get_fields("read")
+        return self.model_fields
+
+    @property
+    def model_fields(self):
         return [field.name for field in self.model._meta.get_fields()]
 
     @property
@@ -106,13 +110,17 @@ class ModelUtil:
         customs = {}
         optionals = []
         if isinstance(self.model, ModelSerializerMeta):
-            customs = {k: v for k, v in payload.items() if self.model.is_custom(k)}
+            customs = {
+                k: v
+                for k, v in payload.items()
+                if self.model.is_custom(k) and k not in self.model_fields
+            }
             optionals = [
                 k for k, v in payload.items() if self.model.is_optional(k) and v is None
             ]
         for k, v in payload.items():
             if isinstance(self.model, ModelSerializerMeta):
-                if self.model.is_custom(k):
+                if self.model.is_custom(k) and k not in self.model_fields:
                     continue
                 if self.model.is_optional(k) and v is None:
                     continue
