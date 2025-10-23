@@ -26,6 +26,79 @@ async def agetattr(obj, name: str, default=None):
 
 
 class ModelUtil:
+    """
+    ModelUtil
+    =========
+    Async utility bound to a Django model class (or a ModelSerializer subclass)
+    providing high‑level CRUD helpers plus (de)serialization glue for Django Ninja.
+
+    Overview
+    --------
+    Central responsibilities:
+    - Introspect model metadata (field list, pk name, verbose names).
+    - Normalize inbound payloads (custom / optional fields, FK resolution, base64 decoding).
+    - Normalize outbound payloads (resolve nested relation dicts into model instances).
+    - Prefetch reverse relations to mitigate N+1 issues.
+    - Invoke optional serializer hooks: custom_actions(), post_create(), queryset_request().
+
+    Compatible With
+    ---------------
+    - Plain Django models.
+    - Models using ModelSerializerMeta exposing:
+        get_fields(mode), is_custom(name), is_optional(name),
+        queryset_request(request), custom_actions(payload), post_create().
+
+    Key Methods
+    -----------
+    - get_object(request, pk=None, filters=None, getters=None, with_qs_request=True)
+        Returns a single object (when pk/getters) or a queryset (otherwise), with
+        select_related + prefetch_related applied.
+    - get_reverse_relations()
+        Discovers reverse relation names for safe prefetch_related usage.
+    - parse_input_data(request, data)
+        Converts a Schema into a model-ready dict:
+          * Strips custom + ignored optionals.
+          * Decodes BinaryField (base64 -> bytes).
+          * Replaces FK ids with related instances.
+        Returns (payload, customs_dict).
+    - parse_output_data(request, data)
+        Post-processes serialized output; replaces nested FK/OneToOne dicts
+        with authoritative related instances and rewrites nested FK keys to <name>_id.
+    - create_s / read_s / update_s / delete_s
+        High-level async CRUD operations wrapping the above transformations and hooks.
+
+    Error Handling
+    --------------
+    - Missing objects -> SerializeError({...}, 404).
+    - Bad base64 -> SerializeError({...}, 400).
+
+    Performance Notes
+    -----------------
+    - Each FK in parse_input_data triggers its own async fetch.
+    - Reverse relation prefetching is opportunistic; trim serializable fields
+      if over-fetching becomes an issue.
+
+    Return Shapes
+    -------------
+    - create_s / read_s / update_s -> dict (post-processed schema dump).
+    - delete_s -> None.
+    - get_object -> model instance or queryset.
+
+    Design Choices
+    --------------
+    - Stateless aside from holding the target model (safe to instantiate per request).
+    - Avoids caching; callers may add caching where profiling justifies it.
+    - Treats absent optional fields as "leave unchanged" (update) or "omit" (create).
+
+    Assumptions
+    -----------
+    - Schema provides model_dump(mode="json").
+    - Django async ORM (Django 4.1+).
+    - BinaryField inputs are base64 strings.
+    - Related primary keys are simple scalars on input.
+
+    """
+
     def __init__(self, model: type["ModelSerializer"] | models.Model):
         self.model = model
 
