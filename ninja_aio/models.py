@@ -218,17 +218,167 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
         abstract = True
 
     class CreateSerializer:
+        """Configuration container describing how to build a create (input) schema for a model.
+
+        Purpose
+        -------
+        Describes which fields are accepted (and in what form) when creating a new
+        instance. A factory/metaclass can read this configuration to generate a
+        Pydantic / Ninja input schema.
+
+        Attributes
+        ----------
+        fields : list[str]
+            Explicit REQUIRED model field names for creation. If empty, the
+            implementation may infer required fields from the model (excluding
+            auto / read-only fields). Prefer being explicit.
+        optionals : list[tuple[str, type]]
+            Model fields allowed on create but not required. Each tuple:
+                (field_name, python_type)
+            If omitted in the payload they are ignored; if present with null/None
+            the caller signals an intentional null (subject to model constraints).
+        customs : list[tuple[str, type, Any]]
+            Non-model / synthetic input fields driving creation logic (e.g.,
+            password confirmation, initial related IDs, flags). Each tuple:
+                (name, python_type, default_value)
+            Resolution order (implementation-dependent):
+                1. Value provided by the incoming payload.
+                2. If default_value is callable -> invoked (passing model class or
+                   context if supported).
+                3. Literal default_value.
+            These values are typically consumed inside custom_actions or post_create
+            hooks and are NOT persisted directly unless you do so manually.
+        excludes : list[str]
+            Model field names that must be rejected on create (e.g., "id",
+            audit fields, computed columns).
+
+        Recommended Conventions
+        -----------------------
+        - Always exclude primary keys and auto-managed timestamps.
+        - Keep customs minimal and clearly documented.
+        - Use optionals instead of putting nullable fields in fields if they are
+          not logically required for initial creation.
+
+        Extensibility
+        -------------
+        A higher-level builder can:
+            1. Collect fields + optionals + customs.
+            2. Build a schema where fields are required, optionals are Optional[…],
+               and customs become additional inputs not mapped directly to the model.
+        """
         fields: list[str] = []
         customs: list[tuple[str, type, Any]] = []
         optionals: list[tuple[str, type]] = []
         excludes: list[str] = []
 
     class ReadSerializer:
+        """Configuration container describing how to build a read (output) schema for a model.
+
+        Attributes
+        ---------
+        fields : list[str]
+            Explicit model field names to include in the read schema. If empty, an
+            implementation may choose to include all model fields (or none, depending
+            on the consuming logic).
+        excludes : list[str]
+            Model field names to force-exclude even if they would otherwise be included
+            (e.g., sensitive columns like password, secrets, internal flags).
+        customs : list[tuple[str, type, Any]]
+            Additional computed / synthetic attributes to append to the serialized
+            output. Each tuple is:
+                (attribute_name, python_type, default_value)
+            The attribute is resolved in the following preferred order (implementation
+            dependent):
+                1. Attribute / property on the model instance with that name.
+                2. Callable (if the default_value is a callable) invoked to produce a value.
+                3. Fallback to the literal default_value.
+            Example:
+                customs = [
+                    ("full_name", str, lambda obj: f"{obj.first_name} {obj.last_name}".strip())
+                ]
+
+        Conceptual Equivalent (Ninja example)
+        -------------------------------------
+        Using django-ninja you might otherwise write:
+        
+        ```python
+        from ninja import ModelSchema
+        from api.models import User
+
+
+        class UserOut(ModelSchema):            
+            class Meta:
+                model = User
+                model_fields = ["id", "username", "email"]
+        ```
+        
+        This ReadSerializer object centralizes the same intent in a lightweight,
+        framework-agnostic configuration primitive that can be inspected to build
+        schemas dynamically.
+
+        Recommended Conventions
+        -----------------------
+        - Keep fields minimal; prefer explicit inclusion over implicit broad exposure.
+        - Use excludes as a safety net (e.g., always exclude "password").
+        - For customs, always specify a concrete python_type for better downstream
+          validation / OpenAPI generation.
+        - Prefer callables as default_value when computing derived data; use simple
+          literals only for static fallbacks.
+
+        Extensibility Notes
+        -------------------
+        A higher-level factory or metaclass can:
+            1. Read these lists.
+            2. Reflect on the model.
+            3. Generate a Pydantic / Ninja schema class at runtime.
+        This separation enables cleaner unit testing (the config is pure data) and
+        reduces coupling to a specific serialization framework."""
         fields: list[str] = []
         excludes: list[str] = []
         customs: list[tuple[str, type, Any]] = []
 
     class UpdateSerializer:
+        """Configuration container describing how to build an update (partial/full) input schema.
+
+        Purpose
+        -------
+        Defines which fields can be changed and how they are treated when updating
+        an existing instance (PATCH / PUT–style operations).
+
+        Attributes
+        ----------
+        fields : list[str]
+            Explicit REQUIRED fields for an update operation (rare; most updates are
+            partial so this is often left empty). If non-empty, these must be present
+            in the payload.
+        optionals : list[tuple[str, type]]
+            Updatable fields that are optional (most typical case). Omitted fields
+            are left untouched. Provided null/None values indicate an explicit attempt
+            to nullify (subject to model constraints).
+        customs : list[tuple[str, type, Any]]
+            Non-model / instruction fields guiding update behavior (e.g., "rotate_key",
+            "regenerate_token"). Each tuple:
+                (name, python_type, default_value)
+            Resolution order mirrors CreateSerializer (payload > callable > literal).
+            Typically consumed in custom_actions before or after saving.
+        excludes : list[str]
+            Fields that must never be updated (immutable or managed fields).
+
+        Recommended Conventions
+        -----------------------
+        - Prefer listing editable columns in optionals rather than fields to facilitate
+          partial updates.
+        - Use customs for operational flags (e.g., "reset_password": bool).
+        - Keep excludes synchronized with CreateSerializer excludes where appropriate.
+
+        Extensibility
+        -------------
+        A schema builder can:
+            1. Treat fields as required.
+            2. Treat optionals as Optional[…].
+            3. Inject customs as additional validated inputs.
+            4. Enforce excludes by rejecting them if present in incoming data.
+        """
         fields: list[str] = []
         customs: list[tuple[str, type, Any]] = []
         optionals: list[tuple[str, type]] = []
