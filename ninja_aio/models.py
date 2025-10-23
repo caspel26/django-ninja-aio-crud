@@ -214,6 +214,113 @@ class ModelUtil:
 
 
 class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
+    """
+    ModelSerializer
+    =================
+    Abstract mixin for Django models centralizing (on the model class itself) the
+    declarative configuration required to auto-generate create / update / read /
+    related schemas.
+
+    Goals
+    - Remove duplication between Model and separate serializer classes.
+    - Provide clear extension points (sync + async hooks, custom synthetic fields).
+
+    Inner configuration classes
+    - CreateSerializer
+        fields    : required model fields on create
+        optionals : optional model fields (accepted if present; ignored if None)
+        customs   : [(name, type, default)] synthetic (non‑model) inputs
+        excludes  : model fields disallowed on create
+    - UpdateSerializer (same structure; usually use optionals for PATCH-like behavior)
+    - ReadSerializer
+        fields    : model fields to expose
+        excludes  : fields always excluded (e.g. password)
+        customs   : [(name, type, default)] computed outputs (property > callable > default)
+
+    Generated schema helpers
+    - generate_create_s()   -> input schema ("In")
+    - generate_update_s()   -> input schema for partial/full update ("Patch")
+    - generate_read_s()     -> detailed output schema ("Out")
+    - generate_related_s()  -> compact nested schema ("Related")
+
+    Relation handling (only if related model is also a ModelSerializer)
+    - Forward FK / OneToOne serialized as single nested objects
+    - Reverse OneToOne / Reverse FK / M2M serialized as single or list
+    - Relations skipped if related model exposes no read/custom fields
+
+    Classification helpers
+    - is_custom(field)   -> True if declared in create/update customs
+    - is_optional(field) -> True if declared in create/update optionals
+
+    Sync lifecycle hooks (override as needed)
+      save():
+        on_create_before_save()  (only first insert)
+        before_save()
+        super().save()
+        on_create_after_save()   (only first insert)
+        after_save()
+      delete():
+        super().delete()
+        on_delete()
+
+    Async extension points
+    - queryset_request(request): request-scoped queryset filtering
+    - post_create(): async logic after creation
+    - custom_actions(payload_customs): react to synthetic fields
+
+    Utilities
+    - has_changed(field): compares in-memory value vs DB persisted value
+    - verbose_name_path_resolver(): slugified plural verbose name
+
+    Implementation notes
+    - If both fields and excludes are empty (create/update), optionals are used as the base.
+    - customs + optionals are passed as custom_fields to the schema factory.
+    - Nested relation schemas generated only if the related model explicitly declares
+      readable or custom fields.
+
+    Minimal example
+    ```python
+    from django.db import models
+    from ninja_aio.models import ModelSerializer
+    
+    
+    class User(ModelSerializer):
+        username = models.CharField(max_length=150, unique=True)
+        email = models.EmailField(unique=True)
+
+        class CreateSerializer:
+            fields = ["username", "email"]
+
+        class ReadSerializer:
+            fields = ["id", "username", "email"]
+
+        def __str__(self):
+            return self.username
+    ```
+    -------------------------------------
+    Conceptual Equivalent (Ninja example)
+    Using django-ninja you might otherwise write:
+    ```python
+    from ninja import ModelSchema
+    from api.models import User
+    
+    
+    class UserIn(ModelSchema):
+        class Meta:
+            model = User
+            fields = ["username", "email"]
+    
+    
+    class UserOut(ModelSchema):
+        class Meta:
+            model = User
+            model_fields = ["id", "username", "email"]
+    ```
+
+    Summary
+    Centralizes serialization intent on the model, reducing boilerplate and keeping
+    API and model definitions consistent.
+    """
     class Meta:
         abstract = True
 
