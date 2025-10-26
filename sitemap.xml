@@ -2,46 +2,58 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://caspel26.github.io/django-ninja-aio-crud/</loc>
-         <lastmod>2024-11-07</lastmod>
+         <lastmod>2025-10-26</lastmod>
     </url>
     <url>
-         <loc>https://caspel26.github.io/django-ninja-aio-crud/authentication/</loc>
-         <lastmod>2024-11-07</lastmod>
+         <loc>https://caspel26.github.io/django-ninja-aio-crud/contributing/</loc>
+         <lastmod>2025-10-26</lastmod>
     </url>
     <url>
-         <loc>https://caspel26.github.io/django-ninja-aio-crud/pagination/</loc>
-         <lastmod>2024-11-07</lastmod>
+         <loc>https://caspel26.github.io/django-ninja-aio-crud/api/authentication/</loc>
+         <lastmod>2025-10-26</lastmod>
     </url>
     <url>
-         <loc>https://caspel26.github.io/django-ninja-aio-crud/models/model_serializer/</loc>
-         <lastmod>2024-11-07</lastmod>
+         <loc>https://caspel26.github.io/django-ninja-aio-crud/api/pagination/</loc>
+         <lastmod>2025-10-26</lastmod>
     </url>
     <url>
-         <loc>https://caspel26.github.io/django-ninja-aio-crud/models/model_util/</loc>
-         <lastmod>2024-11-07</lastmod>
+         <loc>https://caspel26.github.io/django-ninja-aio-crud/api/models/model_serializer/</loc>
+         <lastmod>2025-10-26</lastmod>
+    </url>
+    <url>
+         <loc>https://caspel26.github.io/django-ninja-aio-crud/api/models/model_util/</loc>
+         <lastmod>2025-10-26</lastmod>
+    </url>
+    <url>
+         <loc>https://caspel26.github.io/django-ninja-aio-crud/api/views/api_view/</loc>
+         <lastmod>2025-10-26</lastmod>
+    </url>
+    <url>
+         <loc>https://caspel26.github.io/django-ninja-aio-crud/api/views/api_view_set/</loc>
+         <lastmod>2025-10-26</lastmod>
+    </url>
+    <url>
+         <loc>https://caspel26.github.io/django-ninja-aio-crud/getting_started/installation/</loc>
+         <lastmod>2025-10-26</lastmod>
+    </url>
+    <url>
+         <loc>https://caspel26.github.io/django-ninja-aio-crud/getting_started/quick_start/</loc>
+         <lastmod>2025-10-26</lastmod>
     </url>
     <url>
          <loc>https://caspel26.github.io/django-ninja-aio-crud/tutorial/authentication/</loc>
-         <lastmod>2024-11-07</lastmod>
+         <lastmod>2025-10-26</lastmod>
     </url>
     <url>
          <loc>https://caspel26.github.io/django-ninja-aio-crud/tutorial/crud/</loc>
-         <lastmod>2024-11-07</lastmod>
+         <lastmod>2025-10-26</lastmod>
     </url>
     <url>
-         <loc>https://caspel26.github.io/django-ninja-aio-crud/tutorial/getting_started/</loc>
-         <lastmod>2024-11-07</lastmod>
+         <loc>https://caspel26.github.io/django-ninja-aio-crud/tutorial/filtering/</loc>
+         <lastmod>2025-10-26</lastmod>
     </url>
     <url>
          <loc>https://caspel26.github.io/django-ninja-aio-crud/tutorial/model/</loc>
-         <lastmod>2024-11-07</lastmod>
-    </url>
-    <url>
-         <loc>https://caspel26.github.io/django-ninja-aio-crud/views/api_view/</loc>
-         <lastmod>2024-11-07</lastmod>
-    </url>
-    <url>
-         <loc>https://caspel26.github.io/django-ninja-aio-crud/views/api_view_set/</loc>
-         <lastmod>2024-11-07</lastmod>
+         <lastmod>2025-10-26</lastmod>
     </url>
 </urlset>
