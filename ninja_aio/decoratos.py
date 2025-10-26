@@ -1,3 +1,58 @@
+from django.db.transaction import Atomic
+from functools import wraps
+from asgiref.sync import sync_to_async
+
+
+class AsyncAtomicContextManager(Atomic):
+    def __init__(self, using=None, savepoint=True, durable=False):
+        super().__init__(using, savepoint, durable)
+
+    async def __aenter__(self):
+        await sync_to_async(super().__enter__)()
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        await sync_to_async(super().__exit__)(exc_type, exc_value, traceback)
+
+
+def aatomic(func):
+    """
+    Decorator that executes the wrapped async function inside an asynchronous atomic
+    database transaction context.
+
+    This is useful when you want all ORM write operations performed by the coroutine
+    to either fully succeed or fully roll back on error, preserving data integrity.
+
+    Parameters:
+        func (Callable): The asynchronous function to wrap.
+
+    Returns:
+        Callable: A new async function that, when awaited, runs inside an
+        AsyncAtomicContextManager transaction.
+
+    Behavior:
+        - Opens an async atomic transaction before invoking the wrapped coroutine.
+        - Commits if the coroutine completes successfully.
+        - Rolls back if an exception is raised and propagates the original exception.
+
+    Example:
+        @aatomic
+        async def create_order(user_id: int, items: list[Item]):
+            # Perform multiple related DB writes atomically
+            ...
+
+    Notes:
+        - Ensure AsyncAtomicContextManager is properly implemented to integrate with
+          your async ORM / database backend.
+        - Only use on async functions.
+    """
+    @wraps(func)
+    async def wrapper(*args, **kwargs):
+        async with AsyncAtomicContextManager():
+            return await func(*args, **kwargs)
+    return wrapper
+
+
 def unique_view(self: object | str, plural: bool = False):
     """
     Return a decorator that appends a model-specific suffix to a function's __name__ for uniqueness.
