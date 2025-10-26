@@ -292,3 +292,4 @@ docker_script.sh
 *.eb
 migrations
 django-test/*
+test_api
