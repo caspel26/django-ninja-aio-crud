@@ -1,51 +1,87 @@
-import asyncio
-import functools
-
-
-def unique_view(self):
+def unique_view(self: object | str, plural: bool = False):
     """
-    Factory for a decorator that ensures a function name is made unique per model utility context.
+    Return a decorator that appends a model-specific suffix to a function's __name__ for uniqueness.
 
-    This is useful when registering multiple view functions derived from a common base
-    function but requiring distinct names (e.g., for routing or introspection) tied to a model.
+    This is helpful when multiple view functions share a common base name but must be
+    distinct (e.g., for route registration, debugging, or introspection) per model context.
 
-    Parameters
-    ----------
-    self : APIViewSet
+    self : object | str
+        - If a string, it is used directly as the suffix.
+        - If an object, its `model_util` attribute is inspected for:
+            * model_util.model_name (when plural is False)
+            * model_util.verbose_name_view_resolver() (when plural is True)
+          Missing attributes or call failures result in no suffix being applied.
+    plural : bool, default False
+        If True and `self` is an object with `model_util.verbose_name_view_resolver`,
+        the resolved pluralized verbose name is used; otherwise the singular model name
+        (model_util.model_name) is used.
 
-    Returns
-    -------
-    Callable
-        A decorator. When applied to a function (sync or async), it returns a wrapped version
-        of that function preserving its original behavior while modifying `__name__` to:
-        "<original_name>_<model_name>".
+    Callable[[Callable], Callable]
+        A decorator. When applied, it mutates the target function's __name__ in place to:
+        "<original_name>_<suffix>" if a suffix is resolved. If no suffix is found, the
+        function is returned unchanged.
 
-    Behavior
-    --------
-    - Detects whether the decorated function is asynchronous and wraps accordingly.
-    - Applies functools.wraps to preserve metadata (e.g., __module__, __qualname__, __doc__).
-    - Updates the resulting wrapper's __name__ to include the associated model name, aiding
-      in disambiguation during registration or debugging.
+    - Does NOT wrap or alter the call signature or async/sync nature of the function.
+    - Performs a simple in-place mutation of func.__name__ before returning the original function.
+    - No metadata (e.g., __doc__, __qualname__) is altered besides __name__.
 
-    Example
-    -------
-    @unique_view(self_instance)
-    def list_items(...):
-        ...
+    Suffix Resolution Logic
+    -----------------------
+    1. If `self` is a str: suffix = self
+    2. Else if `self` has `model_util`:
+       - plural == True: suffix = model_util.verbose_name_view_resolver()
+       - plural == False: suffix = model_util.model_name
+    3. If resolution fails or yields a falsy value, no mutation occurs.
 
-    Resulting function name (if model_name == "book"):
-        list_items_book
+    Side Effects
+    ------------
+    - Modifies function.__name__, which can affect:
+      - Debugging output
+      - Route registration relying on function names
+      - Tools expecting the original name
+    - Because mutation is in place, reusing the original function object elsewhere
+      may produce unexpected naming.
+
+    Examples
+    # Using a string suffix directly
+    @unique_view("book")
+    def list_items():
+
+    # Using an object with model_util.model_name
+    @unique_view(viewset_instance)  # where viewset_instance.model_util.model_name == "author"
+    def retrieve():
+    # Resulting function name: "retrieve_author"
+
+    # Using plural form via verbose_name_view_resolver()
+    @unique_view(viewset_instance, plural=True)  # e.g., returns "authors"
+    def list():
+    # Resulting function name: "list_authors"
+
+    Caveats
+    - If the underlying attributes or resolver callable raise exceptions, they are not caught.
+    - Ensure that the modified name does not conflict with other functions after decoration.
+    - Use cautiously when decorators relying on original __name__ appear earlier in the chain.
     """
     def decorator(func):
-        # optional wrapper if you want to preserve original function object
-        if asyncio.iscoroutinefunction(func):
-            @functools.wraps(func)
-            async def wrapper(*args, **kwargs):
-                return await func(*args, **kwargs)
+        # Allow usage as unique_view(self_instance) or unique_view("model_name")
+        if isinstance(self, str):
+            suffix = self
         else:
-            @functools.wraps(func)
-            def wrapper(*args, **kwargs):
-                return func(*args, **kwargs)
-        wrapper.__name__ = f"{func.__name__}_{self.model_util.model_name}"
-        return wrapper
+            suffix = (
+                getattr(
+                    getattr(self, "model_util", None),
+                    "verbose_name_view_resolver",
+                    None,
+                )()
+                if plural
+                else getattr(
+                    getattr(self, "model_util", None),
+                    "model_name",
+                    None,
+                )
+            )
+        if suffix:
+            func.__name__ = f"{func.__name__}_{suffix}"
+        return func  # Return original function (no wrapper)
+
     return decorator

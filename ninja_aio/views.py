@@ -247,6 +247,7 @@ class APIViewSet:
         @unique_view(self)
         async def create(request: HttpRequest, data: self.schema_in):  # type: ignore
             return 201, await self.model_util.create_s(request, data, self.schema_out)
+        return create
 
     def list_view(self):
         @self.router.get(
@@ -259,7 +260,7 @@ class APIViewSet:
                 self.error_codes: GenericMessageSchema,
             },
         )
-        @unique_view(self)
+        @unique_view(self, plural=True)
         @paginate(self.pagination_class)
         async def list(
             request: HttpRequest,
@@ -278,6 +279,7 @@ class APIViewSet:
                 async for obj in qs.all()
             ]
             return objs
+        return list
 
     def retrieve_view(self):
         @self.router.get(
@@ -291,6 +293,7 @@ class APIViewSet:
         async def retrieve(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
             obj = await self.model_util.get_object(request, self._get_pk(pk))
             return await self.model_util.read_s(request, obj, self.schema_out)
+        return retrieve
 
     def update_view(self):
         @self.router.patch(
@@ -309,6 +312,7 @@ class APIViewSet:
             return await self.model_util.update_s(
                 request, data, self._get_pk(pk), self.schema_out
             )
+        return update
 
     def delete_view(self):
         @self.router.delete(
@@ -322,6 +326,7 @@ class APIViewSet:
         @unique_view(self)
         async def delete(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
             return 204, await self.model_util.delete_s(request, self._get_pk(pk))
+        return delete
 
     def views(self):
         """
