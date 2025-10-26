@@ -1,8 +1,4 @@
-import asyncio
-import functools
-
-
-def unique_view(self):
+def unique_view(self: object | str, plural: bool = False):
     """
     Factory for a decorator that ensures a function name is made unique per model utility context.
 
@@ -11,7 +7,8 @@ def unique_view(self):
 
     Parameters
     ----------
-    self : APIViewSet
+    self : APIViewSet or str, If APIViewSet instance is provided, the model name is extracted from it.
+           If a string is provided, it is used directly as the model name suffix.
 
     Returns
     -------
@@ -36,16 +33,27 @@ def unique_view(self):
     Resulting function name (if model_name == "book"):
         list_items_book
     """
+
     def decorator(func):
-        # optional wrapper if you want to preserve original function object
-        if asyncio.iscoroutinefunction(func):
-            @functools.wraps(func)
-            async def wrapper(*args, **kwargs):
-                return await func(*args, **kwargs)
+        # Allow usage as unique_view(self_instance) or unique_view("model_name")
+        if isinstance(self, str):
+            suffix = self
         else:
-            @functools.wraps(func)
-            def wrapper(*args, **kwargs):
-                return func(*args, **kwargs)
-        wrapper.__name__ = f"{func.__name__}_{self.model_util.model_name}"
-        return wrapper
+            suffix = (
+                getattr(
+                    getattr(self, "model_util", None),
+                    "verbose_name_view_resolver",
+                    None,
+                )()
+                if plural
+                else getattr(
+                    getattr(self, "model_util", None),
+                    "model_name",
+                    None,
+                )
+            )
+        if suffix:
+            func.__name__ = f"{func.__name__}_{suffix}"
+        return func  # Return original function (no wrapper)
+
     return decorator
