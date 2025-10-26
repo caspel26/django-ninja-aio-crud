@@ -4,6 +4,7 @@ from joserfc.errors import JoseError
 from ninja import NinjaAPI
 from django.http import HttpRequest, HttpResponse
 from pydantic import ValidationError
+from django.db.models import Model
 
 
 class BaseException(Exception):
@@ -33,6 +34,18 @@ class SerializeError(BaseException):
 
 class AuthError(BaseException):
     pass
+
+
+class NotFoundError(BaseException):
+    status_code = 404
+    error = "not found"
+
+    def __init__(self, model: Model, details=None):
+        super().__init__(
+            error={model._meta.verbose_name: self.error},
+            status_code=self.status_code,
+            details=details,
+        )
 
 
 class PydanticValidationError(BaseException):

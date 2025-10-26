@@ -17,7 +17,7 @@ from django.db.models.fields.related_descriptors import (
     ForwardOneToOneDescriptor,
 )
 
-from .exceptions import SerializeError
+from .exceptions import SerializeError, NotFoundError
 from .types import S_TYPES, F_TYPES, SCHEMA_TYPES, ModelSerializerMeta
 
 
@@ -160,7 +160,7 @@ class ModelUtil:
         try:
             obj = await obj_qs.aget(**get_q)
         except ObjectDoesNotExist:
-            raise SerializeError({self.model_name: "not found"}, 404)
+            raise NotFoundError(self.model)
 
         return obj
 

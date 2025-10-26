@@ -1,0 +1,70 @@
+site_name: Django Ninja Aio CRUD
+site_url: https://caspel26.github.io/django-ninja-aio-crud/
+repo_name: caspel26/django-ninja-aio-crud
+repo_url: https://github.com/caspel26/django-ninja-aio-crud
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: getting_started/installation.md
+    - Quick Start: getting_started/quick_start.md
+  - Tutorial:
+    - 'Step 1: Define Your Model': tutorial/model.md
+    - 'Step 2: Create CRUD Views': tutorial/crud.md
+    - 'Step 3: Add Authentication': tutorial/authentication.md
+    - 'Step 4: Add Filtering & Pagination': tutorial/filtering.md
+  - API Reference:
+    - Views:
+      - 'APIView': api/views/api_view.md
+      - 'APIViewSet': api/views/api_view_set.md
+    - Models:
+      - 'ModelSerializer': api/models/model_serializer.md
+      - 'ModelUtil': api/models/model_util.md
+    - Authentication:
+      - 'Auth Classes': api/authentication.md
+    - Pagination:
+      - 'Pagination Classes': api/pagination.md
+  - Contributing: contributing.md
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme)"
+      primary: deep-purple
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep-purple
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep-purple
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  logo: images/logo.png
+  features:
+    - navigation.tabs
+    - toc.integrate
+
+markdown_extensions:
+  - admonition
+  - codehilite
+  - footnotes
+  - meta
+  - toc:
+      anchorlink: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+
+extra_css:
+  - extra.css
