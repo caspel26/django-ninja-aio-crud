@@ -12,8 +12,7 @@ nav:
     - 'Step 1: Define Your Model': tutorial/model.md
     - 'Step 2: Create CRUD Views': tutorial/crud.md
     - 'Step 3: Add Authentication': tutorial/authentication.md
-    - 'Step 4: Customize Schemas': tutorial/schemas.md
-    - 'Step 5: Add Filtering & Pagination': tutorial/filtering.md
+    - 'Step 4: Add Filtering & Pagination': tutorial/filtering.md
   - API Reference:
     - Views:
       - 'APIView': api/views/api_view.md

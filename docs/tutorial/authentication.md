@@ -849,7 +849,7 @@ class JWTAuth(AsyncJwtBearer):
 
 ## Next Steps
 
-Now that you have authentication set up, let's customize schemas in [Step 4: Customize Schemas](schemas.md).
+Now that you have authentication set up, let's customize schemas in [Step 4: Filtering & Pagination](filtering.md).
 
 !!! success "What You've Learned"
     - ✅ Setting up JWT authentication
@@ -862,4 +862,4 @@ Now that you have authentication set up, let's customize schemas in [Step 4: Cus
 ## See Also
 
 - [Authentication API Reference](../api/authentication.md) - Complete authentication documentation
-- [APIViewSet Auth Options](../api/views/api_view_set.md#authentication) - ViewSet authentication options
+- [APIViewSet Auth Options](../api/views/api_view_set.md#authentication-attributes) - ViewSet authentication options
