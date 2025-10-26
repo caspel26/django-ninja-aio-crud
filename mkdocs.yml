@@ -5,20 +5,27 @@ repo_url: https://github.com/caspel26/django-ninja-aio-crud
 
 nav:
   - Home: index.md
-  - 'Tutorial':
-    - 'Getting Started': 'tutorial/getting_started.md'
-    - 'Defining Model': 'tutorial/model.md'
-    - 'Defining CRUD Views': 'tutorial/crud.md'
-    - 'Authenticating Views': 'tutorial/authentication.md'
-  - Documentation:
-      - 'Models':
-        - 'Model Serializer': 'models/model_serializer.md'
-        - 'Model Util': 'models/model_util.md'
-      - 'Views':
-        - 'API View': 'views/api_view.md'
-        - 'API View Set': 'views/api_view_set.md'
-      - 'Authentication': 'authentication.md'
-      - 'Pagination': 'pagination.md'
+  - Getting Started:
+    - Installation: getting_started/installation.md
+    - Quick Start: getting_started/quick_start.md
+  - Tutorial:
+    - 'Step 1: Define Your Model': tutorial/model.md
+    - 'Step 2: Create CRUD Views': tutorial/crud.md
+    - 'Step 3: Add Authentication': tutorial/authentication.md
+    - 'Step 4: Customize Schemas': tutorial/schemas.md
+    - 'Step 5: Add Filtering & Pagination': tutorial/filtering.md
+  - API Reference:
+    - Views:
+      - 'APIView': api/views/api_view.md
+      - 'APIViewSet': api/views/api_view_set.md
+    - Models:
+      - 'ModelSerializer': api/models/model_serializer.md
+      - 'ModelUtil': api/models/model_util.md
+    - Authentication:
+      - 'Auth Classes': api/authentication.md
+    - Pagination:
+      - 'Pagination Classes': api/pagination.md
+  - Contributing: contributing.md
 
 theme:
   name: material

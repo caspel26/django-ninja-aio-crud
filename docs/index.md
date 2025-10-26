@@ -87,179 +87,21 @@ Traditional Django REST development requires:
     # Done! List, Create, Retrieve, Update, Delete endpoints ready
     ```
 
-## 📦 Installation
-
-```bash
-pip install django-ninja-aio-crud
-```
-
-**Requirements:**
-- Python 3.8+
-- Django 4.1+ (for async ORM support)
-- django-ninja
-
-## 🚀 Quick Start
-
-### 1. Create Your Model
-
-Define your model using `ModelSerializer`:
-
-```python
-# models.py
-from django.db import models
-from ninja_aio.models import ModelSerializer
-
-
-class Article(ModelSerializer):
-    title = models.CharField(max_length=200)
-    content = models.TextField()
-    is_published = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
-    
-    class ReadSerializer:
-        fields = ["id", "title", "content", "is_published", "created_at"]
-    
-    class CreateSerializer:
-        fields = ["title", "content"]
-        optionals = [("is_published", bool)]
-    
-    class UpdateSerializer:
-        optionals = [
-            ("title", str),
-            ("content", str),
-            ("is_published", bool),
-        ]
-```
-
-### 2. Create Your ViewSet
-
-Define your API views using `APIViewSet`:
-
-```python
-# views.py
-from ninja_aio import NinjaAIO
-from ninja_aio.views import APIViewSet
-from .models import Article
-
-api = NinjaAIO(title="My Blog API", version="1.0.0")
-
-
-class ArticleViewSet(APIViewSet):
-    model = Article
-    api = api
-
-
-ArticleViewSet().add_views_to_route()
-```
-
-### 3. Configure URLs
-
-Add the API to your URL configuration:
-
-```python
-# urls.py
-from django.urls import path
-from .views import api
-
-urlpatterns = [
-    path("api/", api.urls),
-]
-```
-
-### 4. Run Your Server
-
-```bash
-python manage.py runserver
-```
-
-Visit **[http://localhost:8000/api/docs](http://localhost:8000/api/docs)** to see your auto-generated API documentation!
-
-## 📸 Generated API Documentation
-
-### Endpoints Overview
-
-![Swagger UI Overview](images/index/foo-index-swagger.png)
-
-Your API automatically includes:
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/article/` | List all articles (paginated) |
-| `POST` | `/article/` | Create new article |
-| `GET` | `/article/{id}` | Retrieve single article |
-| `PATCH` | `/article/{id}/` | Update article |
-| `DELETE` | `/article/{id}/` | Delete article |
-
-### List Endpoint
-
-![List Swagger](images/index/foo-index-list-swagger.png)
-
-Features:
-- Automatic pagination
-- Query parameter filtering
-- Sorting support
-
-### Create Endpoint
-
-![Create Swagger](images/index/foo-index-create-swagger.png)
-
-Features:
-- Input validation
-- Custom field support
-- Relationship handling
-
-### Retrieve Endpoint
-
-![Retrieve Swagger](images/index/foo-index-retrieve-swagger.png)
-
-Features:
-- Nested relationship serialization
-- Optimized queries
-
-### Update Endpoint
-
-![Update Swagger](images/index/foo-index-update-swagger.png)
-
-Features:
-- Partial updates (PATCH)
-- Field-level validation
-- Custom actions
-
-### Delete Endpoint
-
-![Delete Swagger](images/index/foo-index-delete-swagger.png)
-
-Features:
-- Soft delete support
-- Cascade handling
-- Custom hooks
-
-## 🎓 Next Steps
-
-Ready to dive deeper? Check out our comprehensive guides:
-
-### 📖 Tutorial Series
-
-1. **[Getting Started](tutorial/getting_started.md)** - Set up your first project
-2. **[Defining Models](tutorial/model.md)** - Master ModelSerializer
-3. **[Creating CRUD Views](tutorial/crud.md)** - Build powerful APIs
-4. **[Authentication](tutorial/authentication.md)** - Secure your endpoints
-
 ### 📚 Documentation
 
 Explore detailed documentation for each component:
 
 #### Models
-- **[Model Serializer](models/model_serializer.md)** - Schema generation and serialization
-- **[Model Util](models/model_util.md)** - Async CRUD utilities
+- **[Model Serializer](api/models/model_serializer.md)** - Schema generation and serialization
+- **[Model Util](api/models/model_util.md)** - Async CRUD utilities
 
 #### Views
-- **[API View](views/api_view.md)** - Simple custom views
-- **[API View Set](views/api_view_set.md)** - Complete CRUD operations
+- **[API View](api/views/api_view.md)** - Simple custom views
+- **[API View Set](api/views/api_view_set.md)** - Complete CRUD operations
 
 #### Advanced Topics
-- **[Authentication](authentication.md)** - JWT and custom auth
-- **[Pagination](pagination.md)** - Customize pagination behavior
+- **[Authentication](api/authentication.md)** - JWT and custom auth
+- **[Pagination](api/pagination.md)** - Customize pagination behavior
 
 ## 💡 Example: Complete Blog API
 
@@ -441,15 +283,6 @@ class UserViewSet(APIViewSet):
             await user.asave()
             return {"message": "User activated"}
 ```
-
-## 🤝 Contributing
-
-We welcome contributions! Here's how you can help:
-
-1. **Report Bugs** - Open an issue on [GitHub](https://github.com/caspel26/django-ninja-aio-crud/issues)
-2. **Suggest Features** - Share your ideas
-3. **Submit PRs** - Improve code, docs, or tests
-4. **Improve Documentation** - Help others learn
 
 ## 📄 License
 
