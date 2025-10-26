@@ -18,6 +18,14 @@ class BaseTests:
         def read_data(self):
             return {"id": 1, "name": "test", "description": "test"}
 
+        @property
+        def additional_getters(self):
+            return {"description": "test"}
+
+        @property
+        def additional_filters(self):
+            return {"name": "test"}
+
     @tag("model_util_model_serializer")
     class ModelUtilModelSerializerTestCase(ModelUtilTestCaseBase):
         @property
@@ -34,10 +42,6 @@ class BaseTests:
 @tag("model_util_model_serializer_base")
 class ModelUtilModelSerializerBaseTestCase(BaseTests.ModelUtilModelSerializerTestCase):
     model = models.TestModelSerializer
-
-    @property
-    def serializable_fields(self):
-        return self.model.ReadSerializer.fields
 
     @property
     def model_verbose_name_path(self):

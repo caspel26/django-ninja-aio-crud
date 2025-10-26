@@ -69,7 +69,7 @@ class Foo(ModelSerializer):
     fields = ["name", "bar"]
 ```
 
-- ReadSerializer, CreateSerializer, UpdateSerializer are used to define which fields would be included in runtime schemas creation. You can also specify custom fields and handle their function by overriding custom_actions ModelSerializer's method(custom fields are only available for Create and Update serializers).
+- ReadSerializer, CreateSerializer, UpdateSerializer are used to define which fields would be included in runtime schemas creation. You can also specify custom fields and handle their function by overriding custom_actions ModelSerializer's method.
 
 ```python
 # models.py
@@ -96,7 +96,7 @@ class Foo(ModelSerializer):
       if not payload.get("force_activation"):
           return
       setattr(self, "force_activation", True)
-  
+
   async def post_create(self) -> None:
       if not hasattr(self, "force_activation") or not getattr(self, "force_activation"):
           return
@@ -106,7 +106,7 @@ class Foo(ModelSerializer):
 
 - post create method is a custom method that comes out to handle actions which will be excuted after that the object is created. It can be used, indeed, for example to handle custom fields' actions.
 
-- You can also define optional fields for you Create and Update serializers (remember to give your optional fields a default). To declare an optional fields you have to give the field type too.
+- You can also define optional fields for you Create and Update serializers. To declare an optional fields you have to give the field type too.
 ```python
 # models.py
 from django.db import models
@@ -126,7 +126,7 @@ class Foo(ModelSerializer):
     optionals = [("bar", str), ("active", bool)]
 
   class UpdateSerializer:
-    optionals = [[("bar", str), ("active", bool)]
+    optionals = [("bar", str), ("active", bool)]
 ```
 
 - Instead of declaring your fields maybe you want to exclude some of them. Declaring "excludes" attribute into serializers will exclude the given fields. (You can declare only one between "fields" and "excludes").
@@ -151,8 +151,43 @@ class Foo(ModelSerializer):
 
   class UpdateSerializer:
     excludes = ["id", "name"]
-    optionals = [[("bar", str), ("active", bool)]
+    optionals = [("bar", str), ("active", bool)]
 ```
+- If you want to add into ReadSerializer model properties you must define them as customs.
+```python
+# models.py
+from django.db import models
+from ninja_aio.models import ModelSerializer
+
+
+class Foo(ModelSerializer):
+  name = models.CharField(max_length=30)
+  bar = models.CharField(max_length=30, default="")
+  active = models.BooleanField(default=False)
+
+  @property
+  def full_name(self):
+    return f"{self.name} example_full_name"
+
+  class ReadSerializer:
+    excludes = ["bar"]
+    customs = [("full_name", str, "")]
+
+  class CreateSerializer:
+    fields = ["name"]
+    optionals = [("bar", str), ("active", bool)]
+
+  class UpdateSerializer:
+    excludes = ["id", "name"]
+    optionals = [("bar", str), ("active", bool)]
+```
+- ModelSerializer comes out also with methods executed on object save and delete, them are:
+
+  1. on_create_before_save: code executed on object creation but before saving;
+  1. on_create_after_save: code executed on object creation but after saving;
+  1. before_save: code executed on every save but before saving;
+  1. after_save: code executed on every save but after saving;
+  1. on_delete: code executed after object delete;
 
 
 ### APIViewSet
@@ -173,7 +208,7 @@ class FooAPI(APIViewSet):
   model = Foo
   api = api
 
-  
+
 FooAPI().add_views_to_route()
 ```
 
@@ -232,6 +267,29 @@ class FooAPI(APIViewSet):
   model = Foo
   api = api
   disable = ["retrieve", "update"]
+
+
+FooAPI().add_views_to_route()
+```
+For the list endpoint you can also set query params and handle them. They will be also visible into swagger.
+
+```python
+# views.py
+from ninja_aio import NinjaAIO
+from ninja_aio.views import APIViewSet
+
+from .models import Foo
+
+api = NinjaAIO()
+
+
+class FooAPI(APIViewSet):
+  model = Foo
+  api = api
+  query_params = {"name": (str, None), "active": (bool, None)}
+
+  async def query_params_handler(self, queryset, filters):
+      return queryset.filter(**{k: v for k, v in filters.items() if v is not None})
 
 
 FooAPI().add_views_to_route()
@@ -351,7 +409,7 @@ BarAPI().add_views_to_route()
 
 ### Jwt
 
-- AsyncJWTBearer built-in class is an authenticator class which use joserfc module. It cames out with authenticate method which validate given claims. Override auth handler method to write your own authentication method. Default algorithms used is RS256. a jwt Token istance is set as class atribute so you can use it by self.dcd.  
+- AsyncJWTBearer built-in class is an authenticator class which use joserfc module. It cames out with authenticate method which validate given claims. Override auth handler method to write your own authentication method. Default algorithms used is RS256. a jwt Token istance is set as class atribute so you can use it by self.dcd.
 
 ```python
 from ninja_aio.auth import AsyncJWTBearer
@@ -389,7 +447,7 @@ api = NinjaAIO()
 class FooAPI(APIViewSet):
   model = Foo
   api = api
-  auths = CustomJWTBearer()
+  auth = CustomJWTBearer()
 
 
 class ExampleSchemaOut(Schema):
@@ -405,10 +463,10 @@ class SumView(APIView):
   api = api
   api_router_path = "numbers-sum/"
   router_tag = "Sum"
-  auths = CustomJWTBearer()
+  auth = CustomJWTBearer()
 
   def views(self):
-    @self.router.post("/", response={200: ExampleSchemaOut}, auth=self.auths)
+    @self.router.post("/", response={200: ExampleSchemaOut}, auth=self.auth)
     async def sum(request: HttpRequest, data: ExampleSchemaIn):
         return 200, {sum: data.n1 + data.n2}
 

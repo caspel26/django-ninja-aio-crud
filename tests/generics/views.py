@@ -32,7 +32,7 @@ class GenericAdditionalView:
 
 class GenericAPIView(GenericAdditionalView, APIView):
     router_tag = "test_api_view"
-    api_route_path = "sum"
+    api_route_path = "sum/"
     additional_view_path = "/"
 
 
@@ -55,26 +55,26 @@ class Tests:
             cls.viewset.api = cls.api
             cls.viewset.add_views_to_route()
             cls.pk_att = cls.model._meta.pk.attname
-            cls.path = f"{cls.test_util.verbose_name_path_resolver()}/"
-            cls.detail_path = f"{cls.path}<{cls.pk_att}>/"
+            cls.path = f"{cls.test_util.verbose_name_path_resolver()}"
+            cls.detail_path = f"{cls.path}/<{cls.pk_att}>/"
             cls.request = Request(cls.path)
 
         @property
         def create_view_path_name(self):
             return f"create_{self.model._meta.model_name}"
-        
+
         @property
         def list_view_path_name(self):
             return f"list_{self.test_util.verbose_name_view_resolver()}"
-        
+
         @property
         def retrieve_view_path_name(self):
             return f"retrieve_{self.model._meta.model_name}"
-        
+
         @property
         def update_view_path_name(self):
             return f"update_{self.model._meta.model_name}"
-        
+
         @property
         def delete_view_path_name(self):
             return f"delete_{self.model._meta.model_name}"
@@ -102,6 +102,14 @@ class Tests:
         @property
         def pagination_kwargs(self):
             return {"ninja_pagination": self.viewset.pagination_class.Input(page=1)}
+
+        @property
+        def filters_kwargs(self):
+            return {"filters": self.viewset.filters_schema()}
+
+        @property
+        def list_kwargs(self):
+            return self.pagination_kwargs | self.filters_kwargs
 
         @property
         def payload_create(self):
@@ -150,6 +158,9 @@ class Tests:
         @property
         def delete_request(self):
             return self.request.delete()
+
+        def _path_schema(self, pk: int | str):
+            return self.viewset.path_schema(**{self.pk_att: pk})
 
         def _get_routes(self):
             self.assertEqual(len(self.api._routers), 2)
@@ -210,7 +221,7 @@ class Tests:
 
         async def test_list(self):
             view = self.viewset.list_view()
-            content: dict = await view(self.get_request, **self.pagination_kwargs)
+            content: dict = await view(self.get_request, **self.list_kwargs)
             self.assertEqual(["items", "count"], list(content.keys()))
             items = content["items"]
             count = content["count"]
@@ -222,7 +233,7 @@ class Tests:
 
         async def test_retrieve(self):
             view = self.viewset.retrieve_view()
-            content = await view(self.get_request, 1)
+            content = await view(self.get_request, self._path_schema(1))
             content.pop(self.pk_att)
             self.assertEqual(self.response_data, content)
 
@@ -230,7 +241,7 @@ class Tests:
             with self.assertRaises(SerializeError) as exc:
                 await self.model.objects.select_related().all().adelete()
                 view = self.viewset.retrieve_view()
-                await view(self.get_request, 1)
+                await view(self.get_request, self._path_schema(1))
             self.assertEqual(exc.exception.status_code, 404)
             self.assertEqual(
                 exc.exception.error, {self.model._meta.model_name: "not found"}
@@ -238,14 +249,16 @@ class Tests:
 
         async def test_update(self):
             view = self.viewset.update_view()
-            content = await view(self.patch_request, self.update_data, 1)
+            content = await view(
+                self.patch_request, self.update_data, self._path_schema(1)
+            )
             content.pop(self.pk_att)
             self.assertEqual(self.response_data | self.payload_update, content)
 
         async def test_delete(self):
             view = self.viewset.delete_view()
             pk = self.obj_content[self.pk_att]
-            status, content = await view(self.delete_request, pk)
+            status, content = await view(self.delete_request, self._path_schema(pk))
             self.assertEqual(status, 204)
             self.assertEqual(content, None)
 
@@ -288,6 +301,7 @@ class Tests:
 
         @classmethod
         async def _create_relation(cls, data: dict) -> int:
+            cls.relation_viewset.api = cls.api
             view = cls.relation_viewset.create_view()
             _, content = await view(
                 cls.post_request, cls.relation_viewset.schema_in(**data)

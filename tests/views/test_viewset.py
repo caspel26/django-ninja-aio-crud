@@ -91,7 +91,7 @@ class BaseTests:
             obj = cls.model.objects.get(pk=cls.obj_content[cls.pk_att])
             getattr(obj, cls.relation_related_name).add(cls.relation_obj)
             obj.save()
-            cls.relation_schema_data.pop(cls.foreign_key_reverse_field)
+            cls.relation_schema_data.pop(cls.foreign_key_reverse_field, None)
 
         @property
         def response_data(self):
