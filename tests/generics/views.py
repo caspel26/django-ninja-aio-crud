@@ -5,7 +5,7 @@ from django.db import models
 from django.db.models.base import ModelBase
 from asgiref.sync import async_to_sync
 
-from ninja_aio.exceptions import SerializeError
+from ninja_aio.exceptions import NotFoundError
 from ninja_aio.types import ModelSerializerMeta
 from tests.test_app import schema
 from tests.generics.request import Request
@@ -238,13 +238,13 @@ class Tests:
             self.assertEqual(self.response_data, content)
 
         async def test_retrieve_object_not_found(self):
-            with self.assertRaises(SerializeError) as exc:
+            with self.assertRaises(NotFoundError) as exc:
                 await self.model.objects.select_related().all().adelete()
                 view = self.viewset.retrieve_view()
                 await view(self.get_request, self._path_schema(1))
             self.assertEqual(exc.exception.status_code, 404)
             self.assertEqual(
-                exc.exception.error, {self.model._meta.model_name: "not found"}
+                exc.exception.error, {self.model._meta.verbose_name: "not found"}
             )
 
         async def test_update(self):
