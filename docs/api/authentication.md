@@ -959,6 +959,7 @@ class FirebaseAuth(HttpBearer):
 ## See Also
 
 - [API ViewSet](views/api_view_set.md) - Applying auth to ViewSets
+- [Tutorial: Authentication](../tutorial/authentication.md) - Step-by-step guide
 - [Model Serializer](models/model_serializer.md) - Filtering by authenticated user
 
 ---
