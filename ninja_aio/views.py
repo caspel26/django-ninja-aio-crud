@@ -17,6 +17,7 @@ from .schemas import (
     M2MRemoveSchemaIn,
 )
 from .types import ModelSerializerMeta, VIEW_TYPES
+from .decoratos import unique_view
 
 ERROR_CODES = frozenset({400, 401, 404, 428})
 
@@ -243,11 +244,9 @@ class APIViewSet:
             description=self.create_docs,
             response={201: self.schema_out, self.error_codes: GenericMessageSchema},
         )
+        @unique_view(self)
         async def create(request: HttpRequest, data: self.schema_in):  # type: ignore
             return 201, await self.model_util.create_s(request, data, self.schema_out)
-
-        create.__name__ = f"create_{self.model_util.model_name}"
-        return create
 
     def list_view(self):
         @self.router.get(
@@ -260,6 +259,7 @@ class APIViewSet:
                 self.error_codes: GenericMessageSchema,
             },
         )
+        @unique_view(self)
         @paginate(self.pagination_class)
         async def list(
             request: HttpRequest,
@@ -279,9 +279,6 @@ class APIViewSet:
             ]
             return objs
 
-        list.__name__ = f"list_{self.model_util.verbose_name_view_resolver()}"
-        return list
-
     def retrieve_view(self):
         @self.router.get(
             self.get_path_retrieve,
@@ -290,12 +287,10 @@ class APIViewSet:
             description=self.retrieve_docs,
             response={200: self.schema_out, self.error_codes: GenericMessageSchema},
         )
+        @unique_view(self)
         async def retrieve(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
             obj = await self.model_util.get_object(request, self._get_pk(pk))
             return await self.model_util.read_s(request, obj, self.schema_out)
-
-        retrieve.__name__ = f"retrieve_{self.model_util.model_name}"
-        return retrieve
 
     def update_view(self):
         @self.router.patch(
@@ -305,6 +300,7 @@ class APIViewSet:
             description=self.update_docs,
             response={200: self.schema_out, self.error_codes: GenericMessageSchema},
         )
+        @unique_view(self)
         async def update(
             request: HttpRequest,
             data: self.schema_update,  # type: ignore
@@ -314,9 +310,6 @@ class APIViewSet:
                 request, data, self._get_pk(pk), self.schema_out
             )
 
-        update.__name__ = f"update_{self.model_util.model_name}"
-        return update
-
     def delete_view(self):
         @self.router.delete(
             self.path_retrieve,
@@ -325,11 +318,10 @@ class APIViewSet:
             description=self.delete_docs,
             response={204: None, self.error_codes: GenericMessageSchema},
         )
+
+        @unique_view(self)
         async def delete(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
             return 204, await self.model_util.delete_s(request, self._get_pk(pk))
-
-        delete.__name__ = f"delete_{self.model_util.model_name}"
-        return delete
 
     def views(self):
         """
