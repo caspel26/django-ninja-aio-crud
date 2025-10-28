@@ -167,6 +167,7 @@ class APIViewSet:
         self.schema_out, self.schema_in, self.schema_update = self.get_schemas()
         self.path_schema = self._generate_path_schema()
         self.filters_schema = self._generate_filters_schema()
+        self.m2m_filters_schemas = self._generate_m2m_filters_schemas()
         self.model_verbose_name = self.model._meta.verbose_name.capitalize()
         self.router_tag = self.model_verbose_name
         self.router = Router(tags=[self.router_tag])
@@ -218,6 +219,16 @@ class APIViewSet:
 
     def _generate_filters_schema(self):
         return self._generate_schema(self.query_params, "FiltersSchema")
+
+    def _generate_m2m_filters_schemas(self):
+        return {
+            m2m_data.related_name: self._generate_schema(
+                m2m_data.filters,
+                f"{self.model_util.model_name}{m2m_data.related_name.capitalize()}FiltersSchema",
+            )
+            for m2m_data in self.m2m_relations
+            if m2m_data.filters
+        }
 
     def _get_pk(self, data: Schema):
         return data.model_dump()[self.model_util.model_pk_name]
@@ -424,10 +435,30 @@ class APIViewSet:
                 )
                 @unique_view(f"get_{self.model_util.model_name}_{rel_path}")
                 @paginate(self.pagination_class)
-                async def get_related(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
+                async def get_related(
+                    request: HttpRequest,
+                    pk: Path[self.path_schema],  # type: ignore
+                    filters: Query[
+                        self.m2m_filters_schemas.get(m2m_data.related_name) # type: ignore
+                    ] = None,
+                ):
                     obj = await self.model_util.get_object(request, self._get_pk(pk))
                     related_manager = getattr(obj, related_name)
                     related_qs = related_manager.all()
+                    if (
+                        filters is not None
+                        and (
+                            query_handler := getattr(
+                                self,
+                                f"{m2m_data.related_name}_query_params_handler",
+                                None,
+                            )
+                        )
+                        is not None
+                    ):
+                        related_qs = await query_handler(
+                            related_qs, filters.model_dump()
+                        )
                     related_objs = [
                         await rel_util.read_s(
                             request, rel_obj, model.generate_related_s()
