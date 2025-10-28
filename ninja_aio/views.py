@@ -100,6 +100,37 @@ class APIViewSet:
         GET    /{pk}/{related_path}            -> list related objects (paginated)
         POST   /{pk}/{related_path}/           -> add/remove related objects (depending on m2m_add / m2m_remove)
 
+    M2M filters:
+        Each M2MRelationSchema may define a filters dict:
+            filters = { "field_name": (type, default) }
+        A dynamic Pydantic Filters schema is generated and exposed as query params
+        on the related GET endpoint: /{pk}/{related_path}?field_name=value.
+        To apply custom filter logic implement an async hook named:
+            <related_name>_query_params_handler(self, queryset, filters_dict)
+        It receives the initial related queryset and the validated/dumped filters
+        dict, and must return the (optionally) filtered queryset.
+
+        Example:
+            class UserViewSet(APIViewSet):
+                model = models.User
+                m2m_relations = [
+                    M2MRelationSchema(
+                        model=models.Tag,
+                        related_name="tags",
+                        filters={
+                            "name": (str, "")
+                        }
+                    )
+                ]
+
+                async def tags_query_params_handler(self, queryset, filters):
+                    name_filter = filters.get("name")
+                    if name_filter:
+                        queryset = queryset.filter(name__icontains=name_filter)
+                    return queryset
+
+        If filters is empty or omitted no query params are added for that relation.
+
     Attribute summary:
         model: Django model or ModelSerializer.
         api: NinjaAPI instance.
