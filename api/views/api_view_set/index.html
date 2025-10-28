@@ -843,9 +843,9 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#filtering" class="md-nav__link">
+  <a href="#list-filtering" class="md-nav__link">
     <span class="md-ellipsis">
-      Filtering
+      List Filtering
     </span>
   </a>
   
@@ -862,18 +862,18 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#m2m-example" class="md-nav__link">
+  <a href="#generated-m2m-endpoints-per-relation" class="md-nav__link">
     <span class="md-ellipsis">
-      M2M Example
+      Generated M2M Endpoints (per relation)
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#controlling-operations" class="md-nav__link">
+  <a href="#m2m-example" class="md-nav__link">
     <span class="md-ellipsis">
-      Controlling Operations
+      M2M Example
     </span>
   </a>
   
@@ -903,9 +903,18 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#error-codes" class="md-nav__link">
+  <a href="#overridable-hooks" class="md-nav__link">
     <span class="md-ellipsis">
-      Error Codes
+      Overridable Hooks
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#error-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      Error Handling
     </span>
   </a>
   
@@ -930,9 +939,9 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#disable-views" class="md-nav__link">
+  <a href="#disable-selected-views" class="md-nav__link">
     <span class="md-ellipsis">
-      Disable Views
+      Disable Selected Views
     </span>
   </a>
   
@@ -942,6 +951,15 @@
   <a href="#authentication-example" class="md-nav__link">
     <span class="md-ellipsis">
       Authentication Example
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#complete-m2m-filters-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      Complete M2M + Filters Example
     </span>
   </a>
   
@@ -1261,14 +1279,14 @@
 
 
 <h1 id="apiviewset"><a class="toclink" href="#apiviewset">APIViewSet</a></h1>
-<p><code>APIViewSet</code> auto-generates CRUD + optional Many-to-Many (M2M) endpoints for a Django model (or <code>ModelSerializer</code>) with async support, pagination, filtering, per-method authentication, and dynamic schema generation.</p>
+<p><code>APIViewSet</code> auto-generates async CRUD endpoints and optional Many-to-Many (M2M) endpoints for a Django <code>Model</code> or a <code>ModelSerializer</code>. It supports dynamic schema generation, per-verb authentication, pagination, list &amp; relation filtering with runtime-built Pydantic schemas, and custom view injection.</p>
 <h2 id="generated-crud-endpoints"><a class="toclink" href="#generated-crud-endpoints">Generated CRUD Endpoints</a></h2>
 <table>
 <thead>
 <tr>
 <th>Method</th>
-<th>Path Pattern</th>
-<th>Summary (auto)</th>
+<th>Path</th>
+<th>Summary</th>
 <th>Response</th>
 </tr>
 </thead>
@@ -1277,25 +1295,25 @@
 <td>POST</td>
 <td><code>/{base}/</code></td>
 <td>Create Model</td>
-<td><code>201 {schema_out}</code></td>
+<td><code>201 schema_out</code></td>
 </tr>
 <tr>
 <td>GET</td>
 <td><code>/{base}/</code></td>
 <td>List Models</td>
-<td><code>200 List[{schema_out}]</code> (paginated)</td>
+<td><code>200 List[schema_out]</code> (paginated)</td>
 </tr>
 <tr>
 <td>GET</td>
 <td><code>/{base}/{pk}</code></td>
 <td>Retrieve Model</td>
-<td><code>200 {schema_out}</code></td>
+<td><code>200 schema_out</code></td>
 </tr>
 <tr>
 <td>PATCH</td>
 <td><code>/{base}/{pk}/</code></td>
 <td>Update Model</td>
-<td><code>200 {schema_out}</code></td>
+<td><code>200 schema_out</code></td>
 </tr>
 <tr>
 <td>DELETE</td>
@@ -1306,9 +1324,9 @@
 </tbody>
 </table>
 <p>Notes:
-- Retrieve path has no trailing slash; update/delete use trailing slash.
-- <code>{base}</code> defaults to the model verbose name (lowercased plural) unless <code>api_route_path</code> overrides.
-- Error responses share a unified schema for codes: 400, 401, 404, 428.</p>
+- Retrieve path has no trailing slash; update/delete include a trailing slash.
+- <code>{base}</code> auto-resolves from model verbose name plural (lowercase) unless <code>api_route_path</code> is provided.
+- Error responses may use a unified generic schema for codes: 400, 401, 404, 428.</p>
 <h2 id="core-attributes"><a class="toclink" href="#core-attributes">Core Attributes</a></h2>
 <table>
 <thead>
@@ -1336,7 +1354,7 @@
 <td><code>schema_in</code></td>
 <td><code>Schema \| None</code></td>
 <td><code>None</code> (auto)</td>
-<td>Create schema override</td>
+<td>Create input schema override</td>
 </tr>
 <tr>
 <td><code>schema_out</code></td>
@@ -1348,7 +1366,7 @@
 <td><code>schema_update</code></td>
 <td><code>Schema \| None</code></td>
 <td><code>None</code> (auto)</td>
-<td>Update schema override</td>
+<td>Update input schema override</td>
 </tr>
 <tr>
 <td><code>pagination_class</code></td>
@@ -1360,19 +1378,19 @@
 <td><code>query_params</code></td>
 <td><code>dict[str, tuple[type, ...]]</code></td>
 <td><code>{}</code></td>
-<td>Declares filter parameters</td>
+<td>List endpoint filters definition</td>
 </tr>
 <tr>
 <td><code>disable</code></td>
 <td><code>list[type[VIEW_TYPES]]</code></td>
 <td><code>[]</code></td>
-<td>Disable view types (<code>"create"</code>, <code>"list"</code>, <code>"retrieve"</code>, <code>"update"</code>, <code>"delete"</code>, <code>"all"</code>)</td>
+<td>Disable CRUD views (<code>create</code>,<code>list</code>,<code>retrieve</code>,<code>update</code>,<code>delete</code>,<code>all</code>)</td>
 </tr>
 <tr>
 <td><code>api_route_path</code></td>
 <td><code>str</code></td>
 <td><code>""</code></td>
-<td>Base route segment (falls back to resolved verbose name)</td>
+<td>Base route segment</td>
 </tr>
 <tr>
 <td><code>list_docs</code></td>
@@ -1403,6 +1421,18 @@
 <td><code>str</code></td>
 <td><code>"Delete an object by its primary key."</code></td>
 <td>Delete endpoint description</td>
+</tr>
+<tr>
+<td><code>m2m_relations</code></td>
+<td><code>list[M2MRelationSchema]</code></td>
+<td><code>[]</code></td>
+<td>M2M relation configs</td>
+</tr>
+<tr>
+<td><code>m2m_auth</code></td>
+<td><code>list \| None</code></td>
+<td><code>NOT_SET</code></td>
+<td>Default auth for all M2M endpoints (overridden per relation if set)</td>
 </tr>
 </tbody>
 </table>
@@ -1447,30 +1477,27 @@
 <td><code>NOT_SET</code></td>
 <td>Auth for delete</td>
 </tr>
-<tr>
-<td><code>m2m_auth</code></td>
-<td><code>list \| None</code></td>
-<td><code>NOT_SET</code></td>
-<td>Default auth for M2M endpoints</td>
-</tr>
 </tbody>
 </table>
-<p>Resolution: per-method auth overrides <code>auth</code> unless set to <code>NOT_SET</code>. <code>None</code> makes endpoint public.</p>
+<p>Resolution rules:
+- Per-verb auth overrides <code>auth</code> when not <code>NOT_SET</code>.
+- <code>None</code> makes the endpoint public (no authentication).
+- M2M endpoints use relation-level auth (<code>m2m_data.auth</code>) or fall back to <code>m2m_auth</code>.</p>
 <h2 id="automatic-schema-generation"><a class="toclink" href="#automatic-schema-generation">Automatic Schema Generation</a></h2>
-<p>If <code>model</code> inherits <code>ModelSerializer</code>, the following are auto-created:
-- <code>schema_out</code> from <code>ReadSerializer</code>
+<p>If <code>model</code> is a subclass of <code>ModelSerializerMeta</code>:
+- <code>schema_out</code> is generated from <code>ReadSerializer</code>
 - <code>schema_in</code> from <code>CreateSerializer</code>
 - <code>schema_update</code> from <code>UpdateSerializer</code></p>
-<p>Otherwise supply them manually.</p>
-<h2 id="filtering"><a class="toclink" href="#filtering">Filtering</a></h2>
-<p>Declare parameter types via <code>query_params</code>:</p>
+<p>Otherwise provide them manually.</p>
+<h2 id="list-filtering"><a class="toclink" href="#list-filtering">List Filtering</a></h2>
+<p>Define filters for the list view with <code>query_params</code>:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">query_params</span> <span class="o">=</span> <span class="p">{</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="s2">&quot;is_active&quot;</span><span class="p">:</span> <span class="p">(</span><span class="nb">bool</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="s2">&quot;role&quot;</span><span class="p">:</span> <span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="s2">&quot;search&quot;</span><span class="p">:</span> <span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="p">}</span>
 </span></code></pre></div>
-<p>Override:</p>
+<p>Override handler:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">query_params_handler</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">queryset</span><span class="p">,</span> <span class="n">filters</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="k">if</span> <span class="n">filters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;is_active&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>        <span class="n">queryset</span> <span class="o">=</span> <span class="n">queryset</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">is_active</span><span class="o">=</span><span class="n">filters</span><span class="p">[</span><span class="s2">&quot;is_active&quot;</span><span class="p">])</span>
@@ -1482,52 +1509,88 @@
 </span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>        <span class="n">queryset</span> <span class="o">=</span> <span class="n">queryset</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">Q</span><span class="p">(</span><span class="n">username__icontains</span><span class="o">=</span><span class="n">s</span><span class="p">)</span> <span class="o">|</span> <span class="n">Q</span><span class="p">(</span><span class="n">email__icontains</span><span class="o">=</span><span class="n">s</span><span class="p">))</span>
 </span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>    <span class="k">return</span> <span class="n">queryset</span>
 </span></code></pre></div>
+<p>A dynamic Pydantic model (<code>FiltersSchema</code>) is built with <code>pydantic.create_model</code> from <code>query_params</code>.</p>
 <h2 id="many-to-many-relations"><a class="toclink" href="#many-to-many-relations">Many-to-Many Relations</a></h2>
-<p><code>m2m_relations: list[tuple[ModelSerializer | Model, str, str, list]]</code></p>
-<p>Tuple formats supported (variable length):
-1. <code>(RelatedModel, related_name)</code>
-2. <code>(RelatedModel, related_name, custom_path)</code>
-3. <code>(RelatedModel, related_name, custom_path, per_relation_auth)</code></p>
-<p>Resolution rules:
-- If <code>custom_path</code> missing or empty → auto path from related model verbose name.
-- If per-relation auth omitted → falls back to <code>m2m_auth</code>.
-- <code>None</code> auth makes that relation’s endpoints public.</p>
-<p>Generated per relation (if enabled):
-| Method | Path | Feature |
-|--------|------|---------|
-| GET | <code>/{base}/{pk}/{rel_path}</code> | List related objects (paginated) |
-| POST | <code>/{base}/{pk}/{rel_path}/</code> | Add/remove operations |</p>
-<p>Add/remove schema:
-- If both <code>m2m_add</code> and <code>m2m_remove</code> are True: payload <code>{ "add": [ids], "remove": [ids] }</code>
-- If only add: <code>{ "add": [ids] }</code>
-- If only remove: <code>{ "remove": [ids] }</code></p>
-<p>Response format:
-<div class="language-json highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="p">{</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">&quot;results&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;count&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">X</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;details&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;...&quot;</span><span class="p">]</span><span class="w"> </span><span class="p">},</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="nt">&quot;errors&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;count&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">Y</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;details&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;...&quot;</span><span class="p">]</span><span class="w"> </span><span class="p">}</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="p">}</span>
+<p>Relations are declared via <code>M2MRelationSchema</code> objects (not tuples). Each schema can include:
+- <code>model</code>: related Django model or ModelSerializer
+- <code>related_name</code>: attribute name on the main model (e.g. <code>"tags"</code>)
+- <code>path</code>: custom URL segment (optional)
+- <code>auth</code>: list of auth instances (optional)
+- <code>add</code>: enable additions (bool)
+- <code>remove</code>: enable removals (bool)
+- <code>get</code>: enable GET listing (bool)
+- <code>filters</code>: dict of <code>{param_name: (type, default)}</code> for relation-level filtering</p>
+<p>If <code>path</code> is empty it falls back to the related model verbose name (lowercase plural).
+If <code>filters</code> is provided a per-relation filters schema is auto-generated and exposed on the GET relation endpoint:
+<code>GET /{base}/{pk}/{related_path}?param=value</code></p>
+<p>Custom filter hook naming convention:
+<code>&lt;related_name&gt;_query_params_handler(self, queryset, filters_dict)</code></p>
+<p>Example with filters:
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">UserViewSet</span><span class="p">(</span><span class="n">APIViewSet</span><span class="p">):</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="n">model</span> <span class="o">=</span> <span class="n">User</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">api</span> <span class="o">=</span> <span class="n">api</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">m2m_relations</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>        <span class="n">M2MRelationSchema</span><span class="p">(</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>            <span class="n">model</span><span class="o">=</span><span class="n">Tag</span><span class="p">,</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>            <span class="n">related_name</span><span class="o">=</span><span class="s2">&quot;tags&quot;</span><span class="p">,</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>            <span class="n">filters</span><span class="o">=</span><span class="p">{</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>                <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>            <span class="p">}</span>
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>        <span class="p">)</span>
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>    <span class="p">]</span>
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>
+</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">tags_query_params_handler</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">queryset</span><span class="p">,</span> <span class="n">filters</span><span class="p">):</span>
+</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>        <span class="n">name_filter</span> <span class="o">=</span> <span class="n">filters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">)</span>
+</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>        <span class="k">if</span> <span class="n">name_filter</span><span class="p">:</span>
+</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>            <span class="n">queryset</span> <span class="o">=</span> <span class="n">queryset</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">name__icontains</span><span class="o">=</span><span class="n">name_filter</span><span class="p">)</span>
+</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>        <span class="k">return</span> <span class="n">queryset</span>
 </span></code></pre></div></p>
+<h3 id="generated-m2m-endpoints-per-relation"><a class="toclink" href="#generated-m2m-endpoints-per-relation">Generated M2M Endpoints (per relation)</a></h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Feature</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/{base}/{pk}/{rel_path}</code></td>
+<td>List related objects (paginated, optional filters)</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/{base}/{pk}/{rel_path}/</code></td>
+<td>Add/remove related objects</td>
+</tr>
+</tbody>
+</table>
+<p>Request bodies:
+- Both add &amp; remove enabled: <code>{ "add": [ids], "remove": [ids] }</code>
+- Only add: <code>{ "add": [ids] }</code>
+- Only remove: <code>{ "remove": [ids] }</code></p>
+<p>Success/manage response (<code>M2MSchemaOut</code>):
+<div class="language-json highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="p">{</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">&quot;results&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;count&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">X</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;details&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;...&quot;</span><span class="p">]</span><span class="w"> </span><span class="p">},</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="nt">&quot;errors&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;count&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">Y</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;details&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;...&quot;</span><span class="p">]</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="p">}</span>
+</span></code></pre></div></p>
+<p>Operations use async managers (<code>aadd</code>, <code>aremove</code>) and run concurrently via <code>asyncio.gather</code>.</p>
 <h3 id="m2m-example"><a class="toclink" href="#m2m-example">M2M Example</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">ArticleViewSet</span><span class="p">(</span><span class="n">APIViewSet</span><span class="p">):</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="n">model</span> <span class="o">=</span> <span class="n">Article</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">api</span> <span class="o">=</span> <span class="n">api</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">m2m_relations</span> <span class="o">=</span> <span class="p">[</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>        <span class="p">(</span><span class="n">Tag</span><span class="p">,</span> <span class="s2">&quot;tags&quot;</span><span class="p">),</span>                                 <span class="c1"># auto path + m2m_auth</span>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>        <span class="p">(</span><span class="n">Category</span><span class="p">,</span> <span class="s2">&quot;categories&quot;</span><span class="p">,</span> <span class="s2">&quot;article-categories&quot;</span><span class="p">),</span><span class="c1"># custom path</span>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>        <span class="p">(</span><span class="n">User</span><span class="p">,</span> <span class="s2">&quot;authors&quot;</span><span class="p">,</span> <span class="s2">&quot;co-authors&quot;</span><span class="p">,</span> <span class="p">[</span><span class="n">AdminAuth</span><span class="p">()])</span> <span class="c1"># custom path + custom auth</span>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="p">]</span>
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>    <span class="n">m2m_auth</span> <span class="o">=</span> <span class="p">[</span><span class="n">JWTAuth</span><span class="p">()]</span>      <span class="c1"># fallback for first two</span>
-</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>    <span class="n">m2m_add</span> <span class="o">=</span> <span class="kc">True</span>
-</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>    <span class="n">m2m_remove</span> <span class="o">=</span> <span class="kc">True</span>
-</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>    <span class="n">m2m_get</span> <span class="o">=</span> <span class="kc">True</span>
-</span></code></pre></div>
-<h3 id="controlling-operations"><a class="toclink" href="#controlling-operations">Controlling Operations</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">m2m_add</span> <span class="o">=</span> <span class="kc">False</span>       <span class="c1"># disable additions</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">m2m_remove</span> <span class="o">=</span> <span class="kc">True</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">m2m_get</span> <span class="o">=</span> <span class="kc">True</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">ArticleViewSet</span><span class="p">(</span><span class="n">APIViewSet</span><span class="p">):</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    <span class="n">model</span> <span class="o">=</span> <span class="n">Article</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="n">api</span> <span class="o">=</span> <span class="n">api</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="n">m2m_relations</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>        <span class="n">M2MRelationSchema</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">Tag</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s2">&quot;tags&quot;</span><span class="p">),</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>        <span class="n">M2MRelationSchema</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">Category</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s2">&quot;categories&quot;</span><span class="p">,</span> <span class="n">path</span><span class="o">=</span><span class="s2">&quot;article-categories&quot;</span><span class="p">),</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>        <span class="n">M2MRelationSchema</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">User</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s2">&quot;authors&quot;</span><span class="p">,</span> <span class="n">path</span><span class="o">=</span><span class="s2">&quot;co-authors&quot;</span><span class="p">,</span> <span class="n">auth</span><span class="o">=</span><span class="p">[</span><span class="n">AdminAuth</span><span class="p">()])</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>    <span class="p">]</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>    <span class="n">m2m_auth</span> <span class="o">=</span> <span class="p">[</span><span class="n">JWTAuth</span><span class="p">()]</span>  <span class="c1"># fallback for relations without custom auth</span>
 </span></code></pre></div>
 <h2 id="custom-views"><a class="toclink" href="#custom-views">Custom Views</a></h2>
-<p>Add extra endpoints by overriding <code>views()</code>:</p>
+<p>Override <code>views()</code> to register extra endpoints:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">views</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    <span class="nd">@self</span><span class="o">.</span><span class="n">router</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;/stats/&quot;</span><span class="p">,</span> <span class="n">response</span><span class="o">=</span><span class="p">{</span><span class="mi">200</span><span class="p">:</span> <span class="n">GenericMessageSchema</span><span class="p">})</span>
 </span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">stats</span><span class="p">(</span><span class="n">request</span><span class="p">):</span>
@@ -1535,15 +1598,39 @@
 </span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>        <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;Total: </span><span class="si">{</span><span class="n">total</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">}</span>
 </span></code></pre></div>
 <h2 id="dynamic-view-naming"><a class="toclink" href="#dynamic-view-naming">Dynamic View Naming</a></h2>
-<p>All generated handlers are wrapped with <code>@unique_view(...)</code> to ensure stable unique function names (important for schema generation and avoiding collisions).</p>
-<h2 id="error-codes"><a class="toclink" href="#error-codes">Error Codes</a></h2>
-<p>Unified error schema for: 400 (validation), 401 (auth), 404 (not found), 428 (precondition).</p>
+<p>All generated handlers are decorated with <code>@unique_view(...)</code> to ensure stable unique function names (prevents collisions and ensures consistent OpenAPI schema generation). Relation endpoints use explicit names like <code>get_&lt;model&gt;_&lt;rel_path&gt;</code> and <code>manage_&lt;model&gt;_&lt;rel_path&gt;</code>.</p>
+<h2 id="overridable-hooks"><a class="toclink" href="#overridable-hooks">Overridable Hooks</a></h2>
+<table>
+<thead>
+<tr>
+<th>Hook</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>views()</code></td>
+<td>Register custom endpoints</td>
+</tr>
+<tr>
+<td><code>query_params_handler(queryset, filters)</code></td>
+<td>Apply list filters</td>
+</tr>
+<tr>
+<td><code>&lt;related_name&gt;_query_params_handler(queryset, filters)</code></td>
+<td>Apply relation-specific filters</td>
+</tr>
+</tbody>
+</table>
+<h2 id="error-handling"><a class="toclink" href="#error-handling">Error Handling</a></h2>
+<p>All CRUD and M2M endpoints may respond with <code>GenericMessageSchema</code> for error codes: 400 (validation), 401 (auth), 404 (not found), 428 (precondition required).</p>
 <h2 id="performance-tips"><a class="toclink" href="#performance-tips">Performance Tips</a></h2>
 <ol>
-<li>Implement <code>@classmethod async def queryset_request(cls, request)</code> on <code>ModelSerializer</code> to prefetch relations.</li>
-<li>Use indexes on fields referenced in <code>query_params</code>.</li>
-<li>Keep pagination enabled to prevent large memory usage.</li>
-<li>Apply selective slicing for expensive searches (<code>queryset = queryset[:1000]</code>).</li>
+<li>Implement <code>@classmethod async def queryset_request(cls, request)</code> in your <code>ModelSerializer</code> to prefetch related objects.</li>
+<li>Use database indexes on filtered fields (<code>query_params</code> and relation <code>filters</code>).</li>
+<li>Keep pagination enabled for large datasets.</li>
+<li>Prefetch reverse relations via <code>model_util.get_reverse_relations()</code> (already applied in list view).</li>
+<li>Limit slice size for expensive searches if needed (<code>queryset = queryset[:1000]</code>).</li>
 </ol>
 <h2 id="minimal-usage"><a class="toclink" href="#minimal-usage">Minimal Usage</a></h2>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">UserViewSet</span><span class="p">(</span><span class="n">APIViewSet</span><span class="p">):</span>
@@ -1552,7 +1639,7 @@
 </span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>
 </span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="n">UserViewSet</span><span class="p">()</span><span class="o">.</span><span class="n">add_views_to_route</span><span class="p">()</span>
 </span></code></pre></div>
-<h2 id="disable-views"><a class="toclink" href="#disable-views">Disable Views</a></h2>
+<h2 id="disable-selected-views"><a class="toclink" href="#disable-selected-views">Disable Selected Views</a></h2>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">ReadOnlyUserViewSet</span><span class="p">(</span><span class="n">APIViewSet</span><span class="p">):</span>
 </span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>    <span class="n">model</span> <span class="o">=</span> <span class="n">User</span>
 </span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    <span class="n">api</span> <span class="o">=</span> <span class="n">api</span>
@@ -1562,9 +1649,51 @@
 <div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">UserViewSet</span><span class="p">(</span><span class="n">APIViewSet</span><span class="p">):</span>
 </span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>    <span class="n">model</span> <span class="o">=</span> <span class="n">User</span>
 </span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>    <span class="n">api</span> <span class="o">=</span> <span class="n">api</span>
-</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>    <span class="n">auth</span> <span class="o">=</span> <span class="p">[</span><span class="n">JWTAuth</span><span class="p">()]</span>        <span class="c1"># default</span>
-</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>    <span class="n">get_auth</span> <span class="o">=</span> <span class="kc">None</span>           <span class="c1"># list/retrieve public</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>    <span class="n">auth</span> <span class="o">=</span> <span class="p">[</span><span class="n">JWTAuth</span><span class="p">()]</span>      <span class="c1"># global fallback</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>    <span class="n">get_auth</span> <span class="o">=</span> <span class="kc">None</span>         <span class="c1"># list/retrieve public</span>
 </span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>    <span class="n">delete_auth</span> <span class="o">=</span> <span class="p">[</span><span class="n">AdminAuth</span><span class="p">()]</span>  <span class="c1"># delete restricted</span>
+</span></code></pre></div>
+<h2 id="complete-m2m-filters-example"><a class="toclink" href="#complete-m2m-filters-example">Complete M2M + Filters Example</a></h2>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">Tag</span><span class="p">(</span><span class="n">ModelSerializer</span><span class="p">):</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>    <span class="n">name</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">CharField</span><span class="p">(</span><span class="n">max_length</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>    <span class="k">class</span><span class="w"> </span><span class="nc">ReadSerializer</span><span class="p">:</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>        <span class="n">fields</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">,</span> <span class="s2">&quot;name&quot;</span><span class="p">]</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="k">class</span><span class="w"> </span><span class="nc">User</span><span class="p">(</span><span class="n">ModelSerializer</span><span class="p">):</span>
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>    <span class="n">username</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">CharField</span><span class="p">(</span><span class="n">max_length</span><span class="o">=</span><span class="mi">150</span><span class="p">)</span>
+</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>    <span class="n">tags</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">ManyToManyField</span><span class="p">(</span><span class="n">Tag</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s2">&quot;users&quot;</span><span class="p">)</span>
+</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>    <span class="k">class</span><span class="w"> </span><span class="nc">ReadSerializer</span><span class="p">:</span>
+</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>        <span class="n">fields</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">,</span> <span class="s2">&quot;username&quot;</span><span class="p">,</span> <span class="s2">&quot;tags&quot;</span><span class="p">]</span>
+</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>
+</span><span id="__span-9-12"><a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="k">class</span><span class="w"> </span><span class="nc">UserViewSet</span><span class="p">(</span><span class="n">APIViewSet</span><span class="p">):</span>
+</span><span id="__span-9-13"><a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a>    <span class="n">model</span> <span class="o">=</span> <span class="n">User</span>
+</span><span id="__span-9-14"><a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a>    <span class="n">api</span> <span class="o">=</span> <span class="n">api</span>
+</span><span id="__span-9-15"><a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a>    <span class="n">query_params</span> <span class="o">=</span> <span class="p">{</span>
+</span><span id="__span-9-16"><a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a>        <span class="s2">&quot;search&quot;</span><span class="p">:</span> <span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+</span><span id="__span-9-17"><a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a>    <span class="p">}</span>
+</span><span id="__span-9-18"><a id="__codelineno-9-18" name="__codelineno-9-18" href="#__codelineno-9-18"></a>    <span class="n">m2m_relations</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-9-19"><a id="__codelineno-9-19" name="__codelineno-9-19" href="#__codelineno-9-19"></a>        <span class="n">M2MRelationSchema</span><span class="p">(</span>
+</span><span id="__span-9-20"><a id="__codelineno-9-20" name="__codelineno-9-20" href="#__codelineno-9-20"></a>            <span class="n">model</span><span class="o">=</span><span class="n">Tag</span><span class="p">,</span>
+</span><span id="__span-9-21"><a id="__codelineno-9-21" name="__codelineno-9-21" href="#__codelineno-9-21"></a>            <span class="n">related_name</span><span class="o">=</span><span class="s2">&quot;tags&quot;</span><span class="p">,</span>
+</span><span id="__span-9-22"><a id="__codelineno-9-22" name="__codelineno-9-22" href="#__codelineno-9-22"></a>            <span class="n">filters</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)},</span>
+</span><span id="__span-9-23"><a id="__codelineno-9-23" name="__codelineno-9-23" href="#__codelineno-9-23"></a>            <span class="n">add</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-9-24"><a id="__codelineno-9-24" name="__codelineno-9-24" href="#__codelineno-9-24"></a>            <span class="n">remove</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-9-25"><a id="__codelineno-9-25" name="__codelineno-9-25" href="#__codelineno-9-25"></a>            <span class="n">get</span><span class="o">=</span><span class="kc">True</span>
+</span><span id="__span-9-26"><a id="__codelineno-9-26" name="__codelineno-9-26" href="#__codelineno-9-26"></a>        <span class="p">)</span>
+</span><span id="__span-9-27"><a id="__codelineno-9-27" name="__codelineno-9-27" href="#__codelineno-9-27"></a>    <span class="p">]</span>
+</span><span id="__span-9-28"><a id="__codelineno-9-28" name="__codelineno-9-28" href="#__codelineno-9-28"></a>
+</span><span id="__span-9-29"><a id="__codelineno-9-29" name="__codelineno-9-29" href="#__codelineno-9-29"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">query_params_handler</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">queryset</span><span class="p">,</span> <span class="n">filters</span><span class="p">):</span>
+</span><span id="__span-9-30"><a id="__codelineno-9-30" name="__codelineno-9-30" href="#__codelineno-9-30"></a>        <span class="k">if</span> <span class="n">filters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;search&quot;</span><span class="p">):</span>
+</span><span id="__span-9-31"><a id="__codelineno-9-31" name="__codelineno-9-31" href="#__codelineno-9-31"></a>            <span class="kn">from</span><span class="w"> </span><span class="nn">django.db.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">Q</span>
+</span><span id="__span-9-32"><a id="__codelineno-9-32" name="__codelineno-9-32" href="#__codelineno-9-32"></a>            <span class="n">s</span> <span class="o">=</span> <span class="n">filters</span><span class="p">[</span><span class="s2">&quot;search&quot;</span><span class="p">]</span>
+</span><span id="__span-9-33"><a id="__codelineno-9-33" name="__codelineno-9-33" href="#__codelineno-9-33"></a>            <span class="k">return</span> <span class="n">queryset</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">Q</span><span class="p">(</span><span class="n">username__icontains</span><span class="o">=</span><span class="n">s</span><span class="p">))</span>
+</span><span id="__span-9-34"><a id="__codelineno-9-34" name="__codelineno-9-34" href="#__codelineno-9-34"></a>        <span class="k">return</span> <span class="n">queryset</span>
+</span><span id="__span-9-35"><a id="__codelineno-9-35" name="__codelineno-9-35" href="#__codelineno-9-35"></a>
+</span><span id="__span-9-36"><a id="__codelineno-9-36" name="__codelineno-9-36" href="#__codelineno-9-36"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">tags_query_params_handler</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">queryset</span><span class="p">,</span> <span class="n">filters</span><span class="p">):</span>
+</span><span id="__span-9-37"><a id="__codelineno-9-37" name="__codelineno-9-37" href="#__codelineno-9-37"></a>        <span class="n">name_filter</span> <span class="o">=</span> <span class="n">filters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">)</span>
+</span><span id="__span-9-38"><a id="__codelineno-9-38" name="__codelineno-9-38" href="#__codelineno-9-38"></a>        <span class="k">if</span> <span class="n">name_filter</span><span class="p">:</span>
+</span><span id="__span-9-39"><a id="__codelineno-9-39" name="__codelineno-9-39" href="#__codelineno-9-39"></a>            <span class="n">queryset</span> <span class="o">=</span> <span class="n">queryset</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">name__icontains</span><span class="o">=</span><span class="n">name_filter</span><span class="p">)</span>
+</span><span id="__span-9-40"><a id="__codelineno-9-40" name="__codelineno-9-40" href="#__codelineno-9-40"></a>        <span class="k">return</span> <span class="n">queryset</span>
 </span></code></pre></div>
 <h2 id="see-also"><a class="toclink" href="#see-also">See Also</a></h2>
 <ul>
