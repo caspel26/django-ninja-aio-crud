@@ -147,9 +147,6 @@ class APIViewSet:
     update_docs = "Update an object by its primary key."
     delete_docs = "Delete an object by its primary key."
     m2m_relations: list[M2MRelationSchema] = []
-    m2m_add = True
-    m2m_remove = True
-    m2m_get = True
     m2m_auth: list | None = NOT_SET
 
     def __init__(self) -> None:
@@ -228,11 +225,10 @@ class APIViewSet:
         """
         return {
             m2m_data.related_name: self._generate_schema(
-                m2m_data.filters,
+                {} if not m2m_data.filters else m2m_data.filters,
                 f"{self.model_util.model_name}{m2m_data.related_name.capitalize()}FiltersSchema",
             )
             for m2m_data in self.m2m_relations
-            if m2m_data.filters
         }
 
     def _get_pk(self, data: Schema):
@@ -429,7 +425,11 @@ class APIViewSet:
                 if not m2m_data.path
                 else m2m_data.path
             )
-            if self.m2m_get:
+            m2m_add = m2m_data.add
+            m2m_remove = m2m_data.remove
+            m2m_get = m2m_data.get
+            filters_schema = self.m2m_filters_schemas.get(related_name)
+            if m2m_get:
 
                 @self.router.get(
                     f"{self.path_retrieve}{rel_path}",
@@ -446,9 +446,7 @@ class APIViewSet:
                 async def get_related(
                     request: HttpRequest,
                     pk: Path[self.path_schema],  # type: ignore
-                    filters: Query[
-                        self.m2m_filters_schemas.get(m2m_data.related_name) # type: ignore
-                    ] = None,
+                    filters: Query[filters_schema] = None # type: ignore
                 ):
                     obj = await self.model_util.get_object(request, self._get_pk(pk))
                     related_manager = getattr(obj, related_name)
@@ -475,14 +473,14 @@ class APIViewSet:
                     ]
                     return related_objs
 
-            if self.m2m_add or self.m2m_remove:
-                summary = f"{'Add or Remove' if self.m2m_add and self.m2m_remove else 'Add' if self.m2m_add else 'Remove'} {rel_util.model._meta.verbose_name_plural.capitalize()}"
-                description = f"{'Add or remove' if self.m2m_add and self.m2m_remove else 'Add' if self.m2m_add else 'Remove'} {rel_util.model._meta.verbose_name_plural.capitalize()}"
+            if m2m_add or m2m_remove:
+                summary = f"{'Add or Remove' if m2m_add and m2m_remove else 'Add' if m2m_add else 'Remove'} {rel_util.model._meta.verbose_name_plural.capitalize()}"
+                description = f"{'Add or remove' if m2m_add and m2m_remove else 'Add' if m2m_add else 'Remove'} {rel_util.model._meta.verbose_name_plural.capitalize()}"
                 schema_in = (
                     M2MSchemaIn
-                    if self.m2m_add and self.m2m_remove
+                    if m2m_add and m2m_remove
                     else M2MAddSchemaIn
-                    if self.m2m_add
+                    if m2m_add
                     else M2MRemoveSchemaIn
                 )
 
@@ -507,7 +505,7 @@ class APIViewSet:
                     add_errors, add_details, add_objs = [], [], []
                     remove_errors, remove_details, remove_objs = [], [], []
 
-                    if self.m2m_add and hasattr(data, "add"):
+                    if m2m_add and hasattr(data, "add"):
                         (
                             add_errors,
                             add_details,
@@ -515,7 +513,7 @@ class APIViewSet:
                         ) = await self._check_m2m_objs(
                             request, data.add, model, related_manager
                         )
-                    if self.m2m_remove and hasattr(data, "remove"):
+                    if m2m_remove and hasattr(data, "remove"):
                         (
                             remove_errors,
                             remove_details,
