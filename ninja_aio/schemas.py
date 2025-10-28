@@ -1,4 +1,6 @@
 from ninja import Schema
+from ninja_aio.models import ModelSerializer
+from django.db.models import Model
 from pydantic import RootModel
 
 
@@ -27,3 +29,11 @@ class M2MRemoveSchemaIn(Schema):
 class M2MSchemaIn(Schema):
     add: list = []
     remove: list = []
+
+
+class M2MRelationSchema(Schema):
+    model: ModelSerializer | Model
+    related_name: str
+    path: str | None = ""
+    auth: list | None = None
+    filters: dict | None = None

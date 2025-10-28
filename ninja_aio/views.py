@@ -15,6 +15,7 @@ from .schemas import (
     M2MSchemaIn,
     M2MAddSchemaIn,
     M2MRemoveSchemaIn,
+    M2MRelationSchema,
 )
 from .types import ModelSerializerMeta, VIEW_TYPES
 from .decorators import unique_view
@@ -154,7 +155,7 @@ class APIViewSet:
     retrieve_docs = "Retrieve a specific object by its primary key."
     update_docs = "Update an object by its primary key."
     delete_docs = "Delete an object by its primary key."
-    m2m_relations: list[tuple[ModelSerializer | Model, str, str, list]] = []
+    m2m_relations: list[M2MRelationSchema] = []
     m2m_add = True
     m2m_remove = True
     m2m_get = True
@@ -400,19 +401,14 @@ class APIViewSet:
 
     def _m2m_views(self):
         for m2m_data in self.m2m_relations:
-            m2m_auth = self.m2m_auth
-            if len(m2m_data) == 3:
-                model, related_name, m2m_path = m2m_data
-            elif len(m2m_data) == 4:
-                model, related_name, m2m_path, m2m_auth = m2m_data
-            else:
-                model, related_name = m2m_data
-                m2m_path = ""
+            model = m2m_data.model
+            related_name = m2m_data.related_name
+            m2m_auth = m2m_data.auth or self.m2m_auth
             rel_util = ModelUtil(model)
             rel_path = (
                 rel_util.verbose_name_path_resolver()
-                if not m2m_path
-                else m2m_path
+                if not m2m_data.path
+                else m2m_data.path
             )
             if self.m2m_get:
 
