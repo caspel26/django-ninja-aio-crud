@@ -150,7 +150,7 @@ class APIViewSet:
     retrieve_docs = "Retrieve a specific object by its primary key."
     update_docs = "Update an object by its primary key."
     delete_docs = "Delete an object by its primary key."
-    m2m_relations: tuple[ModelSerializer | Model, str] = []
+    m2m_relations: list[tuple[ModelSerializer | Model, str]] = []
     m2m_add = True
     m2m_remove = True
     m2m_get = True
