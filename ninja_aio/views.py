@@ -15,6 +15,7 @@ from .schemas import (
     M2MSchemaIn,
     M2MAddSchemaIn,
     M2MRemoveSchemaIn,
+    M2MRelationSchema,
 )
 from .types import ModelSerializerMeta, VIEW_TYPES
 from .decorators import unique_view
@@ -75,64 +76,86 @@ class APIView:
 
 class APIViewSet:
     """
-    A base class for creating API views with CRUD operations.
+    Base viewset generating async CRUD + optional M2M endpoints for a Django model.
 
-    This class provides methods for creating, listing, retrieving, updating,
-    and deleting objects of a specified model. It supports pagination,
-    authentication, and custom query parameters.
-
-    ## Attributes:
-        - **model** (`ModelSerializer | Model`): The model for CRUD operations.
-        - **api** (`NinjaAPI`): The API instance to which the views are added.
-        - **schema_in** (`Schema | None`): Schema for input data in create/update operations.
-        - **schema_out** (`Schema | None`): Schema for output data in list/retrieve operations.
-        - **schema_update** (`Schema | None`): Schema for update operations.
-        - **auth** (`list | None`): Authentication classes for the views.
-        - **get_auth** (`list | None`): Authentication for GET requests.
-        - **post_auth** (`list | None`): Authentication for POST requests.
-        - **patch_auth** (`list | None`): Authentication for PATCH requests.
-        - **delete_auth** (`list | None`): Authentication for DELETE requests.
-        - **pagination_class** (`type[AsyncPaginationBase]`): Pagination class to use.
-        - **query_params** (`dict[str, tuple[type, ...]]`): Query parameters for filtering.
-        - **disable** (`list[type[VIEW_TYPES]]`): List of view types to disable.
-        - **api_route_path** (`str`): Base path for the API route.
-        - **list_docs** (`str`): Documentation for the list view.
-        - **create_docs** (`str`): Documentation for the create view.
-        - **retrieve_docs** (`str`): Documentation for the retrieve view.
-        - **update_docs** (`str`): Documentation for the update view.
-        - **delete_docs** (`str`): Documentation for the delete view.
-        - **m2m_relations** (`list[tuple[ModelSerializer | Model, str, str, list]]`): Many-to-many relations to manage. Each tuple contains:
-            - The related model.
-            - The related name on the main model.
-            - The name of the path, if not provided a default will be used.
-            - The authentication for the m2m views.
-        - **m2m_add** (`bool`): Enable add operation for M2M relations.
-        - **m2m_remove** (`bool`): Enable remove operation for M2M relations.
-        - **m2m_get** (`bool`): Enable get operation for M2M relations.
-        - **m2m_auth** (`list | None`): Authentication for M2M views.
-
-    ## Notes:
-        If the model is a ModelSerializer instance, schemas are generated
-        automatically based on Create, Read, and Update serializers.
-        Override the `views` method to add custom views.
-        Override the `query_params_handler` method to handle query params
-        and return a filtered queryset.
-
-    ## Methods:
-        - **create_view**: Creates a new object.
-        - **list_view**: Lists all objects.
-        - **retrieve_view**: Retrieves an object by its primary key.
-        - **update_view**: Updates an object by its primary key.
-        - **delete_view**: Deletes an object by its primary key.
-        - **views**: Override to add custom views.
-        - **add_views_to_route**: Adds the views to the API route.
-
-    ## Example:
+    Usage:
         class MyModelViewSet(APIViewSet):
-            model = MyModel  # Your Django model
-            api = my_api_instance  # Your NinjaAPI instance
-
+            model = MyModel
+            api = api
         MyModelViewSet().add_views_to_route()
+
+    Automatic schema generation:
+        If model is a ModelSerializer (subclass of ModelSerializerMeta),
+        read/create/update schemas are auto-generated from its serializers.
+        Otherwise provide schema_in / schema_out / schema_update manually.
+
+    Generated endpoints (unless disabled via `disable`):
+        POST   /                       -> create_view      (201, schema_out)
+        GET    /                       -> list_view        (200, List[schema_out] paginated)
+        GET    /{pk}                   -> retrieve_view    (200, schema_out)
+        PATCH  /{pk}/                  -> update_view      (200, schema_out)
+        DELETE /{pk}/                  -> delete_view      (204)
+
+    M2M endpoints (per entry in m2m_relations) if enabled:
+        GET    /{pk}/{related_path}            -> list related objects (paginated)
+        POST   /{pk}/{related_path}/           -> add/remove related objects (depending on m2m_add / m2m_remove)
+
+    M2M filters:
+        Each M2MRelationSchema may define a filters dict:
+            filters = { "field_name": (type, default) }
+        A dynamic Pydantic Filters schema is generated and exposed as query params
+        on the related GET endpoint: /{pk}/{related_path}?field_name=value.
+        To apply custom filter logic implement an async hook named:
+            <related_name>_query_params_handler(self, queryset, filters_dict)
+        It receives the initial related queryset and the validated/dumped filters
+        dict, and must return the (optionally) filtered queryset.
+
+        Example:
+            class UserViewSet(APIViewSet):
+                model = models.User
+                m2m_relations = [
+                    M2MRelationSchema(
+                        model=models.Tag,
+                        related_name="tags",
+                        filters={
+                            "name": (str, "")
+                        }
+                    )
+                ]
+
+                async def tags_query_params_handler(self, queryset, filters):
+                    name_filter = filters.get("name")
+                    if name_filter:
+                        queryset = queryset.filter(name__icontains=name_filter)
+                    return queryset
+
+        If filters is empty or omitted no query params are added for that relation.
+
+    Attribute summary:
+        model: Django model or ModelSerializer.
+        api: NinjaAPI instance.
+        schema_in / schema_out / schema_update: Pydantic schemas (auto when ModelSerializer).
+        auth: Default auth list or NOT_SET (no auth). Verb specific auth: get_auth, post_auth, patch_auth, delete_auth.
+        pagination_class: AsyncPaginationBase subclass (default PageNumberPagination).
+        query_params: Dict[str, (type, default)] to build a dynamic filters schema for list_view.
+        disable: List of view type strings: 'create','list','retrieve','update','delete','all'.
+        api_route_path: Base path; auto-resolved from verbose name if empty.
+        list_docs / create_docs / retrieve_docs / update_docs / delete_docs: Endpoint descriptions.
+        m2m_relations: List of M2MRelationSchema describing related model, related_name, custom path, auth, filters.
+        m2m_add / m2m_remove / m2m_get: Enable add/remove/get M2M operations.
+        m2m_auth: Auth list for all M2M endpoints unless overridden per relation.
+
+    Overridable hooks:
+        views(): Register extra custom endpoints on self.router.
+        query_params_handler(queryset, filters): Async hook to apply list filters.
+        <related_name>_query_params_handler(queryset, filters): Async hook for per-M2M filtering.
+
+    Error responses:
+        All endpoints may return GenericMessageSchema for codes in ERROR_CODES (400,401,404,428).
+
+    Internal:
+        Dynamic path/filter schemas built with pydantic.create_model.
+        unique_view decorator prevents duplicate registration.
     """
 
     model: ModelSerializer | Model
@@ -154,10 +177,7 @@ class APIViewSet:
     retrieve_docs = "Retrieve a specific object by its primary key."
     update_docs = "Update an object by its primary key."
     delete_docs = "Delete an object by its primary key."
-    m2m_relations: list[tuple[ModelSerializer | Model, str, str, list]] = []
-    m2m_add = True
-    m2m_remove = True
-    m2m_get = True
+    m2m_relations: list[M2MRelationSchema] = []
     m2m_auth: list | None = NOT_SET
 
     def __init__(self) -> None:
@@ -166,6 +186,7 @@ class APIViewSet:
         self.schema_out, self.schema_in, self.schema_update = self.get_schemas()
         self.path_schema = self._generate_path_schema()
         self.filters_schema = self._generate_filters_schema()
+        self.m2m_filters_schemas = self._generate_m2m_filters_schemas()
         self.model_verbose_name = self.model._meta.verbose_name.capitalize()
         self.router_tag = self.model_verbose_name
         self.router = Router(tags=[self.router_tag])
@@ -180,8 +201,7 @@ class APIViewSet:
     @property
     def _crud_views(self):
         """
-        key: view type (create, list, retrieve, update, delete or all)
-        value: tuple with schema and view method
+        Mapping of CRUD operation name to (response schema, view factory).
         """
         return {
             "create": (self.schema_in, self.create_view),
@@ -192,6 +212,9 @@ class APIViewSet:
         }
 
     def _auth_view(self, view_type: str):
+        """
+        Resolve auth for a specific HTTP verb; falls back to self.auth if NOT_SET.
+        """
         auth = getattr(self, f"{view_type}_auth", None)
         return auth if auth is not NOT_SET else self.auth
 
@@ -208,20 +231,47 @@ class APIViewSet:
         return self._auth_view("delete")
 
     def _generate_schema(self, fields: dict, name: str) -> Schema:
+        """
+        Dynamically build a Pydantic model for path / filter schemas.
+        """
         return create_model(f"{self.model_util.model_name}{name}", **fields)
 
     def _generate_path_schema(self):
+        """
+        Schema containing only the primary key field for path resolution.
+        """
         return self._generate_schema(
             {self.model_util.model_pk_name: (int | str, ...)}, "PathSchema"
         )
 
     def _generate_filters_schema(self):
+        """
+        Build filters schema from query_params definition.
+        """
         return self._generate_schema(self.query_params, "FiltersSchema")
 
+    def _generate_m2m_filters_schemas(self):
+        """
+        Build per-relation filters schemas for M2M endpoints.
+        """
+        return {
+            m2m_data.related_name: self._generate_schema(
+                {} if not m2m_data.filters else m2m_data.filters,
+                f"{self.model_util.model_name}{m2m_data.related_name.capitalize()}FiltersSchema",
+            )
+            for m2m_data in self.m2m_relations
+        }
+
     def _get_pk(self, data: Schema):
+        """
+        Extract pk from a path schema instance.
+        """
         return data.model_dump()[self.model_util.model_pk_name]
 
     def get_schemas(self):
+        """
+        Return (schema_out, schema_in, schema_update), generating them if model is a ModelSerializer.
+        """
         if isinstance(self.model, ModelSerializerMeta):
             return (
                 self.model.generate_read_s(),
@@ -234,13 +284,16 @@ class APIViewSet:
         self, queryset: QuerySet[ModelSerializer], filters: dict
     ):
         """
-        Override this method to handle request query params making queries to the database
-        based on filters or any other logic. This method should return a queryset. filters
-        are given already dumped by the schema.
+        Override to apply custom filtering logic for list_view.
+        filters is already validated and dumped.
+        Return the (possibly modified) queryset.
         """
         return queryset
 
     def create_view(self):
+        """
+        Register create endpoint.
+        """
         @self.router.post(
             self.path,
             auth=self.post_view_auth(),
@@ -255,6 +308,9 @@ class APIViewSet:
         return create
 
     def list_view(self):
+        """
+        Register list endpoint with pagination and optional filters.
+        """
         @self.router.get(
             self.get_path,
             auth=self.get_view_auth(),
@@ -288,6 +344,9 @@ class APIViewSet:
         return list
 
     def retrieve_view(self):
+        """
+        Register retrieve endpoint.
+        """
         @self.router.get(
             self.get_path_retrieve,
             auth=self.get_view_auth(),
@@ -303,6 +362,9 @@ class APIViewSet:
         return retrieve
 
     def update_view(self):
+        """
+        Register update endpoint.
+        """
         @self.router.patch(
             self.path_retrieve,
             auth=self.patch_view_auth(),
@@ -323,6 +385,9 @@ class APIViewSet:
         return update
 
     def delete_view(self):
+        """
+        Register delete endpoint.
+        """
         @self.router.delete(
             self.path_retrieve,
             auth=self.delete_view_auth(),
@@ -338,35 +403,8 @@ class APIViewSet:
 
     def views(self):
         """
-        Override this method to add your custom views. For example:
-        @self.router.get(some_path, response=some_schema)
-        async def some_method(request, *args, **kwargs):
-            pass
-
-        You can add multilple views just doing:
-
-        @self.router.get(some_path, response=some_schema)
-        async def some_method(request, *args, **kwargs):
-            pass
-
-        @self.router.post(some_path, response=some_schema)
-        async def some_method(request, *args, **kwargs):
-            pass
-
-        If you provided a list of auths you can chose which of your views
-        should be authenticated:
-
-        AUTHENTICATED VIEW:
-
-        @self.router.get(some_path, response=some_schema, auth=self.auth)
-        async def some_method(request, *args, **kwargs):
-            pass
-
-        NOT AUTHENTICATED VIEW:
-
-        @self.router.post(some_path, response=some_schema)
-        async def some_method(request, *args, **kwargs):
-            pass
+        Override to register custom non-CRUD endpoints on self.router.
+        Use auth=self.auth or verb specific auth attributes if needed.
         """
 
     async def _check_m2m_objs(
@@ -377,6 +415,10 @@ class APIViewSet:
         related_manager: QuerySet,
         remove: bool = False,
     ):
+        """
+        Validate requested add/remove pk list for M2M operations.
+        Returns (errors, details, objects_to_process).
+        """
         errors, objs_detail, objs = [], [], []
         rel_objs = [rel_obj async for rel_obj in related_manager.select_related().all()]
         rel_model_name = model._meta.verbose_name.capitalize()
@@ -389,7 +431,7 @@ class APIViewSet:
                 continue
             if remove ^ (rel_obj in rel_objs):
                 errors.append(
-                    f"{rel_model_name} with id {obj_pk} is {'not ' if remove else ''} in {self.model_util.model_name}"
+                    f"{rel_model_name} with id {obj_pk} is {'not ' if remove else ''}in {self.model_util.model_name}"
                 )
                 continue
             objs.append(rel_obj)
@@ -399,22 +441,26 @@ class APIViewSet:
         return errors, objs_detail, objs
 
     def _m2m_views(self):
+        """
+        Register M2M get/manage endpoints for each relation in m2m_relations.
+        Supports optional per-relation filters and custom query handler:
+        <related_name>_query_params_handler.
+        """
         for m2m_data in self.m2m_relations:
-            m2m_auth = self.m2m_auth
-            if len(m2m_data) == 3:
-                model, related_name, m2m_path = m2m_data
-            elif len(m2m_data) == 4:
-                model, related_name, m2m_path, m2m_auth = m2m_data
-            else:
-                model, related_name = m2m_data
-                m2m_path = ""
+            model = m2m_data.model
+            related_name = m2m_data.related_name
+            m2m_auth = m2m_data.auth or self.m2m_auth
             rel_util = ModelUtil(model)
             rel_path = (
                 rel_util.verbose_name_path_resolver()
-                if not m2m_path
-                else m2m_path
+                if not m2m_data.path
+                else m2m_data.path
             )
-            if self.m2m_get:
+            m2m_add = m2m_data.add
+            m2m_remove = m2m_data.remove
+            m2m_get = m2m_data.get
+            filters_schema = self.m2m_filters_schemas.get(related_name)
+            if m2m_get:
 
                 @self.router.get(
                     f"{self.path_retrieve}{rel_path}",
@@ -428,10 +474,28 @@ class APIViewSet:
                 )
                 @unique_view(f"get_{self.model_util.model_name}_{rel_path}")
                 @paginate(self.pagination_class)
-                async def get_related(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
+                async def get_related(
+                    request: HttpRequest,
+                    pk: Path[self.path_schema],  # type: ignore
+                    filters: Query[filters_schema] = None # type: ignore
+                ):
                     obj = await self.model_util.get_object(request, self._get_pk(pk))
                     related_manager = getattr(obj, related_name)
                     related_qs = related_manager.all()
+                    if (
+                        filters is not None
+                        and (
+                            query_handler := getattr(
+                                self,
+                                f"{m2m_data.related_name}_query_params_handler",
+                                None,
+                            )
+                        )
+                        is not None
+                    ):
+                        related_qs = await query_handler(
+                            related_qs, filters.model_dump()
+                        )
                     related_objs = [
                         await rel_util.read_s(
                             request, rel_obj, model.generate_related_s()
@@ -440,14 +504,14 @@ class APIViewSet:
                     ]
                     return related_objs
 
-            if self.m2m_add or self.m2m_remove:
-                summary = f"{'Add or Remove' if self.m2m_add and self.m2m_remove else 'Add' if self.m2m_add else 'Remove'} {rel_util.model._meta.verbose_name_plural.capitalize()}"
-                description = f"{'Add or remove' if self.m2m_add and self.m2m_remove else 'Add' if self.m2m_add else 'Remove'} {rel_util.model._meta.verbose_name_plural.capitalize()}"
+            if m2m_add or m2m_remove:
+                summary = f"{'Add or Remove' if m2m_add and m2m_remove else 'Add' if m2m_add else 'Remove'} {rel_util.model._meta.verbose_name_plural.capitalize()}"
+                description = f"{'Add or remove' if m2m_add and m2m_remove else 'Add' if m2m_add else 'Remove'} {rel_util.model._meta.verbose_name_plural.capitalize()}"
                 schema_in = (
                     M2MSchemaIn
-                    if self.m2m_add and self.m2m_remove
+                    if m2m_add and m2m_remove
                     else M2MAddSchemaIn
-                    if self.m2m_add
+                    if m2m_add
                     else M2MRemoveSchemaIn
                 )
 
@@ -472,7 +536,7 @@ class APIViewSet:
                     add_errors, add_details, add_objs = [], [], []
                     remove_errors, remove_details, remove_objs = [], [], []
 
-                    if self.m2m_add and hasattr(data, "add"):
+                    if m2m_add and hasattr(data, "add"):
                         (
                             add_errors,
                             add_details,
@@ -480,7 +544,7 @@ class APIViewSet:
                         ) = await self._check_m2m_objs(
                             request, data.add, model, related_manager
                         )
-                    if self.m2m_remove and hasattr(data, "remove"):
+                    if m2m_remove and hasattr(data, "remove"):
                         (
                             remove_errors,
                             remove_details,
@@ -512,6 +576,10 @@ class APIViewSet:
                     }
 
     def _add_views(self):
+        """
+        Register CRUD (unless disabled), custom views, and M2M endpoints.
+        If 'all' in disable only CRUD is skipped; M2M + custom still added.
+        """
         if "all" in self.disable:
             if self.m2m_relations:
                 self._m2m_views()
@@ -530,4 +598,7 @@ class APIViewSet:
         return self.router
 
     def add_views_to_route(self):
+        """
+        Attach router with registered endpoints to the NinjaAPI instance.
+        """
         return self.api.add_router(f"{self.api_route_path}", self._add_views())
