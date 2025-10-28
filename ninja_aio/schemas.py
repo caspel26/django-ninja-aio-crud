@@ -41,6 +41,6 @@ class M2MRelationSchema(BaseModel):
     get: bool = True
     path: Optional[str] = ""
     auth: Optional[list] = None
-    filters: Optional[dict] = None
+    filters: Optional[dict[str, tuple]] = None
     
     model_config = ConfigDict(arbitrary_types_allowed=True)
