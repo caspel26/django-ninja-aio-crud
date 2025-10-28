@@ -400,7 +400,7 @@ class APIViewSet:
                 continue
             if remove ^ (rel_obj in rel_objs):
                 errors.append(
-                    f"{rel_model_name} with id {obj_pk} is {'not ' if remove else ''} in {self.model_util.model_name}"
+                    f"{rel_model_name} with id {obj_pk} is {'not ' if remove else ''}in {self.model_util.model_name}"
                 )
                 continue
             objs.append(rel_obj)
