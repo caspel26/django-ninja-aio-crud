@@ -34,6 +34,27 @@ class M2MSchemaIn(Schema):
 
 
 class M2MRelationSchema(BaseModel):
+    """
+    Configuration schema for declaring a Many-to-Many relation in the API.
+
+    Attributes:
+        model (Type[ModelSerializer] | Type[Model]): Target model class or its serializer.
+        related_name (str): Name of the relationship field on the Django model.
+        add (bool): Enable adding related objects (default True).
+        remove (bool): Enable removing related objects (default True).
+        get (bool): Enable retrieving related objects (default True).
+        path (str | None): Optional custom URL path segment (None/"" => auto-generated).
+        auth (list | None): Optional list of authentication backends for the endpoints.
+        filters (dict[str, tuple] | None): Field name -> (type, default) pairs for query filtering.
+
+    Example:
+        M2MRelationSchema(
+            model=BookSerializer,
+            related_name="authors",
+            filters={"country": ("str", '')}
+        )
+    """
+
     model: Type[ModelSerializer] | Type[Model]
     related_name: str
     add: bool = True
@@ -42,5 +63,5 @@ class M2MRelationSchema(BaseModel):
     path: Optional[str] = ""
     auth: Optional[list] = None
     filters: Optional[dict[str, tuple]] = None
-    
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
