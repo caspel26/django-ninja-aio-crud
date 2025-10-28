@@ -101,10 +101,11 @@ class APIViewSet:
         - **retrieve_docs** (`str`): Documentation for the retrieve view.
         - **update_docs** (`str`): Documentation for the update view.
         - **delete_docs** (`str`): Documentation for the delete view.
-        - **m2m_relations** (`list[tuple[ModelSerializer | Model, str, str]]`): Many-to-many relations to manage. Each tuple contains:
+        - **m2m_relations** (`list[tuple[ModelSerializer | Model, str, str, list]]`): Many-to-many relations to manage. Each tuple contains:
             - The related model.
             - The related name on the main model.
             - The name of the path, if not provided a default will be used.
+            - The authentication for the m2m views.
         - **m2m_add** (`bool`): Enable add operation for M2M relations.
         - **m2m_remove** (`bool`): Enable remove operation for M2M relations.
         - **m2m_get** (`bool`): Enable get operation for M2M relations.
@@ -153,7 +154,7 @@ class APIViewSet:
     retrieve_docs = "Retrieve a specific object by its primary key."
     update_docs = "Update an object by its primary key."
     delete_docs = "Delete an object by its primary key."
-    m2m_relations: list[tuple[ModelSerializer | Model, str, str]] = []
+    m2m_relations: list[tuple[ModelSerializer | Model, str, str, list]] = []
     m2m_add = True
     m2m_remove = True
     m2m_get = True
@@ -399,8 +400,11 @@ class APIViewSet:
 
     def _m2m_views(self):
         for m2m_data in self.m2m_relations:
+            m2m_auth = self.m2m_auth
             if len(m2m_data) == 3:
                 model, related_name, m2m_path = m2m_data
+            elif len(m2m_data) == 4:
+                model, related_name, m2m_path, m2m_auth = m2m_data
             else:
                 model, related_name = m2m_data
                 m2m_path = ""
@@ -418,7 +422,7 @@ class APIViewSet:
                         200: List[model.generate_related_s(),],
                         self.error_codes: GenericMessageSchema,
                     },
-                    auth=self.m2m_auth,
+                    auth=m2m_auth,
                     summary=f"Get {rel_util.model._meta.verbose_name_plural.capitalize()}",
                     description=f"Get all related {rel_util.model._meta.verbose_name_plural.capitalize()}",
                 )
@@ -453,7 +457,7 @@ class APIViewSet:
                         200: M2MSchemaOut,
                         self.error_codes: GenericMessageSchema,
                     },
-                    auth=self.m2m_auth,
+                    auth=m2m_auth,
                     summary=summary,
                     description=description,
                 )
