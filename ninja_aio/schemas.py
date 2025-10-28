@@ -1,7 +1,9 @@
+from typing import Optional, Type
+
 from ninja import Schema
 from .models import ModelSerializer
 from django.db.models import Model
-from pydantic import ConfigDict, RootModel
+from pydantic import BaseModel, RootModel, ConfigDict
 
 
 class GenericMessageSchema(RootModel[dict[str, str]]):
@@ -31,13 +33,14 @@ class M2MSchemaIn(Schema):
     remove: list = []
 
 
-class M2MRelationSchema(Schema):
-    model: ModelSerializer | Model
+class M2MRelationSchema(BaseModel):
+    model: Type[ModelSerializer] | Type[Model]
     related_name: str
     add: bool = True
     remove: bool = True
     get: bool = True
-    path: str | None = ""
-    auth: list | None = None
-    filters: dict | None = None
+    path: Optional[str] = ""
+    auth: Optional[list] = None
+    filters: Optional[dict] = None
+    
     model_config = ConfigDict(arbitrary_types_allowed=True)
