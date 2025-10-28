@@ -101,7 +101,11 @@ class APIViewSet:
         - **retrieve_docs** (`str`): Documentation for the retrieve view.
         - **update_docs** (`str`): Documentation for the update view.
         - **delete_docs** (`str`): Documentation for the delete view.
-        - **m2m_relations** (`tuple[ModelSerializer | Model, str]`): Many-to-many relations to manage.
+        - **m2m_relations** (`list[tuple[ModelSerializer | Model, str, str, list]]`): Many-to-many relations to manage. Each tuple contains:
+            - The related model.
+            - The related name on the main model.
+            - The name of the path, if not provided a default will be used.
+            - The authentication for the m2m views.
         - **m2m_add** (`bool`): Enable add operation for M2M relations.
         - **m2m_remove** (`bool`): Enable remove operation for M2M relations.
         - **m2m_get** (`bool`): Enable get operation for M2M relations.
@@ -150,12 +154,11 @@ class APIViewSet:
     retrieve_docs = "Retrieve a specific object by its primary key."
     update_docs = "Update an object by its primary key."
     delete_docs = "Delete an object by its primary key."
-    m2m_relations: list[tuple[ModelSerializer | Model, str]] = []
+    m2m_relations: list[tuple[ModelSerializer | Model, str, str, list]] = []
     m2m_add = True
     m2m_remove = True
     m2m_get = True
     m2m_auth: list | None = NOT_SET
-    m2m_path: str = ""
 
     def __init__(self) -> None:
         self.error_codes = ERROR_CODES
@@ -396,12 +399,20 @@ class APIViewSet:
         return errors, objs_detail, objs
 
     def _m2m_views(self):
-        for model, related_name in self.m2m_relations:
+        for m2m_data in self.m2m_relations:
+            m2m_auth = self.m2m_auth
+            if len(m2m_data) == 3:
+                model, related_name, m2m_path = m2m_data
+            elif len(m2m_data) == 4:
+                model, related_name, m2m_path, m2m_auth = m2m_data
+            else:
+                model, related_name = m2m_data
+                m2m_path = ""
             rel_util = ModelUtil(model)
             rel_path = (
                 rel_util.verbose_name_path_resolver()
-                if not self.m2m_path
-                else self.m2m_path
+                if not m2m_path
+                else m2m_path
             )
             if self.m2m_get:
 
@@ -411,7 +422,7 @@ class APIViewSet:
                         200: List[model.generate_related_s(),],
                         self.error_codes: GenericMessageSchema,
                     },
-                    auth=self.m2m_auth,
+                    auth=m2m_auth,
                     summary=f"Get {rel_util.model._meta.verbose_name_plural.capitalize()}",
                     description=f"Get all related {rel_util.model._meta.verbose_name_plural.capitalize()}",
                 )
@@ -446,7 +457,7 @@ class APIViewSet:
                         200: M2MSchemaOut,
                         self.error_codes: GenericMessageSchema,
                     },
-                    auth=self.m2m_auth,
+                    auth=m2m_auth,
                     summary=summary,
                     description=description,
                 )
