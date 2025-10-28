@@ -17,7 +17,7 @@ from .schemas import (
     M2MRemoveSchemaIn,
 )
 from .types import ModelSerializerMeta, VIEW_TYPES
-from .decoratos import unique_view
+from .decorators import unique_view
 
 ERROR_CODES = frozenset({400, 401, 404, 428})
 
