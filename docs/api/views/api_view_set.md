@@ -1,327 +1,208 @@
-# API ViewSet
+# APIViewSet
 
-The `APIViewSet` class provides complete CRUD operations with automatic endpoint generation, pagination, filtering, and many-to-many relationship management.
+`APIViewSet` auto-generates CRUD + optional Many-to-Many (M2M) endpoints for a Django model (or `ModelSerializer`) with async support, pagination, filtering, per-method authentication, and dynamic schema generation.
 
-## Overview
+## Generated CRUD Endpoints
 
-`APIViewSet` automatically generates:
-- **List** endpoint with pagination and filtering
-- **Create** endpoint with validation
-- **Retrieve** endpoint for single objects
-- **Update** endpoint (partial/full)
-- **Delete** endpoint
-- **Many-to-Many** relationship endpoints (optional)
+| Method | Path Pattern | Summary (auto) | Response |
+|--------|--------------|----------------|----------|
+| POST | `/{base}/` | Create Model | `201 {schema_out}` |
+| GET | `/{base}/` | List Models | `200 List[{schema_out}]` (paginated) |
+| GET | `/{base}/{pk}` | Retrieve Model | `200 {schema_out}` |
+| PATCH | `/{base}/{pk}/` | Update Model | `200 {schema_out}` |
+| DELETE | `/{base}/{pk}/` | Delete Model | `204 No Content` |
 
-## Class Definition
-
-```python
-class APIViewSet:
-    model: ModelSerializer | Model
-    api: NinjaAPI
-    schema_in: Schema | None = None
-    schema_out: Schema | None = None
-    schema_update: Schema | None = None
-    # ... additional attributes
-```
+Notes:
+- Retrieve path has no trailing slash; update/delete use trailing slash.
+- `{base}` defaults to the model verbose name (lowercased plural) unless `api_route_path` overrides.
+- Error responses share a unified schema for codes: 400, 401, 404, 428.
 
 ## Core Attributes
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `model` | `ModelSerializer \| Model` | **Required** | Django model or ModelSerializer |
-| `api` | `NinjaAPI` | **Required** | API instance |
-| `schema_in` | `Schema \| None` | `None` | Input schema for create |
-| `schema_out` | `Schema \| None` | `None` | Output schema for read |
-| `schema_update` | `Schema \| None` | `None` | Input schema for update |
+| `model` | `ModelSerializer \| Model` | — | Target model (required) |
+| `api` | `NinjaAPI` | — | API instance (required) |
+| `schema_in` | `Schema \| None` | `None` (auto) | Create schema override |
+| `schema_out` | `Schema \| None` | `None` (auto) | Read/output schema override |
+| `schema_update` | `Schema \| None` | `None` (auto) | Update schema override |
+| `pagination_class` | `type[AsyncPaginationBase]` | `PageNumberPagination` | Pagination strategy |
+| `query_params` | `dict[str, tuple[type, ...]]` | `{}` | Declares filter parameters |
+| `disable` | `list[type[VIEW_TYPES]]` | `[]` | Disable view types (`"create"`, `"list"`, `"retrieve"`, `"update"`, `"delete"`, `"all"`) |
+| `api_route_path` | `str` | `""` | Base route segment (falls back to resolved verbose name) |
+| `list_docs` | `str` | `"List all objects."` | List endpoint description |
+| `create_docs` | `str` | `"Create a new object."` | Create endpoint description |
+| `retrieve_docs` | `str` | `"Retrieve a specific object by its primary key."` | Retrieve endpoint description |
+| `update_docs` | `str` | `"Update an object by its primary key."` | Update endpoint description |
+| `delete_docs` | `str` | `"Delete an object by its primary key."` | Delete endpoint description |
 
 ## Authentication Attributes
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `auth` | `list \| None` | `NOT_SET` | Global auth for all views |
-| `get_auth` | `list \| None` | `NOT_SET` | Auth for GET requests |
-| `post_auth` | `list \| None` | `NOT_SET` | Auth for POST requests |
-| `patch_auth` | `list \| None` | `NOT_SET` | Auth for PATCH requests |
-| `delete_auth` | `list \| None` | `NOT_SET` | Auth for DELETE requests |
+| `auth` | `list \| None` | `NOT_SET` | Global fallback auth |
+| `get_auth` | `list \| None` | `NOT_SET` | Auth for list + retrieve |
+| `post_auth` | `list \| None` | `NOT_SET` | Auth for create |
+| `patch_auth` | `list \| None` | `NOT_SET` | Auth for update |
+| `delete_auth` | `list \| None` | `NOT_SET` | Auth for delete |
+| `m2m_auth` | `list \| None` | `NOT_SET` | Default auth for M2M endpoints |
 
-## Pagination & Filtering
+Resolution: per-method auth overrides `auth` unless set to `NOT_SET`. `None` makes endpoint public.
 
-| Attribute | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `pagination_class` | `type[AsyncPaginationBase]` | `PageNumberPagination` | Pagination class |
-| `query_params` | `dict[str, tuple[type, ...]]` | `{}` | Query parameter filters |
+## Automatic Schema Generation
 
-## Customization Attributes
+If `model` inherits `ModelSerializer`, the following are auto-created:
+- `schema_out` from `ReadSerializer`
+- `schema_in` from `CreateSerializer`
+- `schema_update` from `UpdateSerializer`
 
-| Attribute | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `disable` | `list[type[VIEW_TYPES]]` | `[]` | Disable specific views |
-| `api_route_path` | `str` | `""` | Custom base path |
-| `list_docs` | `str` | `"List all objects."` | List endpoint docs |
-| `create_docs` | `str` | `"Create a new object."` | Create endpoint docs |
-| `retrieve_docs` | `str` | `"Retrieve a specific object..."` | Retrieve endpoint docs |
-| `update_docs` | `str` | `"Update an object..."` | Update endpoint docs |
-| `delete_docs` | `str` | `"Delete an object..."` | Delete endpoint docs |
+Otherwise supply them manually.
 
-## Many-to-Many Attributes
+## Filtering
 
-| Attribute | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `m2m_relations` | `tuple[ModelSerializer \| Model, str]` | `[]` | M2M relations to manage |
-| `m2m_add` | `bool` | `True` | Enable add operation |
-| `m2m_remove` | `bool` | `True` | Enable remove operation |
-| `m2m_get` | `bool` | `True` | Enable get operation |
-| `m2m_auth` | `list \| None` | `NOT_SET` | Auth for M2M views |
-
-## Generated Endpoints
-
-When you create an `APIViewSet`, the following endpoints are automatically generated:
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/` | List all objects (paginated) |
-| `POST` | `/` | Create new object |
-| `GET` | `/{id}` | Retrieve single object |
-| `PATCH` | `/{id}/` | Update object |
-| `DELETE` | `/{id}/` | Delete object |
-
-## Basic Example
+Declare parameter types via `query_params`:
 
 ```python
-from ninja_aio import NinjaAIO
-from ninja_aio.views import APIViewSet
-from ninja_aio.models import ModelSerializer
-from django.db import models
-
-# Define your model
-class User(ModelSerializer):
-    username = models.CharField(max_length=150, unique=True)
-    email = models.EmailField()
-    is_active = models.BooleanField(default=True)
-    
-    class CreateSerializer:
-        fields = ["username", "email"]
-    
-    class ReadSerializer:
-        fields = ["id", "username", "email", "is_active"]
-    
-    class UpdateSerializer:
-        optionals = [("email", str), ("is_active", bool)]
-
-# Create API
-api = NinjaAIO(title="My API")
-
-# Create ViewSet
-class UserViewSet(APIViewSet):
-    model = User
-    api = api
-
-# Register routes
-UserViewSet().add_views_to_route()
-```
-
-This generates:
-- `GET /user/` - List users
-- `POST /user/` - Create user
-- `GET /user/{id}` - Get user
-- `PATCH /user/{id}/` - Update user
-- `DELETE /user/{id}/` - Delete user
-
-## Advanced Examples
-
-### With Custom Authentication
-
-```python
-from ninja_aio.auth import AsyncJwtBearer
-
-class MyAuth(AsyncJwtBearer):
-    jwt_public = jwk.RSAKey.import_key(PUBLIC_KEY)
-    claims = {"iss": {"value": "my-issuer"}}
-    
-    async def auth_handler(self, request):
-        user_id = self.dcd.claims.get("sub")
-        return await User.objects.aget(id=user_id)
-
-class UserViewSet(APIViewSet):
-    model = User
-    api = api
-    auth = [MyAuth()]  # Apply to all endpoints
-    delete_auth = None  # Except delete (public)
-```
-
-### With Query Parameters
-
-```python
-class UserViewSet(APIViewSet):
-    model = User
-    api = api
-    query_params = {
-        "is_active": (bool, ...),
-        "created_after": (str, None),
-        "role": (str, None),
-    }
-    
-    async def query_params_handler(self, queryset, filters):
-        if filters.get("is_active") is not None:
-            queryset = queryset.filter(is_active=filters["is_active"])
-        if filters.get("created_after"):
-            queryset = queryset.filter(
-                created_at__gte=filters["created_after"]
-            )
-        if filters.get("role"):
-            queryset = queryset.filter(role=filters["role"])
-        return queryset
-```
-
-Usage: `GET /user/?is_active=true&role=admin`
-
-### Disabling Specific Views
-
-```python
-class UserViewSet(APIViewSet):
-    model = User
-    api = api
-    disable = ["delete", "update"]  # Only list, create, retrieve
-```
-
-### Custom Views
-
-```python
-class UserViewSet(APIViewSet):
-    model = User
-    api = api
-    
-    def views(self):
-        # Add custom endpoint
-        @self.router.post("/{pk}/activate/")
-        async def activate_user(request, pk: int):
-            user = await User.objects.aget(pk=pk)
-            user.is_active = True
-            await user.asave()
-            return {"message": "User activated"}
-        
-        @self.router.get("/statistics/")
-        async def statistics(request):
-            total = await User.objects.acount()
-            active = await User.objects.filter(is_active=True).acount()
-            return {"total": total, "active": active}
-```
-
-## Many-to-Many Relationships
-
-### Setup
-
-```python
-class Group(ModelSerializer):
-    name = models.CharField(max_length=100)
-    
-    class ReadSerializer:
-        fields = ["id", "name"]
-
-class User(ModelSerializer):
-    username = models.CharField(max_length=150)
-    groups = models.ManyToManyField(Group, related_name="users")
-    
-    class ReadSerializer:
-        fields = ["id", "username", "groups"]
-
-class UserViewSet(APIViewSet):
-    model = User
-    api = api
-    m2m_relations = [(Group, "groups")]
-```
-
-### Generated M2M Endpoints
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/{id}/group/` | List related groups |
-| `POST` | `/{id}/group/` | Add/remove groups |
-
-### Usage Examples
-
-**Get related groups:**
-```bash
-GET /user/1/group/
-```
-
-Response:
-```json
-{
-  "items": [
-    {"id": 1, "name": "Admins"},
-    {"id": 2, "name": "Users"}
-  ],
-  "count": 2
+query_params = {
+    "is_active": (bool, None),
+    "role": (str, None),
+    "search": (str, None),
 }
 ```
 
-**Add and remove groups:**
-```bash
-POST /user/1/group/
-Content-Type: application/json
-
-{
-  "add": [3, 4],
-  "remove": [2]
-}
-```
-
-Response:
-```json
-{
-  "results": {
-    "count": 3,
-    "details": [
-      "Group with id 3 successfully added",
-      "Group with id 4 successfully added",
-      "Group with id 2 successfully removed"
-    ]
-  },
-  "errors": {
-    "count": 0,
-    "details": []
-  }
-}
-```
-
-## Overridable Methods
-
-### `query_params_handler(queryset, filters)`
-
-Handle custom filtering logic.
+Override:
 
 ```python
-async def query_params_handler(self, queryset, filters):
+async def query_params_handler(self, queryset, filters: dict):
+    if filters.get("is_active") is not None:
+        queryset = queryset.filter(is_active=filters["is_active"])
+    if filters.get("role"):
+        queryset = queryset.filter(role=filters["role"])
     if filters.get("search"):
-        queryset = queryset.filter(
-            Q(username__icontains=filters["search"]) |
-            Q(email__icontains=filters["search"])
-        )
+        from django.db.models import Q
+        s = filters["search"]
+        queryset = queryset.filter(Q(username__icontains=s) | Q(email__icontains=s))
     return queryset
 ```
 
-## Error Handling
+## Many-to-Many Relations
 
-All endpoints automatically return appropriate error responses:
+`m2m_relations: list[tuple[ModelSerializer | Model, str, str, list]]`
 
-| Status Code | Description |
-|-------------|-------------|
-| `400` | Bad Request (validation errors) |
-| `401` | Unauthorized |
-| `404` | Not Found |
-| `428` | Precondition Required |
+Tuple formats supported (variable length):
+1. `(RelatedModel, related_name)`
+2. `(RelatedModel, related_name, custom_path)`
+3. `(RelatedModel, related_name, custom_path, per_relation_auth)`
+
+Resolution rules:
+- If `custom_path` missing or empty → auto path from related model verbose name.
+- If per-relation auth omitted → falls back to `m2m_auth`.
+- `None` auth makes that relation’s endpoints public.
+
+Generated per relation (if enabled):
+| Method | Path | Feature |
+|--------|------|---------|
+| GET | `/{base}/{pk}/{rel_path}` | List related objects (paginated) |
+| POST | `/{base}/{pk}/{rel_path}/` | Add/remove operations |
+
+Add/remove schema:
+- If both `m2m_add` and `m2m_remove` are True: payload `{ "add": [ids], "remove": [ids] }`
+- If only add: `{ "add": [ids] }`
+- If only remove: `{ "remove": [ids] }`
+
+Response format:
+```json
+{
+  "results": { "count": X, "details": ["..."] },
+  "errors": { "count": Y, "details": ["..."] }
+}
+```
+
+### M2M Example
+
+```python
+class ArticleViewSet(APIViewSet):
+    model = Article
+    api = api
+    m2m_relations = [
+        (Tag, "tags"),                                 # auto path + m2m_auth
+        (Category, "categories", "article-categories"),# custom path
+        (User, "authors", "co-authors", [AdminAuth()]) # custom path + custom auth
+    ]
+    m2m_auth = [JWTAuth()]      # fallback for first two
+    m2m_add = True
+    m2m_remove = True
+    m2m_get = True
+```
+
+### Controlling Operations
+
+```python
+m2m_add = False       # disable additions
+m2m_remove = True
+m2m_get = True
+```
+
+## Custom Views
+
+Add extra endpoints by overriding `views()`:
+
+```python
+def views(self):
+    @self.router.get("/stats/", response={200: GenericMessageSchema})
+    async def stats(request):
+        total = await self.model.objects.acount()
+        return {"message": f"Total: {total}"}
+```
+
+## Dynamic View Naming
+
+All generated handlers are wrapped with `@unique_view(...)` to ensure stable unique function names (important for schema generation and avoiding collisions).
+
+## Error Codes
+
+Unified error schema for: 400 (validation), 401 (auth), 404 (not found), 428 (precondition).
 
 ## Performance Tips
 
-1. **Use `select_related()` and `prefetch_related()`** - Automatically handled for ModelSerializer
-2. **Implement custom `queryset_request()`** - Filter at database level
-3. **Use pagination** - Prevents loading too many objects
-4. **Optimize query parameters** - Use indexed fields for filtering
+1. Implement `@classmethod async def queryset_request(cls, request)` on `ModelSerializer` to prefetch relations.
+2. Use indexes on fields referenced in `query_params`.
+3. Keep pagination enabled to prevent large memory usage.
+4. Apply selective slicing for expensive searches (`queryset = queryset[:1000]`).
+
+## Minimal Usage
+
+```python
+class UserViewSet(APIViewSet):
+    model = User
+    api = api
+
+UserViewSet().add_views_to_route()
+```
+
+## Disable Views
+
+```python
+class ReadOnlyUserViewSet(APIViewSet):
+    model = User
+    api = api
+    disable = ["create", "update", "delete"]
+```
+
+## Authentication Example
+
+```python
+class UserViewSet(APIViewSet):
+    model = User
+    api = api
+    auth = [JWTAuth()]        # default
+    get_auth = None           # list/retrieve public
+    delete_auth = [AdminAuth()]  # delete restricted
+```
 
 ## See Also
 
-- [Model Serializer](../models/model_serializer.md) - Define schemas on models
-- [Authentication](../authentication.md) - Secure your endpoints
-- [Pagination](../pagination.md) - Configure pagination
-- [API View](api_view.md) - Simple custom views
+- [ModelSerializer](../models/model_serializer.md)
+- [Authentication](../authentication.md)
+- [Pagination](../pagination.md)
+- [APIView](api_view.md)
