@@ -54,7 +54,6 @@ theme:
     - navigation.footer
     - toc.integrate
     - content.code.copy
-    - content.action.edit
     - content.tabs.link
     - content.tooltips
     - search.suggest
