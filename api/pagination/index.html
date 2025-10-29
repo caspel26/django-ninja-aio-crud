@@ -1412,20 +1412,24 @@
 <h1 id="pagination">Pagination<a class="headerlink" href="#pagination" title="Permanent link">&para;</a></h1>
 <p>Django Ninja Aio CRUD provides built-in async pagination support for efficiently handling large datasets in your API responses.</p>
 <h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
-<p>Pagination in Django Ninja Aio CRUD:
-- <strong>Fully async</strong> - No blocking database queries
-- <strong>Customizable</strong> - Override default behavior per ViewSet
-- <strong>Type-safe</strong> - Proper type hints and validation
-- <strong>Automatic</strong> - Works out of the box with APIViewSet
-- <strong>Flexible</strong> - Support for multiple pagination styles</p>
+<p>Pagination in Django Ninja Aio CRUD:</p>
+<ul>
+<li><strong>Fully async</strong> - No blocking database queries</li>
+<li><strong>Customizable</strong> - Override default behavior per ViewSet</li>
+<li><strong>Type-safe</strong> - Proper type hints and validation</li>
+<li><strong>Automatic</strong> - Works out of the box with APIViewSet</li>
+<li><strong>Flexible</strong> - Support for multiple pagination styles</li>
+</ul>
 <h2 id="default-pagination">Default Pagination<a class="headerlink" href="#default-pagination" title="Permanent link">&para;</a></h2>
 <h3 id="pagenumberpagination">PageNumberPagination<a class="headerlink" href="#pagenumberpagination" title="Permanent link">&para;</a></h3>
 <p>The default pagination class used by <code>APIViewSet</code>.</p>
-<p><strong>Features:</strong>
-- Page-based navigation
-- Configurable page size
-- Total count included
-- Next/previous page info</p>
+<p><strong>Features:</strong></p>
+<ul>
+<li>Page-based navigation</li>
+<li>Configurable page size</li>
+<li>Total count included</li>
+<li>Next/previous page info</li>
+</ul>
 <p><strong>Default Configuration:</strong></p>
 <table>
 <thead>
@@ -1521,11 +1525,11 @@
 </span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>
 </span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="n">ArticleViewSet</span><span class="p">()</span><span class="o">.</span><span class="n">add_views_to_route</span><span class="p">()</span>
 </span></code></pre></div>
-<p><strong>Generated endpoint:</strong>
+<p><strong>Generated endpoint:</strong></p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>GET /article/?page=1&amp;page_size=10
-</span></code></pre></div></p>
+</span></code></pre></div>
 <h3 id="manual-usage">Manual Usage<a class="headerlink" href="#manual-usage" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ninja_aio.pagination</span><span class="w"> </span><span class="kn">import</span> <span class="n">PageNumberPagination</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ninja.pagination</span><span class="w"> </span><span class="kn">import</span> <span class="n">PageNumberPagination</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">django.http</span><span class="w"> </span><span class="kn">import</span> <span class="n">HttpRequest</span>
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
 </span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">my_view</span><span class="p">(</span><span class="n">request</span><span class="p">:</span> <span class="n">HttpRequest</span><span class="p">):</span>
@@ -1549,30 +1553,34 @@
 <p>Current page number (1-indexed).</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>GET<span class="w"> </span>/article/?page<span class="o">=</span><span class="m">2</span>
 </span></code></pre></div>
-<p><strong>Validation:</strong>
-- Must be &gt;= 1
-- Returns 404 if page doesn't exist</p>
+<p><strong>Validation:</strong></p>
+<ul>
+<li>Must be &gt;= 1</li>
+<li>Returns 404 if page doesn't exist</li>
+</ul>
 <h3 id="page_size">page_size<a class="headerlink" href="#page_size" title="Permanent link">&para;</a></h3>
 <p>Number of items per page.</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>GET<span class="w"> </span>/article/?page<span class="o">=</span><span class="m">1</span><span class="p">&amp;</span><span class="nv">page_size</span><span class="o">=</span><span class="m">20</span>
 </span></code></pre></div>
-<p><strong>Validation:</strong>
-- Must be &gt;= 1
-- Cannot exceed <code>max_page_size</code>
-- Defaults to pagination class default</p>
+<p><strong>Validation:</strong></p>
+<ul>
+<li>Must be &gt;= 1</li>
+<li>Cannot exceed <code>max_page_size</code></li>
+<li>Defaults to pagination class default</li>
+</ul>
 <h3 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h3>
-<p><strong>First page with 10 items:</strong>
+<p><strong>First page with 10 items:</strong></p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>GET<span class="w"> </span>/article/?page<span class="o">=</span><span class="m">1</span><span class="p">&amp;</span><span class="nv">page_size</span><span class="o">=</span><span class="m">10</span>
-</span></code></pre></div></p>
-<p><strong>Second page with 25 items:</strong>
+</span></code></pre></div>
+<p><strong>Second page with 25 items:</strong></p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>GET<span class="w"> </span>/article/?page<span class="o">=</span><span class="m">2</span><span class="p">&amp;</span><span class="nv">page_size</span><span class="o">=</span><span class="m">25</span>
-</span></code></pre></div></p>
-<p><strong>Maximum items per page:</strong>
+</span></code></pre></div>
+<p><strong>Maximum items per page:</strong></p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>GET<span class="w"> </span>/article/?page<span class="o">=</span><span class="m">1</span><span class="p">&amp;</span><span class="nv">page_size</span><span class="o">=</span><span class="m">100</span>
-</span></code></pre></div></p>
+</span></code></pre></div>
 <h2 id="custom-pagination">Custom Pagination<a class="headerlink" href="#custom-pagination" title="Permanent link">&para;</a></h2>
 <h3 id="override-default-page-size">Override Default Page Size<a class="headerlink" href="#override-default-page-size" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ninja_aio.pagination</span><span class="w"> </span><span class="kn">import</span> <span class="n">PageNumberPagination</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ninja.pagination</span><span class="w"> </span><span class="kn">import</span> <span class="n">PageNumberPagination</span>
 </span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
 </span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>
 </span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="k">class</span><span class="w"> </span><span class="nc">LargePagePagination</span><span class="p">(</span><span class="n">PageNumberPagination</span><span class="p">):</span>
@@ -1599,7 +1607,7 @@
 <h2 id="asyncpaginationbase">AsyncPaginationBase<a class="headerlink" href="#asyncpaginationbase" title="Permanent link">&para;</a></h2>
 <p>Base class for creating custom pagination.</p>
 <h3 id="class-definition">Class Definition<a class="headerlink" href="#class-definition" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ninja_aio.pagination</span><span class="w"> </span><span class="kn">import</span> <span class="n">AsyncPaginationBase</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ninja.pagination</span><span class="w"> </span><span class="kn">import</span> <span class="n">AsyncPaginationBase</span>
 </span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>
 </span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="k">class</span><span class="w"> </span><span class="nc">MyPagination</span><span class="p">(</span><span class="n">AsyncPaginationBase</span><span class="p">):</span>
 </span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>    <span class="n">page_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span>
@@ -1663,7 +1671,7 @@
 <p>Dictionary with pagination metadata and results.</p>
 <h2 id="custom-pagination-examples">Custom Pagination Examples<a class="headerlink" href="#custom-pagination-examples" title="Permanent link">&para;</a></h2>
 <h3 id="cursor-based-pagination">Cursor-Based Pagination<a class="headerlink" href="#cursor-based-pagination" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ninja_aio.pagination</span><span class="w"> </span><span class="kn">import</span> <span class="n">AsyncPaginationBase</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ninja.pagination</span><span class="w"> </span><span class="kn">import</span> <span class="n">AsyncPaginationBase</span>
 </span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ninja</span><span class="w"> </span><span class="kn">import</span> <span class="n">Schema</span>
 </span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>
 </span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>
@@ -1707,19 +1715,19 @@
 </span><span id="__span-13-42"><a id="__codelineno-13-42" name="__codelineno-13-42" href="#__codelineno-13-42"></a>    <span class="n">api</span> <span class="o">=</span> <span class="n">api</span>
 </span><span id="__span-13-43"><a id="__codelineno-13-43" name="__codelineno-13-43" href="#__codelineno-13-43"></a>    <span class="n">pagination_class</span> <span class="o">=</span> <span class="n">CursorPagination</span>
 </span></code></pre></div>
-<p><strong>Usage:</strong>
+<p><strong>Usage:</strong></p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># First page</span>
 </span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>GET<span class="w"> </span>/article/?page_size<span class="o">=</span><span class="m">10</span>
 </span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>
 </span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="c1"># Next page</span>
 </span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>GET<span class="w"> </span>/article/?cursor<span class="o">=</span><span class="m">10</span><span class="p">&amp;</span><span class="nv">page_size</span><span class="o">=</span><span class="m">10</span>
-</span></code></pre></div></p>
-<p><strong>Response:</strong>
+</span></code></pre></div>
+<p><strong>Response:</strong></p>
 <div class="language-json highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="p">{</span>
 </span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="w">  </span><span class="nt">&quot;next_cursor&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;20&quot;</span><span class="p">,</span>
 </span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">  </span><span class="nt">&quot;results&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="err">...</span><span class="p">]</span>
 </span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="p">}</span>
-</span></code></pre></div></p>
+</span></code></pre></div>
 <h3 id="offset-based-pagination">Offset-Based Pagination<a class="headerlink" href="#offset-based-pagination" title="Permanent link">&para;</a></h3>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">OffsetPagination</span><span class="p">(</span><span class="n">AsyncPaginationBase</span><span class="p">):</span>
 </span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>    <span class="n">page_size</span> <span class="o">=</span> <span class="mi">10</span>
@@ -1750,7 +1758,7 @@
 </span><span id="__span-16-27"><a id="__codelineno-16-27" name="__codelineno-16-27" href="#__codelineno-16-27"></a>    <span class="n">api</span> <span class="o">=</span> <span class="n">api</span>
 </span><span id="__span-16-28"><a id="__codelineno-16-28" name="__codelineno-16-28" href="#__codelineno-16-28"></a>    <span class="n">pagination_class</span> <span class="o">=</span> <span class="n">OffsetPagination</span>
 </span></code></pre></div>
-<p><strong>Usage:</strong>
+<p><strong>Usage:</strong></p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="c1"># First 10 items</span>
 </span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>GET<span class="w"> </span>/article/?offset<span class="o">=</span><span class="m">0</span><span class="p">&amp;</span><span class="nv">limit</span><span class="o">=</span><span class="m">10</span>
 </span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>
@@ -1759,15 +1767,15 @@
 </span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>
 </span><span id="__span-17-7"><a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="c1"># Skip 20, get 15</span>
 </span><span id="__span-17-8"><a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>GET<span class="w"> </span>/article/?offset<span class="o">=</span><span class="m">20</span><span class="p">&amp;</span><span class="nv">limit</span><span class="o">=</span><span class="m">15</span>
-</span></code></pre></div></p>
-<p><strong>Response:</strong>
+</span></code></pre></div>
+<p><strong>Response:</strong></p>
 <div class="language-json highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="p">{</span>
 </span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="w">  </span><span class="nt">&quot;count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">100</span><span class="p">,</span>
 </span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="w">  </span><span class="nt">&quot;offset&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">20</span><span class="p">,</span>
 </span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="w">  </span><span class="nt">&quot;limit&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">15</span><span class="p">,</span>
 </span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="w">  </span><span class="nt">&quot;results&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="err">...</span><span class="p">]</span>
 </span><span id="__span-18-6"><a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a><span class="p">}</span>
-</span></code></pre></div></p>
+</span></code></pre></div>
 <h3 id="link-header-pagination">Link Header Pagination<a class="headerlink" href="#link-header-pagination" title="Permanent link">&para;</a></h3>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">django.http</span><span class="w"> </span><span class="kn">import</span> <span class="n">HttpResponse</span>
 </span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>
@@ -1807,12 +1815,12 @@
 </span><span id="__span-19-36"><a id="__codelineno-19-36" name="__codelineno-19-36" href="#__codelineno-19-36"></a>            <span class="s2">&quot;_links&quot;</span><span class="p">:</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">links</span><span class="p">)</span>
 </span><span id="__span-19-37"><a id="__codelineno-19-37" name="__codelineno-19-37" href="#__codelineno-19-37"></a>        <span class="p">}</span>
 </span></code></pre></div>
-<p><strong>Response Headers:</strong>
+<p><strong>Response Headers:</strong></p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>Link: &lt;http://api.example.com/article/?page=1&amp;page_size=10&gt;; rel=&quot;first&quot;,
 </span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>      &lt;http://api.example.com/article/?page=2&amp;page_size=10&gt;; rel=&quot;prev&quot;,
 </span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>      &lt;http://api.example.com/article/?page=4&amp;page_size=10&gt;; rel=&quot;next&quot;,
 </span><span id="__span-20-4"><a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a>      &lt;http://api.example.com/article/?page=10&amp;page_size=10&gt;; rel=&quot;last&quot;
-</span></code></pre></div></p>
+</span></code></pre></div>
 <h2 id="disable-pagination">Disable Pagination<a class="headerlink" href="#disable-pagination" title="Permanent link">&para;</a></h2>
 <h3 id="for-specific-viewset">For Specific ViewSet<a class="headerlink" href="#for-specific-viewset" title="Permanent link">&para;</a></h3>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">ArticleViewSet</span><span class="p">(</span><span class="n">APIViewSet</span><span class="p">):</span>
@@ -1842,13 +1850,13 @@
 </span><span id="__span-24-10"><a id="__codelineno-24-10" name="__codelineno-24-10" href="#__codelineno-24-10"></a>        <span class="c1"># Otherwise use default pagination</span>
 </span><span id="__span-24-11"><a id="__codelineno-24-11" name="__codelineno-24-11" href="#__codelineno-24-11"></a>        <span class="k">return</span> <span class="k">await</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">apaginate_queryset</span><span class="p">(</span><span class="n">queryset</span><span class="p">,</span> <span class="n">pagination</span><span class="p">,</span> <span class="n">request</span><span class="p">,</span> <span class="o">**</span><span class="n">params</span><span class="p">)</span>
 </span></code></pre></div>
-<p><strong>Usage:</strong>
+<p><strong>Usage:</strong></p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="c1"># Paginated</span>
 </span><span id="__span-25-2"><a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>GET<span class="w"> </span>/article/?page<span class="o">=</span><span class="m">1</span><span class="p">&amp;</span><span class="nv">page_size</span><span class="o">=</span><span class="m">10</span>
 </span><span id="__span-25-3"><a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>
 </span><span id="__span-25-4"><a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a><span class="c1"># All items</span>
 </span><span id="__span-25-5"><a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a>GET<span class="w"> </span>/article/?all<span class="o">=</span><span class="nb">true</span>
-</span></code></pre></div></p>
+</span></code></pre></div>
 <h2 id="integration-with-filtering">Integration with Filtering<a class="headerlink" href="#integration-with-filtering" title="Permanent link">&para;</a></h2>
 <p>Pagination works seamlessly with query parameter filtering:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">ArticleViewSet</span><span class="p">(</span><span class="n">APIViewSet</span><span class="p">):</span>
@@ -1866,10 +1874,10 @@
 </span><span id="__span-26-13"><a id="__codelineno-26-13" name="__codelineno-26-13" href="#__codelineno-26-13"></a>            <span class="n">queryset</span> <span class="o">=</span> <span class="n">queryset</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">category_id</span><span class="o">=</span><span class="n">filters</span><span class="p">[</span><span class="s2">&quot;category&quot;</span><span class="p">])</span>
 </span><span id="__span-26-14"><a id="__codelineno-26-14" name="__codelineno-26-14" href="#__codelineno-26-14"></a>        <span class="k">return</span> <span class="n">queryset</span>
 </span></code></pre></div>
-<p><strong>Usage:</strong>
+<p><strong>Usage:</strong></p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-27-1"><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="c1"># Filter + pagination</span>
 </span><span id="__span-27-2"><a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a>GET<span class="w"> </span>/article/?is_published<span class="o">=</span>true<span class="p">&amp;</span><span class="nv">category</span><span class="o">=</span><span class="m">5</span><span class="p">&amp;</span><span class="nv">page</span><span class="o">=</span><span class="m">2</span><span class="p">&amp;</span><span class="nv">page_size</span><span class="o">=</span><span class="m">20</span>
-</span></code></pre></div></p>
+</span></code></pre></div>
 <p>The filtering is applied first, then pagination is applied to the filtered queryset.</p>
 <h2 id="performance-optimization">Performance Optimization<a class="headerlink" href="#performance-optimization" title="Permanent link">&para;</a></h2>
 <h3 id="count-optimization">Count Optimization<a class="headerlink" href="#count-optimization" title="Permanent link">&para;</a></h3>
@@ -1927,14 +1935,14 @@
 </span><span id="__span-29-18"><a id="__codelineno-29-18" name="__codelineno-29-18" href="#__codelineno-29-18"></a>    <span class="n">model</span> <span class="o">=</span> <span class="n">Article</span>
 </span><span id="__span-29-19"><a id="__codelineno-29-19" name="__codelineno-29-19" href="#__codelineno-29-19"></a>    <span class="n">api</span> <span class="o">=</span> <span class="n">api</span>
 </span></code></pre></div>
-<p>Now pagination queries are optimized:
+<p>Now pagination queries are optimized:</p>
 <div class="language-sql highlight"><pre><span></span><code><span id="__span-30-1"><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a><span class="c1">-- Single query with joins instead of N+1</span>
 </span><span id="__span-30-2"><a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a><span class="k">SELECT</span><span class="w"> </span><span class="n">article</span><span class="p">.</span><span class="o">*</span><span class="p">,</span><span class="w"> </span><span class="k">user</span><span class="p">.</span><span class="o">*</span><span class="p">,</span><span class="w"> </span><span class="n">category</span><span class="p">.</span><span class="o">*</span>
 </span><span id="__span-30-3"><a id="__codelineno-30-3" name="__codelineno-30-3" href="#__codelineno-30-3"></a><span class="k">FROM</span><span class="w"> </span><span class="n">article</span>
 </span><span id="__span-30-4"><a id="__codelineno-30-4" name="__codelineno-30-4" href="#__codelineno-30-4"></a><span class="k">LEFT</span><span class="w"> </span><span class="k">JOIN</span><span class="w"> </span><span class="k">user</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">article</span><span class="p">.</span><span class="n">author_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">user</span><span class="p">.</span><span class="n">id</span>
 </span><span id="__span-30-5"><a id="__codelineno-30-5" name="__codelineno-30-5" href="#__codelineno-30-5"></a><span class="k">LEFT</span><span class="w"> </span><span class="k">JOIN</span><span class="w"> </span><span class="n">category</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">article</span><span class="p">.</span><span class="n">category_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">category</span><span class="p">.</span><span class="n">id</span>
 </span><span id="__span-30-6"><a id="__codelineno-30-6" name="__codelineno-30-6" href="#__codelineno-30-6"></a><span class="k">LIMIT</span><span class="w"> </span><span class="mi">10</span><span class="w"> </span><span class="k">OFFSET</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
-</span></code></pre></div></p>
+</span></code></pre></div>
 <h3 id="approximate-counts">Approximate Counts<a class="headerlink" href="#approximate-counts" title="Permanent link">&para;</a></h3>
 <p>For very large tables, use approximate counts:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-31-1"><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">ApproximatePagination</span><span class="p">(</span><span class="n">PageNumberPagination</span><span class="p">):</span>
@@ -2045,9 +2053,9 @@
 </span></code></pre></div>
 <h2 id="best-practices">Best Practices<a class="headerlink" href="#best-practices" title="Permanent link">&para;</a></h2>
 <ol>
-<li>
-<p><strong>Choose appropriate page size:</strong>
-   <div class="language-python highlight"><pre><span></span><code><span id="__span-36-1"><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a><span class="c1"># Mobile API</span>
+<li><strong>Choose appropriate page size:</strong></li>
+</ol>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-36-1"><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a><span class="c1"># Mobile API</span>
 </span><span id="__span-36-2"><a id="__codelineno-36-2" name="__codelineno-36-2" href="#__codelineno-36-2"></a><span class="n">page_size</span> <span class="o">=</span> <span class="mi">10</span>
 </span><span id="__span-36-3"><a id="__codelineno-36-3" name="__codelineno-36-3" href="#__codelineno-36-3"></a>
 </span><span id="__span-36-4"><a id="__codelineno-36-4" name="__codelineno-36-4" href="#__codelineno-36-4"></a><span class="c1"># Desktop/Web API</span>
@@ -2055,38 +2063,36 @@
 </span><span id="__span-36-6"><a id="__codelineno-36-6" name="__codelineno-36-6" href="#__codelineno-36-6"></a>
 </span><span id="__span-36-7"><a id="__codelineno-36-7" name="__codelineno-36-7" href="#__codelineno-36-7"></a><span class="c1"># Admin/Internal API</span>
 </span><span id="__span-36-8"><a id="__codelineno-36-8" name="__codelineno-36-8" href="#__codelineno-36-8"></a><span class="n">page_size</span> <span class="o">=</span> <span class="mi">100</span>
-</span></code></pre></div></p>
-</li>
-<li>
-<p><strong>Set reasonable max_page_size:</strong>
-   <div class="language-python highlight"><pre><span></span><code><span id="__span-37-1"><a id="__codelineno-37-1" name="__codelineno-37-1" href="#__codelineno-37-1"></a><span class="c1"># Prevent excessive data transfer</span>
+</span></code></pre></div>
+<ol>
+<li><strong>Set reasonable max_page_size:</strong></li>
+</ol>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-37-1"><a id="__codelineno-37-1" name="__codelineno-37-1" href="#__codelineno-37-1"></a><span class="c1"># Prevent excessive data transfer</span>
 </span><span id="__span-37-2"><a id="__codelineno-37-2" name="__codelineno-37-2" href="#__codelineno-37-2"></a><span class="n">max_page_size</span> <span class="o">=</span> <span class="mi">100</span>
-</span></code></pre></div></p>
-</li>
-<li>
-<p><strong>Cache expensive counts:</strong>
-   <div class="language-python highlight"><pre><span></span><code><span id="__span-38-1"><a id="__codelineno-38-1" name="__codelineno-38-1" href="#__codelineno-38-1"></a><span class="c1"># For large, slowly-changing datasets</span>
+</span></code></pre></div>
+<ol>
+<li><strong>Cache expensive counts:</strong></li>
+</ol>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-38-1"><a id="__codelineno-38-1" name="__codelineno-38-1" href="#__codelineno-38-1"></a><span class="c1"># For large, slowly-changing datasets</span>
 </span><span id="__span-38-2"><a id="__codelineno-38-2" name="__codelineno-38-2" href="#__codelineno-38-2"></a><span class="n">cache</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;count_</span><span class="si">{</span><span class="n">model</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">count</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">300</span><span class="p">)</span>
-</span></code></pre></div></p>
-</li>
-<li>
-<p><strong>Optimize queries:</strong>
-   <div class="language-python highlight"><pre><span></span><code><span id="__span-39-1"><a id="__codelineno-39-1" name="__codelineno-39-1" href="#__codelineno-39-1"></a><span class="n">queryset</span> <span class="o">=</span> <span class="n">queryset</span><span class="o">.</span><span class="n">select_related</span><span class="p">(</span><span class="o">...</span><span class="p">)</span><span class="o">.</span><span class="n">prefetch_related</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
-</span></code></pre></div></p>
-</li>
-<li>
-<p><strong>Use cursor pagination for infinite scroll:</strong>
-   <div class="language-python highlight"><pre><span></span><code><span id="__span-40-1"><a id="__codelineno-40-1" name="__codelineno-40-1" href="#__codelineno-40-1"></a><span class="c1"># Better for real-time feeds</span>
+</span></code></pre></div>
+<ol>
+<li><strong>Optimize queries:</strong></li>
+</ol>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-39-1"><a id="__codelineno-39-1" name="__codelineno-39-1" href="#__codelineno-39-1"></a><span class="n">queryset</span> <span class="o">=</span> <span class="n">queryset</span><span class="o">.</span><span class="n">select_related</span><span class="p">(</span><span class="o">...</span><span class="p">)</span><span class="o">.</span><span class="n">prefetch_related</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+</span></code></pre></div>
+<ol>
+<li><strong>Use cursor pagination for infinite scroll:</strong></li>
+</ol>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-40-1"><a id="__codelineno-40-1" name="__codelineno-40-1" href="#__codelineno-40-1"></a><span class="c1"># Better for real-time feeds</span>
 </span><span id="__span-40-2"><a id="__codelineno-40-2" name="__codelineno-40-2" href="#__codelineno-40-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">FeedPagination</span><span class="p">(</span><span class="n">CursorPagination</span><span class="p">):</span>
 </span><span id="__span-40-3"><a id="__codelineno-40-3" name="__codelineno-40-3" href="#__codelineno-40-3"></a>    <span class="n">page_size</span> <span class="o">=</span> <span class="mi">20</span>
-</span></code></pre></div></p>
-</li>
-<li>
-<p><strong>Consider approximate counts for huge tables:</strong>
+</span></code></pre></div>
+<ol>
+<li><strong>Consider approximate counts for huge tables:</strong>
    <div class="language-python highlight"><pre><span></span><code><span id="__span-41-1"><a id="__codelineno-41-1" name="__codelineno-41-1" href="#__codelineno-41-1"></a><span class="c1"># Faster than exact count for millions of rows</span>
 </span><span id="__span-41-2"><a id="__codelineno-41-2" name="__codelineno-41-2" href="#__codelineno-41-2"></a><span class="n">use_approximate</span> <span class="o">=</span> <span class="n">queryset</span><span class="o">.</span><span class="n">count</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">1_000_000</span>
-</span></code></pre></div></p>
-</li>
+</span></code></pre></div></li>
 </ol>
 <h2 id="see-also">See Also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
 <ul>
@@ -2116,7 +2122,7 @@
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="October 26, 2025 21:50:46 UTC">October 26, 2025</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="October 29, 2025 01:23:30 UTC">October 29, 2025</span>
   </span>
 
     
