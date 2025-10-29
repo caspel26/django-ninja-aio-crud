@@ -28,57 +28,90 @@ nav:
 
 theme:
   name: material
+  language: en
+  logo: images/logo.png
+  favicon: images/favicon.ico
   palette:
     - media: "(prefers-color-scheme)"
-      primary: deep-purple
       toggle:
         icon: material/brightness-auto
         name: Auto
+      primary: deep-purple
+      accent: deep-purple
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: deep-purple
       toggle:
         icon: material/weather-night
         name: Dark
+      primary: deep-purple
+      accent: deep-purple
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: deep-purple
       toggle:
         icon: material/weather-sunny
         name: Light
-  logo: images/logo.png
-  favicon: images/favicon.ico
+      primary: deep-purple
+      accent: deep-purple
   features:
+    - navigation.instant
+    - navigation.tracking
     - navigation.tabs
     - navigation.top
     - navigation.footer
+    - navigation.sections
+    - navigation.indexes
+    - header.autohide
+    - toc.follow
     - toc.integrate
     - content.code.copy
+    - content.code.select
+    - content.code.annotate
     - content.tabs.link
     - content.tooltips
+    - content.footnote.tooltips
     - search.suggest
     - search.highlight
+    - search.share
 
 extra:
+  project:
+    name: django-ninja-aio-crud
+    pypi: django-ninja-aio-crud
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/caspel26/django-ninja-aio-crud
+      name: GitHub
     - icon: fontawesome/brands/python
       link: https://pypi.org/project/django-ninja-aio-crud/
+      name: PyPI
+  analytics:
+    provider: google
+    property: UA-XXXXXXX-X  # replace or remove
+  version:
+    default: latest  # useful if later using mike
 
 plugins:
-  - search
-  - git-revision-date-localized:
-      type: date
-      fallback_to_build_date: true
+  - search:
+      separator: '[\\s\\-]+'
+  - autorefs
+  - section-index
   - mkdocstrings:
       handlers:
         python:
+          setup_commands:
+            - import sys, os
+            - sys.path.insert(0, os.path.abspath(".."))
           options:
             show_source: true
             docstring_style: google
-            heading_level: 3
             separate_signature: true
+            show_if_no_docstring: true
+            merge_init_into_class: true
+            members_order: source
+            filters:
+              - "!^__"
+            inherited_members: true
+            signature_crossrefs: true
 
 markdown_extensions:
   - admonition
@@ -92,6 +125,7 @@ markdown_extensions:
       anchor_linenums: true
       line_spans: __span
       pygments_lang_class: true
+      auto_title: true
   - pymdownx.inlinehilite
   - pymdownx.snippets
   - pymdownx.superfences
@@ -102,9 +136,11 @@ markdown_extensions:
       repo_url_shorthand: true
       user: caspel26
       repo: django-ninja-aio-crud
-  - pymdownx.emoji
   - pymdownx.tasklist:
       custom_checkbox: true
+  - pymdownx.tilde
+  - pymdownx.caret
+  - pymdownx.mark
 
 extra_css:
   - extra.css
