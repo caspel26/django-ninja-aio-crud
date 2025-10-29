@@ -109,5 +109,3 @@ markdown_extensions:
 
 extra_css:
   - extra.css
-extra_javascript:
-  - js/analytics.js
