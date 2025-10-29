@@ -1,6 +1,6 @@
 site_name: Django Ninja Aio CRUD
 site_description: Async CRUD utilities for Django Ninja with auth, filtering, pagination.
-site_url: https://caspel26.github.io/django-ninja-aio-crud/
+site_url: https://django-ninja-aio.com
 repo_name: caspel26/django-ninja-aio-crud
 repo_url: https://github.com/caspel26/django-ninja-aio-crud
 use_directory_urls: true
