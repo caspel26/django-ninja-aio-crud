@@ -1,7 +1,9 @@
 site_name: Django Ninja Aio CRUD
+site_description: Async CRUD utilities for Django Ninja with auth, filtering, pagination.
 site_url: https://caspel26.github.io/django-ninja-aio-crud/
 repo_name: caspel26/django-ninja-aio-crud
 repo_url: https://github.com/caspel26/django-ninja-aio-crud
+use_directory_urls: true
 
 nav:
   - Home: index.md
@@ -15,15 +17,13 @@ nav:
     - 'Step 4: Add Filtering & Pagination': tutorial/filtering.md
   - API Reference:
     - Views:
-      - 'APIView': api/views/api_view.md
-      - 'APIViewSet': api/views/api_view_set.md
+      - APIView: api/views/api_view.md
+      - APIViewSet: api/views/api_view_set.md
     - Models:
-      - 'ModelSerializer': api/models/model_serializer.md
-      - 'ModelUtil': api/models/model_util.md
-    - Authentication:
-      - 'Auth Classes': api/authentication.md
-    - Pagination:
-      - 'Pagination Classes': api/pagination.md
+      - ModelSerializer: api/models/model_serializer.md
+      - ModelUtil: api/models/model_util.md
+    - Authentication: api/authentication.md
+    - Pagination: api/pagination.md
   - Contributing: contributing.md
 
 theme:
@@ -33,32 +33,62 @@ theme:
       primary: deep-purple
       toggle:
         icon: material/brightness-auto
-        name: Switch to light mode
+        name: Auto
     - media: "(prefers-color-scheme: light)"
       scheme: default
       primary: deep-purple
       toggle:
         icon: material/weather-night
-        name: Switch to dark mode
+        name: Dark
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
       primary: deep-purple
       toggle:
         icon: material/weather-sunny
-        name: Switch to light mode
+        name: Light
   logo: images/logo.png
   favicon: images/favicon.ico
   features:
     - navigation.tabs
+    - navigation.top
+    - navigation.footer
     - toc.integrate
+    - content.code.copy
+    - content.action.edit
+    - content.tabs.link
+    - content.tooltips
+    - search.suggest
+    - search.highlight
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/caspel26/django-ninja-aio-crud
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/django-ninja-aio-crud/
+
+plugins:
+  - search
+  - git-revision-date-localized:
+      type: date
+      fallback_to_build_date: true
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            show_source: true
+            docstring_style: google
+            heading_level: 3
+            separate_signature: true
 
 markdown_extensions:
   - admonition
-  - codehilite
+  - attr_list
+  - def_list
   - footnotes
   - meta
   - toc:
-      anchorlink: true
+      permalink: true
   - pymdownx.highlight:
       anchor_linenums: true
       line_spans: __span
@@ -66,6 +96,18 @@ markdown_extensions:
   - pymdownx.inlinehilite
   - pymdownx.snippets
   - pymdownx.superfences
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.magiclink:
+      repo_url_shorthand: true
+      user: caspel26
+      repo: django-ninja-aio-crud
+  - pymdownx.emoji
+  - pymdownx.tasklist:
+      custom_checkbox: true
 
 extra_css:
   - extra.css
+extra_javascript:
+  - js/analytics.js
