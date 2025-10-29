@@ -6,6 +6,8 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
+        <meta name="description" content="Async CRUD utilities for Django Ninja with auth, filtering, pagination.">
+      
       
       
         <link rel="canonical" href="https://caspel26.github.io/django-ninja-aio-crud/api/models/model_util/">
@@ -17,7 +19,7 @@
         <link rel="next" href="../../authentication/">
       
       
-      <link rel="icon" href="../../../assets/images/favicon.png">
+      <link rel="icon" href="../../../images/favicon.ico">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.22">
     
     
@@ -47,6 +49,8 @@
         <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
       
     
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
     
       <link rel="stylesheet" href="../../../extra.css">
     
@@ -122,9 +126,9 @@
     
     
     
-    <input class="md-option" data-md-color-media="(prefers-color-scheme)" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    <input class="md-option" data-md-color-media="(prefers-color-scheme)" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="indigo"  aria-label="Auto"  type="radio" name="__palette" id="__palette_0">
     
-      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+      <label class="md-header__button md-icon" title="Auto" for="__palette_1" hidden>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.3 16-.7-2h-3.2l-.7 2H7.8L11 7h2l3.2 9zM20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12zm-9.15 3.96h2.3L12 9z"/></svg>
       </label>
     
@@ -132,9 +136,9 @@
     
     
     
-    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="indigo"  aria-label="Dark"  type="radio" name="__palette" id="__palette_1">
     
-      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_2" hidden>
+      <label class="md-header__button md-icon" title="Dark" for="__palette_2" hidden>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
       </label>
     
@@ -142,9 +146,9 @@
     
     
     
-    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_2">
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="indigo"  aria-label="Light"  type="radio" name="__palette" id="__palette_2">
     
-      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+      <label class="md-header__button md-icon" title="Light" for="__palette_0" hidden>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
       </label>
     
@@ -181,6 +185,8 @@
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
         </button>
       </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
       
     </form>
     <div class="md-search__output">
@@ -1734,54 +1740,13 @@
   
   
   
-    
-    
-    
-    
-      
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_3" >
-        
-          
-          <label class="md-nav__link" for="__nav_4_3" id="__nav_4_3_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    Authentication
-    
-  </span>
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_3_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_3">
-            <span class="md-nav__icon md-icon"></span>
-            Authentication
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
     <li class="md-nav__item">
       <a href="../../authentication/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
-    Auth Classes
+    Authentication
     
   </span>
   
@@ -1791,55 +1756,6 @@
   
 
               
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    
-    
-    
-    
-      
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_4" >
-        
-          
-          <label class="md-nav__link" for="__nav_4_4" id="__nav_4_4_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    Pagination
-    
-  </span>
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_4_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_4">
-            <span class="md-nav__icon md-icon"></span>
-            Pagination
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
             
               
                 
@@ -1853,20 +1769,12 @@
   
   
   <span class="md-ellipsis">
-    Pagination Classes
+    Pagination
     
   </span>
   
 
       </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
     </li>
   
 
@@ -1920,35 +1828,35 @@
   
 
 
-<h1 id="model-util"><a class="toclink" href="#model-util">Model Util</a></h1>
+<h1 id="model-util">Model Util<a class="headerlink" href="#model-util" title="Permanent link">&para;</a></h1>
 <p><code>ModelUtil</code> is an async utility class that provides high-level CRUD operations and serialization management for Django models and ModelSerializer instances.</p>
-<h2 id="overview"><a class="toclink" href="#overview">Overview</a></h2>
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
 <p>ModelUtil acts as a bridge between Django Ninja schemas and Django ORM, handling:
 - <strong>Data normalization</strong> (input/output)
 - <strong>Relationship resolution</strong> (FK/M2M)
 - <strong>Binary field handling</strong> (base64 encoding/decoding)
 - <strong>Query optimization</strong> (select_related/prefetch_related)
 - <strong>Lifecycle hook invocation</strong> (custom_actions, post_create, queryset_request)</p>
-<h2 id="class-definition"><a class="toclink" href="#class-definition">Class Definition</a></h2>
+<h2 id="class-definition">Class Definition<a class="headerlink" href="#class-definition" title="Permanent link">&para;</a></h2>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ninja_aio.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModelUtil</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">util</span> <span class="o">=</span> <span class="n">ModelUtil</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
 </span></code></pre></div>
 <p><strong>Parameters:</strong>
 - <code>model</code> (<code>type[ModelSerializer] | models.Model</code>): Django model or ModelSerializer subclass</p>
-<h2 id="properties"><a class="toclink" href="#properties">Properties</a></h2>
-<h3 id="model_pk_name"><a class="toclink" href="#model_pk_name"><code>model_pk_name</code></a></h3>
+<h2 id="properties">Properties<a class="headerlink" href="#properties" title="Permanent link">&para;</a></h2>
+<h3 id="model_pk_name"><code>model_pk_name</code><a class="headerlink" href="#model_pk_name" title="Permanent link">&para;</a></h3>
 <p>Returns the primary key field name.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">util</span> <span class="o">=</span> <span class="n">ModelUtil</span><span class="p">(</span><span class="n">User</span><span class="p">)</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nb">print</span><span class="p">(</span><span class="n">util</span><span class="o">.</span><span class="n">model_pk_name</span><span class="p">)</span>  <span class="c1"># &quot;id&quot;</span>
 </span></code></pre></div>
-<h3 id="model_fields"><a class="toclink" href="#model_fields"><code>model_fields</code></a></h3>
+<h3 id="model_fields"><code>model_fields</code><a class="headerlink" href="#model_fields" title="Permanent link">&para;</a></h3>
 <p>Returns a list of all model field names.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">util</span> <span class="o">=</span> <span class="n">ModelUtil</span><span class="p">(</span><span class="n">User</span><span class="p">)</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nb">print</span><span class="p">(</span><span class="n">util</span><span class="o">.</span><span class="n">model_fields</span><span class="p">)</span>
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="c1"># [&quot;id&quot;, &quot;username&quot;, &quot;email&quot;, &quot;created_at&quot;, &quot;is_active&quot;]</span>
 </span></code></pre></div>
-<h3 id="schema_out_fields"><a class="toclink" href="#schema_out_fields"><code>schema_out_fields</code></a></h3>
+<h3 id="schema_out_fields"><code>schema_out_fields</code><a class="headerlink" href="#schema_out_fields" title="Permanent link">&para;</a></h3>
 <p>Returns serializable fields (ReadSerializer fields or all model fields).</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">User</span><span class="p">(</span><span class="n">ModelSerializer</span><span class="p">):</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="n">username</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">CharField</span><span class="p">(</span><span class="n">max_length</span><span class="o">=</span><span class="mi">150</span><span class="p">)</span>
@@ -1962,15 +1870,15 @@
 </span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="nb">print</span><span class="p">(</span><span class="n">util</span><span class="o">.</span><span class="n">schema_out_fields</span><span class="p">)</span>
 </span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="c1"># [&quot;id&quot;, &quot;username&quot;, &quot;email&quot;]  (password excluded)</span>
 </span></code></pre></div>
-<h3 id="serializer_meta"><a class="toclink" href="#serializer_meta"><code>serializer_meta</code></a></h3>
+<h3 id="serializer_meta"><code>serializer_meta</code><a class="headerlink" href="#serializer_meta" title="Permanent link">&para;</a></h3>
 <p>Returns the ModelSerializerMeta instance if model uses ModelSerializer.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">if</span> <span class="n">util</span><span class="o">.</span><span class="n">serializer_meta</span><span class="p">:</span>
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    <span class="n">fields</span> <span class="o">=</span> <span class="n">util</span><span class="o">.</span><span class="n">serializer_meta</span><span class="o">.</span><span class="n">get_fields</span><span class="p">(</span><span class="s2">&quot;create&quot;</span><span class="p">)</span>
 </span></code></pre></div>
-<h2 id="core-methods"><a class="toclink" href="#core-methods">Core Methods</a></h2>
-<h3 id="get_object"><a class="toclink" href="#get_object"><code>get_object()</code></a></h3>
+<h2 id="core-methods">Core Methods<a class="headerlink" href="#core-methods" title="Permanent link">&para;</a></h2>
+<h3 id="get_object"><code>get_object()</code><a class="headerlink" href="#get_object" title="Permanent link">&para;</a></h3>
 <p>Fetch single object or queryset with optimized queries.</p>
-<h4 id="signature"><a class="toclink" href="#signature">Signature</a></h4>
+<h4 id="signature">Signature<a class="headerlink" href="#signature" title="Permanent link">&para;</a></h4>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">get_object</span><span class="p">(</span>
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    <span class="n">request</span><span class="p">:</span> <span class="n">HttpRequest</span><span class="p">,</span>
 </span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="n">pk</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -1979,7 +1887,7 @@
 </span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    <span class="n">with_qs_request</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
 </span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ModelSerializer</span> <span class="o">|</span> <span class="n">models</span><span class="o">.</span><span class="n">Model</span> <span class="o">|</span> <span class="n">QuerySet</span>
 </span></code></pre></div>
-<h4 id="parameters"><a class="toclink" href="#parameters">Parameters</a></h4>
+<h4 id="parameters">Parameters<a class="headerlink" href="#parameters" title="Permanent link">&para;</a></h4>
 <table>
 <thead>
 <tr>
@@ -2022,18 +1930,18 @@
 </tr>
 </tbody>
 </table>
-<h4 id="return-value"><a class="toclink" href="#return-value">Return Value</a></h4>
+<h4 id="return-value">Return Value<a class="headerlink" href="#return-value" title="Permanent link">&para;</a></h4>
 <ul>
 <li>If <code>pk</code> or <code>getters</code> provided → Single model instance</li>
 <li>Otherwise → QuerySet</li>
 </ul>
-<h4 id="features"><a class="toclink" href="#features">Features</a></h4>
+<h4 id="features">Features<a class="headerlink" href="#features" title="Permanent link">&para;</a></h4>
 <ul>
 <li><strong>Automatic query optimization:</strong> Applies <code>select_related()</code> for ForeignKey and <code>prefetch_related()</code> for reverse relations</li>
 <li><strong>Request-based filtering:</strong> Respects model's <code>queryset_request()</code> method</li>
 <li><strong>Error handling:</strong> Raises <code>SerializeError</code> (404) if object not found</li>
 </ul>
-<h4 id="examples"><a class="toclink" href="#examples">Examples</a></h4>
+<h4 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h4>
 <p><strong>Get single object by ID:</strong></p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">user</span> <span class="o">=</span> <span class="k">await</span> <span class="n">util</span><span class="o">.</span><span class="n">get_object</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="n">pk</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
 </span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="c1"># SELECT * FROM user WHERE id = 1</span>
@@ -2071,14 +1979,14 @@
 </span><span id="__span-10-12"><a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a><span class="c1"># LEFT JOIN category ON article.category_id = category.id</span>
 </span><span id="__span-10-13"><a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a><span class="c1"># WITH prefetch for tags</span>
 </span></code></pre></div>
-<h3 id="get_reverse_relations"><a class="toclink" href="#get_reverse_relations"><code>get_reverse_relations()</code></a></h3>
+<h3 id="get_reverse_relations"><code>get_reverse_relations()</code><a class="headerlink" href="#get_reverse_relations" title="Permanent link">&para;</a></h3>
 <p>Discovers reverse relationship field names for prefetch optimization.</p>
-<h4 id="signature_1"><a class="toclink" href="#signature_1">Signature</a></h4>
+<h4 id="signature_1">Signature<a class="headerlink" href="#signature_1" title="Permanent link">&para;</a></h4>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">get_reverse_relations</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
 </span></code></pre></div>
-<h4 id="return-value_1"><a class="toclink" href="#return-value_1">Return Value</a></h4>
+<h4 id="return-value_1">Return Value<a class="headerlink" href="#return-value_1" title="Permanent link">&para;</a></h4>
 <p>List of reverse relation accessor names.</p>
-<h4 id="example"><a class="toclink" href="#example">Example</a></h4>
+<h4 id="example">Example<a class="headerlink" href="#example" title="Permanent link">&para;</a></h4>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">Author</span><span class="p">(</span><span class="n">ModelSerializer</span><span class="p">):</span>
 </span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>    <span class="n">name</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">CharField</span><span class="p">(</span><span class="n">max_length</span><span class="o">=</span><span class="mi">200</span><span class="p">)</span>
 </span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>
@@ -2089,7 +1997,7 @@
 </span><span id="__span-12-8"><a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="n">reverse_rels</span> <span class="o">=</span> <span class="n">util</span><span class="o">.</span><span class="n">get_reverse_relations</span><span class="p">()</span>
 </span><span id="__span-12-9"><a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a><span class="nb">print</span><span class="p">(</span><span class="n">reverse_rels</span><span class="p">)</span>  <span class="c1"># [&quot;books&quot;]</span>
 </span></code></pre></div>
-<h4 id="detected-relation-types"><a class="toclink" href="#detected-relation-types">Detected Relation Types</a></h4>
+<h4 id="detected-relation-types">Detected Relation Types<a class="headerlink" href="#detected-relation-types" title="Permanent link">&para;</a></h4>
 <table>
 <thead>
 <tr>
@@ -2126,7 +2034,7 @@
 </tr>
 </tbody>
 </table>
-<h4 id="use-case"><a class="toclink" href="#use-case">Use Case</a></h4>
+<h4 id="use-case">Use Case<a class="headerlink" href="#use-case" title="Permanent link">&para;</a></h4>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># Avoid N+1 queries when serializing reverse relations</span>
 </span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="n">relations</span> <span class="o">=</span> <span class="n">util</span><span class="o">.</span><span class="n">get_reverse_relations</span><span class="p">()</span>
 </span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="n">queryset</span> <span class="o">=</span> <span class="n">Author</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">prefetch_related</span><span class="p">(</span><span class="o">*</span><span class="n">relations</span><span class="p">)</span>
@@ -2135,15 +2043,15 @@
 </span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="k">async</span> <span class="k">for</span> <span class="n">author</span> <span class="ow">in</span> <span class="n">queryset</span><span class="p">:</span>
 </span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>    <span class="n">books</span> <span class="o">=</span> <span class="k">await</span> <span class="n">sync_to_async</span><span class="p">(</span><span class="nb">list</span><span class="p">)(</span><span class="n">author</span><span class="o">.</span><span class="n">books</span><span class="o">.</span><span class="n">all</span><span class="p">())</span>  <span class="c1"># No query!</span>
 </span></code></pre></div>
-<h3 id="parse_input_data"><a class="toclink" href="#parse_input_data"><code>parse_input_data()</code></a></h3>
+<h3 id="parse_input_data"><code>parse_input_data()</code><a class="headerlink" href="#parse_input_data" title="Permanent link">&para;</a></h3>
 <p>Normalize incoming schema data into model-ready dictionary.</p>
-<h4 id="signature_2"><a class="toclink" href="#signature_2">Signature</a></h4>
+<h4 id="signature_2">Signature<a class="headerlink" href="#signature_2" title="Permanent link">&para;</a></h4>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">parse_input_data</span><span class="p">(</span>
 </span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>    <span class="n">request</span><span class="p">:</span> <span class="n">HttpRequest</span><span class="p">,</span>
 </span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>    <span class="n">data</span><span class="p">:</span> <span class="n">Schema</span>
 </span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">dict</span><span class="p">,</span> <span class="nb">dict</span><span class="p">]</span>
 </span></code></pre></div>
-<h4 id="parameters_1"><a class="toclink" href="#parameters_1">Parameters</a></h4>
+<h4 id="parameters_1">Parameters<a class="headerlink" href="#parameters_1" title="Permanent link">&para;</a></h4>
 <table>
 <thead>
 <tr>
@@ -2165,18 +2073,18 @@
 </tr>
 </tbody>
 </table>
-<h4 id="return-value_2"><a class="toclink" href="#return-value_2">Return Value</a></h4>
+<h4 id="return-value_2">Return Value<a class="headerlink" href="#return-value_2" title="Permanent link">&para;</a></h4>
 <p><code>(payload, customs)</code> where:
 - <code>payload</code> (<code>dict</code>): Model-ready data with resolved relationships
 - <code>customs</code> (<code>dict</code>): Custom/synthetic fields stripped from payload</p>
-<h4 id="transformations"><a class="toclink" href="#transformations">Transformations</a></h4>
+<h4 id="transformations">Transformations<a class="headerlink" href="#transformations" title="Permanent link">&para;</a></h4>
 <ol>
 <li><strong>Strip custom fields</strong> → Move to <code>customs</code> dict</li>
 <li><strong>Remove optional None values</strong> → Don't update if not provided</li>
 <li><strong>Decode BinaryField</strong> → Convert base64 string to bytes</li>
 <li><strong>Resolve FK IDs</strong> → Fetch related instances</li>
 </ol>
-<h4 id="examples_1"><a class="toclink" href="#examples_1">Examples</a></h4>
+<h4 id="examples_1">Examples<a class="headerlink" href="#examples_1" title="Permanent link">&para;</a></h4>
 <p><strong>Basic transformation:</strong></p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ninja</span><span class="w"> </span><span class="kn">import</span> <span class="n">Schema</span>
 </span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>
@@ -2277,15 +2185,15 @@
 </span><span id="__span-19-6"><a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a>    <span class="c1"># {&quot;file_data&quot;: &quot;Invalid base64 encoding&quot;}</span>
 </span><span id="__span-19-7"><a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a>    <span class="c1"># or {&quot;author&quot;: &quot;User with id 999 not found&quot;}</span>
 </span></code></pre></div>
-<h3 id="parse_output_data"><a class="toclink" href="#parse_output_data"><code>parse_output_data()</code></a></h3>
+<h3 id="parse_output_data"><code>parse_output_data()</code><a class="headerlink" href="#parse_output_data" title="Permanent link">&para;</a></h3>
 <p>Post-process serialized output for consistency.</p>
-<h4 id="signature_3"><a class="toclink" href="#signature_3">Signature</a></h4>
+<h4 id="signature_3">Signature<a class="headerlink" href="#signature_3" title="Permanent link">&para;</a></h4>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">parse_output_data</span><span class="p">(</span>
 </span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>    <span class="n">request</span><span class="p">:</span> <span class="n">HttpRequest</span><span class="p">,</span>
 </span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>    <span class="n">data</span><span class="p">:</span> <span class="n">Schema</span>
 </span><span id="__span-20-4"><a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span>
 </span></code></pre></div>
-<h4 id="parameters_2"><a class="toclink" href="#parameters_2">Parameters</a></h4>
+<h4 id="parameters_2">Parameters<a class="headerlink" href="#parameters_2" title="Permanent link">&para;</a></h4>
 <table>
 <thead>
 <tr>
@@ -2307,15 +2215,15 @@
 </tr>
 </tbody>
 </table>
-<h4 id="return-value_3"><a class="toclink" href="#return-value_3">Return Value</a></h4>
+<h4 id="return-value_3">Return Value<a class="headerlink" href="#return-value_3" title="Permanent link">&para;</a></h4>
 <p>Post-processed dictionary ready for API response.</p>
-<h4 id="transformations_1"><a class="toclink" href="#transformations_1">Transformations</a></h4>
+<h4 id="transformations_1">Transformations<a class="headerlink" href="#transformations_1" title="Permanent link">&para;</a></h4>
 <ol>
 <li><strong>Replace nested FK dicts</strong> → Actual model instances</li>
 <li><strong>Add <code>&lt;field&gt;_id</code> keys</strong> → For nested FK references</li>
 <li><strong>Flatten nested structures</strong> → Consistent response format</li>
 </ol>
-<h4 id="examples_2"><a class="toclink" href="#examples_2">Examples</a></h4>
+<h4 id="examples_2">Examples<a class="headerlink" href="#examples_2" title="Permanent link">&para;</a></h4>
 <p><strong>Basic FK transformation:</strong></p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="c1"># Before parse_output_data</span>
 </span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="p">{</span>
@@ -2364,14 +2272,14 @@
 </span><span id="__span-23-7"><a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a><span class="c1"># Also provides IDs for convenience</span>
 </span><span id="__span-23-8"><a id="__codelineno-23-8" name="__codelineno-23-8" href="#__codelineno-23-8"></a><span class="n">author_id</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="s2">&quot;author_id&quot;</span><span class="p">]</span>
 </span></code></pre></div>
-<h3 id="verbose_name_path_resolver"><a class="toclink" href="#verbose_name_path_resolver"><code>verbose_name_path_resolver()</code></a></h3>
+<h3 id="verbose_name_path_resolver"><code>verbose_name_path_resolver()</code><a class="headerlink" href="#verbose_name_path_resolver" title="Permanent link">&para;</a></h3>
 <p>Get URL-friendly path segment from model's verbose name plural.</p>
-<h4 id="signature_4"><a class="toclink" href="#signature_4">Signature</a></h4>
+<h4 id="signature_4">Signature<a class="headerlink" href="#signature_4" title="Permanent link">&para;</a></h4>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">verbose_name_path_resolver</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">str</span>
 </span></code></pre></div>
-<h4 id="return-value_4"><a class="toclink" href="#return-value_4">Return Value</a></h4>
+<h4 id="return-value_4">Return Value<a class="headerlink" href="#return-value_4" title="Permanent link">&para;</a></h4>
 <p>Slugified plural verbose name.</p>
-<h4 id="example_1"><a class="toclink" href="#example_1">Example</a></h4>
+<h4 id="example_1">Example<a class="headerlink" href="#example_1" title="Permanent link">&para;</a></h4>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">BlogPost</span><span class="p">(</span><span class="n">ModelSerializer</span><span class="p">):</span>
 </span><span id="__span-25-2"><a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>    <span class="k">class</span><span class="w"> </span><span class="nc">Meta</span><span class="p">:</span>
 </span><span id="__span-25-3"><a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>        <span class="n">verbose_name</span> <span class="o">=</span> <span class="s2">&quot;blog post&quot;</span>
@@ -2385,14 +2293,14 @@
 </span><span id="__span-25-11"><a id="__codelineno-25-11" name="__codelineno-25-11" href="#__codelineno-25-11"></a><span class="c1"># /api/blog-posts/</span>
 </span><span id="__span-25-12"><a id="__codelineno-25-12" name="__codelineno-25-12" href="#__codelineno-25-12"></a><span class="c1"># /api/blog-posts/{id}/</span>
 </span></code></pre></div>
-<h3 id="verbose_name_view_resolver"><a class="toclink" href="#verbose_name_view_resolver"><code>verbose_name_view_resolver()</code></a></h3>
+<h3 id="verbose_name_view_resolver"><code>verbose_name_view_resolver()</code><a class="headerlink" href="#verbose_name_view_resolver" title="Permanent link">&para;</a></h3>
 <p>Get display name from model's singular verbose name.</p>
-<h4 id="signature_5"><a class="toclink" href="#signature_5">Signature</a></h4>
+<h4 id="signature_5">Signature<a class="headerlink" href="#signature_5" title="Permanent link">&para;</a></h4>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">verbose_name_view_resolver</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">str</span>
 </span></code></pre></div>
-<h4 id="return-value_5"><a class="toclink" href="#return-value_5">Return Value</a></h4>
+<h4 id="return-value_5">Return Value<a class="headerlink" href="#return-value_5" title="Permanent link">&para;</a></h4>
 <p>Capitalized singular verbose name.</p>
-<h4 id="example_2"><a class="toclink" href="#example_2">Example</a></h4>
+<h4 id="example_2">Example<a class="headerlink" href="#example_2" title="Permanent link">&para;</a></h4>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-27-1"><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">BlogPost</span><span class="p">(</span><span class="n">ModelSerializer</span><span class="p">):</span>
 </span><span id="__span-27-2"><a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a>    <span class="k">class</span><span class="w"> </span><span class="nc">Meta</span><span class="p">:</span>
 </span><span id="__span-27-3"><a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a>        <span class="n">verbose_name</span> <span class="o">=</span> <span class="s2">&quot;blog post&quot;</span>
@@ -2405,17 +2313,17 @@
 </span><span id="__span-27-10"><a id="__codelineno-27-10" name="__codelineno-27-10" href="#__codelineno-27-10"></a><span class="c1"># &quot;Create Blog post&quot;</span>
 </span><span id="__span-27-11"><a id="__codelineno-27-11" name="__codelineno-27-11" href="#__codelineno-27-11"></a><span class="c1"># &quot;Update Blog post&quot;</span>
 </span></code></pre></div>
-<h2 id="crud-operations"><a class="toclink" href="#crud-operations">CRUD Operations</a></h2>
-<h3 id="create_s"><a class="toclink" href="#create_s"><code>create_s()</code></a></h3>
+<h2 id="crud-operations">CRUD Operations<a class="headerlink" href="#crud-operations" title="Permanent link">&para;</a></h2>
+<h3 id="create_s"><code>create_s()</code><a class="headerlink" href="#create_s" title="Permanent link">&para;</a></h3>
 <p>Create new model instance with full lifecycle support.</p>
-<h4 id="signature_6"><a class="toclink" href="#signature_6">Signature</a></h4>
+<h4 id="signature_6">Signature<a class="headerlink" href="#signature_6" title="Permanent link">&para;</a></h4>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-28-1"><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">create_s</span><span class="p">(</span>
 </span><span id="__span-28-2"><a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>    <span class="n">request</span><span class="p">:</span> <span class="n">HttpRequest</span><span class="p">,</span>
 </span><span id="__span-28-3"><a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a>    <span class="n">data</span><span class="p">:</span> <span class="n">Schema</span><span class="p">,</span>
 </span><span id="__span-28-4"><a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a>    <span class="n">obj_schema</span><span class="p">:</span> <span class="n">Schema</span>
 </span><span id="__span-28-5"><a id="__codelineno-28-5" name="__codelineno-28-5" href="#__codelineno-28-5"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span>
 </span></code></pre></div>
-<h4 id="parameters_3"><a class="toclink" href="#parameters_3">Parameters</a></h4>
+<h4 id="parameters_3">Parameters<a class="headerlink" href="#parameters_3" title="Permanent link">&para;</a></h4>
 <table>
 <thead>
 <tr>
@@ -2442,9 +2350,9 @@
 </tr>
 </tbody>
 </table>
-<h4 id="return-value_6"><a class="toclink" href="#return-value_6">Return Value</a></h4>
+<h4 id="return-value_6">Return Value<a class="headerlink" href="#return-value_6" title="Permanent link">&para;</a></h4>
 <p>Serialized created object as dictionary.</p>
-<h4 id="execution-flow"><a class="toclink" href="#execution-flow">Execution Flow</a></h4>
+<h4 id="execution-flow">Execution Flow<a class="headerlink" href="#execution-flow" title="Permanent link">&para;</a></h4>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-29-1"><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a>1. parse_input_data(data) → (payload, customs)
 </span><span id="__span-29-2"><a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a>2. Model.objects.acreate(**payload)
 </span><span id="__span-29-3"><a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a>3. custom_actions(customs)    [if ModelSerializer]
@@ -2452,7 +2360,7 @@
 </span><span id="__span-29-5"><a id="__codelineno-29-5" name="__codelineno-29-5" href="#__codelineno-29-5"></a>5. read_s(obj, obj_schema)
 </span><span id="__span-29-6"><a id="__codelineno-29-6" name="__codelineno-29-6" href="#__codelineno-29-6"></a>6. return serialized_dict
 </span></code></pre></div>
-<h4 id="example_3"><a class="toclink" href="#example_3">Example</a></h4>
+<h4 id="example_3">Example<a class="headerlink" href="#example_3" title="Permanent link">&para;</a></h4>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-30-1"><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ninja</span><span class="w"> </span><span class="kn">import</span> <span class="n">Schema</span>
 </span><span id="__span-30-2"><a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a>
 </span><span id="__span-30-3"><a id="__codelineno-30-3" name="__codelineno-30-3" href="#__codelineno-30-3"></a><span class="k">class</span><span class="w"> </span><span class="nc">UserCreateSchema</span><span class="p">(</span><span class="n">Schema</span><span class="p">):</span>
@@ -2483,7 +2391,7 @@
 </span><span id="__span-30-28"><a id="__codelineno-30-28" name="__codelineno-30-28" href="#__codelineno-30-28"></a><span class="c1">#     &quot;created_at&quot;: &quot;2024-01-15T10:30:00Z&quot;</span>
 </span><span id="__span-30-29"><a id="__codelineno-30-29" name="__codelineno-30-29" href="#__codelineno-30-29"></a><span class="c1"># }</span>
 </span></code></pre></div>
-<h4 id="with-hooks"><a class="toclink" href="#with-hooks">With Hooks</a></h4>
+<h4 id="with-hooks">With Hooks<a class="headerlink" href="#with-hooks" title="Permanent link">&para;</a></h4>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-31-1"><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">User</span><span class="p">(</span><span class="n">ModelSerializer</span><span class="p">):</span>
 </span><span id="__span-31-2"><a id="__codelineno-31-2" name="__codelineno-31-2" href="#__codelineno-31-2"></a>    <span class="n">username</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">CharField</span><span class="p">(</span><span class="n">max_length</span><span class="o">=</span><span class="mi">150</span><span class="p">)</span>
 </span><span id="__span-31-3"><a id="__codelineno-31-3" name="__codelineno-31-3" href="#__codelineno-31-3"></a>    <span class="n">email</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">EmailField</span><span class="p">()</span>
@@ -2505,16 +2413,16 @@
 </span><span id="__span-31-19"><a id="__codelineno-31-19" name="__codelineno-31-19" href="#__codelineno-31-19"></a><span class="c1"># Hooks are automatically invoked</span>
 </span><span id="__span-31-20"><a id="__codelineno-31-20" name="__codelineno-31-20" href="#__codelineno-31-20"></a><span class="n">result</span> <span class="o">=</span> <span class="k">await</span> <span class="n">util</span><span class="o">.</span><span class="n">create_s</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">UserReadSchema</span><span class="p">)</span>
 </span></code></pre></div>
-<h3 id="read_s"><a class="toclink" href="#read_s"><code>read_s()</code></a></h3>
+<h3 id="read_s"><code>read_s()</code><a class="headerlink" href="#read_s" title="Permanent link">&para;</a></h3>
 <p>Serialize model instance to response dict.</p>
-<h4 id="signature_7"><a class="toclink" href="#signature_7">Signature</a></h4>
+<h4 id="signature_7">Signature<a class="headerlink" href="#signature_7" title="Permanent link">&para;</a></h4>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-32-1"><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">read_s</span><span class="p">(</span>
 </span><span id="__span-32-2"><a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a>    <span class="n">request</span><span class="p">:</span> <span class="n">HttpRequest</span><span class="p">,</span>
 </span><span id="__span-32-3"><a id="__codelineno-32-3" name="__codelineno-32-3" href="#__codelineno-32-3"></a>    <span class="n">obj</span><span class="p">:</span> <span class="n">ModelSerializer</span> <span class="o">|</span> <span class="n">models</span><span class="o">.</span><span class="n">Model</span><span class="p">,</span>
 </span><span id="__span-32-4"><a id="__codelineno-32-4" name="__codelineno-32-4" href="#__codelineno-32-4"></a>    <span class="n">obj_schema</span><span class="p">:</span> <span class="n">Schema</span>
 </span><span id="__span-32-5"><a id="__codelineno-32-5" name="__codelineno-32-5" href="#__codelineno-32-5"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span>
 </span></code></pre></div>
-<h4 id="parameters_4"><a class="toclink" href="#parameters_4">Parameters</a></h4>
+<h4 id="parameters_4">Parameters<a class="headerlink" href="#parameters_4" title="Permanent link">&para;</a></h4>
 <table>
 <thead>
 <tr>
@@ -2541,15 +2449,15 @@
 </tr>
 </tbody>
 </table>
-<h4 id="return-value_7"><a class="toclink" href="#return-value_7">Return Value</a></h4>
+<h4 id="return-value_7">Return Value<a class="headerlink" href="#return-value_7" title="Permanent link">&para;</a></h4>
 <p>Serialized object as dictionary.</p>
-<h4 id="execution-flow_1"><a class="toclink" href="#execution-flow_1">Execution Flow</a></h4>
+<h4 id="execution-flow_1">Execution Flow<a class="headerlink" href="#execution-flow_1" title="Permanent link">&para;</a></h4>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-33-1"><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a>1. obj_schema.from_orm(obj)
 </span><span id="__span-33-2"><a id="__codelineno-33-2" name="__codelineno-33-2" href="#__codelineno-33-2"></a>2. schema.model_dump(mode=&quot;json&quot;)
 </span><span id="__span-33-3"><a id="__codelineno-33-3" name="__codelineno-33-3" href="#__codelineno-33-3"></a>3. parse_output_data(dumped_data)
 </span><span id="__span-33-4"><a id="__codelineno-33-4" name="__codelineno-33-4" href="#__codelineno-33-4"></a>4. return processed_dict
 </span></code></pre></div>
-<h4 id="example_4"><a class="toclink" href="#example_4">Example</a></h4>
+<h4 id="example_4">Example<a class="headerlink" href="#example_4" title="Permanent link">&para;</a></h4>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-34-1"><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a><span class="n">user</span> <span class="o">=</span> <span class="k">await</span> <span class="n">User</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">aget</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
 </span><span id="__span-34-2"><a id="__codelineno-34-2" name="__codelineno-34-2" href="#__codelineno-34-2"></a><span class="n">result</span> <span class="o">=</span> <span class="k">await</span> <span class="n">util</span><span class="o">.</span><span class="n">read_s</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="n">user</span><span class="p">,</span> <span class="n">UserReadSchema</span><span class="p">)</span>
 </span><span id="__span-34-3"><a id="__codelineno-34-3" name="__codelineno-34-3" href="#__codelineno-34-3"></a>
@@ -2561,7 +2469,7 @@
 </span><span id="__span-34-9"><a id="__codelineno-34-9" name="__codelineno-34-9" href="#__codelineno-34-9"></a><span class="c1">#     &quot;created_at&quot;: &quot;2024-01-15T10:30:00Z&quot;</span>
 </span><span id="__span-34-10"><a id="__codelineno-34-10" name="__codelineno-34-10" href="#__codelineno-34-10"></a><span class="c1"># }</span>
 </span></code></pre></div>
-<h4 id="with-nested-relations"><a class="toclink" href="#with-nested-relations">With Nested Relations</a></h4>
+<h4 id="with-nested-relations">With Nested Relations<a class="headerlink" href="#with-nested-relations" title="Permanent link">&para;</a></h4>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-35-1"><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">ArticleReadSchema</span><span class="p">(</span><span class="n">Schema</span><span class="p">):</span>
 </span><span id="__span-35-2"><a id="__codelineno-35-2" name="__codelineno-35-2" href="#__codelineno-35-2"></a>    <span class="nb">id</span><span class="p">:</span> <span class="nb">int</span>
 </span><span id="__span-35-3"><a id="__codelineno-35-3" name="__codelineno-35-3" href="#__codelineno-35-3"></a>    <span class="n">title</span><span class="p">:</span> <span class="nb">str</span>
@@ -2578,9 +2486,9 @@
 </span><span id="__span-35-14"><a id="__codelineno-35-14" name="__codelineno-35-14" href="#__codelineno-35-14"></a><span class="c1">#     &quot;author_id&quot;: 10</span>
 </span><span id="__span-35-15"><a id="__codelineno-35-15" name="__codelineno-35-15" href="#__codelineno-35-15"></a><span class="c1"># }</span>
 </span></code></pre></div>
-<h3 id="update_s"><a class="toclink" href="#update_s"><code>update_s()</code></a></h3>
+<h3 id="update_s"><code>update_s()</code><a class="headerlink" href="#update_s" title="Permanent link">&para;</a></h3>
 <p>Update existing model instance.</p>
-<h4 id="signature_8"><a class="toclink" href="#signature_8">Signature</a></h4>
+<h4 id="signature_8">Signature<a class="headerlink" href="#signature_8" title="Permanent link">&para;</a></h4>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-36-1"><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">update_s</span><span class="p">(</span>
 </span><span id="__span-36-2"><a id="__codelineno-36-2" name="__codelineno-36-2" href="#__codelineno-36-2"></a>    <span class="n">request</span><span class="p">:</span> <span class="n">HttpRequest</span><span class="p">,</span>
 </span><span id="__span-36-3"><a id="__codelineno-36-3" name="__codelineno-36-3" href="#__codelineno-36-3"></a>    <span class="n">data</span><span class="p">:</span> <span class="n">Schema</span><span class="p">,</span>
@@ -2588,7 +2496,7 @@
 </span><span id="__span-36-5"><a id="__codelineno-36-5" name="__codelineno-36-5" href="#__codelineno-36-5"></a>    <span class="n">obj_schema</span><span class="p">:</span> <span class="n">Schema</span>
 </span><span id="__span-36-6"><a id="__codelineno-36-6" name="__codelineno-36-6" href="#__codelineno-36-6"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span>
 </span></code></pre></div>
-<h4 id="parameters_5"><a class="toclink" href="#parameters_5">Parameters</a></h4>
+<h4 id="parameters_5">Parameters<a class="headerlink" href="#parameters_5" title="Permanent link">&para;</a></h4>
 <table>
 <thead>
 <tr>
@@ -2620,9 +2528,9 @@
 </tr>
 </tbody>
 </table>
-<h4 id="return-value_8"><a class="toclink" href="#return-value_8">Return Value</a></h4>
+<h4 id="return-value_8">Return Value<a class="headerlink" href="#return-value_8" title="Permanent link">&para;</a></h4>
 <p>Serialized updated object as dictionary.</p>
-<h4 id="execution-flow_2"><a class="toclink" href="#execution-flow_2">Execution Flow</a></h4>
+<h4 id="execution-flow_2">Execution Flow<a class="headerlink" href="#execution-flow_2" title="Permanent link">&para;</a></h4>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-37-1"><a id="__codelineno-37-1" name="__codelineno-37-1" href="#__codelineno-37-1"></a>1. get_object(pk=pk)
 </span><span id="__span-37-2"><a id="__codelineno-37-2" name="__codelineno-37-2" href="#__codelineno-37-2"></a>2. parse_input_data(data) → (payload, customs)
 </span><span id="__span-37-3"><a id="__codelineno-37-3" name="__codelineno-37-3" href="#__codelineno-37-3"></a>3. Update obj fields from payload
@@ -2631,7 +2539,7 @@
 </span><span id="__span-37-6"><a id="__codelineno-37-6" name="__codelineno-37-6" href="#__codelineno-37-6"></a>6. read_s(obj, obj_schema)
 </span><span id="__span-37-7"><a id="__codelineno-37-7" name="__codelineno-37-7" href="#__codelineno-37-7"></a>7. return serialized_dict
 </span></code></pre></div>
-<h4 id="example_5"><a class="toclink" href="#example_5">Example</a></h4>
+<h4 id="example_5">Example<a class="headerlink" href="#example_5" title="Permanent link">&para;</a></h4>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-38-1"><a id="__codelineno-38-1" name="__codelineno-38-1" href="#__codelineno-38-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">UserUpdateSchema</span><span class="p">(</span><span class="n">Schema</span><span class="p">):</span>
 </span><span id="__span-38-2"><a id="__codelineno-38-2" name="__codelineno-38-2" href="#__codelineno-38-2"></a>    <span class="n">email</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
 </span><span id="__span-38-3"><a id="__codelineno-38-3" name="__codelineno-38-3" href="#__codelineno-38-3"></a>    <span class="n">bio</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
@@ -2647,7 +2555,7 @@
 </span><span id="__span-38-13"><a id="__codelineno-38-13" name="__codelineno-38-13" href="#__codelineno-38-13"></a><span class="c1">#     &quot;bio&quot;: &quot;...&quot;,  # unchanged</span>
 </span><span id="__span-38-14"><a id="__codelineno-38-14" name="__codelineno-38-14" href="#__codelineno-38-14"></a><span class="c1"># }</span>
 </span></code></pre></div>
-<h4 id="partial-updates"><a class="toclink" href="#partial-updates">Partial Updates</a></h4>
+<h4 id="partial-updates">Partial Updates<a class="headerlink" href="#partial-updates" title="Permanent link">&para;</a></h4>
 <p>Only provided fields are updated:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-39-1"><a id="__codelineno-39-1" name="__codelineno-39-1" href="#__codelineno-39-1"></a><span class="c1"># Update only email</span>
 </span><span id="__span-39-2"><a id="__codelineno-39-2" name="__codelineno-39-2" href="#__codelineno-39-2"></a><span class="n">data</span> <span class="o">=</span> <span class="n">UserUpdateSchema</span><span class="p">(</span><span class="n">email</span><span class="o">=</span><span class="s2">&quot;new@example.com&quot;</span><span class="p">)</span>
@@ -2661,7 +2569,7 @@
 </span><span id="__span-39-10"><a id="__codelineno-39-10" name="__codelineno-39-10" href="#__codelineno-39-10"></a><span class="n">data</span> <span class="o">=</span> <span class="n">UserUpdateSchema</span><span class="p">(</span><span class="n">email</span><span class="o">=</span><span class="s2">&quot;new@example.com&quot;</span><span class="p">,</span> <span class="n">bio</span><span class="o">=</span><span class="s2">&quot;New bio&quot;</span><span class="p">)</span>
 </span><span id="__span-39-11"><a id="__codelineno-39-11" name="__codelineno-39-11" href="#__codelineno-39-11"></a><span class="k">await</span> <span class="n">util</span><span class="o">.</span><span class="n">update_s</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">pk</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">UserReadSchema</span><span class="p">)</span>
 </span></code></pre></div>
-<h4 id="with-custom-actions"><a class="toclink" href="#with-custom-actions">With Custom Actions</a></h4>
+<h4 id="with-custom-actions">With Custom Actions<a class="headerlink" href="#with-custom-actions" title="Permanent link">&para;</a></h4>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-40-1"><a id="__codelineno-40-1" name="__codelineno-40-1" href="#__codelineno-40-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">User</span><span class="p">(</span><span class="n">ModelSerializer</span><span class="p">):</span>
 </span><span id="__span-40-2"><a id="__codelineno-40-2" name="__codelineno-40-2" href="#__codelineno-40-2"></a>    <span class="k">class</span><span class="w"> </span><span class="nc">UpdateSerializer</span><span class="p">:</span>
 </span><span id="__span-40-3"><a id="__codelineno-40-3" name="__codelineno-40-3" href="#__codelineno-40-3"></a>        <span class="n">optionals</span> <span class="o">=</span> <span class="p">[(</span><span class="s2">&quot;email&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">)]</span>
@@ -2675,15 +2583,15 @@
 </span><span id="__span-40-11"><a id="__codelineno-40-11" name="__codelineno-40-11" href="#__codelineno-40-11"></a><span class="k">await</span> <span class="n">util</span><span class="o">.</span><span class="n">update_s</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">pk</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">UserReadSchema</span><span class="p">)</span>
 </span><span id="__span-40-12"><a id="__codelineno-40-12" name="__codelineno-40-12" href="#__codelineno-40-12"></a><span class="c1"># Email updated AND password reset email sent</span>
 </span></code></pre></div>
-<h3 id="delete_s"><a class="toclink" href="#delete_s"><code>delete_s()</code></a></h3>
+<h3 id="delete_s"><code>delete_s()</code><a class="headerlink" href="#delete_s" title="Permanent link">&para;</a></h3>
 <p>Delete model instance.</p>
-<h4 id="signature_9"><a class="toclink" href="#signature_9">Signature</a></h4>
+<h4 id="signature_9">Signature<a class="headerlink" href="#signature_9" title="Permanent link">&para;</a></h4>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-41-1"><a id="__codelineno-41-1" name="__codelineno-41-1" href="#__codelineno-41-1"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">delete_s</span><span class="p">(</span>
 </span><span id="__span-41-2"><a id="__codelineno-41-2" name="__codelineno-41-2" href="#__codelineno-41-2"></a>    <span class="n">request</span><span class="p">:</span> <span class="n">HttpRequest</span><span class="p">,</span>
 </span><span id="__span-41-3"><a id="__codelineno-41-3" name="__codelineno-41-3" href="#__codelineno-41-3"></a>    <span class="n">pk</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">str</span>
 </span><span id="__span-41-4"><a id="__codelineno-41-4" name="__codelineno-41-4" href="#__codelineno-41-4"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
 </span></code></pre></div>
-<h4 id="parameters_6"><a class="toclink" href="#parameters_6">Parameters</a></h4>
+<h4 id="parameters_6">Parameters<a class="headerlink" href="#parameters_6" title="Permanent link">&para;</a></h4>
 <table>
 <thead>
 <tr>
@@ -2705,18 +2613,18 @@
 </tr>
 </tbody>
 </table>
-<h4 id="return-value_9"><a class="toclink" href="#return-value_9">Return Value</a></h4>
+<h4 id="return-value_9">Return Value<a class="headerlink" href="#return-value_9" title="Permanent link">&para;</a></h4>
 <p><code>None</code></p>
-<h4 id="execution-flow_3"><a class="toclink" href="#execution-flow_3">Execution Flow</a></h4>
+<h4 id="execution-flow_3">Execution Flow<a class="headerlink" href="#execution-flow_3" title="Permanent link">&para;</a></h4>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-42-1"><a id="__codelineno-42-1" name="__codelineno-42-1" href="#__codelineno-42-1"></a>1. get_object(pk=pk)
 </span><span id="__span-42-2"><a id="__codelineno-42-2" name="__codelineno-42-2" href="#__codelineno-42-2"></a>2. obj.adelete()
 </span><span id="__span-42-3"><a id="__codelineno-42-3" name="__codelineno-42-3" href="#__codelineno-42-3"></a>3. obj.on_delete()    [if ModelSerializer]
 </span></code></pre></div>
-<h4 id="example_6"><a class="toclink" href="#example_6">Example</a></h4>
+<h4 id="example_6">Example<a class="headerlink" href="#example_6" title="Permanent link">&para;</a></h4>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-43-1"><a id="__codelineno-43-1" name="__codelineno-43-1" href="#__codelineno-43-1"></a><span class="k">await</span> <span class="n">util</span><span class="o">.</span><span class="n">delete_s</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="n">pk</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
 </span><span id="__span-43-2"><a id="__codelineno-43-2" name="__codelineno-43-2" href="#__codelineno-43-2"></a><span class="c1"># User with id=1 is deleted</span>
 </span></code></pre></div>
-<h4 id="with-delete-hook"><a class="toclink" href="#with-delete-hook">With Delete Hook</a></h4>
+<h4 id="with-delete-hook">With Delete Hook<a class="headerlink" href="#with-delete-hook" title="Permanent link">&para;</a></h4>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-44-1"><a id="__codelineno-44-1" name="__codelineno-44-1" href="#__codelineno-44-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">User</span><span class="p">(</span><span class="n">ModelSerializer</span><span class="p">):</span>
 </span><span id="__span-44-2"><a id="__codelineno-44-2" name="__codelineno-44-2" href="#__codelineno-44-2"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">on_delete</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span id="__span-44-3"><a id="__codelineno-44-3" name="__codelineno-44-3" href="#__codelineno-44-3"></a>        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;User </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">username</span><span class="si">}</span><span class="s2"> deleted&quot;</span><span class="p">)</span>
@@ -2725,9 +2633,9 @@
 </span><span id="__span-44-6"><a id="__codelineno-44-6" name="__codelineno-44-6" href="#__codelineno-44-6"></a><span class="k">await</span> <span class="n">util</span><span class="o">.</span><span class="n">delete_s</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="n">pk</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
 </span><span id="__span-44-7"><a id="__codelineno-44-7" name="__codelineno-44-7" href="#__codelineno-44-7"></a><span class="c1"># Logs deletion and clears cache</span>
 </span></code></pre></div>
-<h2 id="error-handling"><a class="toclink" href="#error-handling">Error Handling</a></h2>
+<h2 id="error-handling">Error Handling<a class="headerlink" href="#error-handling" title="Permanent link">&para;</a></h2>
 <p>ModelUtil raises <code>SerializeError</code> for various failure scenarios:</p>
-<h3 id="404-not-found"><a class="toclink" href="#404-not-found">404 Not Found</a></h3>
+<h3 id="404-not-found">404 Not Found<a class="headerlink" href="#404-not-found" title="Permanent link">&para;</a></h3>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-45-1"><a id="__codelineno-45-1" name="__codelineno-45-1" href="#__codelineno-45-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ninja_aio.exceptions</span><span class="w"> </span><span class="kn">import</span> <span class="n">SerializeError</span>
 </span><span id="__span-45-2"><a id="__codelineno-45-2" name="__codelineno-45-2" href="#__codelineno-45-2"></a>
 </span><span id="__span-45-3"><a id="__codelineno-45-3" name="__codelineno-45-3" href="#__codelineno-45-3"></a><span class="k">try</span><span class="p">:</span>
@@ -2737,7 +2645,7 @@
 </span><span id="__span-45-7"><a id="__codelineno-45-7" name="__codelineno-45-7" href="#__codelineno-45-7"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">details</span><span class="p">)</span>
 </span><span id="__span-45-8"><a id="__codelineno-45-8" name="__codelineno-45-8" href="#__codelineno-45-8"></a>    <span class="c1"># {&quot;user&quot;: &quot;not found&quot;}</span>
 </span></code></pre></div>
-<h3 id="400-bad-request"><a class="toclink" href="#400-bad-request">400 Bad Request</a></h3>
+<h3 id="400-bad-request">400 Bad Request<a class="headerlink" href="#400-bad-request" title="Permanent link">&para;</a></h3>
 <p><strong>Invalid base64:</strong></p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-46-1"><a id="__codelineno-46-1" name="__codelineno-46-1" href="#__codelineno-46-1"></a><span class="k">try</span><span class="p">:</span>
 </span><span id="__span-46-2"><a id="__codelineno-46-2" name="__codelineno-46-2" href="#__codelineno-46-2"></a>    <span class="n">data</span> <span class="o">=</span> <span class="n">DocumentCreateSchema</span><span class="p">(</span>
@@ -2762,8 +2670,8 @@
 </span><span id="__span-47-9"><a id="__codelineno-47-9" name="__codelineno-47-9" href="#__codelineno-47-9"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">details</span><span class="p">)</span>
 </span><span id="__span-47-10"><a id="__codelineno-47-10" name="__codelineno-47-10" href="#__codelineno-47-10"></a>    <span class="c1"># {&quot;author&quot;: &quot;User with id 999 not found&quot;}</span>
 </span></code></pre></div>
-<h2 id="performance-optimization"><a class="toclink" href="#performance-optimization">Performance Optimization</a></h2>
-<h3 id="automatic-query-optimization"><a class="toclink" href="#automatic-query-optimization">Automatic Query Optimization</a></h3>
+<h2 id="performance-optimization">Performance Optimization<a class="headerlink" href="#performance-optimization" title="Permanent link">&para;</a></h2>
+<h3 id="automatic-query-optimization">Automatic Query Optimization<a class="headerlink" href="#automatic-query-optimization" title="Permanent link">&para;</a></h3>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-48-1"><a id="__codelineno-48-1" name="__codelineno-48-1" href="#__codelineno-48-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">Article</span><span class="p">(</span><span class="n">ModelSerializer</span><span class="p">):</span>
 </span><span id="__span-48-2"><a id="__codelineno-48-2" name="__codelineno-48-2" href="#__codelineno-48-2"></a>    <span class="n">author</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">ForeignKey</span><span class="p">(</span><span class="n">User</span><span class="p">,</span> <span class="n">on_delete</span><span class="o">=</span><span class="n">models</span><span class="o">.</span><span class="n">CASCADE</span><span class="p">)</span>
 </span><span id="__span-48-3"><a id="__codelineno-48-3" name="__codelineno-48-3" href="#__codelineno-48-3"></a>    <span class="n">category</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">ForeignKey</span><span class="p">(</span><span class="n">Category</span><span class="p">,</span> <span class="n">on_delete</span><span class="o">=</span><span class="n">models</span><span class="o">.</span><span class="n">SET_NULL</span><span class="p">,</span> <span class="n">null</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
@@ -2783,7 +2691,7 @@
 </span><span id="__span-48-17"><a id="__codelineno-48-17" name="__codelineno-48-17" href="#__codelineno-48-17"></a><span class="n">articles</span> <span class="o">=</span> <span class="k">await</span> <span class="n">util</span><span class="o">.</span><span class="n">get_object</span><span class="p">(</span><span class="n">request</span><span class="p">)</span>
 </span><span id="__span-48-18"><a id="__codelineno-48-18" name="__codelineno-48-18" href="#__codelineno-48-18"></a><span class="c1"># Automatically adds select_related and prefetch_related</span>
 </span></code></pre></div>
-<h3 id="manual-optimization"><a class="toclink" href="#manual-optimization">Manual Optimization</a></h3>
+<h3 id="manual-optimization">Manual Optimization<a class="headerlink" href="#manual-optimization" title="Permanent link">&para;</a></h3>
 <p>For complex scenarios, override in ModelSerializer:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-49-1"><a id="__codelineno-49-1" name="__codelineno-49-1" href="#__codelineno-49-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">Article</span><span class="p">(</span><span class="n">ModelSerializer</span><span class="p">):</span>
 </span><span id="__span-49-2"><a id="__codelineno-49-2" name="__codelineno-49-2" href="#__codelineno-49-2"></a>    <span class="nd">@classmethod</span>
@@ -2801,7 +2709,7 @@
 </span><span id="__span-49-14"><a id="__codelineno-49-14" name="__codelineno-49-14" href="#__codelineno-49-14"></a>            <span class="s1">&#39;category__name&#39;</span>
 </span><span id="__span-49-15"><a id="__codelineno-49-15" name="__codelineno-49-15" href="#__codelineno-49-15"></a>        <span class="p">)</span>
 </span></code></pre></div>
-<h2 id="integration-with-apiviewset"><a class="toclink" href="#integration-with-apiviewset">Integration with APIViewSet</a></h2>
+<h2 id="integration-with-apiviewset">Integration with APIViewSet<a class="headerlink" href="#integration-with-apiviewset" title="Permanent link">&para;</a></h2>
 <p>ModelUtil is automatically used by APIViewSet:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-50-1"><a id="__codelineno-50-1" name="__codelineno-50-1" href="#__codelineno-50-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ninja_aio.views</span><span class="w"> </span><span class="kn">import</span> <span class="n">APIViewSet</span>
 </span><span id="__span-50-2"><a id="__codelineno-50-2" name="__codelineno-50-2" href="#__codelineno-50-2"></a>
@@ -2812,7 +2720,7 @@
 </span><span id="__span-50-7"><a id="__codelineno-50-7" name="__codelineno-50-7" href="#__codelineno-50-7"></a>    <span class="c1"># Internally creates ModelUtil(User)</span>
 </span><span id="__span-50-8"><a id="__codelineno-50-8" name="__codelineno-50-8" href="#__codelineno-50-8"></a>    <span class="c1"># All CRUD operations use ModelUtil methods</span>
 </span></code></pre></div>
-<h2 id="complete-example"><a class="toclink" href="#complete-example">Complete Example</a></h2>
+<h2 id="complete-example">Complete Example<a class="headerlink" href="#complete-example" title="Permanent link">&para;</a></h2>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-51-1"><a id="__codelineno-51-1" name="__codelineno-51-1" href="#__codelineno-51-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">django.db</span><span class="w"> </span><span class="kn">import</span> <span class="n">models</span>
 </span><span id="__span-51-2"><a id="__codelineno-51-2" name="__codelineno-51-2" href="#__codelineno-51-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ninja_aio.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModelSerializer</span><span class="p">,</span> <span class="n">ModelUtil</span>
 </span><span id="__span-51-3"><a id="__codelineno-51-3" name="__codelineno-51-3" href="#__codelineno-51-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ninja</span><span class="w"> </span><span class="kn">import</span> <span class="n">Schema</span>
@@ -2888,7 +2796,7 @@
 </span><span id="__span-51-73"><a id="__codelineno-51-73" name="__codelineno-51-73" href="#__codelineno-51-73"></a>    <span class="c1"># Delete</span>
 </span><span id="__span-51-74"><a id="__codelineno-51-74" name="__codelineno-51-74" href="#__codelineno-51-74"></a>    <span class="k">await</span> <span class="n">util</span><span class="o">.</span><span class="n">delete_s</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="n">created</span><span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">])</span>
 </span></code></pre></div>
-<h2 id="best-practices"><a class="toclink" href="#best-practices">Best Practices</a></h2>
+<h2 id="best-practices">Best Practices<a class="headerlink" href="#best-practices" title="Permanent link">&para;</a></h2>
 <ol>
 <li>
 <p><strong>Always use with async views:</strong>
@@ -2932,7 +2840,7 @@
 </span></code></pre></div></p>
 </li>
 </ol>
-<h2 id="see-also"><a class="toclink" href="#see-also">See Also</a></h2>
+<h2 id="see-also">See Also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="../model_serializer/">Model Serializer</a> - Define schemas on models</li>
 <li><a href="../../views/api_view_set/">API ViewSet</a> - High-level CRUD views using ModelUtil</li>
@@ -2944,6 +2852,27 @@
 
 
 
+  
+    
+  
+  
+
+
+  <aside class="md-source-file">
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Last update">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="October 26, 2025 21:50:46 UTC">October 26, 2025</span>
+  </span>
+
+    
+    
+    
+    
+  </aside>
 
 
 
@@ -2954,12 +2883,60 @@
             </div>
           
           
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
 <script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
         </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
         
       </main>
       
         <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../model_serializer/" class="md-footer__link md-footer__link--prev" aria-label="Previous: ModelSerializer">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                ModelSerializer
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../../authentication/" class="md-footer__link md-footer__link--next" aria-label="Next: Authentication">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Authentication
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
   
   <div class="md-footer-meta md-typeset">
     <div class="md-footer-meta__inner md-grid">
@@ -2969,6 +2946,33 @@
     Made with
     <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
       Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/caspel26/django-ninja-aio-crud" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://pypi.org/project/django-ninja-aio-crud/" target="_blank" rel="noopener" title="pypi.org" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.8 200.5c-7.7-30.9-22.3-54.2-53.4-54.2h-40.1v47.4c0 36.8-31.2 67.8-66.8 67.8H172.7c-29.2 0-53.4 25-53.4 54.3v101.8c0 29 25.2 46 53.4 54.3 33.8 9.9 66.3 11.7 106.8 0 26.9-7.8 53.4-23.5 53.4-54.3v-40.7H226.2v-13.6h160.2c31.1 0 42.6-21.7 53.4-54.2 11.2-33.5 10.7-65.7 0-108.6M286.2 444.7a20.4 20.4 0 1 1 0-40.7 20.4 20.4 0 1 1 0 40.7M167.8 248.1h106.8c29.7 0 53.4-24.5 53.4-54.3V91.9c0-29-24.4-50.7-53.4-55.6-35.8-5.9-74.7-5.6-106.8.1-45.2 8-53.4 24.7-53.4 55.6v40.7h106.9v13.6h-147c-31.1 0-58.3 18.7-66.8 54.2-9.8 40.7-10.2 66.1 0 108.6 7.6 31.6 25.7 54.2 56.8 54.2H101v-48.8c0-35.3 30.5-66.4 66.8-66.4m-6.6-183.4a20.4 20.4 0 1 1 0 40.8 20.4 20.4 0 1 1 0-40.8"/></svg>
     </a>
   
 </div>
@@ -2985,7 +2989,7 @@
     
     
       
-      <script id="__config" type="application/json">{"base": "../../..", "features": ["navigation.tabs", "toc.integrate"], "search": "../../../assets/javascripts/workers/search.973d3a69.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"base": "../../..", "features": ["navigation.tabs", "navigation.top", "navigation.footer", "toc.integrate", "content.code.copy", "content.tabs.link", "content.tooltips", "search.suggest", "search.highlight"], "search": "../../../assets/javascripts/workers/search.973d3a69.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
       <script src="../../../assets/javascripts/bundle.f55a23d4.min.js"></script>
