@@ -420,13 +420,10 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
             the caller signals an intentional null (subject to model constraints).
         customs : list[tuple[str, type, Any]]
             Non-model / synthetic input fields driving creation logic (e.g.,
-            password confirmation, initial related IDs, flags). Each tuple:
-                (name, python_type, default_value)
-            Resolution order (implementation-dependent):
-                1. Value provided by the incoming payload.
-                2. If default_value is callable -> invoked (passing model class or
-                   context if supported).
-                3. Literal default_value.
+            password confirmation, initial related IDs, flags). Each tuple can be:
+                (name, python_type)                -> REQUIRED (no default; enforced)
+                (name, python_type, default_value) -> Optional; default applied if not provided
+            If default_value is callable it may be invoked (implementation-defined).
             These values are typically consumed inside custom_actions or post_create
             hooks and are NOT persisted directly unless you do so manually.
         excludes : list[str]
@@ -466,14 +463,14 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
             Model field names to force-exclude even if they would otherwise be included
             (e.g., sensitive columns like password, secrets, internal flags).
         customs : list[tuple[str, type, Any]]
-            Additional computed / synthetic attributes to append to the serialized
-            output. Each tuple is:
-                (attribute_name, python_type, default_value)
-            The attribute is resolved in the following preferred order (implementation
-            dependent):
-                1. Attribute / property on the model instance with that name.
-                2. Callable (if the default_value is a callable) invoked to produce a value.
-                3. Fallback to the literal default_value.
+            Additional computed / synthetic attributes. Each tuple can be:
+                (attribute_name, python_type)                  -> value resolved; if missing and no
+                                                                 resolvable attribute, validation may fail
+                (attribute_name, python_type, default_value)   -> fallback default (callable or literal)
+            Resolution order:
+              1. Attribute / property on the instance.
+              2. If default_value is callable -> invoked.
+              3. Literal default_value (if provided).
             Example:
                 customs = [
                     ("full_name", str, lambda obj: f"{obj.first_name} {obj.last_name}".strip())
@@ -541,7 +538,8 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
         customs : list[tuple[str, type, Any]]
             Non-model / instruction fields guiding update behavior (e.g., "rotate_key",
             "regenerate_token"). Each tuple:
-                (name, python_type, default_value)
+                (name, python_type)                -> required flag/instruction
+                (name, python_type, default_value) -> optional with fallback (callable or literal)
             Resolution order mirrors CreateSerializer (payload > callable > literal).
             Typically consumed in custom_actions before or after saving.
         excludes : list[str]
@@ -811,10 +809,10 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
         """
         Normalize declared custom field specs into (name, py_type, default) triples.
 
-        Accepts items shaped as:
-          (name, py_type, default) -> kept as-is
-          (name, py_type)          -> default filled with Ellipsis (meaning "no default" so required)
-        Raises ValueError for any other arity.
+        Accepted tuple shapes:
+          (name, py_type, default) -> keeps provided default (callable or literal)
+          (name, py_type)          -> marks as required (default = Ellipsis)
+        Any other arity raises ValueError.
         """
         raw_customs = cls._get_fields(s_type, "customs") or []
         normalized: list[tuple[str, type, Any]] = []
