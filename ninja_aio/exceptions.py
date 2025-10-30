@@ -42,7 +42,7 @@ class NotFoundError(BaseException):
 
     def __init__(self, model: Model, details=None):
         super().__init__(
-            error={model._meta.verbose_name: self.error},
+            error={model._meta.verbose_name.replace(" ", "_"): self.error},
             status_code=self.status_code,
             details=details,
         )
