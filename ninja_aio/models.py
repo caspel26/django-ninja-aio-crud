@@ -355,8 +355,8 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
     ```python
     from django.db import models
     from ninja_aio.models import ModelSerializer
-    
-    
+
+
     class User(ModelSerializer):
         username = models.CharField(max_length=150, unique=True)
         email = models.EmailField(unique=True)
@@ -376,14 +376,14 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
     ```python
     from ninja import ModelSchema
     from api.models import User
-    
-    
+
+
     class UserIn(ModelSchema):
         class Meta:
             model = User
             fields = ["username", "email"]
-    
-    
+
+
     class UserOut(ModelSchema):
         class Meta:
             model = User
@@ -394,6 +394,7 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
     Centralizes serialization intent on the model, reducing boilerplate and keeping
     API and model definitions consistent.
     """
+
     class Meta:
         abstract = True
 
@@ -446,6 +447,7 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
             2. Build a schema where fields are required, optionals are Optional[…],
                and customs become additional inputs not mapped directly to the model.
         """
+
         fields: list[str] = []
         customs: list[tuple[str, type, Any]] = []
         optionals: list[tuple[str, type]] = []
@@ -480,18 +482,18 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
         Conceptual Equivalent (Ninja example)
         -------------------------------------
         Using django-ninja you might otherwise write:
-        
+
         ```python
         from ninja import ModelSchema
         from api.models import User
 
 
-        class UserOut(ModelSchema):            
+        class UserOut(ModelSchema):
             class Meta:
                 model = User
                 model_fields = ["id", "username", "email"]
         ```
-        
+
         This ReadSerializer object centralizes the same intent in a lightweight,
         framework-agnostic configuration primitive that can be inspected to build
         schemas dynamically.
@@ -513,6 +515,7 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
             3. Generate a Pydantic / Ninja schema class at runtime.
         This separation enables cleaner unit testing (the config is pure data) and
         reduces coupling to a specific serialization framework."""
+
         fields: list[str] = []
         excludes: list[str] = []
         customs: list[tuple[str, type, Any]] = []
@@ -559,6 +562,7 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
             3. Inject customs as additional validated inputs.
             4. Enforce excludes by rejecting them if present in incoming data.
         """
+
         fields: list[str] = []
         customs: list[tuple[str, type, Any]] = []
         optionals: list[tuple[str, type]] = []
@@ -803,8 +807,32 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
         ) or cls._is_special_field("update", field, "optionals")
 
     @classmethod
-    def get_custom_fields(cls, s_type: type[S_TYPES]) -> list[tuple]:
-        return cls._get_fields(s_type, "customs")
+    def get_custom_fields(cls, s_type: type[S_TYPES]) -> list[tuple[str, type, Any]]:
+        """
+        Normalize declared custom field specs into (name, py_type, default) triples.
+
+        Accepts items shaped as:
+          (name, py_type, default) -> kept as-is
+          (name, py_type)          -> default filled with Ellipsis (meaning "no default" so required)
+        Raises ValueError for any other arity.
+        """
+        raw_customs = cls._get_fields(s_type, "customs") or []
+        normalized: list[tuple[str, type, Any]] = []
+        for spec in raw_customs:
+            if not isinstance(spec, tuple):
+                raise ValueError(f"Custom field spec must be a tuple, got {type(spec)}")
+            match len(spec):
+                case 3:
+                    name, py_type, default = spec
+                case 2:
+                    name, py_type = spec
+                    default = ...
+                case _:
+                    raise ValueError(
+                        f"Custom field tuple must have length 2 or 3 (name, type[, default]); got {len(spec)}"
+                    )
+            normalized.append((name, py_type, default))
+        return normalized
 
     @classmethod
     def get_optional_fields(cls, s_type: type[S_TYPES]):
