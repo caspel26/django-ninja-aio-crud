@@ -1,7 +1,9 @@
 site_name: Django Ninja Aio CRUD
-site_url: https://caspel26.github.io/django-ninja-aio-crud/
+site_description: Async CRUD utilities for Django Ninja with auth, filtering, pagination.
+site_url: https://django-ninja-aio.com/
 repo_name: caspel26/django-ninja-aio-crud
 repo_url: https://github.com/caspel26/django-ninja-aio-crud
+use_directory_urls: true
 
 nav:
   - Home: index.md
@@ -15,56 +17,130 @@ nav:
     - 'Step 4: Add Filtering & Pagination': tutorial/filtering.md
   - API Reference:
     - Views:
-      - 'APIView': api/views/api_view.md
-      - 'APIViewSet': api/views/api_view_set.md
+      - APIView: api/views/api_view.md
+      - APIViewSet: api/views/api_view_set.md
     - Models:
-      - 'ModelSerializer': api/models/model_serializer.md
-      - 'ModelUtil': api/models/model_util.md
-    - Authentication:
-      - 'Auth Classes': api/authentication.md
-    - Pagination:
-      - 'Pagination Classes': api/pagination.md
+      - ModelSerializer: api/models/model_serializer.md
+      - ModelUtil: api/models/model_util.md
+    - Authentication: api/authentication.md
+    - Pagination: api/pagination.md
   - Contributing: contributing.md
 
 theme:
   name: material
+  language: en
+  logo: images/logo.png
+  favicon: images/favicon.ico
   palette:
     - media: "(prefers-color-scheme)"
-      primary: deep-purple
       toggle:
         icon: material/brightness-auto
-        name: Switch to light mode
+        name: Auto
+      primary: deep-purple
+      accent: deep-purple
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: deep-purple
       toggle:
         icon: material/weather-night
-        name: Switch to dark mode
+        name: Dark
+      primary: deep-purple
+      accent: deep-purple
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: deep-purple
       toggle:
         icon: material/weather-sunny
-        name: Switch to light mode
-  logo: images/logo.png
+        name: Light
+      primary: deep-purple
+      accent: deep-purple
   features:
+    - navigation.instant
+    - navigation.tracking
     - navigation.tabs
+    - navigation.top
+    - navigation.footer
+    - navigation.sections
+    - navigation.indexes
+    - header.autohide
+    - toc.follow
     - toc.integrate
+    - content.code.copy
+    - content.code.select
+    - content.code.annotate
+    - content.tabs.link
+    - content.tooltips
+    - content.footnote.tooltips
+    - search.suggest
+    - search.highlight
+    - search.share
+
+extra:
+  project:
+    name: django-ninja-aio-crud
+    pypi: django-ninja-aio-crud
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/caspel26/django-ninja-aio-crud
+      name: GitHub
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/django-ninja-aio-crud/
+      name: PyPI
+  analytics:
+    provider: google
+    property: UA-XXXXXXX-X  # replace or remove
+  version:
+    default: latest  # useful if later using mike
+
+plugins:
+  - search:
+      separator: '[\\s\\-]+'
+  - autorefs
+  - section-index
+  - mkdocstrings:
+      handlers:
+        python:
+          setup_commands:
+            - import sys, os
+            - sys.path.insert(0, os.path.abspath(".."))
+          options:
+            show_source: true
+            docstring_style: google
+            separate_signature: true
+            show_if_no_docstring: true
+            merge_init_into_class: true
+            members_order: source
+            filters:
+              - "!^__"
+            inherited_members: true
+            signature_crossrefs: true
 
 markdown_extensions:
   - admonition
-  - codehilite
+  - attr_list
+  - def_list
   - footnotes
   - meta
   - toc:
-      anchorlink: true
+      permalink: true
   - pymdownx.highlight:
       anchor_linenums: true
       line_spans: __span
       pygments_lang_class: true
+      auto_title: true
   - pymdownx.inlinehilite
   - pymdownx.snippets
   - pymdownx.superfences
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.magiclink:
+      repo_url_shorthand: true
+      user: caspel26
+      repo: django-ninja-aio-crud
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+  - pymdownx.caret
+  - pymdownx.mark
 
 extra_css:
   - extra.css

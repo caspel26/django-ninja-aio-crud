@@ -292,7 +292,7 @@ If you find Django Ninja Aio CRUD useful, consider supporting the project:
 
 ## 🔗 Links
 
-- **Documentation:** [https://caspel26.github.io/django-ninja-aio-crud/](https://caspel26.github.io/django-ninja-aio-crud/)
+- **Documentation:** [https://django-ninja-aio.com](https://django-ninja-aio.com)
 - **GitHub:** [https://github.com/caspel26/django-ninja-aio-crud](https://github.com/caspel26/django-ninja-aio-crud)
 - **PyPI:** [https://pypi.org/project/django-ninja-aio-crud/](https://pypi.org/project/django-ninja-aio-crud/)
 - **Django Ninja:** [https://django-ninja.dev/](https://django-ninja.dev/)

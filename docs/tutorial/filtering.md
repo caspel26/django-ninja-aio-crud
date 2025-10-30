@@ -14,6 +14,7 @@ In this final step, you'll learn how to implement advanced filtering, searching,
 ## Prerequisites
 
 Make sure you've completed:
+
 - [Step 1: Define Your Model](model.md)
 - [Step 2: Create CRUD Views](crud.md)
 - [Step 3: Add Authentication](authentication.md)
@@ -30,26 +31,26 @@ from .models import Article
 class ArticleViewSet(APIViewSet):
     model = Article
     api = api
-    
+
     query_params = {
         "is_published": (bool, None),
         "author": (int, None),
         "category": (int, None),
     }
-    
+
     async def query_params_handler(self, queryset, filters):
         # Filter by published status
         if filters.get("is_published") is not None:
             queryset = queryset.filter(is_published=filters["is_published"])
-        
+
         # Filter by author ID
         if filters.get("author"):
             queryset = queryset.filter(author_id=filters["author"])
-        
+
         # Filter by category ID
         if filters.get("category"):
             queryset = queryset.filter(category_id=filters["category"])
-        
+
         return queryset
 
 
@@ -80,33 +81,33 @@ from datetime import datetime
 class ArticleViewSet(APIViewSet):
     model = Article
     api = api
-    
+
     query_params = {
         "created_after": (str, None),   # ISO date string
         "created_before": (str, None),
         "published_after": (str, None),
         "published_before": (str, None),
     }
-    
+
     async def query_params_handler(self, queryset, filters):
         # Filter by creation date
         if filters.get("created_after"):
             date = datetime.fromisoformat(filters["created_after"])
             queryset = queryset.filter(created_at__gte=date)
-        
+
         if filters.get("created_before"):
             date = datetime.fromisoformat(filters["created_before"])
             queryset = queryset.filter(created_at__lte=date)
-        
+
         # Filter by publication date
         if filters.get("published_after"):
             date = datetime.fromisoformat(filters["published_after"])
             queryset = queryset.filter(published_at__gte=date)
-        
+
         if filters.get("published_before"):
             date = datetime.fromisoformat(filters["published_before"])
             queryset = queryset.filter(published_at__lte=date)
-        
+
         return queryset
 ```
 
@@ -129,29 +130,29 @@ GET /api/article/?created_after=2024-01-15
 class ArticleViewSet(APIViewSet):
     model = Article
     api = api
-    
+
     query_params = {
         "min_views": (int, None),
         "max_views": (int, None),
         "min_rating": (float, None),
         "max_rating": (float, None),
     }
-    
+
     async def query_params_handler(self, queryset, filters):
         # Filter by views
         if filters.get("min_views"):
             queryset = queryset.filter(views__gte=filters["min_views"])
-        
+
         if filters.get("max_views"):
             queryset = queryset.filter(views__lte=filters["max_views"])
-        
+
         # Filter by rating
         if filters.get("min_rating"):
             queryset = queryset.filter(rating__gte=filters["min_rating"])
-        
+
         if filters.get("max_rating"):
             queryset = queryset.filter(rating__lte=filters["max_rating"])
-        
+
         return queryset
 ```
 
@@ -178,11 +179,11 @@ from django.db.models import Q
 class ArticleViewSet(APIViewSet):
     model = Article
     api = api
-    
+
     query_params = {
         "search": (str, None),
     }
-    
+
     async def query_params_handler(self, queryset, filters):
         if filters.get("search"):
             search_term = filters["search"]
@@ -191,7 +192,7 @@ class ArticleViewSet(APIViewSet):
                 Q(content__icontains=search_term) |
                 Q(excerpt__icontains=search_term)
             )
-        
+
         return queryset
 ```
 
@@ -215,28 +216,28 @@ from django.contrib.postgres.search import SearchVector, SearchQuery, SearchRank
 class ArticleViewSet(APIViewSet):
     model = Article
     api = api
-    
+
     query_params = {
         "search": (str, None),
     }
-    
+
     async def query_params_handler(self, queryset, filters):
         if filters.get("search"):
             search_term = filters["search"]
-            
+
             # Create search vector
             vector = SearchVector('title', weight='A') + \
                      SearchVector('content', weight='B')
-            
+
             query = SearchQuery(search_term)
-            
+
             # Filter and rank by relevance
             queryset = queryset.annotate(
                 rank=SearchRank(vector, query)
             ).filter(
                 rank__gte=0.1
             ).order_by('-rank')
-        
+
         return queryset
 ```
 
@@ -248,16 +249,16 @@ from django.contrib.postgres.search import SearchVector, SearchQuery, SearchHead
 class ArticleViewSet(APIViewSet):
     model = Article
     api = api
-    
+
     query_params = {
         "search": (str, None),
     }
-    
+
     async def query_params_handler(self, queryset, filters):
         if filters.get("search"):
             search_term = filters["search"]
             query = SearchQuery(search_term)
-            
+
             # Add highlighted excerpts
             queryset = queryset.annotate(
                 headline=SearchHeadline(
@@ -268,7 +269,7 @@ class ArticleViewSet(APIViewSet):
                     max_words=50,
                 )
             )
-        
+
         return queryset
 ```
 
@@ -280,14 +281,14 @@ class ArticleViewSet(APIViewSet):
 class ArticleViewSet(APIViewSet):
     model = Article
     api = api
-    
+
     query_params = {
         "ordering": (str, "-created_at"),  # Default: newest first
     }
-    
+
     async def query_params_handler(self, queryset, filters):
         ordering = filters.get("ordering", "-created_at")
-        
+
         # Whitelist allowed ordering fields
         valid_orderings = [
             "created_at", "-created_at",
@@ -297,10 +298,10 @@ class ArticleViewSet(APIViewSet):
             "rating", "-rating",
             "published_at", "-published_at",
         ]
-        
+
         if ordering in valid_orderings:
             queryset = queryset.order_by(ordering)
-        
+
         return queryset
 ```
 
@@ -329,32 +330,32 @@ GET /api/article/?ordering=-rating
 class ArticleViewSet(APIViewSet):
     model = Article
     api = api
-    
+
     query_params = {
         "ordering": (str, "-created_at,title"),  # Multiple fields
     }
-    
+
     async def query_params_handler(self, queryset, filters):
         ordering = filters.get("ordering", "-created_at,title")
-        
+
         # Parse ordering string
         order_fields = ordering.split(',')
-        
+
         # Validate each field
         valid_fields = {
             "created_at", "-created_at",
             "title", "-title",
             "views", "-views",
         }
-        
+
         validated_fields = [
             field for field in order_fields
             if field in valid_fields
         ]
-        
+
         if validated_fields:
             queryset = queryset.order_by(*validated_fields)
-        
+
         return queryset
 ```
 
@@ -376,32 +377,32 @@ GET /api/article/?ordering=-views,-rating
 class ArticleViewSet(APIViewSet):
     model = Article
     api = api
-    
+
     query_params = {
         "author_username": (str, None),
         "category_slug": (str, None),
         "tag_name": (str, None),
     }
-    
+
     async def query_params_handler(self, queryset, filters):
         # Filter by author username
         if filters.get("author_username"):
             queryset = queryset.filter(
                 author__username__iexact=filters["author_username"]
             )
-        
+
         # Filter by category slug
         if filters.get("category_slug"):
             queryset = queryset.filter(
                 category__slug=filters["category_slug"]
             )
-        
+
         # Filter by tag name
         if filters.get("tag_name"):
             queryset = queryset.filter(
                 tags__name__iexact=filters["tag_name"]
             )
-        
+
         return queryset
 ```
 
@@ -424,22 +425,22 @@ GET /api/article/?tag_name=python
 class ArticleViewSet(APIViewSet):
     model = Article
     api = api
-    
+
     query_params = {
         "tags": (str, None),  # Comma-separated tag IDs or names
         "tags_mode": (str, "any"),  # "any" or "all"
     }
-    
+
     async def query_params_handler(self, queryset, filters):
         if filters.get("tags"):
             tag_list = filters["tags"].split(',')
             mode = filters.get("tags_mode", "any")
-            
+
             # Check if tags are IDs or names
             if tag_list[0].isdigit():
                 # Filter by tag IDs
                 tag_ids = [int(t) for t in tag_list]
-                
+
                 if mode == "all":
                     # Must have ALL tags
                     for tag_id in tag_ids:
@@ -456,7 +457,7 @@ class ArticleViewSet(APIViewSet):
                     queryset = queryset.filter(
                         tags__name__in=tag_list
                     ).distinct()
-        
+
         return queryset
 ```
 
@@ -479,27 +480,27 @@ GET /api/article/?tags=1,2,3&tags_mode=all
 class ArticleViewSet(APIViewSet):
     model = Article
     api = api
-    
+
     query_params = {
         "exclude_author": (int, None),
         "exclude_category": (int, None),
         "exclude_ids": (str, None),  # Comma-separated IDs
     }
-    
+
     async def query_params_handler(self, queryset, filters):
         # Exclude specific author
         if filters.get("exclude_author"):
             queryset = queryset.exclude(author_id=filters["exclude_author"])
-        
+
         # Exclude specific category
         if filters.get("exclude_category"):
             queryset = queryset.exclude(category_id=filters["exclude_category"])
-        
+
         # Exclude specific article IDs
         if filters.get("exclude_ids"):
             ids = [int(id) for id in filters["exclude_ids"].split(',')]
             queryset = queryset.exclude(id__in=ids)
-        
+
         return queryset
 ```
 
@@ -553,7 +554,7 @@ GET /api/article/?page=2&page_size=20
 ### Custom Pagination
 
 ```python
-from ninja_aio.pagination import PageNumberPagination
+from ninja.pagination import PageNumberPagination
 
 
 class CustomPagination(PageNumberPagination):
@@ -585,7 +586,7 @@ class ConditionalPagination(PageNumberPagination):
             async for item in queryset:
                 items.append(item)
             return {"results": items}
-        
+
         return await super().apaginate_queryset(queryset, pagination, request, **params)
 ```
 
@@ -597,49 +598,49 @@ Create reusable filter combinations:
 class ArticleViewSet(APIViewSet):
     model = Article
     api = api
-    
+
     query_params = {
         "preset": (str, None),
         # ... other filters
     }
-    
+
     async def query_params_handler(self, queryset, filters):
         preset = filters.get("preset")
-        
+
         # Apply preset filters
         if preset == "trending":
             # Popular recent articles
             from django.utils import timezone
             from datetime import timedelta
-            
+
             last_week = timezone.now() - timedelta(days=7)
             queryset = queryset.filter(
                 created_at__gte=last_week,
                 is_published=True
             ).order_by('-views', '-rating')
-        
+
         elif preset == "featured":
             # Featured articles
             queryset = queryset.filter(
                 is_published=True,
                 is_featured=True
             ).order_by('-featured_at')
-        
+
         elif preset == "recent":
             # Recently published
             queryset = queryset.filter(
                 is_published=True
             ).order_by('-published_at')[:20]
-        
+
         elif preset == "popular":
             # All-time most viewed
             queryset = queryset.filter(
                 is_published=True
             ).order_by('-views')[:50]
-        
+
         # Apply other filters
         # ...
-        
+
         return queryset
 ```
 
@@ -665,7 +666,7 @@ Optimize queries with foreign keys:
 ```python
 class Article(ModelSerializer):
     # ... fields ...
-    
+
     @classmethod
     async def queryset_request(cls, request):
         # Always include related objects
@@ -693,7 +694,7 @@ class Article(ModelSerializer):
     slug = models.SlugField(unique=True, db_index=True)
     is_published = models.BooleanField(default=False, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
-    
+
     class Meta:
         indexes = [
             models.Index(fields=['-created_at']),
@@ -709,15 +710,15 @@ class Article(ModelSerializer):
 class ArticleViewSet(APIViewSet):
     model = Article
     api = api
-    
+
     async def query_params_handler(self, queryset, filters):
         # Apply filters
         # ...
-        
+
         # Limit results for expensive queries
         if filters.get("search"):
             queryset = queryset[:1000]  # Max 1000 results for search
-        
+
         return queryset
 ```
 
@@ -729,7 +730,7 @@ Here's a comprehensive filtering implementation:
 # views.py
 from ninja_aio import NinjaAIO
 from ninja_aio.views import APIViewSet
-from ninja_aio.pagination import PageNumberPagination
+from ninja.pagination import PageNumberPagination
 from django.db.models import Q
 from datetime import datetime
 from .models import Article
@@ -746,37 +747,37 @@ class ArticleViewSet(APIViewSet):
     model = Article
     api = api
     pagination_class = ArticlePagination
-    
+
     query_params = {
         # Basic filters
         "is_published": (bool, None),
         "author": (int, None),
         "category": (int, None),
-        
+
         # Text search
         "search": (str, None),
-        
+
         # Date range
         "created_after": (str, None),
         "created_before": (str, None),
-        
+
         # Numeric range
         "min_views": (int, None),
         "max_views": (int, None),
-        
+
         # Related filters
         "author_username": (str, None),
         "category_slug": (str, None),
         "tags": (str, None),
         "tags_mode": (str, "any"),
-        
+
         # Ordering
         "ordering": (str, "-created_at"),
-        
+
         # Presets
         "preset": (str, None),
     }
-    
+
     async def query_params_handler(self, queryset, filters):
         # Apply preset first
         preset = filters.get("preset")
@@ -790,11 +791,11 @@ class ArticleViewSet(APIViewSet):
             )
         elif preset == "popular":
             queryset = queryset.filter(is_published=True)
-        
+
         # Published status
         if filters.get("is_published") is not None:
             queryset = queryset.filter(is_published=filters["is_published"])
-        
+
         # Author filter
         if filters.get("author"):
             queryset = queryset.filter(author_id=filters["author"])
@@ -802,18 +803,18 @@ class ArticleViewSet(APIViewSet):
             queryset = queryset.filter(
                 author__username__iexact=filters["author_username"]
             )
-        
+
         # Category filter
         if filters.get("category"):
             queryset = queryset.filter(category_id=filters["category"])
         elif filters.get("category_slug"):
             queryset = queryset.filter(category__slug=filters["category_slug"])
-        
+
         # Tags filter
         if filters.get("tags"):
             tag_list = filters["tags"].split(',')
             mode = filters.get("tags_mode", "any")
-            
+
             if mode == "all":
                 for tag in tag_list:
                     if tag.isdigit():
@@ -826,7 +827,7 @@ class ArticleViewSet(APIViewSet):
                     queryset = queryset.filter(tags__id__in=tag_ids).distinct()
                 else:
                     queryset = queryset.filter(tags__name__in=tag_list).distinct()
-        
+
         # Search
         if filters.get("search"):
             search_term = filters["search"]
@@ -834,23 +835,23 @@ class ArticleViewSet(APIViewSet):
                 Q(title__icontains=search_term) |
                 Q(content__icontains=search_term)
             )
-        
+
         # Date range
         if filters.get("created_after"):
             date = datetime.fromisoformat(filters["created_after"])
             queryset = queryset.filter(created_at__gte=date)
-        
+
         if filters.get("created_before"):
             date = datetime.fromisoformat(filters["created_before"])
             queryset = queryset.filter(created_at__lte=date)
-        
+
         # Views range
         if filters.get("min_views"):
             queryset = queryset.filter(views__gte=filters["min_views"])
-        
+
         if filters.get("max_views"):
             queryset = queryset.filter(views__lte=filters["max_views"])
-        
+
         # Ordering
         ordering = filters.get("ordering", "-created_at")
         valid_orderings = [
@@ -859,14 +860,14 @@ class ArticleViewSet(APIViewSet):
             "views", "-views",
             "published_at", "-published_at",
         ]
-        
+
         if ordering in valid_orderings:
             queryset = queryset.order_by(ordering)
         elif preset == "trending":
             queryset = queryset.order_by('-views', '-rating')
         elif preset == "popular":
             queryset = queryset.order_by('-views')
-        
+
         return queryset
 
 
