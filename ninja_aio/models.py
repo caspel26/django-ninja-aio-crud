@@ -355,8 +355,8 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
     ```python
     from django.db import models
     from ninja_aio.models import ModelSerializer
-    
-    
+
+
     class User(ModelSerializer):
         username = models.CharField(max_length=150, unique=True)
         email = models.EmailField(unique=True)
@@ -376,14 +376,14 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
     ```python
     from ninja import ModelSchema
     from api.models import User
-    
-    
+
+
     class UserIn(ModelSchema):
         class Meta:
             model = User
             fields = ["username", "email"]
-    
-    
+
+
     class UserOut(ModelSchema):
         class Meta:
             model = User
@@ -394,6 +394,7 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
     Centralizes serialization intent on the model, reducing boilerplate and keeping
     API and model definitions consistent.
     """
+
     class Meta:
         abstract = True
 
@@ -419,13 +420,10 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
             the caller signals an intentional null (subject to model constraints).
         customs : list[tuple[str, type, Any]]
             Non-model / synthetic input fields driving creation logic (e.g.,
-            password confirmation, initial related IDs, flags). Each tuple:
-                (name, python_type, default_value)
-            Resolution order (implementation-dependent):
-                1. Value provided by the incoming payload.
-                2. If default_value is callable -> invoked (passing model class or
-                   context if supported).
-                3. Literal default_value.
+            password confirmation, initial related IDs, flags). Each tuple can be:
+                (name, python_type)                -> REQUIRED (no default; enforced)
+                (name, python_type, default_value) -> Optional; default applied if not provided
+            If default_value is callable it may be invoked (implementation-defined).
             These values are typically consumed inside custom_actions or post_create
             hooks and are NOT persisted directly unless you do so manually.
         excludes : list[str]
@@ -446,6 +444,7 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
             2. Build a schema where fields are required, optionals are Optional[…],
                and customs become additional inputs not mapped directly to the model.
         """
+
         fields: list[str] = []
         customs: list[tuple[str, type, Any]] = []
         optionals: list[tuple[str, type]] = []
@@ -464,14 +463,14 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
             Model field names to force-exclude even if they would otherwise be included
             (e.g., sensitive columns like password, secrets, internal flags).
         customs : list[tuple[str, type, Any]]
-            Additional computed / synthetic attributes to append to the serialized
-            output. Each tuple is:
-                (attribute_name, python_type, default_value)
-            The attribute is resolved in the following preferred order (implementation
-            dependent):
-                1. Attribute / property on the model instance with that name.
-                2. Callable (if the default_value is a callable) invoked to produce a value.
-                3. Fallback to the literal default_value.
+            Additional computed / synthetic attributes. Each tuple can be:
+                (attribute_name, python_type)                  -> value resolved; if missing and no
+                                                                 resolvable attribute, validation may fail
+                (attribute_name, python_type, default_value)   -> fallback default (callable or literal)
+            Resolution order:
+              1. Attribute / property on the instance.
+              2. If default_value is callable -> invoked.
+              3. Literal default_value (if provided).
             Example:
                 customs = [
                     ("full_name", str, lambda obj: f"{obj.first_name} {obj.last_name}".strip())
@@ -480,18 +479,18 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
         Conceptual Equivalent (Ninja example)
         -------------------------------------
         Using django-ninja you might otherwise write:
-        
+
         ```python
         from ninja import ModelSchema
         from api.models import User
 
 
-        class UserOut(ModelSchema):            
+        class UserOut(ModelSchema):
             class Meta:
                 model = User
                 model_fields = ["id", "username", "email"]
         ```
-        
+
         This ReadSerializer object centralizes the same intent in a lightweight,
         framework-agnostic configuration primitive that can be inspected to build
         schemas dynamically.
@@ -513,6 +512,7 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
             3. Generate a Pydantic / Ninja schema class at runtime.
         This separation enables cleaner unit testing (the config is pure data) and
         reduces coupling to a specific serialization framework."""
+
         fields: list[str] = []
         excludes: list[str] = []
         customs: list[tuple[str, type, Any]] = []
@@ -538,7 +538,8 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
         customs : list[tuple[str, type, Any]]
             Non-model / instruction fields guiding update behavior (e.g., "rotate_key",
             "regenerate_token"). Each tuple:
-                (name, python_type, default_value)
+                (name, python_type)                -> required flag/instruction
+                (name, python_type, default_value) -> optional with fallback (callable or literal)
             Resolution order mirrors CreateSerializer (payload > callable > literal).
             Typically consumed in custom_actions before or after saving.
         excludes : list[str]
@@ -559,6 +560,7 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
             3. Inject customs as additional validated inputs.
             4. Enforce excludes by rejecting them if present in incoming data.
         """
+
         fields: list[str] = []
         customs: list[tuple[str, type, Any]] = []
         optionals: list[tuple[str, type]] = []
@@ -803,8 +805,32 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
         ) or cls._is_special_field("update", field, "optionals")
 
     @classmethod
-    def get_custom_fields(cls, s_type: type[S_TYPES]) -> list[tuple]:
-        return cls._get_fields(s_type, "customs")
+    def get_custom_fields(cls, s_type: type[S_TYPES]) -> list[tuple[str, type, Any]]:
+        """
+        Normalize declared custom field specs into (name, py_type, default) triples.
+
+        Accepted tuple shapes:
+          (name, py_type, default) -> keeps provided default (callable or literal)
+          (name, py_type)          -> marks as required (default = Ellipsis)
+        Any other arity raises ValueError.
+        """
+        raw_customs = cls._get_fields(s_type, "customs") or []
+        normalized: list[tuple[str, type, Any]] = []
+        for spec in raw_customs:
+            if not isinstance(spec, tuple):
+                raise ValueError(f"Custom field spec must be a tuple, got {type(spec)}")
+            match len(spec):
+                case 3:
+                    name, py_type, default = spec
+                case 2:
+                    name, py_type = spec
+                    default = ...
+                case _:
+                    raise ValueError(
+                        f"Custom field tuple must have length 2 or 3 (name, type[, default]); got {len(spec)}"
+                    )
+            normalized.append((name, py_type, default))
+        return normalized
 
     @classmethod
     def get_optional_fields(cls, s_type: type[S_TYPES]):
