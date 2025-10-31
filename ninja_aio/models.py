@@ -262,7 +262,7 @@ class ModelUtil:
     async def _get_field(self, k: str):
         return (await agetattr(self.model, k)).field
 
-    async def _decode_binary(
+    def _decode_binary(
         self, payload: dict, k: str, v: Any, field_obj: models.Field
     ):
         if not isinstance(field_obj, models.BinaryField):
@@ -345,7 +345,7 @@ class ModelUtil:
             if k in skip_keys:
                 continue
             field_obj = await self._get_field(k)
-            await self._decode_binary(payload, k, v, field_obj)
+            self._decode_binary(payload, k, v, field_obj)
             await self._resolve_fk(request, payload, k, v, field_obj)
 
         # Preserve original exclusion semantics (customs if present else optionals)
