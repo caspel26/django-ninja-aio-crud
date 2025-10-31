@@ -259,6 +259,33 @@ class ModelUtil:
                 reverse_rels.append(field_obj.related.name)
         return reverse_rels
 
+    async def _get_field(self, k: str):
+        return (await agetattr(self.model, k)).field
+
+    async def _decode_binary(
+        self, payload: dict, k: str, v: Any, field_obj: models.Field
+    ):
+        if not isinstance(field_obj, models.BinaryField):
+            return
+        try:
+            payload[k] = base64.b64decode(v)
+        except Exception as exc:
+            raise SerializeError({k: ". ".join(exc.args)}, 400)
+
+    async def _resolve_fk(
+        self,
+        request: HttpRequest,
+        payload: dict,
+        k: str,
+        v: Any,
+        field_obj: models.Field,
+    ):
+        if not isinstance(field_obj, models.ForeignKey):
+            return
+        rel_util = ModelUtil(field_obj.related_model)
+        rel = await rel_util.get_object(request, v, with_qs_request=False)
+        payload[k] = rel
+
     async def parse_input_data(self, request: HttpRequest, data: Schema):
         """
         Transform inbound schema data to a model-ready payload.
@@ -287,9 +314,13 @@ class ModelUtil:
             On base64 decoding failure.
         """
         payload = data.model_dump(mode="json")
-        customs = {}
-        optionals = []
-        if isinstance(self.model, ModelSerializerMeta):
+
+        is_serializer = isinstance(self.model, ModelSerializerMeta)
+
+        # Collect custom and optional fields (only if ModelSerializerMeta)
+        customs: dict[str, Any] = {}
+        optionals: list[str] = []
+        if is_serializer:
             customs = {
                 k: v
                 for k, v in payload.items()
@@ -298,27 +329,29 @@ class ModelUtil:
             optionals = [
                 k for k, v in payload.items() if self.model.is_optional(k) and v is None
             ]
+
+        skip_keys = set()
+        if is_serializer:
+            # Keys to skip during model field processing
+            skip_keys = {
+                k
+                for k, v in payload.items()
+                if (self.model.is_custom(k) and k not in self.model_fields)
+                or (self.model.is_optional(k) and v is None)
+            }
+
+        # Process payload fields
         for k, v in payload.items():
-            if isinstance(self.model, ModelSerializerMeta):
-                if self.model.is_custom(k) and k not in self.model_fields:
-                    continue
-                if self.model.is_optional(k) and v is None:
-                    continue
-            field_obj = (await agetattr(self.model, k)).field
-            if isinstance(field_obj, models.BinaryField):
-                try:
-                    payload |= {k: base64.b64decode(v)}
-                except Exception as exc:
-                    raise SerializeError({k: ". ".join(exc.args)}, 400)
-            if isinstance(field_obj, models.ForeignKey):
-                rel_util = ModelUtil(field_obj.related_model)
-                rel: ModelSerializer = await rel_util.get_object(
-                    request, v, with_qs_request=False
-                )
-                payload |= {k: rel}
-        new_payload = {
-            k: v for k, v in payload.items() if k not in (customs.keys() or optionals)
-        }
+            if k in skip_keys:
+                continue
+            field_obj = await self._get_field(k)
+            await self._decode_binary(payload, k, v, field_obj)
+            await self._resolve_fk(request, payload, k, v, field_obj)
+
+        # Preserve original exclusion semantics (customs if present else optionals)
+        exclude_keys = customs.keys() or optionals
+        new_payload = {k: v for k, v in payload.items() if k not in exclude_keys}
+
         return new_payload, customs
 
     async def parse_output_data(self, request: HttpRequest, data: Schema):
