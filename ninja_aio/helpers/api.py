@@ -18,12 +18,192 @@ from django.db.models import QuerySet, Model
 
 
 class ManyToManyAPI:
+    """
+    ManyToManyAPI
+    -------------
+    Utility class that dynamically attaches asynchronous Many-To-Many (M2M) management
+    endpoints (GET / ADD / REMOVE) to a provided APIViewSet router in a Django Ninja
+    async CRUD context.
+
+    It inspects a list of M2MRelationSchema definitions and, for each relation, builds:
+        - An optional paginated GET endpoint to list related objects.
+        - An optional POST endpoint to add and/or remove related object primary keys.
+
+    Core behaviors:
+        - Dynamically generates per-relation filter schemas for query parameters.
+        - Supports custom per-relation query filtering handlers on the parent view set
+            via a `{related_name}_query_params_handler` coroutine.
+        - Validates requested add/remove primary keys, producing granular success and
+            error feedback.
+        - Performs add/remove operations concurrently using asyncio.gather when both
+            types of operations are requested in the same call.
+
+    Attributes established at initialization:
+        relations: list of M2MRelationSchema defining each relation.
+        view_set: The parent APIViewSet instance from which router, pagination, model util,
+                            and path schema are derived.
+        router: Ninja router used to register generated endpoints.
+        pagination_class: Pagination class used for GET related endpoints.
+        path_schema: Pydantic schema used to validate path parameters (e.g., primary key).
+        related_model_util: A ModelUtil instance cloned from the parent view set to access
+                                                base object retrieval helpers.
+        relations_filters_schemas: Mapping of related_name -> generated Pydantic filter schema.
+
+    Generated endpoint naming conventions:
+        GET   -> get_{base_model_name}_{relation_path}
+        POST  -> manage_{base_model_name}_{relation_path}
+
+    All responses standardize success and error reporting for POST as:
+    {
+        "results": {"count": int, "details": [str, ...]},
+        "errors":  {"count": int, "details": [str, ...]}
+
+    Concurrency note:
+        Add and remove operations are executed concurrently when both lists are non-empty,
+        minimizing round-trip latency for bulk mutations.
+
+    Error semantics:
+        - Missing related objects: reported individually.
+        - Invalid operation context (e.g., removing objects not currently related or adding
+            objects already related) reported per primary key.
+        - Successful operations yield a corresponding success detail string per PK.
+
+    Security / auth:
+        - Each relation may optionally override auth via its schema; otherwise falls back
+            to a default configured on the instance (self.m2m_auth).
+
+    Pagination:
+        - Applied only to GET related endpoints via @paginate(self.pagination_class).
+
+    Extensibility:
+        - Provide custom query param handling by defining an async method on the parent
+            view set: `<related_name>_query_params_handler(self, queryset, filters_dict)`.
+        - Customize relation filtering schema via each relation's `filters` definition.
+
+    -----------------------------------------------------------------------
+
+    __init__(relations, view_set)
+    Initialize the M2M API helper by binding core utilities from the provided view set
+    and precomputing filter schemas per relation.
+
+    Parameters:
+        relations (list[M2MRelationSchema]): Definitions for each M2M relation to expose.
+        view_set (APIViewSet): Parent view set containing model utilities and router.
+
+    Side effects:
+        - Captures router, pagination class, path schema from view_set.
+        - Clones ModelUtil for related model operations.
+        - Pre-generates filter schemas for each relation (if filters declared).
+
+    -----------------------------------------------------------------------
+
+    _generate_m2m_filters_schemas()
+    Create a mapping of related_name -> Pydantic schema used for query filtering in
+    GET related endpoints. If a relation has no filters specified, an empty schema
+    (dict) is used.
+
+    Returns:
+        dict[str, BaseModel]: Generated schemas keyed by related_name.
+
+    -----------------------------------------------------------------------
+
+    _get_query_handler(related_name)
+    Retrieve an optional per-relation query handler coroutine from the parent view set.
+    Naming convention: `<related_name>_query_params_handler`.
+
+    Parameters:
+        related_name (str): The relation's attribute name on the base model.
+
+    Returns:
+        Coroutine | None: Handler to transform or filter the queryset based on query params.
+
+    -----------------------------------------------------------------------
+
+    _check_m2m_objs(request, objs_pks, model, related_manager, remove=False)
+    Validate requested primary keys for add/remove operations against the current
+    relation state. Performs existence checks and logical consistency (e.g., prevents
+    adding already-related objects or removing non-related objects).
+
+    Parameters:
+        request (HttpRequest): Incoming request context (passed to ModelUtil for access control).
+        objs_pks (list): List of primary keys to add or remove.
+        model (ModelSerializer | Model): Model class or serializer used to resolve objects.
+        related_manager (QuerySet): Related manager for the base object's M2M field.
+        remove (bool): If True, treat operation as removal validation.
+
+    Returns:
+        tuple[list[str], list[str], list[Model]]:
+            errors      -> List of error messages per invalid PK.
+            objs_detail -> List of success detail messages per valid PK.
+            objs        -> List of resolved model instances to process.
+
+    Error cases:
+        - Object not found.
+        - Object presence mismatch (attempting wrong operation given relation membership).
+
+    -----------------------------------------------------------------------
+
+    _collect_m2m(request, pks, model, related_manager, remove=False)
+    Wrapper around _check_m2m_objs that short-circuits on empty PK lists.
+
+    Parameters:
+        request (HttpRequest)
+        pks (list): Primary keys proposed for mutation.
+        model (ModelSerializer | Model)
+        related_manager (QuerySet)
+        remove (bool): Operation type flag.
+
+    Returns:
+        tuple[list[str], list[str], list[Model]]: See _check_m2m_objs.
+
+    -----------------------------------------------------------------------
+
+    _build_views(relation)
+    Dynamically define and register the GET and/or POST endpoints for a single M2M
+    relation based on the relation's schema flags (get/add/remove). Builds filter
+    schemas, resolves path fragments, and binds handlers to the router with unique
+    operation IDs.
+
+    Parameters:
+        relation (M2MRelationSchema): Declarative specification for one M2M relation.
+
+    Side effects:
+        - Registers endpoints on self.router.
+        - Creates closures (get_related / manage_related) capturing relation context.
+
+    GET endpoint behavior:
+        - Retrieves base object via related_model_util.
+        - Fetches all related objects; applies optional query handler and filters.
+        - Serializes each related object with rel_util.read_s.
+
+    POST endpoint behavior:
+        - Parses add/remove PK lists.
+        - Validates objects via _collect_m2m.
+        - Performs asynchronous add/remove operations using aadd / aremove.
+        - Aggregates results and errors into standardized response payload.
+
+    -----------------------------------------------------------------------
+
+    _add_views()
+    Iterates over all declared relations and invokes _build_views to attach endpoints.
+
+    Side effects:
+        - Populates router with all required M2M endpoints.
+
+    -----------------------------------------------------------------------
+
+    Usage Example (conceptual):
+        api = ManyToManyAPI(relations=[...], view_set=my_view_set)
+        api._add_views()  # Registers all endpoints automatically during initialization flow.
+    """
+
     def __init__(
         self,
         relations: list[M2MRelationSchema],
         view_set,
     ):
         from ninja_aio.views import APIViewSet
+
         self.relations = relations
         self.view_set: APIViewSet = view_set
         self.router = view_set.router
