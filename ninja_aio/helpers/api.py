@@ -70,7 +70,7 @@ class ManyToManyAPI:
 
     Security / auth:
         - Each relation may optionally override auth via its schema; otherwise falls back
-            to a default configured on the instance (self.m2m_auth).
+            to a default configured on the instance (self.default_auth).
 
     Pagination:
         - Applied only to GET related endpoints via @paginate(self.pagination_class).
@@ -202,14 +202,16 @@ class ManyToManyAPI:
         relations: list[M2MRelationSchema],
         view_set,
     ):
+        # Import here to avoid circular imports
         from ninja_aio.views import APIViewSet
 
         self.relations = relations
         self.view_set: APIViewSet = view_set
-        self.router = view_set.router
-        self.pagination_class = view_set.pagination_class
-        self.path_schema = view_set.path_schema
-        self.related_model_util = ModelUtil(view_set.model_util)
+        self.router = self.view_set.router
+        self.pagination_class = self.view_set.pagination_class
+        self.path_schema = self.view_set.path_schema
+        self.default_auth = self.view_set.m2m_auth
+        self.related_model_util = ModelUtil(self.view_set.model_util)
         self.relations_filters_schemas = self._generate_m2m_filters_schemas()
 
     def _generate_m2m_filters_schemas(self):
