@@ -63,7 +63,7 @@
   
   
 
-<script id="__analytics">function __md_analytics(){function e(){dataLayer.push(arguments)}window.dataLayer=window.dataLayer||[],e("js",new Date),e("config","UA-XXXXXXX-X"),document.addEventListener("DOMContentLoaded",(function(){document.forms.search&&document.forms.search.query.addEventListener("blur",(function(){this.value&&e("event","search",{search_term:this.value})}));document$.subscribe((function(){var t=document.forms.feedback;if(void 0!==t)for(var a of t.querySelectorAll("[type=submit]"))a.addEventListener("click",(function(a){a.preventDefault();var n=document.location.pathname,d=this.getAttribute("data-md-value");e("event","feedback",{page:n,data:d}),t.firstElementChild.disabled=!0;var r=t.querySelector(".md-feedback__note [data-md-value='"+d+"']");r&&(r.hidden=!1)})),t.hidden=!1})),location$.subscribe((function(t){e("config","UA-XXXXXXX-X",{page_path:t.pathname})}))}));var t=document.createElement("script");t.async=!0,t.src="https://www.googletagmanager.com/gtag/js?id=UA-XXXXXXX-X",document.getElementById("__analytics").insertAdjacentElement("afterEnd",t)}</script>
+<script id="__analytics">function __md_analytics(){function e(){dataLayer.push(arguments)}window.dataLayer=window.dataLayer||[],e("js",new Date),e("config",""),document.addEventListener("DOMContentLoaded",(function(){document.forms.search&&document.forms.search.query.addEventListener("blur",(function(){this.value&&e("event","search",{search_term:this.value})}));document$.subscribe((function(){var t=document.forms.feedback;if(void 0!==t)for(var a of t.querySelectorAll("[type=submit]"))a.addEventListener("click",(function(a){a.preventDefault();var n=document.location.pathname,d=this.getAttribute("data-md-value");e("event","feedback",{page:n,data:d}),t.firstElementChild.disabled=!0;var r=t.querySelector(".md-feedback__note [data-md-value='"+d+"']");r&&(r.hidden=!1)})),t.hidden=!1})),location$.subscribe((function(t){e("config","",{page_path:t.pathname})}))}));var t=document.createElement("script");t.async=!0,t.src="https://www.googletagmanager.com/gtag/js?id=",document.getElementById("__analytics").insertAdjacentElement("afterEnd",t)}</script>
   
     <script>"undefined"!=typeof __md_analytics&&__md_analytics()</script>
   
@@ -1333,6 +1333,24 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#custom-fields-normalization" class="md-nav__link">
+    <span class="md-ellipsis">
+      Custom Fields Normalization
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#error-cases" class="md-nav__link">
+    <span class="md-ellipsis">
+      Error Cases
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#best-practices" class="md-nav__link">
     <span class="md-ellipsis">
       Best Practices
@@ -1487,17 +1505,21 @@
 <h1 id="model-serializer">Model Serializer<a class="headerlink" href="#model-serializer" title="Permanent link">&para;</a></h1>
 <p><code>ModelSerializer</code> is a powerful abstract mixin for Django models that centralizes schema generation and serialization configuration directly on the model class.</p>
 <h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
-<p><strong>Goals:</strong>
-- Eliminate duplication between Model and separate serializer classes
-- Provide clear extension points (sync + async hooks, custom synthetic fields)
-- Auto-generate Ninja schemas from model metadata
-- Support nested serialization for relationships</p>
-<p><strong>Key Features:</strong>
-- Declarative schema configuration via inner classes
-- Automatic CRUD schema generation
-- Nested relationship handling
-- Sync and async lifecycle hooks
-- Custom field support (computed/synthetic fields)</p>
+<p><strong>Goals:</strong></p>
+<ul>
+<li>Eliminate duplication between Model and separate serializer classes</li>
+<li>Provide clear extension points (sync + async hooks, custom synthetic fields)</li>
+<li>Auto-generate Ninja schemas from model metadata</li>
+<li>Support nested serialization for relationships</li>
+</ul>
+<p><strong>Key Features:</strong></p>
+<ul>
+<li>Declarative schema configuration via inner classes</li>
+<li>Automatic CRUD schema generation</li>
+<li>Nested relationship handling</li>
+<li>Sync and async lifecycle hooks</li>
+<li>Custom field support (computed/synthetic fields)</li>
+</ul>
 <h2 id="quick-start">Quick Start<a class="headerlink" href="#quick-start" title="Permanent link">&para;</a></h2>
 <div class="language-python highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">django.db</span><span class="w"> </span><span class="kn">import</span> <span class="n">models</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ninja_aio.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModelSerializer</span>
@@ -1540,8 +1562,8 @@
 </tr>
 <tr>
 <td><code>customs</code></td>
-<td><code>list[tuple[str, type, Any]]</code></td>
-<td>Synthetic input fields: <code>(name, type, default)</code></td>
+<td><code>list[tuple]</code></td>
+<td>Synthetic inputs. Tuple forms:<br> <code>(name, type)</code> = required (no default)<br> <code>(name, type, default)</code> = optional (literal or callable default)</td>
 </tr>
 <tr>
 <td><code>excludes</code></td>
@@ -1563,15 +1585,18 @@
 </span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>            <span class="p">(</span><span class="s2">&quot;bio&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">),</span>
 </span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>        <span class="p">]</span>
 </span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>        <span class="n">customs</span> <span class="o">=</span> <span class="p">[</span>
-</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>            <span class="p">(</span><span class="s2">&quot;password_confirm&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
-</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>            <span class="p">(</span><span class="s2">&quot;send_welcome_email&quot;</span><span class="p">,</span> <span class="nb">bool</span><span class="p">,</span> <span class="kc">True</span><span class="p">),</span>
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>            <span class="p">(</span><span class="s2">&quot;password_confirm&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">),</span>          <span class="c1"># required (no default) equivalent of (&quot;password_confirm&quot;, str, ...)</span>
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>            <span class="p">(</span><span class="s2">&quot;send_welcome_email&quot;</span><span class="p">,</span> <span class="nb">bool</span><span class="p">,</span> <span class="kc">True</span><span class="p">),</span> <span class="c1"># optional with default</span>
 </span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>        <span class="p">]</span>
 </span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>        <span class="n">excludes</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">,</span> <span class="s2">&quot;created_at&quot;</span><span class="p">]</span>
 </span></code></pre></div>
-<p><strong>Resolution Order for <code>customs</code>:</strong>
-1. Value from incoming payload
-2. If <code>default</code> is callable → invoke it
-3. Use literal <code>default</code> value</p>
+<p><strong>Resolution Order for <code>customs</code>:</strong></p>
+<ol>
+<li>Payload value (if provided)</li>
+<li>If default present and callable → invoked</li>
+<li>Literal default (if provided)</li>
+<li>If tuple was only (name, type) and no value supplied → validation error (required)</li>
+</ol>
 <p><strong>Conceptual Equivalent (django-ninja):</strong></p>
 <div class="language-python highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Without ModelSerializer</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ninja</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModelSchema</span>
@@ -1583,33 +1608,12 @@
 </span></code></pre></div>
 <h3 id="readserializer">ReadSerializer<a class="headerlink" href="#readserializer" title="Permanent link">&para;</a></h3>
 <p>Describes how to build a read (output) schema for a model.</p>
-<p><strong>Attributes:</strong></p>
-<table>
-<thead>
-<tr>
-<th>Attribute</th>
-<th>Type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>fields</code></td>
-<td><code>list[str]</code></td>
-<td>Model field names to include</td>
-</tr>
-<tr>
-<td><code>excludes</code></td>
-<td><code>list[str]</code></td>
-<td>Field names to force-exclude (e.g., passwords)</td>
-</tr>
-<tr>
-<td><code>customs</code></td>
-<td><code>list[tuple[str, type, Any]]</code></td>
-<td>Computed attributes: <code>(name, type, default)</code></td>
-</tr>
-</tbody>
-</table>
+<p><strong>Attributes:</strong>
+| Attribute   | Type                     | Description                                                                                                                                                                                                                                       |
+| ----------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| <code>fields</code>    | <code>list[str]</code>              | REQUIRED model field / related names explicitly included in the read (output) schema.                                                                                                                                                             |
+| <code>excludes</code>  | <code>list[str]</code>              | Field / related names to always omit (takes precedence over <code>fields</code> and <code>optionals</code>). Use for sensitive or noisy data (e.g., passwords, internal flags).                                                                                          |
+| <code>customs</code>   | <code>list[tuple]</code>            | Computed / synthetic output values. Tuples:<br><code>(name, type)</code> = required resolvable attribute (object attribute or property) else serialization error.<br><code>(name, type, default)</code> = optional; default may be callable (<code>lambda obj: ...</code>) or literal. |</p>
 <p><strong>Example:</strong></p>
 <div class="language-python highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">User</span><span class="p">(</span><span class="n">ModelSerializer</span><span class="p">):</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="n">first_name</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">CharField</span><span class="p">(</span><span class="n">max_length</span><span class="o">=</span><span class="mi">150</span><span class="p">)</span>
@@ -1625,10 +1629,13 @@
 </span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>            <span class="p">(</span><span class="s2">&quot;is_premium&quot;</span><span class="p">,</span> <span class="nb">bool</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">obj</span><span class="p">:</span> <span class="n">obj</span><span class="o">.</span><span class="n">subscription</span><span class="o">.</span><span class="n">is_active</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="s1">&#39;subscription&#39;</span><span class="p">)</span> <span class="k">else</span> <span class="kc">False</span><span class="p">),</span>
 </span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>        <span class="p">]</span>
 </span></code></pre></div>
-<p><strong>Resolution Order for <code>customs</code>:</strong>
-1. Property/attribute on model instance
-2. Callable (invoke with object)
-3. Literal default value</p>
+<p><strong>Resolution Order for <code>customs</code>:</strong></p>
+<ol>
+<li>Attribute / property on instance</li>
+<li>Callable default (if provided)</li>
+<li>Literal default</li>
+<li>If required (2‑tuple) and still unresolved → error</li>
+</ol>
 <p><strong>Generated Output:</strong></p>
 <div class="language-json highlight"><span class="filename">JSON</span><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="p">{</span>
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
@@ -1664,8 +1671,8 @@
 </tr>
 <tr>
 <td><code>customs</code></td>
-<td><code>list[tuple[str, type, Any]]</code></td>
-<td>Instruction fields: <code>(name, type, default)</code></td>
+<td><code>list[tuple]</code></td>
+<td>Instruction fields: <code>(name, type)</code> required; <code>(name, type, default)</code> optional</td>
 </tr>
 <tr>
 <td><code>excludes</code></td>
@@ -1688,8 +1695,8 @@
 </span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>            <span class="p">(</span><span class="s2">&quot;is_active&quot;</span><span class="p">,</span> <span class="nb">bool</span><span class="p">),</span>
 </span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>        <span class="p">]</span>
 </span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>        <span class="n">customs</span> <span class="o">=</span> <span class="p">[</span>
-</span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>            <span class="p">(</span><span class="s2">&quot;reset_password&quot;</span><span class="p">,</span> <span class="nb">bool</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span>
-</span><span id="__span-5-15"><a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>            <span class="p">(</span><span class="s2">&quot;rotate_token&quot;</span><span class="p">,</span> <span class="nb">bool</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span>
+</span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>            <span class="p">(</span><span class="s2">&quot;reset_password&quot;</span><span class="p">,</span> <span class="nb">bool</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span>  <span class="c1"># optional flag</span>
+</span><span id="__span-5-15"><a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>            <span class="p">(</span><span class="s2">&quot;rotate_token&quot;</span><span class="p">,</span> <span class="nb">bool</span><span class="p">),</span>          <span class="c1"># required instruction</span>
 </span><span id="__span-5-16"><a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>        <span class="p">]</span>
 </span><span id="__span-5-17"><a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a>        <span class="n">excludes</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;username&quot;</span><span class="p">,</span> <span class="s2">&quot;created_at&quot;</span><span class="p">,</span> <span class="s2">&quot;id&quot;</span><span class="p">]</span>
 </span></code></pre></div>
@@ -1767,7 +1774,7 @@
 </span><span id="__span-8-11"><a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>    <span class="k">class</span><span class="w"> </span><span class="nc">ReadSerializer</span><span class="p">:</span>
 </span><span id="__span-8-12"><a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a>        <span class="n">fields</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">,</span> <span class="s2">&quot;username&quot;</span><span class="p">,</span> <span class="s2">&quot;profile&quot;</span><span class="p">]</span>
 </span></code></pre></div>
-<p><strong>Output:</strong>
+<p><strong>Output:</strong></p>
 <div class="language-json highlight"><span class="filename">JSON</span><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="p">{</span>
 </span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">  </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
 </span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span><span class="nt">&quot;username&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;john_doe&quot;</span><span class="p">,</span>
@@ -1776,7 +1783,7 @@
 </span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="w">    </span><span class="nt">&quot;bio&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Software developer&quot;</span>
 </span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="w">  </span><span class="p">}</span>
 </span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="p">}</span>
-</span></code></pre></div></p>
+</span></code></pre></div>
 <h4 id="manytomany">ManyToMany<a class="headerlink" href="#manytomany" title="Permanent link">&para;</a></h4>
 <div class="language-python highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">Tag</span><span class="p">(</span><span class="n">ModelSerializer</span><span class="p">):</span>
 </span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>    <span class="n">name</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">CharField</span><span class="p">(</span><span class="n">max_length</span><span class="o">=</span><span class="mi">50</span><span class="p">)</span>
@@ -1791,16 +1798,16 @@
 </span><span id="__span-10-11"><a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>    <span class="k">class</span><span class="w"> </span><span class="nc">ReadSerializer</span><span class="p">:</span>
 </span><span id="__span-10-12"><a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>        <span class="n">fields</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">,</span> <span class="s2">&quot;title&quot;</span><span class="p">,</span> <span class="s2">&quot;tags&quot;</span><span class="p">]</span>
 </span></code></pre></div>
-<p><strong>Output:</strong>
+<p><strong>Output:</strong></p>
 <div class="language-json highlight"><span class="filename">JSON</span><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="p">{</span>
 </span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">  </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
 </span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">  </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Getting Started&quot;</span><span class="p">,</span>
 </span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">  </span><span class="nt">&quot;tags&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="w">    </span><span class="p">{</span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;python&quot;</span><span class="p">},</span>
-</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="w">    </span><span class="p">{</span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;django&quot;</span><span class="p">}</span>
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="w">    </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;python&quot;</span><span class="w"> </span><span class="p">},</span>
+</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="w">    </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;django&quot;</span><span class="w"> </span><span class="p">}</span>
 </span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="w">  </span><span class="p">]</span>
 </span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="p">}</span>
-</span></code></pre></div></p>
+</span></code></pre></div>
 <h4 id="reverse-relationships">Reverse Relationships<a class="headerlink" href="#reverse-relationships" title="Permanent link">&para;</a></h4>
 <div class="language-python highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">Author</span><span class="p">(</span><span class="n">ModelSerializer</span><span class="p">):</span>
 </span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>    <span class="n">name</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">CharField</span><span class="p">(</span><span class="n">max_length</span><span class="o">=</span><span class="mi">200</span><span class="p">)</span>
@@ -1815,16 +1822,16 @@
 </span><span id="__span-12-11"><a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a>    <span class="k">class</span><span class="w"> </span><span class="nc">ReadSerializer</span><span class="p">:</span>
 </span><span id="__span-12-12"><a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a>        <span class="n">fields</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">,</span> <span class="s2">&quot;title&quot;</span><span class="p">]</span>
 </span></code></pre></div>
-<p><strong>Output:</strong>
+<p><strong>Output:</strong></p>
 <div class="language-json highlight"><span class="filename">JSON</span><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="p">{</span>
 </span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">  </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
 </span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">  </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;J.K. Rowling&quot;</span><span class="p">,</span>
 </span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="w">  </span><span class="nt">&quot;books&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="w">    </span><span class="p">{</span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Harry Potter&quot;</span><span class="p">},</span>
-</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="w">    </span><span class="p">{</span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Fantastic Beasts&quot;</span><span class="p">}</span>
+</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="w">    </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Harry Potter&quot;</span><span class="w"> </span><span class="p">},</span>
+</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="w">    </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Fantastic Beasts&quot;</span><span class="w"> </span><span class="p">}</span>
 </span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="w">  </span><span class="p">]</span>
 </span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="p">}</span>
-</span></code></pre></div></p>
+</span></code></pre></div>
 <h2 id="async-extension-points">Async Extension Points<a class="headerlink" href="#async-extension-points" title="Permanent link">&para;</a></h2>
 <h3 id="queryset_requestrequest"><code>queryset_request(request)</code><a class="headerlink" href="#queryset_requestrequest" title="Permanent link">&para;</a></h3>
 <p>Filter queryset based on request context (user, permissions, tenant, etc.).</p>
@@ -1910,7 +1917,7 @@
 </span><span id="__span-17-19"><a id="__codelineno-17-19" name="__codelineno-17-19" href="#__codelineno-17-19"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Executed only after creation&quot;&quot;&quot;</span>
 </span><span id="__span-17-20"><a id="__codelineno-17-20" name="__codelineno-17-20" href="#__codelineno-17-20"></a>        <span class="n">send_welcome_email_sync</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">email</span><span class="p">)</span>
 </span></code></pre></div>
-<p><strong>Execution Order:</strong>
+<p><strong>Execution Order:</strong></p>
 <div class="language-text highlight"><span class="filename">Text Only</span><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>CREATE:
 </span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>1. on_create_before_save()
 </span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>2. before_save()
@@ -1922,7 +1929,7 @@
 </span><span id="__span-18-9"><a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a>1. before_save()
 </span><span id="__span-18-10"><a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a>2. super().save()
 </span><span id="__span-18-11"><a id="__codelineno-18-11" name="__codelineno-18-11" href="#__codelineno-18-11"></a>3. after_save()
-</span></code></pre></div></p>
+</span></code></pre></div>
 <h3 id="delete-hook">Delete Hook<a class="headerlink" href="#delete-hook" title="Permanent link">&para;</a></h3>
 <div class="language-python highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">User</span><span class="p">(</span><span class="n">ModelSerializer</span><span class="p">):</span>
 </span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>
@@ -1969,12 +1976,14 @@
 </span><span id="__span-22-2"><a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>
 </span><span id="__span-22-3"><a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a><span class="n">util</span> <span class="o">=</span> <span class="n">ModelUtil</span><span class="p">(</span><span class="n">User</span><span class="p">)</span>
 </span></code></pre></div>
-<p><strong>Key Responsibilities:</strong>
-- Introspect model metadata
-- Normalize inbound/outbound payloads
-- Handle FK resolution and base64 decoding
-- Prefetch reverse relations
-- Invoke serializer hooks</p>
+<p><strong>Key Responsibilities:</strong></p>
+<ul>
+<li>Introspect model metadata</li>
+<li>Normalize inbound/outbound payloads</li>
+<li>Handle FK resolution and base64 decoding</li>
+<li>Prefetch reverse relations</li>
+<li>Invoke serializer hooks</li>
+</ul>
 <h3 id="key-methods">Key Methods<a class="headerlink" href="#key-methods" title="Permanent link">&para;</a></h3>
 <h4 id="get_objectrequest-pknone-filtersnone-gettersnone"><code>get_object(request, pk=None, filters=None, getters=None)</code><a class="headerlink" href="#get_objectrequest-pknone-filtersnone-gettersnone" title="Permanent link">&para;</a></h4>
 <p>Fetch single object or queryset with optimized queries.</p>
@@ -1993,17 +2002,21 @@
 </span><span id="__span-23-13"><a id="__codelineno-23-13" name="__codelineno-23-13" href="#__codelineno-23-13"></a>    <span class="n">getters</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;email&quot;</span><span class="p">:</span> <span class="s2">&quot;john@example.com&quot;</span><span class="p">}</span>
 </span><span id="__span-23-14"><a id="__codelineno-23-14" name="__codelineno-23-14" href="#__codelineno-23-14"></a><span class="p">)</span>
 </span></code></pre></div>
-<p><strong>Features:</strong>
-- Automatic <code>select_related()</code> and <code>prefetch_related()</code>
-- Respects <code>queryset_request()</code> filtering
-- Raises <code>SerializeError</code> (404) if not found</p>
+<p><strong>Features:</strong></p>
+<ul>
+<li>Automatic <code>select_related()</code> and <code>prefetch_related()</code></li>
+<li>Respects <code>queryset_request()</code> filtering</li>
+<li>Raises <code>SerializeError</code> (404) if not found</li>
+</ul>
 <h4 id="parse_input_datarequest-data"><code>parse_input_data(request, data)</code><a class="headerlink" href="#parse_input_datarequest-data" title="Permanent link">&para;</a></h4>
 <p>Convert incoming schema to model-ready dict.</p>
-<p><strong>Transformations:</strong>
-1. Strips custom fields (stored separately)
-2. Removes optional fields with <code>None</code> value
-3. Decodes BinaryField (base64 → bytes)
-4. Resolves FK IDs to model instances</p>
+<p><strong>Transformations:</strong></p>
+<ol>
+<li>Strips custom fields (stored separately)</li>
+<li>Removes optional fields with <code>None</code> value</li>
+<li>Decodes BinaryField (base64 → bytes)</li>
+<li>Resolves FK IDs to model instances</li>
+</ol>
 <div class="language-python highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ninja</span><span class="w"> </span><span class="kn">import</span> <span class="n">Schema</span>
 </span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>
 </span><span id="__span-24-3"><a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a><span class="k">class</span><span class="w"> </span><span class="nc">UserCreateSchema</span><span class="p">(</span><span class="n">Schema</span><span class="p">):</span>
@@ -2033,9 +2046,11 @@
 </span></code></pre></div>
 <h4 id="parse_output_datarequest-data"><code>parse_output_data(request, data)</code><a class="headerlink" href="#parse_output_datarequest-data" title="Permanent link">&para;</a></h4>
 <p>Post-process serialized output for consistency.</p>
-<p><strong>Transformations:</strong>
-1. Replaces nested FK dicts with actual instances
-2. Rewrites nested FK keys to <code>&lt;field&gt;_id</code> format</p>
+<p><strong>Transformations:</strong></p>
+<ol>
+<li>Replaces nested FK dicts with actual instances</li>
+<li>Rewrites nested FK keys to <code>&lt;field&gt;_id</code> format</li>
+</ol>
 <div class="language-python highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="c1"># Before</span>
 </span><span id="__span-25-2"><a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a><span class="p">{</span>
 </span><span id="__span-25-3"><a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>    <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
@@ -2209,41 +2224,87 @@
 </span><span id="__span-31-106"><a id="__codelineno-31-106" name="__codelineno-31-106" href="#__codelineno-31-106"></a>    <span class="k">class</span><span class="w"> </span><span class="nc">ReadSerializer</span><span class="p">:</span>
 </span><span id="__span-31-107"><a id="__codelineno-31-107" name="__codelineno-31-107" href="#__codelineno-31-107"></a>        <span class="n">fields</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">,</span> <span class="s2">&quot;name&quot;</span><span class="p">]</span>
 </span></code></pre></div>
+<h2 id="custom-fields-normalization">Custom Fields Normalization<a class="headerlink" href="#custom-fields-normalization" title="Permanent link">&para;</a></h2>
+<p>Custom tuples are normalized by <code>ModelSerializer.get_custom_fields()</code> to <code>(name, python_type, default)</code>.</p>
+<p>Accepted forms:</p>
+<ul>
+<li><code>(name, type)</code> -&gt; stored with <code>default = Ellipsis</code> (treated as required)</li>
+<li><code>(name, type, default)</code> -&gt; default kept (callable or literal)</li>
+</ul>
+<p>Invalid lengths raise <code>ValueError</code>.</p>
+<p>Example mix:</p>
+<div class="language-python highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-32-1"><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">CreateSerializer</span><span class="p">:</span>
+</span><span id="__span-32-2"><a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a>    <span class="n">customs</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-32-3"><a id="__codelineno-32-3" name="__codelineno-32-3" href="#__codelineno-32-3"></a>        <span class="p">(</span><span class="s2">&quot;password_confirm&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">),</span>           <span class="c1"># required</span>
+</span><span id="__span-32-4"><a id="__codelineno-32-4" name="__codelineno-32-4" href="#__codelineno-32-4"></a>        <span class="p">(</span><span class="s2">&quot;send_welcome&quot;</span><span class="p">,</span> <span class="nb">bool</span><span class="p">,</span> <span class="kc">True</span><span class="p">),</span>        <span class="c1"># optional</span>
+</span><span id="__span-32-5"><a id="__codelineno-32-5" name="__codelineno-32-5" href="#__codelineno-32-5"></a>        <span class="p">(</span><span class="s2">&quot;initial_quota&quot;</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="k">lambda</span><span class="p">:</span> <span class="mi">100</span><span class="p">)</span>  <span class="c1"># optional callable</span>
+</span><span id="__span-32-6"><a id="__codelineno-32-6" name="__codelineno-32-6" href="#__codelineno-32-6"></a>    <span class="p">]</span>
+</span></code></pre></div>
+<p>At runtime:</p>
+<div class="language-python highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-33-1"><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a><span class="c1"># Normalized</span>
+</span><span id="__span-33-2"><a id="__codelineno-33-2" name="__codelineno-33-2" href="#__codelineno-33-2"></a><span class="p">[</span>
+</span><span id="__span-33-3"><a id="__codelineno-33-3" name="__codelineno-33-3" href="#__codelineno-33-3"></a>  <span class="p">(</span><span class="s2">&quot;password_confirm&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="bp">Ellipsis</span><span class="p">),</span>
+</span><span id="__span-33-4"><a id="__codelineno-33-4" name="__codelineno-33-4" href="#__codelineno-33-4"></a>  <span class="p">(</span><span class="s2">&quot;send_welcome&quot;</span><span class="p">,</span> <span class="nb">bool</span><span class="p">,</span> <span class="kc">True</span><span class="p">),</span>
+</span><span id="__span-33-5"><a id="__codelineno-33-5" name="__codelineno-33-5" href="#__codelineno-33-5"></a>  <span class="p">(</span><span class="s2">&quot;initial_quota&quot;</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="o">&lt;</span><span class="n">function</span> <span class="o">...&gt;</span><span class="p">)</span>
+</span><span id="__span-33-6"><a id="__codelineno-33-6" name="__codelineno-33-6" href="#__codelineno-33-6"></a><span class="p">]</span>
+</span></code></pre></div>
+<p>Required customs (Ellipsis) must be provided in input (create/update) or resolvable (read) or an error is raised.</p>
+<h2 id="error-cases">Error Cases<a class="headerlink" href="#error-cases" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Situation</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1‑item or 4‑item tuple</td>
+<td>ValueError</td>
+</tr>
+<tr>
+<td>Missing required custom (2‑tuple) in payload</td>
+<td>Validation error</td>
+</tr>
+<tr>
+<td>Unresolvable required read custom</td>
+<td>Serialization error</td>
+</tr>
+</tbody>
+</table>
 <h2 id="best-practices">Best Practices<a class="headerlink" href="#best-practices" title="Permanent link">&para;</a></h2>
 <ol>
-<li>
-<p><strong>Always exclude sensitive fields:</strong>
-   <div class="language-python highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-32-1"><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">ReadSerializer</span><span class="p">:</span>
-</span><span id="__span-32-2"><a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a>    <span class="n">excludes</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;password&quot;</span><span class="p">,</span> <span class="s2">&quot;secret_key&quot;</span><span class="p">,</span> <span class="s2">&quot;internal_id&quot;</span><span class="p">]</span>
-</span></code></pre></div></p>
-</li>
-<li>
-<p><strong>Use optionals for PATCH operations:</strong>
-   <div class="language-python highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-33-1"><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">UpdateSerializer</span><span class="p">:</span>
-</span><span id="__span-33-2"><a id="__codelineno-33-2" name="__codelineno-33-2" href="#__codelineno-33-2"></a>    <span class="n">optionals</span> <span class="o">=</span> <span class="p">[(</span><span class="s2">&quot;email&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">),</span> <span class="p">(</span><span class="s2">&quot;bio&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">)]</span>  <span class="c1"># Partial updates</span>
-</span></code></pre></div></p>
-</li>
-<li>
-<p><strong>Leverage customs for computed data:</strong>
-   <div class="language-python highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-34-1"><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a><span class="n">customs</span> <span class="o">=</span> <span class="p">[</span>
-</span><span id="__span-34-2"><a id="__codelineno-34-2" name="__codelineno-34-2" href="#__codelineno-34-2"></a>    <span class="p">(</span><span class="s2">&quot;full_name&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">obj</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">obj</span><span class="o">.</span><span class="n">first_name</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">obj</span><span class="o">.</span><span class="n">last_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">),</span>
-</span><span id="__span-34-3"><a id="__codelineno-34-3" name="__codelineno-34-3" href="#__codelineno-34-3"></a><span class="p">]</span>
-</span></code></pre></div></p>
-</li>
-<li>
-<p><strong>Optimize queries in queryset_request:</strong>
-   <div class="language-python highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-35-1"><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a><span class="nd">@classmethod</span>
-</span><span id="__span-35-2"><a id="__codelineno-35-2" name="__codelineno-35-2" href="#__codelineno-35-2"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">queryset_request</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">request</span><span class="p">):</span>
-</span><span id="__span-35-3"><a id="__codelineno-35-3" name="__codelineno-35-3" href="#__codelineno-35-3"></a>    <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">select_related</span><span class="p">(</span><span class="s1">&#39;author&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">prefetch_related</span><span class="p">(</span><span class="s1">&#39;tags&#39;</span><span class="p">)</span>
-</span></code></pre></div></p>
-</li>
-<li>
-<p><strong>Keep hooks focused:</strong>
-   <div class="language-python highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-36-1"><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">post_create</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span id="__span-36-2"><a id="__codelineno-36-2" name="__codelineno-36-2" href="#__codelineno-36-2"></a>    <span class="c1"># Do ONE thing well</span>
-</span><span id="__span-36-3"><a id="__codelineno-36-3" name="__codelineno-36-3" href="#__codelineno-36-3"></a>    <span class="k">await</span> <span class="n">send_welcome_email</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">email</span><span class="p">)</span>
-</span></code></pre></div></p>
-</li>
+<li><strong>Always exclude sensitive fields:</strong></li>
+</ol>
+<div class="language-python highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-34-1"><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">ReadSerializer</span><span class="p">:</span>
+</span><span id="__span-34-2"><a id="__codelineno-34-2" name="__codelineno-34-2" href="#__codelineno-34-2"></a>    <span class="n">excludes</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;password&quot;</span><span class="p">,</span> <span class="s2">&quot;secret_key&quot;</span><span class="p">,</span> <span class="s2">&quot;internal_id&quot;</span><span class="p">]</span>
+</span></code></pre></div>
+<ol>
+<li><strong>Use optionals for PATCH operations:</strong></li>
+</ol>
+<div class="language-python highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-35-1"><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">UpdateSerializer</span><span class="p">:</span>
+</span><span id="__span-35-2"><a id="__codelineno-35-2" name="__codelineno-35-2" href="#__codelineno-35-2"></a>    <span class="n">optionals</span> <span class="o">=</span> <span class="p">[(</span><span class="s2">&quot;email&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">),</span> <span class="p">(</span><span class="s2">&quot;bio&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">)]</span>  <span class="c1"># Partial updates</span>
+</span></code></pre></div>
+<ol>
+<li><strong>Leverage customs for computed data:</strong></li>
+</ol>
+<div class="language-python highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-36-1"><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a><span class="n">customs</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-36-2"><a id="__codelineno-36-2" name="__codelineno-36-2" href="#__codelineno-36-2"></a>    <span class="p">(</span><span class="s2">&quot;full_name&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">obj</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">obj</span><span class="o">.</span><span class="n">first_name</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">obj</span><span class="o">.</span><span class="n">last_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">),</span>
+</span><span id="__span-36-3"><a id="__codelineno-36-3" name="__codelineno-36-3" href="#__codelineno-36-3"></a><span class="p">]</span>
+</span></code></pre></div>
+<ol>
+<li><strong>Optimize queries in queryset_request:</strong></li>
+</ol>
+<div class="language-python highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-37-1"><a id="__codelineno-37-1" name="__codelineno-37-1" href="#__codelineno-37-1"></a><span class="nd">@classmethod</span>
+</span><span id="__span-37-2"><a id="__codelineno-37-2" name="__codelineno-37-2" href="#__codelineno-37-2"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">queryset_request</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">request</span><span class="p">):</span>
+</span><span id="__span-37-3"><a id="__codelineno-37-3" name="__codelineno-37-3" href="#__codelineno-37-3"></a>    <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">select_related</span><span class="p">(</span><span class="s1">&#39;author&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">prefetch_related</span><span class="p">(</span><span class="s1">&#39;tags&#39;</span><span class="p">)</span>
+</span></code></pre></div>
+<ol>
+<li><strong>Keep hooks focused:</strong>
+   <div class="language-python highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-38-1"><a id="__codelineno-38-1" name="__codelineno-38-1" href="#__codelineno-38-1"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">post_create</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="__span-38-2"><a id="__codelineno-38-2" name="__codelineno-38-2" href="#__codelineno-38-2"></a>    <span class="c1"># Do ONE thing well</span>
+</span><span id="__span-38-3"><a id="__codelineno-38-3" name="__codelineno-38-3" href="#__codelineno-38-3"></a>    <span class="k">await</span> <span class="n">send_welcome_email</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">email</span><span class="p">)</span>
+</span></code></pre></div></li>
 </ol>
 <h2 id="see-also">See Also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
 <ul>
@@ -2370,7 +2431,7 @@
     
     
       
-      <script id="__config" type="application/json">{"base": "../../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.top", "navigation.footer", "navigation.sections", "navigation.indexes", "header.autohide", "toc.follow", "toc.integrate", "content.code.copy", "content.code.select", "content.code.annotate", "content.tabs.link", "content.tooltips", "content.footnote.tooltips", "search.suggest", "search.highlight", "search.share"], "search": "../../../assets/javascripts/workers/search.973d3a69.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"default": "latest"}}</script>
+      <script id="__config" type="application/json">{"base": "../../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.top", "navigation.footer", "navigation.sections", "navigation.indexes", "header.autohide", "toc.follow", "toc.integrate", "content.code.copy", "content.code.select", "content.code.annotate", "content.tabs.link", "content.tooltips", "content.footnote.tooltips", "search.suggest", "search.highlight", "search.share"], "search": "../../../assets/javascripts/workers/search.973d3a69.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"default": "latest", "provider": "mike"}}</script>
     
     
       <script src="../../../assets/javascripts/bundle.f55a23d4.min.js"></script>
