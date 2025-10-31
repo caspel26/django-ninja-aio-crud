@@ -8,6 +8,7 @@ from django.db.models import Model
 from django.test import TestCase, tag
 
 from tests.generics.request import Request
+from tests.generics.literals import NOT_FOUND
 
 
 class Tests:
@@ -114,7 +115,7 @@ class Tests:
                 await self.model_util.get_object(self.request.get(), 0)
             self.assertEqual(
                 exc.exception.error,
-                {self.model._meta.verbose_name.replace(" ", "_"): "not found"},
+                {self.model._meta.verbose_name.replace(" ", "_"): NOT_FOUND},
             )
             self.assertEqual(exc.exception.status_code, 404)
 
@@ -217,7 +218,7 @@ class Tests:
             self.assertEqual(exc.exception.status_code, 404)
             self.assertEqual(
                 exc.exception.error,
-                {self.model._meta.verbose_name.replace(" ", "_"): "not found"},
+                {self.model._meta.verbose_name.replace(" ", "_"): NOT_FOUND},
             )
 
         async def test_update_s(self):
@@ -232,7 +233,7 @@ class Tests:
             self.assertEqual(exc.exception.status_code, 404)
             self.assertEqual(
                 exc.exception.error,
-                {self.model._meta.verbose_name.replace(" ", "_"): "not found"},
+                {self.model._meta.verbose_name.replace(" ", "_"): NOT_FOUND},
             )
 
         async def test_delete_s(self):

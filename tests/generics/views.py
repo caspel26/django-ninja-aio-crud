@@ -7,6 +7,7 @@ from asgiref.sync import async_to_sync
 
 from ninja_aio.exceptions import NotFoundError
 from ninja_aio.types import ModelSerializerMeta
+from tests.generics.literals import NOT_FOUND
 from tests.test_app import schema
 from tests.generics.request import Request
 from ninja_aio import NinjaAIO
@@ -244,7 +245,7 @@ class Tests:
                 await view(self.get_request, self._path_schema(1))
             self.assertEqual(exc.exception.status_code, 404)
             self.assertEqual(
-                exc.exception.error, {self.model._meta.verbose_name.replace(" ", "_"): "not found"}
+                exc.exception.error, {self.model._meta.verbose_name.replace(" ", "_"): NOT_FOUND}
             )
 
         async def test_update(self):
