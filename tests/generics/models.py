@@ -113,7 +113,8 @@ class Tests:
             with self.assertRaises(NotFoundError) as exc:
                 await self.model_util.get_object(self.request.get(), 0)
             self.assertEqual(
-                exc.exception.error, {self.model._meta.verbose_name: "not found"}
+                exc.exception.error,
+                {self.model._meta.verbose_name.replace(" ", "_"): "not found"},
             )
             self.assertEqual(exc.exception.status_code, 404)
 
@@ -215,7 +216,8 @@ class Tests:
                 )
             self.assertEqual(exc.exception.status_code, 404)
             self.assertEqual(
-                exc.exception.error, {self.model._meta.verbose_name: "not found"}
+                exc.exception.error,
+                {self.model._meta.verbose_name.replace(" ", "_"): "not found"},
             )
 
         async def test_update_s(self):
@@ -229,7 +231,8 @@ class Tests:
                 await self.model_util.delete_s(self.request.delete(), 0)
             self.assertEqual(exc.exception.status_code, 404)
             self.assertEqual(
-                exc.exception.error, {self.model._meta.verbose_name: "not found"}
+                exc.exception.error,
+                {self.model._meta.verbose_name.replace(" ", "_"): "not found"},
             )
 
         async def test_delete_s(self):
