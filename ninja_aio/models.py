@@ -286,6 +286,44 @@ class ModelUtil:
         rel = await rel_util.get_object(request, v, with_qs_request=False)
         payload[k] = rel
 
+    def _extract_field_obj(self, field_name: str):
+        """
+        Return the underlying Django Field (if any) for a given attribute name.
+        """
+        descriptor = getattr(self.model, field_name, None)
+        if descriptor is None:
+            return None
+        return getattr(descriptor, "field", None) or getattr(descriptor, "related", None)
+
+    def _should_process_nested(self, value: Any, field_obj: Any) -> bool:
+        """
+        Determine if a payload entry represents a nested FK / O2O relation dict.
+        """
+        if not isinstance(value, dict):
+            return False
+        return isinstance(field_obj, (models.ForeignKey, models.OneToOneField))
+
+    async def _fetch_related_instance(self, request, field_obj: models.Field, nested_dict: dict):
+        """
+        Resolve the related instance from its primary key inside the nested dict.
+        """
+        rel_util = ModelUtil(field_obj.related_model)
+        rel_pk = nested_dict.get(rel_util.model_pk_name)
+        return await rel_util.get_object(request, rel_pk)
+
+    async def _rewrite_nested_foreign_keys(self, rel_obj, nested_dict: dict):
+        """
+        Rewrite foreign key keys inside a nested dict from <key> to <key>_id.
+        """
+        keys_to_rewrite: list[str] = []
+        for rel_k in nested_dict.keys():
+            attr = getattr(rel_obj.__class__, rel_k, None)
+            fk_field = getattr(attr, "field", None)
+            if isinstance(fk_field, models.ForeignKey):
+                keys_to_rewrite.append(rel_k)
+            for old_k in keys_to_rewrite:
+                nested_dict[f"{old_k}_id"] = nested_dict.pop(old_k)
+
     async def parse_input_data(self, request: HttpRequest, data: Schema):
         """
         Transform inbound schema data to a model-ready payload.
@@ -373,35 +411,20 @@ class ModelUtil:
         dict
             Normalized output payload.
         """
-        olds_k: list[dict] = []
         payload = data.model_dump(mode="json")
+
         for k, v in payload.items():
-            try:
-                field_obj = (await agetattr(self.model, k)).field
-            except AttributeError:
-                try:
-                    field_obj = (await agetattr(self.model, k)).related
-                except AttributeError:
-                    pass
-            if isinstance(v, dict) and (
-                isinstance(field_obj, models.ForeignKey)
-                or isinstance(field_obj, models.OneToOneField)
-            ):
-                rel_util = ModelUtil(field_obj.related_model)
-                rel: ModelSerializer = await rel_util.get_object(
-                    request, v.get(rel_util.model_pk_name)
-                )
-                if isinstance(field_obj, models.ForeignKey):
-                    for rel_k, rel_v in v.items():
-                        field_rel_obj = await agetattr(rel, rel_k)
-                        if isinstance(field_rel_obj, models.ForeignKey):
-                            olds_k.append({rel_k: rel_v})
-                    for obj in olds_k:
-                        for old_k, old_v in obj.items():
-                            v.pop(old_k)
-                            v |= {f"{old_k}_id": old_v}
-                    olds_k = []
-                payload |= {k: rel}
+            field_obj = self._extract_field_obj(k)
+            if not self._should_process_nested(v, field_obj):
+                continue
+
+            rel_instance = await self._fetch_related_instance(request, field_obj, v)
+
+            if isinstance(field_obj, models.ForeignKey):
+                await self._rewrite_nested_foreign_keys(rel_instance, v)
+
+            payload[k] = rel_instance
+
         return payload
 
     async def create_s(self, request: HttpRequest, data: Schema, obj_schema: Schema):
