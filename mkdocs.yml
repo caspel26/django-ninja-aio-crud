@@ -25,6 +25,7 @@ nav:
     - Authentication: api/authentication.md
     - Pagination: api/pagination.md
   - Contributing: contributing.md
+  - Release Notes: release_notes.md
 
 theme:
   font:
@@ -91,6 +92,8 @@ extra:
     provider: google
 
 plugins:
+  - macros:
+      include_dir: docs
   - search:
       separator: '[\\s\\-]+'
   - autorefs
@@ -112,7 +115,6 @@ plugins:
               - "!^__"
             inherited_members: true
             signature_crossrefs: true
-  - mike
 
 markdown_extensions:
   - admonition
