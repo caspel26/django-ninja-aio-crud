@@ -220,6 +220,14 @@ class ManyToManyAPI:
         self.related_model_util = self.view_set.model_util
         self.relations_filters_schemas = self._generate_m2m_filters_schemas()
 
+    @property
+    def views_action_map(self):
+        return {
+            (True, True): ("Add or Remove", M2MSchemaIn),
+            (True, False): ("Add", M2MAddSchemaIn),
+            (False, True): ("Remove", M2MRemoveSchemaIn),
+        }
+
     def _generate_m2m_filters_schemas(self):
         """
         Build per-relation filters schemas for M2M endpoints.
@@ -282,6 +290,112 @@ class ManyToManyAPI:
             request, pks, model, related_manager, remove=remove
         )
 
+    def _register_get_relation_view(
+        self,
+        *,
+        related_name: str,
+        m2m_auth,
+        rel_util: ModelUtil,
+        rel_path: str,
+        related_schema,
+        filters_schema,
+    ):
+        @self.router.get(
+            f"{self.view_set.path_retrieve}{rel_path}",
+            response={
+                200: list[related_schema],
+                self.view_set.error_codes: GenericMessageSchema,
+            },
+            auth=m2m_auth,
+            summary=f"Get {rel_util.model._meta.verbose_name_plural.capitalize()}",
+            description=f"Get all related {rel_util.model._meta.verbose_name_plural.capitalize()}",
+        )
+        @unique_view(f"get_{self.related_model_util.model_name}_{rel_path}")
+        @paginate(self.pagination_class)
+        async def get_related(
+            request: HttpRequest,
+            pk: Path[self.path_schema],  # type: ignore
+            filters: Query[filters_schema] = None,  # type: ignore
+        ):
+            obj = await self.related_model_util.get_object(
+                request, self.view_set._get_pk(pk)
+            )
+            related_manager = getattr(obj, related_name)
+            related_qs = related_manager.all()
+
+            query_handler = self._get_query_handler(related_name)
+            if filters is not None and query_handler:
+                related_qs = await query_handler(related_qs, filters.model_dump())
+
+            return [
+                await rel_util.read_s(request, rel_obj, related_schema)
+                async for rel_obj in related_qs
+            ]
+
+    def _resolve_action_schema(self, add: bool, remove: bool):
+        return self.views_action_map[(add, remove)]
+
+    def _register_manage_relation_view(
+        self,
+        *,
+        model,
+        related_name: str,
+        m2m_auth,
+        rel_util: ModelUtil,
+        rel_path: str,
+        m2m_add: bool,
+        m2m_remove: bool,
+    ):
+        action, schema_in = self._resolve_action_schema(m2m_add, m2m_remove)
+        plural = rel_util.model._meta.verbose_name_plural.capitalize()
+        summary = f"{action} {plural}"
+
+        @self.router.post(
+            f"{self.view_set.path_retrieve}{rel_path}/",
+            response={
+                200: M2MSchemaOut,
+                self.view_set.error_codes: GenericMessageSchema,
+            },
+            auth=m2m_auth,
+            summary=summary,
+            description=summary,
+        )
+        @unique_view(f"manage_{self.related_model_util.model_name}_{rel_path}")
+        async def manage_related(
+            request: HttpRequest,
+            pk: Path[self.path_schema],  # type: ignore
+            data: schema_in,  # type: ignore
+        ):
+            obj = await self.related_model_util.get_object(
+                request, self.view_set._get_pk(pk)
+            )
+            related_manager: QuerySet = getattr(obj, related_name)
+
+            add_pks = getattr(data, "add", []) if m2m_add else []
+            remove_pks = getattr(data, "remove", []) if m2m_remove else []
+
+            add_errors, add_details, add_objs = await self._collect_m2m(
+                request, add_pks, model, related_manager
+            )
+            remove_errors, remove_details, remove_objs = await self._collect_m2m(
+                request, remove_pks, model, related_manager, remove=True
+            )
+
+            tasks = []
+            if add_objs:
+                tasks.append(related_manager.aadd(*add_objs))
+            if remove_objs:
+                tasks.append(related_manager.aremove(*remove_objs))
+            if tasks:
+                await asyncio.gather(*tasks)
+
+            results = add_details + remove_details
+            errors = add_errors + remove_errors
+            return {
+                "results": {"count": len(results), "details": results},
+                "errors": {"count": len(errors), "details": errors},
+            }
+
     def _build_views(self, relation: M2MRelationSchema):
         model = relation.model
         related_name = relation.related_name
@@ -289,105 +403,29 @@ class ManyToManyAPI:
         rel_util = ModelUtil(model)
         rel_path = relation.path or rel_util.verbose_name_path_resolver()
         related_schema = model.generate_related_s()
-
-        m2m_add = relation.add
-        m2m_remove = relation.remove
-        m2m_get = relation.get
+        m2m_add, m2m_remove, m2m_get = relation.add, relation.remove, relation.get
         filters_schema = self.relations_filters_schemas.get(related_name)
 
-        # GET related
         if m2m_get:
-
-            @self.router.get(
-                f"{self.view_set.path_retrieve}{rel_path}",
-                response={
-                    200: list[related_schema],
-                    self.view_set.error_codes: GenericMessageSchema,
-                },
-                auth=m2m_auth,
-                summary=f"Get {rel_util.model._meta.verbose_name_plural.capitalize()}",
-                description=f"Get all related {rel_util.model._meta.verbose_name_plural.capitalize()}",
+            self._register_get_relation_view(
+                related_name=related_name,
+                m2m_auth=m2m_auth,
+                rel_util=rel_util,
+                rel_path=rel_path,
+                related_schema=related_schema,
+                filters_schema=filters_schema,
             )
-            @unique_view(f"get_{self.related_model_util.model_name}_{rel_path}")
-            @paginate(self.pagination_class)
-            async def get_related(
-                request: HttpRequest,
-                pk: Path[self.path_schema],  # type: ignore
-                filters: Query[filters_schema] = None,  # type: ignore
-            ):
-                obj = await self.related_model_util.get_object(
-                    request, self.view_set._get_pk(pk)
-                )
-                related_manager = getattr(obj, related_name)
-                related_qs = related_manager.all()
 
-                query_handler = self._get_query_handler(related_name)
-                if filters is not None and query_handler:
-                    related_qs = await query_handler(related_qs, filters.model_dump())
-
-                return [
-                    await rel_util.read_s(request, rel_obj, related_schema)
-                    async for rel_obj in related_qs
-                ]
-
-        # ADD / REMOVE related
         if m2m_add or m2m_remove:
-            plural = rel_util.model._meta.verbose_name_plural.capitalize()
-            action_map = {
-                (True, True): ("Add or Remove", M2MSchemaIn),
-                (True, False): ("Add", M2MAddSchemaIn),
-                (False, True): ("Remove", M2MRemoveSchemaIn),
-            }
-            action, schema_in = action_map[(m2m_add, m2m_remove)]
-            summary = f"{action} {plural}"
-            description = summary
-
-            @self.router.post(
-                f"{self.view_set.path_retrieve}{rel_path}/",
-                response={
-                    200: M2MSchemaOut,
-                    self.view_set.error_codes: GenericMessageSchema,
-                },
-                auth=m2m_auth,
-                summary=summary,
-                description=description,
+            self._register_manage_relation_view(
+                model=model,
+                related_name=related_name,
+                m2m_auth=m2m_auth,
+                rel_util=rel_util,
+                rel_path=rel_path,
+                m2m_add=m2m_add,
+                m2m_remove=m2m_remove,
             )
-            @unique_view(f"manage_{self.related_model_util.model_name}_{rel_path}")
-            async def manage_related(
-                request: HttpRequest,
-                pk: Path[self.path_schema],  # type: ignore
-                data: schema_in,  # type: ignore
-            ):
-                obj = await self.related_model_util.get_object(
-                    request, self.view_set._get_pk(pk)
-                )
-                related_manager: QuerySet = getattr(obj, related_name)
-
-                add_pks = getattr(data, "add", []) if m2m_add else []
-                remove_pks = getattr(data, "remove", []) if m2m_remove else []
-
-                add_errors, add_details, add_objs = await self._collect_m2m(
-                    request, add_pks, model, related_manager
-                )
-                remove_errors, remove_details, remove_objs = await self._collect_m2m(
-                    request, remove_pks, model, related_manager, remove=True
-                )
-
-                tasks = []
-                if add_objs:
-                    tasks.append(related_manager.aadd(*add_objs))
-                if remove_objs:
-                    tasks.append(related_manager.aremove(*remove_objs))
-                if tasks:
-                    await asyncio.gather(*tasks)
-
-                results = add_details + remove_details
-                errors = add_errors + remove_errors
-
-                return {
-                    "results": {"count": len(results), "details": results},
-                    "errors": {"count": len(errors), "details": errors},
-                }
 
     def _add_views(self):
         for relation in self.relations:
