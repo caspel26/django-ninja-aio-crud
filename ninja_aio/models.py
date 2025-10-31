@@ -311,7 +311,7 @@ class ModelUtil:
         rel_pk = nested_dict.get(rel_util.model_pk_name)
         return await rel_util.get_object(request, rel_pk)
 
-    async def _rewrite_nested_foreign_keys(self, rel_obj, nested_dict: dict):
+    def _rewrite_nested_foreign_keys(self, rel_obj, nested_dict: dict):
         """
         Rewrite foreign key keys inside a nested dict from <key> to <key>_id.
         """
@@ -421,7 +421,7 @@ class ModelUtil:
             rel_instance = await self._fetch_related_instance(request, field_obj, v)
 
             if isinstance(field_obj, models.ForeignKey):
-                await self._rewrite_nested_foreign_keys(rel_instance, v)
+                self._rewrite_nested_foreign_keys(rel_instance, v)
 
             payload[k] = rel_instance
 
