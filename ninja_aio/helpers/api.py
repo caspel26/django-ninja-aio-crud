@@ -217,7 +217,7 @@ class ManyToManyAPI:
         self.pagination_class = self.view_set.pagination_class
         self.path_schema = self.view_set.path_schema
         self.default_auth = self.view_set.m2m_auth
-        self.related_model_util = ModelUtil(self.view_set.model_util)
+        self.related_model_util = self.view_set.model_util
         self.relations_filters_schemas = self._generate_m2m_filters_schemas()
 
     def _generate_m2m_filters_schemas(self):
@@ -259,7 +259,7 @@ class ManyToManyAPI:
                 continue
             if remove ^ (rel_obj in rel_objs):
                 errors.append(
-                    f"{rel_model_name} with id {obj_pk} is {'not ' if remove else ''}in {self.model_util.model_name}"
+                    f"{rel_model_name} with id {obj_pk} is {'not ' if remove else ''}in {self.related_model_util.model_name}"
                 )
                 continue
             objs.append(rel_obj)
@@ -285,7 +285,7 @@ class ManyToManyAPI:
     def _build_views(self, relation: M2MRelationSchema):
         model = relation.model
         related_name = relation.related_name
-        m2m_auth = relation.auth or self.m2m_auth
+        m2m_auth = relation.auth or self.default_auth
         rel_util = ModelUtil(model)
         rel_path = relation.path or rel_util.verbose_name_path_resolver()
         related_schema = model.generate_related_s()
@@ -293,16 +293,16 @@ class ManyToManyAPI:
         m2m_add = relation.add
         m2m_remove = relation.remove
         m2m_get = relation.get
-        filters_schema = self.m2m_filters_schemas.get(related_name)
+        filters_schema = self.relations_filters_schemas.get(related_name)
 
         # GET related
         if m2m_get:
 
             @self.router.get(
-                f"{self.path_retrieve}{rel_path}",
+                f"{self.view_set.path_retrieve}{rel_path}",
                 response={
                     200: list[related_schema],
-                    self.error_codes: GenericMessageSchema,
+                    self.view_set.error_codes: GenericMessageSchema,
                 },
                 auth=m2m_auth,
                 summary=f"Get {rel_util.model._meta.verbose_name_plural.capitalize()}",
@@ -343,8 +343,11 @@ class ManyToManyAPI:
             description = summary
 
             @self.router.post(
-                f"{self.path_retrieve}{rel_path}/",
-                response={200: M2MSchemaOut, self.error_codes: GenericMessageSchema},
+                f"{self.view_set.path_retrieve}{rel_path}/",
+                response={
+                    200: M2MSchemaOut,
+                    self.view_set.error_codes: GenericMessageSchema,
+                },
                 auth=m2m_auth,
                 summary=summary,
                 description=description,
