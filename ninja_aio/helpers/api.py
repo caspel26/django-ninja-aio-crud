@@ -21,6 +21,11 @@ class ManyToManyAPI:
     """
     ManyToManyAPI
     -------------
+    WARNING (Internal Use Only):
+        This helper is currently intended solely for internal purposes. Its API,
+        behaviors, and response formats may change without notice. Do not rely on
+        it as a stable public interface.
+
     Utility class that dynamically attaches asynchronous Many-To-Many (M2M) management
     endpoints (GET / ADD / REMOVE) to a provided APIViewSet router in a Django Ninja
     async CRUD context.
@@ -57,6 +62,7 @@ class ManyToManyAPI:
     {
         "results": {"count": int, "details": [str, ...]},
         "errors":  {"count": int, "details": [str, ...]}
+    }
 
     Concurrency note:
         Add and remove operations are executed concurrently when both lists are non-empty,
