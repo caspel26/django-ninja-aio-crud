@@ -89,9 +89,6 @@ extra:
       name: PyPI
   analytics:
     provider: google
-  version:
-    default: latest
-    provider: mike
 
 plugins:
   - search:
