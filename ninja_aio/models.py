@@ -262,9 +262,7 @@ class ModelUtil:
     async def _get_field(self, k: str):
         return (await agetattr(self.model, k)).field
 
-    def _decode_binary(
-        self, payload: dict, k: str, v: Any, field_obj: models.Field
-    ):
+    def _decode_binary(self, payload: dict, k: str, v: Any, field_obj: models.Field):
         if not isinstance(field_obj, models.BinaryField):
             return
         try:
@@ -293,7 +291,9 @@ class ModelUtil:
         descriptor = getattr(self.model, field_name, None)
         if descriptor is None:
             return None
-        return getattr(descriptor, "field", None) or getattr(descriptor, "related", None)
+        return getattr(descriptor, "field", None) or getattr(
+            descriptor, "related", None
+        )
 
     def _should_process_nested(self, value: Any, field_obj: Any) -> bool:
         """
@@ -303,7 +303,9 @@ class ModelUtil:
             return False
         return isinstance(field_obj, (models.ForeignKey, models.OneToOneField))
 
-    async def _fetch_related_instance(self, request, field_obj: models.Field, nested_dict: dict):
+    async def _fetch_related_instance(
+        self, request, field_obj: models.Field, nested_dict: dict
+    ):
         """
         Resolve the related instance from its primary key inside the nested dict.
         """
@@ -882,6 +884,48 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
         return related_fields, custom_related_fields
 
     @classmethod
+    def _build_schema_reverse_rel(cls, field_name: str, descriptor: Any):
+        """
+        Build a reverse relation schema component for 'Out' schema generation.
+        """
+        if isinstance(descriptor, ManyToManyDescriptor):
+            rel_model: ModelSerializer = descriptor.field.related_model
+            if descriptor.reverse:  # reverse side of M2M
+                rel_model = descriptor.field.model
+            rel_type = "many"
+        elif isinstance(descriptor, ReverseManyToOneDescriptor):
+            rel_model = descriptor.field.model
+            rel_type = "many"
+        else:  # ReverseOneToOneDescriptor
+            rel_model = descriptor.related.related_model
+            rel_type = "one"
+
+        if not isinstance(rel_model, ModelSerializerMeta):
+            return None
+        if not rel_model.get_fields("read") and not rel_model.get_custom_fields("read"):
+            return None
+
+        rel_schema = (
+            rel_model.generate_related_s()
+            if rel_type == "one"
+            else list[rel_model.generate_related_s()]
+        )
+        return (field_name, rel_schema | None, None)
+
+    @classmethod
+    def _build_schema_forward_rel(cls, field_name: str, descriptor: Any):
+        """
+        Build a forward relation schema component for 'Out' schema generation.
+        """
+        rel_model = descriptor.field.related_model
+        if not isinstance(rel_model, ModelSerializerMeta):
+            return True  # Signal: treat as plain field
+        if not rel_model.get_fields("read") and not rel_model.get_custom_fields("read"):
+            return None  # Skip entirely
+        rel_schema = rel_model.generate_related_s()
+        return (field_name, rel_schema | None, None)
+
+    @classmethod
     def get_schema_out_data(cls):
         """
         Collect components for 'Out' read schema generation.
@@ -891,11 +935,15 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
         tuple
             (fields, reverse_rel_descriptors, excludes, custom_fields_with_forward_relations)
         """
-        fields = []
-        reverse_rels = []
-        rels = []
+
+        fields: list[str] = []
+        reverse_rels: list[tuple] = []
+        rels: list[tuple] = []
+
         for f in cls.get_fields("read"):
             field_obj = getattr(cls, f)
+
+            # Reverse relations
             if isinstance(
                 field_obj,
                 (
@@ -904,46 +952,26 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
                     ReverseOneToOneDescriptor,
                 ),
             ):
-                if isinstance(field_obj, ManyToManyDescriptor):
-                    rel_obj: ModelSerializer = field_obj.field.related_model
-                    if field_obj.reverse:
-                        rel_obj = field_obj.field.model
-                    rel_type = "many"
-                elif isinstance(field_obj, ReverseManyToOneDescriptor):
-                    rel_obj = field_obj.field.model
-                    rel_type = "many"
-                else:  # ReverseOneToOneDescriptor
-                    rel_obj = field_obj.related.related_model
-                    rel_type = "one"
-                if not isinstance(rel_obj, ModelSerializerMeta):
+                rel_tuple = cls._build_schema_reverse_rel(f, field_obj)
+                if rel_tuple:
+                    reverse_rels.append(rel_tuple)
                     continue
-                if not rel_obj.get_fields("read") and not rel_obj.get_custom_fields(
-                    "read"
-                ):
-                    continue
-                rel_schema = (
-                    rel_obj.generate_related_s()
-                    if rel_type != "many"
-                    else list[rel_obj.generate_related_s()]
-                )
-                rel_data = (f, rel_schema | None, None)
-                reverse_rels.append(rel_data)
-                continue
+
+            # Forward relations
             if isinstance(
                 field_obj, (ForwardOneToOneDescriptor, ForwardManyToOneDescriptor)
             ):
-                rel_obj = field_obj.field.related_model
-                if not isinstance(rel_obj, ModelSerializerMeta):
+                rel_tuple = cls._build_schema_forward_rel(f, field_obj)
+                if rel_tuple is True:
                     fields.append(f)
-                    continue
-                if not rel_obj.get_fields("read") and not rel_obj.get_custom_fields(
-                    "read"
-                ):
-                    continue
-                rel_data = (f, rel_obj.generate_related_s() | None, None)
-                rels.append(rel_data)
+                elif rel_tuple:
+                    rels.append(rel_tuple)
+                # If rel_tuple is None -> skip
                 continue
+
+            # Plain field
             fields.append(f)
+
         return (
             fields,
             reverse_rels,
