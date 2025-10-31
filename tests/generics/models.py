@@ -64,7 +64,7 @@ class Tests:
             """
             Should be implemented into the child class
             """
-            return list()
+            return []
 
         @property
         def parsed_input_data(self) -> dict:
