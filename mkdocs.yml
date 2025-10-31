@@ -27,6 +27,9 @@ nav:
   - Contributing: contributing.md
 
 theme:
+  font:
+    text: Roboto
+    code: Roboto Mono
   name: material
   language: en
   logo: images/logo.png
@@ -86,9 +89,9 @@ extra:
       name: PyPI
   analytics:
     provider: google
-    property: UA-XXXXXXX-X  # replace or remove
   version:
-    default: latest  # useful if later using mike
+    default: latest
+    provider: mike
 
 plugins:
   - search:
@@ -112,6 +115,7 @@ plugins:
               - "!^__"
             inherited_members: true
             signature_crossrefs: true
+  - mike
 
 markdown_extensions:
   - admonition
