@@ -74,9 +74,9 @@ class M2MRelationSchema(BaseModel):
         if related_schema is not None:
             return data
         model = data.get("model")
-        if not isinstance(model, ModelSerializer):
+        if not issubclass(model, ModelSerializer):
             raise ValueError(
                 "related_schema must be provided if model is not a ModelSerializer",
             )
-        data.related_schema = model.generate_related_s()
+        data["related_schema"] = model.generate_related_s()
         return data
