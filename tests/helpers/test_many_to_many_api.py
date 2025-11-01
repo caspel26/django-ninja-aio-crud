@@ -117,6 +117,3 @@ class ManyToManyAPITestCase(TestCase):
         content = await self.manage_view(self.request.post(), self.path_schema, data)
         self.assertEqual(content["results"]["count"], 0)
         self.assertEqual(content["errors"]["count"], 1)
-
-    async def test_t(self):
-        self.assertTrue(True)
