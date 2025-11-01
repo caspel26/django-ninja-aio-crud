@@ -3,7 +3,7 @@ from typing import Optional, Type
 from ninja import Schema
 from .models import ModelSerializer
 from django.db.models import Model
-from pydantic import BaseModel, RootModel, ConfigDict
+from pydantic import BaseModel, RootModel, ConfigDict, model_validator
 
 
 class GenericMessageSchema(RootModel[dict[str, str]]):
@@ -63,5 +63,20 @@ class M2MRelationSchema(BaseModel):
     path: Optional[str] = ""
     auth: Optional[list] = None
     filters: Optional[dict[str, tuple]] = None
+    related_schema: Optional[Type[Schema]] = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def validate_related_schema(cls, data):
+        related_schema = data.get("related_schema")
+        if related_schema is not None:
+            return data
+        model = data.get("model")
+        if not isinstance(model, ModelSerializer):
+            raise ValueError(
+                "related_schema must be provided if model is not a ModelSerializer",
+            )
+        data.related_schema = model.generate_related_s()
+        return data

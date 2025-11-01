@@ -402,7 +402,7 @@ class ManyToManyAPI:
         m2m_auth = relation.auth or self.default_auth
         rel_util = ModelUtil(model)
         rel_path = relation.path or rel_util.verbose_name_path_resolver()
-        related_schema = model.generate_related_s()
+        related_schema = relation.related_schema
         m2m_add, m2m_remove, m2m_get = relation.add, relation.remove, relation.get
         filters_schema = self.relations_filters_schemas.get(related_name)
 
