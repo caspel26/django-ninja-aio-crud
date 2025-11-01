@@ -11,9 +11,9 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.10'
       - name: Install Flit
@@ -27,6 +27,6 @@ jobs:
           coverage xml
 
       - name: Coverage
-        uses: codecov/codecov-action@v5.1.2
+        uses: codecov/codecov-action@v5.5.1
         with: 
           token: ${{ secrets.CODECOV_TOKEN }}

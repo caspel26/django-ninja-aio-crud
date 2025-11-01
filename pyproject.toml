@@ -37,3 +37,4 @@ test = [
 
 [tool.flit.metadata.urls]
 Repository = "https://github.com/caspel26/django-ninja-aio-crud"
+Documentation = "https://django-ninja-aio.com"

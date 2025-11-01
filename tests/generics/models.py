@@ -3,11 +3,12 @@ from unittest import mock
 from ninja import Schema
 from ninja_aio.models import ModelUtil
 from ninja_aio.types import ModelSerializerMeta
-from ninja_aio.exceptions import SerializeError
+from ninja_aio.exceptions import NotFoundError
 from django.db.models import Model
 from django.test import TestCase, tag
 
 from tests.generics.request import Request
+from tests.generics.literals import NOT_FOUND
 
 
 class Tests:
@@ -64,10 +65,22 @@ class Tests:
             """
             Should be implemented into the child class
             """
-            return list()
+            return []
 
         @property
         def parsed_input_data(self) -> dict:
+            """
+            Should be implemented into the child class
+            """
+
+        @property
+        def additional_getters(self) -> dict:
+            """
+            Should be implemented into the child class
+            """
+
+        @property
+        def additional_filters(self) -> dict:
             """
             Should be implemented into the child class
             """
@@ -98,10 +111,11 @@ class Tests:
             )
 
         async def test_get_object_not_found(self):
-            with self.assertRaises(SerializeError) as exc:
+            with self.assertRaises(NotFoundError) as exc:
                 await self.model_util.get_object(self.request.get(), 0)
             self.assertEqual(
-                exc.exception.error, {self.model._meta.model_name: "not found"}
+                exc.exception.error,
+                {self.model._meta.verbose_name.replace(" ", "_"): NOT_FOUND},
             )
             self.assertEqual(exc.exception.status_code, 404)
 
@@ -113,6 +127,34 @@ class Tests:
             mock_queryset_request.return_value = self.model.objects.select_related()
             obj = await self.model_util.get_object(self.request.get(), self.obj.pk)
             self.assertEqual(obj, self.obj)
+            if isinstance(self.model, ModelSerializerMeta):
+                mock_queryset_request.assert_awaited_once()
+            else:
+                mock_queryset_request.assert_not_awaited()
+
+        @mock.patch(
+            "ninja_aio.models.ModelSerializer.queryset_request",
+            new_callable=mock.AsyncMock,
+        )
+        async def test_get_object_with_additional_data(
+            self, mock_queryset_request: mock.AsyncMock
+        ):
+            mock_queryset_request.return_value = (
+                self.model.objects.select_related().all()
+            )
+            obj = await self.model_util.get_object(
+                self.request.get(),
+                **{
+                    "filters": self.additional_filters,
+                    "getters": self.additional_getters,
+                },
+            )
+            _obj = (
+                await self.model.objects.select_related()
+                .filter(**self.additional_filters)
+                .aget(**self.additional_getters)
+            )
+            self.assertEqual(obj, _obj)
             if isinstance(self.model, ModelSerializerMeta):
                 mock_queryset_request.assert_awaited_once()
             else:
@@ -169,13 +211,14 @@ class Tests:
             self.assertEqual(response, self.read_data)
 
         async def test_update_s_object_not_found(self):
-            with self.assertRaises(SerializeError) as exc:
+            with self.assertRaises(NotFoundError) as exc:
                 await self.model_util.update_s(
                     self.request.patch(), self.data_patch, 0, self.schema_out
                 )
             self.assertEqual(exc.exception.status_code, 404)
             self.assertEqual(
-                exc.exception.error, {self.model._meta.model_name: "not found"}
+                exc.exception.error,
+                {self.model._meta.verbose_name.replace(" ", "_"): NOT_FOUND},
             )
 
         async def test_update_s(self):
@@ -185,11 +228,12 @@ class Tests:
             self.assertEqual(response, self.read_data)
 
         async def test_delete_s_object_not_found(self):
-            with self.assertRaises(SerializeError) as exc:
+            with self.assertRaises(NotFoundError) as exc:
                 await self.model_util.delete_s(self.request.delete(), 0)
             self.assertEqual(exc.exception.status_code, 404)
             self.assertEqual(
-                exc.exception.error, {self.model._meta.model_name: "not found"}
+                exc.exception.error,
+                {self.model._meta.verbose_name.replace(" ", "_"): NOT_FOUND},
             )
 
         async def test_delete_s(self):

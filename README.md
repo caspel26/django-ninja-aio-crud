@@ -1,435 +1,304 @@
 # 🥷 django-ninja-aio-crud
-![Test](https://github.com/caspel26/django-ninja-aio-crud/actions/workflows/coverage.yml/badge.svg)
-[![codecov](https://codecov.io/gh/caspel26/django-ninja-aio-crud/graph/badge.svg?token=DZ5WDT3S20)](https://codecov.io/gh/caspel26/django-ninja-aio-crud)
+
+![Tests](https://github.com/caspel26/django-ninja-aio-crud/actions/workflows/coverage.yml/badge.svg)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=caspel26_django-ninja-aio-crud&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=caspel26_django-ninja-aio-crud)
+[![codecov](https://codecov.io/gh/caspel26/django-ninja-aio-crud/graph/badge.svg?token=DZ5WDT3S20)](https://codecov.io/gh/caspel26/django-ninja-aio-crud/)
 [![PyPI - Version](https://img.shields.io/pypi/v/django-ninja-aio-crud?color=g&logo=pypi&logoColor=white)](https://pypi.org/project/django-ninja-aio-crud/)
-[![PyPI - License](https://img.shields.io/pypi/l/django-ninja-aio-crud)](https://github.com/caspel26/django-ninja-aio-crud/blob/main/LICENSE)
+[![PyPI - License](https://img.shields.io/pypi/l/django-ninja-aio-crud)](LICENSE)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-> [!NOTE]
-> Django ninja aio crud framework is based on **<a href="https://django-ninja.dev/">Django Ninja framework</a>**. It comes out with built-in views and models which are able to make automatic async CRUD operations and codes views class based making the developers' life easier and the code cleaner.
 
-## 📝 Instructions
+> Lightweight async CRUD layer on top of **[Django Ninja](https://django-ninja.dev/)** with automatic schema generation, filtering, pagination, auth & Many‑to‑Many management.
 
-### 📚 Prerequisites
+---
 
-- Install Python from the [official website](https://www.python.org/) (latest version) and ensure it is added to the system Path and environment variables.
+## ✨ Features
 
-### 💻 Setup your environment
+- Async CRUD ViewSets (create, list, retrieve, update, delete)
+- Automatic Pydantic schemas from `ModelSerializer` (read/create/update)
+- Dynamic query params (runtime schema via `pydantic.create_model`)
+- Per-method authentication (`auth`, `get_auth`, `post_auth`, etc.)
+- Async pagination (customizable)
+- M2M relation endpoints via `M2MRelationSchema` (add/remove/get + filters)
+- Reverse relation serialization
+- Hook methods (`query_params_handler`, `<related>_query_params_handler`, `custom_actions`, lifecycle hooks)
+- ORJSON renderer through `NinjaAIO`
+- Clean, minimal integration
 
-- Create a virtual environment
-```bash
-python -m venv .venv
-```
+---
 
-### ✅ Activate it
-
-- If you are from linux activate it with
-
-```bash
-. .venv/bin/activate
-```
-
-- If you are from windows activate it with
-
-```bash
-. .venv/Scripts/activate
-```
-
-### 📥 Install package
+## 📦 Installation
 
 ```bash
 pip install django-ninja-aio-crud
 ```
 
-## 🚀 Usage
+Add to your project’s dependencies and ensure Django Ninja is installed.
 
-> [!TIP]
-> If you find **django ninja aio crud** useful, consider :star: this project
-> and why not ... [Buy me a coffee](https://buymeacoffee.com/caspel26)
+---
 
-### ModelSerializer
+## 🚀 Quick Start
 
-- You can serialize your models using ModelSerializer and made them inherit from it. In your models.py import ModelSerializer
+models.py
 ```python
-# models.py
 from django.db import models
 from ninja_aio.models import ModelSerializer
 
-
-class Foo(ModelSerializer):
-  name = models.CharField(max_length=30)
-  bar = models.CharField(max_length=30)
-
-  class ReadSerializer:
-    fields = ["id", "name", "bar"]
-
-  class CreateSerializer:
-    fields = ["name", "bar"]
-
-  class UpdateSerializer:
-    fields = ["name", "bar"]
-```
-
-- ReadSerializer, CreateSerializer, UpdateSerializer are used to define which fields would be included in runtime schemas creation. You can also specify custom fields and handle their function by overriding custom_actions ModelSerializer's method(custom fields are only available for Create and Update serializers).
-
-```python
-# models.py
-from django.db import models
-from ninja_aio.models import ModelSerializer
-
-
-class Foo(ModelSerializer):
-  name = models.CharField(max_length=30)
-  bar = models.CharField(max_length=30)
-  active = models.BooleanField(default=False)
-
-  class ReadSerializer:
-    fields = ["id", "name", "bar"]
-
-  class CreateSerializer:
-    customs = [("force_activation", bool, False)]
-    fields = ["name", "bar"]
-
-  class UpdateSerializer:
-    fields = ["name", "bar"]
-
-  async def custom_actions(self, payload: dict[str, Any]):
-      if not payload.get("force_activation"):
-          return
-      setattr(self, "force_activation", True)
-  
-  async def post_create(self) -> None:
-      if not hasattr(self, "force_activation") or not getattr(self, "force_activation"):
-          return
-      self.active = True
-      await self.asave()
-```
-
-- post create method is a custom method that comes out to handle actions which will be excuted after that the object is created. It can be used, indeed, for example to handle custom fields' actions.
-
-- You can also define optional fields for you Create and Update serializers (remember to give your optional fields a default). To declare an optional fields you have to give the field type too.
-```python
-# models.py
-from django.db import models
-from ninja_aio.models import ModelSerializer
-
-
-class Foo(ModelSerializer):
-  name = models.CharField(max_length=30)
-  bar = models.CharField(max_length=30, default="")
-  active = models.BooleanField(default=False)
-
-  class ReadSerializer:
-    fields = ["id", "name", "bar"]
-
-  class CreateSerializer:
-    fields = ["name"]
-    optionals = [("bar", str), ("active", bool)]
-
-  class UpdateSerializer:
-    optionals = [[("bar", str), ("active", bool)]
-```
-
-- Instead of declaring your fields maybe you want to exclude some of them. Declaring "excludes" attribute into serializers will exclude the given fields. (You can declare only one between "fields" and "excludes").
-
-```python
-# models.py
-from django.db import models
-from ninja_aio.models import ModelSerializer
-
-
-class Foo(ModelSerializer):
-  name = models.CharField(max_length=30)
-  bar = models.CharField(max_length=30, default="")
-  active = models.BooleanField(default=False)
-
-  class ReadSerializer:
-    excludes = ["bar"]
-
-  class CreateSerializer:
-    fields = ["name"]
-    optionals = [("bar", str), ("active", bool)]
-
-  class UpdateSerializer:
-    excludes = ["id", "name"]
-    optionals = [[("bar", str), ("active", bool)]
-```
-
-
-### APIViewSet
-
-- View class used to automatically generate CRUD views. in your views.py import APIViewSet and define your api using NinjaAIO class. NinjaAIO class uses built-in parser and renderer which use orjson for data serialization.
-
-```python
-# views.py
-from ninja_aio import NinjaAIO
-from ninja_aio.views import APIViewSet
-
-from .models import Foo
-
-api = NinjaAIO()
-
-
-class FooAPI(APIViewSet):
-  model = Foo
-  api = api
-
-  
-FooAPI().add_views_to_route()
-```
-
-- and that's it, your model CRUD will be automatically created. You can also add custom views to CRUD overriding the built-in method "views".
-
-```python
-# views.py
-from ninja import Schema
-from ninja_aio import NinjaAIO
-from ninja_aio.views import APIViewSet
-
-from .models import Foo
-
-api = NinjaAIO()
-
-
-class ExampleSchemaOut(Schema):
-  sum: float
-
-
-class ExampleSchemaIn(Schema):
-  n1: float
-  n2: float
-
-
-class FooAPI(APIViewSet):
-  model = Foo
-  api = api
-
-  def views(self):
-    @self.router.post("numbers-sum/", response={200: ExampleSchemaOut})
-    async def sum(request: HttpRequest, data: ExampleSchemaIn):
-        return 200, {sum: data.n1 + data.n2}
-
-
-FooAPI().add_views_to_route()
-```
-
-- You can also choose to disable any operation from crud by declaring "disbale" attribute. You can give "all" to disable every crud operation except for additional views.
-
-> [!TIP]
-> You can exclude by default an endpoint without declaring the serializer.
-> For example if you don't want to give update method to a CRUD just do not declare UpdateSerializer into model.
-
-```python
-# views.py
-from ninja_aio import NinjaAIO
-from ninja_aio.views import APIViewSet
-
-from .models import Foo
-
-api = NinjaAIO()
-
-
-class FooAPI(APIViewSet):
-  model = Foo
-  api = api
-  disable = ["retrieve", "update"]
-
-
-FooAPI().add_views_to_route()
-```
-
-### APIView
-
-- View class to code generic views class based. In your views.py import APIView class.
-
-```python
-# views.py
-from ninja import Schema
-from ninja_aio import NinjaAIO
-from ninja_aio.views import APIView
-
-api = NinjaAIO()
-
-
-class ExampleSchemaOut(Schema):
-  sum: float
-
-
-class ExampleSchemaIn(Schema):
-  n1: float
-  n2: float
-
-
-class SumView(APIView):
-  api = api
-  api_router_path = "numbers-sum/"
-  router_tag = "Sum"
-
-  def views(self):
-    @self.router.post("/", response={200: ExampleSchemaOut})
-    async def sum(request: HttpRequest, data: ExampleSchemaIn):
-        return 200, {sum: data.n1 + data.n2}
-
-
-SumView().add_views_to_route()
-```
-
-### Relations
-- You can also set ForeignKey, OneToOne and ManyToMany relations into serialization(reverse relations are supported too). Django ninja aio crud will serialize every of these relation automatically.
-
-- Define models:
-
-```python
-# models.py
-class Bar(ModelSerializer):
-    name = models.CharField(max_length=30)
-    description = models.TextField(max_length=30)
-
-    # ReadSerializer with reverse OneToMany relation (foos)
-    class ReadSerializer:
-        fields = ["id", "name", "description", "foos"]
-
-    class CreateSerializer:
-        fields = ["name", "description"]
-
-    class UpdateSerializer:
-        fields = ["name", "description"]
-
-
-class Foo(ModelSerializer):
-    name = models.CharField(max_length=30)
-    bar = models.ForeignKey(Bar, on_delete=models.CASCADE, related_name="foos")
+class Book(ModelSerializer):
+    title = models.CharField(max_length=120)
+    published = models.BooleanField(default=True)
 
     class ReadSerializer:
-        fields = ["id", "name", "bar"]
+        fields = ["id", "title", "published"]
 
     class CreateSerializer:
-        fields = ["name", "bar"]
+        fields = ["title", "published"]
 
     class UpdateSerializer:
-        fields = ["name"]
+        optionals = [("title", str), ("published", bool)]
 ```
 
-- Define views:
-
+views.py
 ```python
-# views.py
 from ninja_aio import NinjaAIO
 from ninja_aio.views import APIViewSet
-
-from .models import Foo, Bar
-
-api = NinjaAIO()
-
-
-class FooAPI(APIViewSet):
-  model = Foo
-  api = api
-
-
-class BarAPI(APIViewSet):
-  model = Bar
-  api = api
-
-
-FooAPI().add_views_to_route()
-BarAPI().add_views_to_route()
-```
-
-- Now run your server and go to /docs url:
-
-### Docs
-
-- Foo Schemas
-
-![Swagger UI](docs/images/foo-swagger.png)
-
-- Bar Schemas with reverse relation
-
-![Swagger UI](docs/images/bar-swagger.png)
-
-## 🔒 Authentication
-
-### Jwt
-
-- AsyncJWTBearer built-in class is an authenticator class which use joserfc module. It cames out with authenticate method which validate given claims. Override auth handler method to write your own authentication method. Default algorithms used is RS256. a jwt Token istance is set as class atribute so you can use it by self.dcd.  
-
-```python
-from ninja_aio.auth import AsyncJWTBearer
-from django.conf import settings
-from django.http import HttpRequest
-
-from .models import Foo
-
-
-class CustomJWTBearer(AsyncJWTBearer):
-    jwt_public = settings.JWT_PUBLIC
-    claims = {"foo_id": {"essential": True}}
-
-    async def auth_handler(self, request: HttpRequest):
-      try:
-        request.user = await Foo.objects.aget(id=self.dcd.claims["foo_id"])
-      except Foo.DoesNotExist:
-        return None
-      return request.user
-```
-
-- Then add it to views.
-
-```python
-# views.py
-from ninja import Schema
-from ninja_aio import NinjaAIO
-from ninja_aio.views import APIViewSet, APIView
-
-from .models import Foo
+from .models import Book
 
 api = NinjaAIO()
 
+class BookViewSet(APIViewSet):
+    model = Book
+    api = api
 
-class FooAPI(APIViewSet):
-  model = Foo
-  api = api
-  auths = CustomJWTBearer()
-
-
-class ExampleSchemaOut(Schema):
-  sum: float
-
-
-class ExampleSchemaIn(Schema):
-  n1: float
-  n2: float
-
-
-class SumView(APIView):
-  api = api
-  api_router_path = "numbers-sum/"
-  router_tag = "Sum"
-  auths = CustomJWTBearer()
-
-  def views(self):
-    @self.router.post("/", response={200: ExampleSchemaOut}, auth=self.auths)
-    async def sum(request: HttpRequest, data: ExampleSchemaIn):
-        return 200, {sum: data.n1 + data.n2}
-
-
-FooAPI().add_views_to_route()
-SumView().add_views_to_route()
+BookViewSet().add_views_to_route()
 ```
 
-## 📝 Pagination
+Visit `/docs` → CRUD endpoints ready.
 
-- By default APIViewSet list view uses Django Ninja built-in AsyncPagination class "PageNumberPagination". You can customize and assign it to APIViewSet class. To make your custom pagination consult **<a href="https://django-ninja.dev/guides/response/pagination/#async-pagination">Django Ninja pagination documentation</a>**.
+---
+
+## 🔄 Query Filtering
 
 ```python
-# views.py
+class BookViewSet(APIViewSet):
+    model = Book
+    api = api
+    query_params = {"published": (bool, None), "title": (str, None)}
 
-class FooAPI(APIViewSet):
-  model = Foo
-  api = api
-  pagination_class = CustomPaginationClass
-
+    async def query_params_handler(self, queryset, filters):
+        if filters.get("published") is not None:
+            queryset = queryset.filter(published=filters["published"])
+        if filters.get("title"):
+            queryset = queryset.filter(title__icontains=filters["title"])
+        return queryset
 ```
 
-## 📌 Notes
-- Feel free to contribute and improve the program. 🛠️
+Request:
+```
+GET /book/?published=true&title=python
+```
+
+---
+
+## 🤝 Many-to-Many Example (with filters)
+
+```python
+from ninja_aio.schemas import M2MRelationSchema
+
+class Tag(ModelSerializer):
+    name = models.CharField(max_length=50)
+    class ReadSerializer:
+        fields = ["id", "name"]
+
+class Article(ModelSerializer):
+    title = models.CharField(max_length=120)
+    tags = models.ManyToManyField(Tag, related_name="articles")
+
+    class ReadSerializer:
+        fields = ["id", "title", "tags"]
+
+class ArticleViewSet(APIViewSet):
+    model = Article
+    api = api
+    m2m_relations = [
+        M2MRelationSchema(
+            model=Tag,
+            related_name="tags",
+            filters={"name": (str, "")}
+        )
+    ]
+
+    async def tags_query_params_handler(self, queryset, filters):
+        n = filters.get("name")
+        if n:
+            queryset = queryset.filter(name__icontains=n)
+        return queryset
+
+ArticleViewSet().add_views_to_route()
+```
+
+Endpoints:
+- `GET /article/{pk}/tag?name=dev`
+- `POST /article/{pk}/tag/` body: `{"add":[1,2],"remove":[3]}`
+
+---
+
+## 🔐 Authentication (JWT example)
+
+```python
+from ninja_aio.auth import AsyncJwtBearer
+from joserfc import jwk
+from .models import Book
+
+PUBLIC_KEY = "-----BEGIN PUBLIC KEY----- ..."
+
+class JWTAuth(AsyncJwtBearer):
+    jwt_public = jwk.RSAKey.import_key(PUBLIC_KEY)
+    jwt_alg = "RS256"
+    claims = {"sub": {"essential": True}}
+
+    async def auth_handler(self, request):
+        book_id = self.dcd.claims.get("sub")
+        return await Book.objects.aget(id=book_id)
+
+class SecureBookViewSet(APIViewSet):
+    model = Book
+    api = api
+    auth = [JWTAuth()]
+    get_auth = None  # list/retrieve public
+```
+
+---
+
+## 📑 Lifecycle Hooks (ModelSerializer)
+
+Available on every save/delete:
+- `on_create_before_save`
+- `on_create_after_save`
+- `before_save`
+- `after_save`
+- `on_delete`
+- `custom_actions(payload)` (create/update custom field logic)
+- `post_create()` (after create commit)
+
+---
+
+## 🧩 Adding Custom Endpoints
+
+```python
+class BookViewSet(APIViewSet):
+    model = Book
+    api = api
+
+    def views(self):
+        @self.router.get("/stats/")
+        async def stats(request):
+            total = await Book.objects.acount()
+            return {"total": total}
+```
+
+---
+
+## 📄 Pagination
+
+Default: `PageNumberPagination`. Override:
+
+```python
+from ninja.pagination import PageNumberPagination
+
+class LargePagination(PageNumberPagination):
+    page_size = 50
+    max_page_size = 200
+
+class BookViewSet(APIViewSet):
+    model = Book
+    api = api
+    pagination_class = LargePagination
+```
+
+---
+
+## 🛠 Project Structure & Docs
+
+Documentation (MkDocs + Material):
+```
+docs/
+  getting_started/
+  tutorial/
+  api/
+    views/
+    models/
+    authentication.md
+    pagination.md
+```
+
+Browse full reference:
+- APIViewSet: `docs/api/views/api_view_set.md`
+- APIView: `docs/api/views/api_view.md`
+- ModelSerializer: `docs/api/models/model_serializer.md`
+- Authentication: `docs/api/authentication.md`
+- Pagination: `docs/api/pagination.md`
+
+---
+
+## 🧪 Tests
+
+Use Django test runner + async ORM patterns. Example async pattern:
+```python
+obj = await Book.objects.acreate(title="T1", published=True)
+count = await Book.objects.acount()
+```
+
+---
+
+## 🚫 Disable Operations
+
+```python
+class ReadOnlyBookViewSet(APIViewSet):
+    model = Book
+    api = api
+    disable = ["update", "delete"]
+```
+
+---
+
+## 📌 Performance Tips
+
+- Use `queryset_request` classmethod to prefetch
+- Index frequently filtered fields
+- Keep pagination enabled
+- Limit slices (`queryset = queryset[:1000]`) for heavy searches
+
+---
+
+## 🤲 Contributing
+
+1. Fork
+2. Create branch
+3. Add tests
+4. Run lint (`ruff check .`)
+5. Open PR
+
+---
+
+## ⭐ Support
+
+Star the repo or donate:
+- [Buy me a coffee](https://buymeacoffee.com/caspel26)
+
+---
+
+## 📜 License
+
+MIT License. See [LICENSE](LICENSE).
+
+---
+
+## 🔗 Quick Links
+
+| Item | Link |
+|------|------|
+| PyPI | https://pypi.org/project/django-ninja-aio-crud/ |
+| Docs | https://django-ninja-aio.com
+| Issues | https://github.com/caspel26/django-ninja-aio-crud/issues |
+
+---

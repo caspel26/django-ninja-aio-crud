@@ -1,6 +1,10 @@
 from functools import partial
+
+from joserfc.errors import JoseError
 from ninja import NinjaAPI
 from django.http import HttpRequest, HttpResponse
+from pydantic import ValidationError
+from django.db.models import Model
 
 
 class BaseException(Exception):
@@ -11,11 +15,14 @@ class BaseException(Exception):
         self,
         error: str | dict = None,
         status_code: int | None = None,
-        is_critical: bool = False,
+        details: str | None = None,
     ) -> None:
-        self.error = error or self.error
+        if isinstance(error, str):
+            self.error = {"error": error}
+        if isinstance(error, dict):
+            self.error = error
+        self.error |= {"details": details} if details else {}
         self.status_code = status_code or self.status_code
-        self.is_critical = is_critical
 
     def get_error(self):
         return self.error, self.status_code
@@ -29,13 +36,55 @@ class AuthError(BaseException):
     pass
 
 
-def _default_serialize_error(
-    request: HttpRequest, exc: SerializeError, api: "NinjaAPI"
+class NotFoundError(BaseException):
+    status_code = 404
+    error = "not found"
+
+    def __init__(self, model: Model, details=None):
+        super().__init__(
+            error={model._meta.verbose_name.replace(" ", "_"): self.error},
+            status_code=self.status_code,
+            details=details,
+        )
+
+
+class PydanticValidationError(BaseException):
+    def __init__(self, details=None):
+        super().__init__("Validation Error", 400, details)
+
+
+def _default_error(
+    request: HttpRequest, exc: BaseException, api: type[NinjaAPI]
 ) -> HttpResponse:
     return api.create_response(request, exc.error, status=exc.status_code)
 
 
+def _pydantic_validation_error(
+    request: HttpRequest, exc: ValidationError, api: type[NinjaAPI]
+) -> HttpResponse:
+    error = PydanticValidationError(exc.errors(include_input=False))
+    return api.create_response(request, error.error, status=error.status_code)
+
+
+def _jose_error(
+    request: HttpRequest, exc: JoseError, api: type[NinjaAPI]
+) -> HttpResponse:
+    error = BaseException(**parse_jose_error(exc), status_code=401)
+    return api.create_response(request, error.error, status=error.status_code)
+
+
 def set_api_exception_handlers(api: type[NinjaAPI]) -> None:
+    api.add_exception_handler(BaseException, partial(_default_error, api=api))
+    api.add_exception_handler(JoseError, partial(_jose_error, api=api))
     api.add_exception_handler(
-        SerializeError, partial(_default_serialize_error, api=api)
+        ValidationError, partial(_pydantic_validation_error, api=api)
+    )
+
+
+def parse_jose_error(jose_exc: JoseError) -> dict:
+    error_msg = {"error": jose_exc.error}
+    return (
+        error_msg | {"details": jose_exc.description}
+        if jose_exc.description
+        else error_msg
     )
