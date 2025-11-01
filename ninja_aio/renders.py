@@ -1,5 +1,6 @@
 import base64
 from ipaddress import IPv4Address, IPv6Address
+from typing import Any
 
 import orjson
 from django.http import HttpRequest
@@ -40,5 +41,7 @@ class ORJSONRenderer(BaseRenderer):
         return value
 
     @classmethod
-    def parse_data(cls, data: dict):
+    def parse_data(cls, data: dict | Any):
+        if not isinstance(data, dict):
+            return cls.transform(data)
         return {k: cls.transform(v) for k, v in data.items()}
