@@ -284,14 +284,14 @@ class ModelUtil:
         rel = await rel_util.get_object(request, v, with_qs_request=False)
         payload[k] = rel
 
-    def _extract_field_obj(self, field_name: str):
+    async def _extract_field_obj(self, field_name: str):
         """
         Return the underlying Django Field (if any) for a given attribute name.
         """
-        descriptor = getattr(self.model, field_name, None)
+        descriptor = await agetattr(self.model, field_name, None)
         if descriptor is None:
             return None
-        return getattr(descriptor, "field", None) or getattr(
+        return await agetattr(descriptor, "field", None) or await agetattr(
             descriptor, "related", None
         )
 
@@ -312,6 +312,21 @@ class ModelUtil:
         rel_util = ModelUtil(field_obj.related_model)
         rel_pk = nested_dict.get(rel_util.model_pk_name)
         return await rel_util.get_object(request, rel_pk)
+
+    async def _rewrite_nested_foreign_keys(self, rel_obj, nested_dict: dict):
+        """
+        Rewrite foreign key keys inside a nested dict from <key> to <key>_id.
+        """
+        keys_to_rewrite: list[str] = []
+        new_nested = nested_dict
+        for rel_k in nested_dict.keys():
+            attr = await agetattr(rel_obj, rel_k)
+            if isinstance(attr, models.ForeignKey):
+                keys_to_rewrite.append(rel_k)
+        for old_k in keys_to_rewrite:
+            new_nested[f"{old_k}_id"] = new_nested.pop(old_k)
+        return new_nested
+
 
     async def parse_input_data(self, request: HttpRequest, data: Schema):
         """
@@ -403,10 +418,13 @@ class ModelUtil:
         payload = data.model_dump(mode="json")
 
         for k, v in payload.items():
-            field_obj = self._extract_field_obj(k)
+            field_obj = await self._extract_field_obj(k)
             if not self._should_process_nested(v, field_obj):
                 continue
-            payload[k] = await self._fetch_related_instance(request, field_obj, v)
+            rel_instance = await self._fetch_related_instance(request, field_obj, v)
+            if isinstance(field_obj, models.ForeignKey):
+                v = await self._rewrite_nested_foreign_keys(rel_instance, v)
+            payload[k] = rel_instance
         return payload
 
     async def create_s(self, request: HttpRequest, data: Schema, obj_schema: Schema):
