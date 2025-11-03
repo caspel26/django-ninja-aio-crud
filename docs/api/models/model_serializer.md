@@ -47,12 +47,12 @@ Describes how to build a create (input) schema for a model.
 
 **Attributes:**
 
-| Attribute   | Type                     | Description                                                                                                                                    |
-| ----------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `fields`    | `list[str]`              | REQUIRED model field names for creation                                                                                                        |
-| `optionals` | `list[tuple[str, type]]` | Optional model fields: `(field_name, python_type)`                                                                                             |
-| `customs`   | `list[tuple]`            | Synthetic inputs. Tuple forms:<br> `(name, type)` = required (no default)<br> `(name, type, default)` = optional (literal or callable default) |
-| `excludes`  | `list[str]`              | Field names rejected on create                                                                                                                 |
+| Attribute   | Type                     | Description                                                                                                                       |
+| ----------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| `fields`    | `list[str]`              | REQUIRED model field names for creation                                                                                           |
+| `optionals` | `list[tuple[str, type]]` | Optional model fields: `(field_name, python_type)`                                                                                |
+| `customs`   | `list[tuple]`            | Synthetic inputs. Tuple forms: `(name, type)` = required (no default); `(name, type, default)` = optional (literal or callable)   |
+| `excludes`  | `list[str]`              | Field names rejected on create                                                                                                    |
 
 **Example:**
 
