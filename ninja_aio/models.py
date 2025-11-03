@@ -313,19 +313,6 @@ class ModelUtil:
         rel_pk = nested_dict.get(rel_util.model_pk_name)
         return await rel_util.get_object(request, rel_pk)
 
-    def _rewrite_nested_foreign_keys(self, rel_obj, nested_dict: dict):
-        """
-        Rewrite foreign key keys inside a nested dict from <key> to <key>_id.
-        """
-        keys_to_rewrite: list[str] = []
-        for rel_k in nested_dict.keys():
-            attr = getattr(rel_obj.__class__, rel_k, None)
-            fk_field = getattr(attr, "field", None)
-            if isinstance(fk_field, models.ForeignKey):
-                keys_to_rewrite.append(rel_k)
-            for old_k in keys_to_rewrite:
-                nested_dict[f"{old_k}_id"] = nested_dict.pop(old_k)
-
     async def parse_input_data(self, request: HttpRequest, data: Schema):
         """
         Transform inbound schema data to a model-ready payload.
@@ -419,14 +406,7 @@ class ModelUtil:
             field_obj = self._extract_field_obj(k)
             if not self._should_process_nested(v, field_obj):
                 continue
-
-            rel_instance = await self._fetch_related_instance(request, field_obj, v)
-
-            if isinstance(field_obj, models.ForeignKey):
-                self._rewrite_nested_foreign_keys(rel_instance, v)
-
-            payload[k] = rel_instance
-
+            payload[k] = await self._fetch_related_instance(request, field_obj, v)
         return payload
 
     async def create_s(self, request: HttpRequest, data: Schema, obj_schema: Schema):
