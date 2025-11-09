@@ -25,4 +25,4 @@ jobs:
         run: pip install -r docs/requirements.txt
 
       - name: Deploy to GitHub Pages
-        run: git fetch && git pull && mkdocs gh-deploy
+        run: git fetch --all --tags  && git pull && mkdocs gh-deploy
