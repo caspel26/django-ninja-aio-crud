@@ -148,9 +148,7 @@ def generate_release_table() -> str:
         "<th style='text-align:left;padding:.75rem 1rem;border-bottom:2px solid #ccc;width:70%;font-size:.85rem;'>Summary</th>"
         "</tr>"
         "</thead>"
-        "<tbody>"
-        + "".join(rows_html)
-        + "</tbody></table></div>"
+        "<tbody>" + "".join(rows_html) + "</tbody></table></div>"
     )
     return html
 

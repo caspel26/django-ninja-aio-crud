@@ -15,14 +15,14 @@ class Article(ModelSerializer):
     content = models.TextField()
     is_published = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
-    
+
     class ReadSerializer:
         fields = ["id", "title", "content", "is_published", "created_at"]
-    
+
     class CreateSerializer:
         fields = ["title", "content"]
         optionals = [("is_published", bool)]
-    
+
     class UpdateSerializer:
         optionals = [
             ("title", str),

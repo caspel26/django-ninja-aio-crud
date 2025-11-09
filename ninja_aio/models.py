@@ -327,7 +327,6 @@ class ModelUtil:
             new_nested[f"{old_k}_id"] = new_nested.pop(old_k)
         return new_nested
 
-
     async def parse_input_data(self, request: HttpRequest, data: Schema):
         """
         Transform inbound schema data to a model-ready payload.

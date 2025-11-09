@@ -245,7 +245,8 @@ class Tests:
                 await view(self.get_request, self._path_schema(1))
             self.assertEqual(exc.exception.status_code, 404)
             self.assertEqual(
-                exc.exception.error, {self.model._meta.verbose_name.replace(" ", "_"): NOT_FOUND}
+                exc.exception.error,
+                {self.model._meta.verbose_name.replace(" ", "_"): NOT_FOUND},
             )
 
         async def test_update(self):

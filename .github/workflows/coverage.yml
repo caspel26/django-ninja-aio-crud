@@ -9,7 +9,7 @@ on:
 jobs:
   test_coverage:
     runs-on: ubuntu-latest
-    
+
     steps:
       - uses: actions/checkout@v5
       - name: Set up Python
@@ -28,5 +28,5 @@ jobs:
 
       - name: Coverage
         uses: codecov/codecov-action@v5.5.1
-        with: 
+        with:
           token: ${{ secrets.CODECOV_TOKEN }}

@@ -38,18 +38,18 @@ Traditional Django REST development requires:
         class Meta:
             model = User
             fields = ['id', 'username', 'email']
-    
+
     class UserSchemaIn(ModelSchema):
         class Meta:
             model = User
             fields = ['username', 'email', 'password']
-    
+
     # views.py
     @api.get("users", response={200: UserSchemaOut})
     async def list_users(request):
         return [user async for user in User.objects.all()]
-    
-    
+
+
     @api.post("users/", response{201: UserSchemaOut})
     async def create_user(request, data: UserSchemaIn):
         user_pk = (await User.objects.acreate(**data.model_dump())).pk
@@ -65,21 +65,21 @@ Traditional Django REST development requires:
         username = models.CharField(max_length=150)
         email = models.EmailField()
         password = models.CharField(max_length=128)
-        
+
         class ReadSerializer:
             fields = ["id", "username", "email"]
-        
+
         class CreateSerializer:
             fields = ["username", "email", "password"]
-        
+
         class UpdateSerializer:
             optionals = [("email", str)]
-    
+
     # views.py
     class UserViewSet(APIViewSet):
         model = User
         api = api
-    
+
     UserViewSet().add_views_to_route()
     # Done! List, Create, Retrieve, Update, Delete endpoints ready
     ```
@@ -114,10 +114,10 @@ class Author(ModelSerializer):
     name = models.CharField(max_length=200)
     email = models.EmailField(unique=True)
     bio = models.TextField(blank=True)
-    
+
     class ReadSerializer:
         fields = ["id", "name", "email", "bio", "articles"]
-    
+
     class CreateSerializer:
         fields = ["name", "email"]
         optionals = [("bio", str)]
@@ -126,10 +126,10 @@ class Author(ModelSerializer):
 class Category(ModelSerializer):
     name = models.CharField(max_length=100)
     slug = models.SlugField(unique=True)
-    
+
     class ReadSerializer:
         fields = ["id", "name", "slug"]
-    
+
     class CreateSerializer:
         fields = ["name", "slug"]
 
@@ -144,25 +144,25 @@ class Article(ModelSerializer):
     is_published = models.BooleanField(default=False)
     views = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
-    
+
     class ReadSerializer:
         fields = [
             "id", "title", "slug", "content",
             "author", "category", "tags",
             "is_published", "views", "created_at"
         ]
-    
+
     class CreateSerializer:
         fields = ["title", "slug", "content", "author", "category"]
         customs = [("notify_subscribers", bool, True)]
-    
+
     class UpdateSerializer:
         optionals = [
             ("title", str),
             ("content", str),
             ("is_published", bool),
         ]
-    
+
     async def custom_actions(self, payload: dict):
         if payload.get("notify_subscribers"):
             # Send notifications
@@ -171,7 +171,7 @@ class Article(ModelSerializer):
 
 class Tag(ModelSerializer):
     name = models.CharField(max_length=50, unique=True)
-    
+
     class ReadSerializer:
         fields = ["id", "name"]
 
@@ -202,7 +202,7 @@ class ArticleViewSet(APIViewSet):
         "category": (int, None),
         "author": (int, None),
     }
-    
+
     async def query_params_handler(self, queryset, filters):
         if filters.get("is_published") is not None:
             queryset = queryset.filter(is_published=filters["is_published"])
@@ -241,13 +241,13 @@ Central to Django Ninja Aio CRUD - defines schemas directly on models:
 ```python
 class User(ModelSerializer):
     username = models.CharField(max_length=150)
-    
+
     class ReadSerializer:
         fields = ["id", "username"]  # Response schema
-    
+
     class CreateSerializer:
         fields = ["username"]  # Input schema
-    
+
     class UpdateSerializer:
         optionals = [("username", str)]  # Partial update schema
 ```
@@ -271,7 +271,7 @@ Extend with custom endpoints:
 class UserViewSet(APIViewSet):
     model = User
     api = api
-    
+
     def views(self):
         @self.router.post("/{pk}/activate/")
         async def activate(request, pk: int):

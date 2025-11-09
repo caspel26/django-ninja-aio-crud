@@ -2,8 +2,6 @@ from joserfc import jwt, jwk, errors
 from django.http.request import HttpRequest
 from ninja.security.http import HttpBearer
 
-from .exceptions import AuthError
-
 
 class AsyncJwtBearer(HttpBearer):
     """
@@ -71,6 +69,7 @@ class AsyncJwtBearer(HttpBearer):
     Return Semantics:
         - authenticate -> user object (success) | False (failure)
     """
+
     jwt_public: jwk.RSAKey
     claims: dict[str, dict]
     algorithms: list[str] = ["RS256"]
@@ -96,13 +95,13 @@ class AsyncJwtBearer(HttpBearer):
         """
         try:
             self.dcd = jwt.decode(token, self.jwt_public, algorithms=self.algorithms)
-        except ValueError as exc:
+        except ValueError:
             # raise AuthError(", ".join(exc.args), 401)
             return False
 
         try:
             self.validate_claims(self.dcd.claims)
-        except errors.JoseError as exc:
+        except errors.JoseError:
             return False
 
         return await self.auth_handler(request)

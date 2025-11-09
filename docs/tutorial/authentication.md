@@ -75,15 +75,15 @@ class User(AbstractUser, ModelSerializer):
     email = models.EmailField(unique=True)
     bio = models.TextField(blank=True)
     avatar = models.URLField(blank=True)
-    
+
     class ReadSerializer:
         fields = ["id", "username", "email", "first_name", "last_name", "bio", "avatar"]
         excludes = ["password"]
-    
+
     class CreateSerializer:
         fields = ["username", "email", "password", "first_name", "last_name"]
         optionals = [("bio", str), ("avatar", str)]
-    
+
     class UpdateSerializer:
         optionals = [
             ("first_name", str),
@@ -92,7 +92,7 @@ class User(AbstractUser, ModelSerializer):
             ("avatar", str),
         ]
         excludes = ["username", "email", "password"]
-    
+
     def __str__(self):
         return self.username
 
@@ -136,14 +136,14 @@ class JWTAuth(AsyncJwtBearer):
     # Import public key for verification
     jwt_public = jwk.RSAKey.import_key(settings.JWT_PUBLIC_KEY)
     jwt_alg = "RS256"
-    
+
     # Validate required claims
     claims = {
         "iss": {"essential": True, "value": settings.JWT_ISSUER},
         "aud": {"essential": True, "value": settings.JWT_AUDIENCE},
         "sub": {"essential": True},  # User ID
     }
-    
+
     async def auth_handler(self, request):
         """
         Called after token validation.
@@ -151,7 +151,7 @@ class JWTAuth(AsyncJwtBearer):
         """
         # Get user ID from token
         user_id = self.dcd.claims.get("sub")
-        
+
         try:
             # Fetch user from database
             user = await User.objects.aget(id=user_id, is_active=True)
@@ -172,7 +172,7 @@ from django.conf import settings
 def create_access_token(user_id: int, **extra_claims) -> str:
     """Generate JWT access token"""
     now = datetime.utcnow()
-    
+
     payload = {
         "sub": str(user_id),
         "iss": settings.JWT_ISSUER,
@@ -181,20 +181,20 @@ def create_access_token(user_id: int, **extra_claims) -> str:
         "exp": now + timedelta(seconds=settings.JWT_ACCESS_TOKEN_EXPIRE),
         **extra_claims
     }
-    
+
     token = jwt.encode(
         payload,
         settings.JWT_PRIVATE_KEY,
         algorithm="RS256"
     )
-    
+
     return token
 
 
 def create_refresh_token(user_id: int) -> str:
     """Generate JWT refresh token"""
     now = datetime.utcnow()
-    
+
     payload = {
         "sub": str(user_id),
         "iss": settings.JWT_ISSUER,
@@ -203,13 +203,13 @@ def create_refresh_token(user_id: int) -> str:
         "exp": now + timedelta(seconds=settings.JWT_REFRESH_TOKEN_EXPIRE),
         "type": "refresh"
     }
-    
+
     token = jwt.encode(
         payload,
         settings.JWT_PRIVATE_KEY,
         algorithm="RS256"
     )
-    
+
     return token
 ```
 
@@ -267,14 +267,14 @@ async def register(request, data: RegisterSchema):
             {"username": "Username already taken"},
             status_code=400
         )
-    
+
     # Check if email exists
     if await User.objects.filter(email=data.email).aexists():
         raise SerializeError(
             {"email": "Email already registered"},
             status_code=400
         )
-    
+
     # Create user
     user = await User.objects.acreate(
         username=data.username,
@@ -283,11 +283,11 @@ async def register(request, data: RegisterSchema):
         first_name=data.first_name,
         last_name=data.last_name,
     )
-    
+
     # Generate tokens
     access_token = create_access_token(user.id)
     refresh_token = create_refresh_token(user.id)
-    
+
     from django.conf import settings
     return {
         "access_token": access_token,
@@ -307,25 +307,25 @@ async def login(request, data: LoginSchema):
             {"detail": "Invalid credentials"},
             status_code=401
         )
-    
+
     # Check password
     if not check_password(data.password, user.password):
         raise SerializeError(
             {"detail": "Invalid credentials"},
             status_code=401
         )
-    
+
     # Check if user is active
     if not user.is_active:
         raise SerializeError(
             {"detail": "Account is disabled"},
             status_code=401
         )
-    
+
     # Generate tokens
     access_token = create_access_token(user.id)
     refresh_token = create_refresh_token(user.id)
-    
+
     from django.conf import settings
     return {
         "access_token": access_token,
@@ -354,7 +354,7 @@ async def refresh(request, refresh_token: str):
     """Refresh access token"""
     import jwt
     from django.conf import settings
-    
+
     try:
         # Decode refresh token
         payload = jwt.decode(
@@ -364,26 +364,26 @@ async def refresh(request, refresh_token: str):
             audience=settings.JWT_AUDIENCE,
             issuer=settings.JWT_ISSUER
         )
-        
+
         # Check token type
         if payload.get("type") != "refresh":
             raise SerializeError(
                 {"detail": "Invalid token type"},
                 status_code=401
             )
-        
+
         user_id = int(payload.get("sub"))
-        
+
         # Generate new tokens
         new_access_token = create_access_token(user_id)
         new_refresh_token = create_refresh_token(user_id)
-        
+
         return {
             "access_token": new_access_token,
             "refresh_token": new_refresh_token,
             "expires_in": settings.JWT_ACCESS_TOKEN_EXPIRE
         }
-    
+
     except jwt.ExpiredSignatureError:
         raise SerializeError(
             {"detail": "Refresh token expired"},
@@ -412,7 +412,7 @@ api = NinjaAIO(title="Blog API", version="1.0.0")
 class ArticleViewSet(APIViewSet):
     model = Article
     api = api
-    
+
     # Public read, authenticated write
     get_auth = None  # List and retrieve are public
     post_auth = [JWTAuth()]  # Create requires auth
@@ -431,12 +431,12 @@ Modify the Article model to set the author from the authenticated user:
 # models.py
 class Article(ModelSerializer):
     # ... existing fields ...
-    
+
     @classmethod
     async def queryset_request(cls, request):
         """Filter articles based on authentication"""
         qs = cls.objects.select_related('author', 'category').prefetch_related('tags')
-        
+
         # Show all published articles
         # Plus user's own drafts if authenticated
         if request.auth:
@@ -444,16 +444,16 @@ class Article(ModelSerializer):
             return qs.filter(
                 Q(is_published=True) | Q(author=request.auth)
             )
-        
+
         return qs.filter(is_published=True)
-    
+
     async def custom_actions(self, payload: dict):
         """Set author from request"""
         # This is called during creation
         if hasattr(self, '_request') and self._request.auth:
             self.author = self._request.auth
             await self.asave(update_fields=['author'])
-        
+
         # Call parent
         await super().custom_actions(payload)
 ```
@@ -479,7 +479,7 @@ class JWTAuth(AsyncJwtBearer):
         "aud": {"essential": True, "value": settings.JWT_AUDIENCE},
         "sub": {"essential": True},
     }
-    
+
     async def auth_handler(self, request):
         user_id = self.dcd.claims.get("sub")
         try:
@@ -491,25 +491,25 @@ class JWTAuth(AsyncJwtBearer):
 
 class AdminAuth(JWTAuth):
     """Requires admin/staff privileges"""
-    
+
     async def auth_handler(self, request):
         user = await super().auth_handler(request)
-        
+
         if not user.is_staff:
             return False
-        
+
         return user
 
 
 class SuperuserAuth(JWTAuth):
     """Requires superuser privileges"""
-    
+
     async def auth_handler(self, request):
         user = await super().auth_handler(request)
-        
+
         if not user.is_superuser:
             return False
-        
+
         return user
 ```
 
@@ -523,16 +523,16 @@ from .auth import JWTAuth, AdminAuth
 class ArticleViewSet(APIViewSet):
     model = Article
     api = api
-    
+
     # Public read
     get_auth = None
-    
+
     # Regular users can create
     post_auth = [JWTAuth()]
-    
+
     # Regular users can update (own articles)
     patch_auth = [JWTAuth()]
-    
+
     # Only admins can delete
     delete_auth = [AdminAuth()]
 
@@ -540,7 +540,7 @@ class ArticleViewSet(APIViewSet):
 class UserViewSet(APIViewSet):
     model = User
     api = api
-    
+
     # Only admins can manage users
     auth = [AdminAuth()]
 
@@ -558,12 +558,12 @@ Ensure users can only edit their own articles:
 class ArticleViewSet(APIViewSet):
     model = Article
     api = api
-    
+
     get_auth = None
     post_auth = [JWTAuth()]
     patch_auth = [JWTAuth()]
     delete_auth = [JWTAuth()]
-    
+
     def views(self):
         # Override update to check ownership
         @self.router.patch("/{pk}/")
@@ -573,7 +573,7 @@ class ArticleViewSet(APIViewSet):
                 article = await Article.objects.aget(pk=pk)
             except Article.DoesNotExist:
                 raise SerializeError({"article": "not found"}, status_code=404)
-            
+
             # Check ownership (unless admin)
             user = request.auth
             if article.author_id != user.id and not user.is_staff:
@@ -581,14 +581,14 @@ class ArticleViewSet(APIViewSet):
                     {"detail": "You can only edit your own articles"},
                     status_code=403
                 )
-            
+
             # Update article
             from ninja_aio.models import ModelUtil
             util = ModelUtil(Article)
             schema = Article.generate_read_s()
-            
+
             return await util.update_s(request, article, data, schema)
-        
+
         # Override delete to check ownership
         @self.router.delete("/{pk}/")
         async def delete(request, pk: int):
@@ -597,7 +597,7 @@ class ArticleViewSet(APIViewSet):
                 article = await Article.objects.aget(pk=pk)
             except Article.DoesNotExist:
                 raise SerializeError({"article": "not found"}, status_code=404)
-            
+
             # Check ownership (unless admin)
             user = request.auth
             if article.author_id != user.id and not user.is_staff:
@@ -605,7 +605,7 @@ class ArticleViewSet(APIViewSet):
                     {"detail": "You can only delete your own articles"},
                     status_code=403
                 )
-            
+
             await article.adelete()
             return {"message": "Article deleted successfully"}
 
@@ -758,7 +758,7 @@ Add custom claims to your tokens:
 def create_access_token(user_id: int, **extra_claims) -> str:
     """Generate JWT access token with custom claims"""
     now = datetime.utcnow()
-    
+
     # Add custom claims
     payload = {
         "sub": str(user_id),
@@ -768,14 +768,14 @@ def create_access_token(user_id: int, **extra_claims) -> str:
         "exp": now + timedelta(seconds=settings.JWT_ACCESS_TOKEN_EXPIRE),
         **extra_claims
     }
-    
+
     return jwt.encode(payload, settings.JWT_PRIVATE_KEY, algorithm="RS256")
 
 
 # In login endpoint
 async def login(request, data: LoginSchema):
     # ... authentication logic ...
-    
+
     # Create token with custom claims
     access_token = create_access_token(
         user.id,
@@ -784,7 +784,7 @@ async def login(request, data: LoginSchema):
         is_staff=user.is_staff,
         permissions=["read:articles", "write:articles"]
     )
-    
+
     # ...
 ```
 
@@ -793,15 +793,15 @@ Access custom claims in your auth handler:
 ```python
 class JWTAuth(AsyncJwtBearer):
     # ...
-    
+
     async def auth_handler(self, request):
         user_id = self.dcd.claims.get("sub")
         user = await User.objects.aget(id=user_id, is_active=True)
-        
+
         # Attach custom claims to request
         request.user_permissions = self.dcd.claims.get("permissions", [])
         request.user_email = self.dcd.claims.get("email")
-        
+
         return user
 ```
 

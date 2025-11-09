@@ -32,7 +32,7 @@ class JWTAuth(AsyncJwtBearer):
         "iss": {"essential": True, "value": "https://your-issuer.com"},
         "aud": {"essential": True, "value": "your-api"}
     }
-    
+
     async def auth_handler(self, request):
         user_id = self.dcd.claims.get("sub")
         user = await User.objects.aget(id=user_id)
@@ -81,7 +81,7 @@ class MyAuth(AsyncJwtBearer):
     jwt_public: jwk.RSAKey | jwk.OctKey  # Public key for verification
     jwt_alg: str = "RS256"  # Signing algorithm
     claims: dict = {}  # Required claims
-    
+
     async def auth_handler(self, request):
         # Return user object or custom auth context
         pass
@@ -268,17 +268,17 @@ async def my_view(request):
 ```python
 async def auth_handler(self, request):
     user_id = self.dcd.claims.get("sub")
-    
+
     # Check if user exists and is active
     try:
         user = await User.objects.aget(id=user_id, is_active=True)
     except User.DoesNotExist:
         return False
-    
+
     # Check subscription status
     if not await user.has_active_subscription():
         return False
-    
+
     return user
 ```
 
@@ -289,15 +289,15 @@ from django.core.cache import cache
 
 async def auth_handler(self, request):
     user_id = self.dcd.claims.get("sub")
-    
+
     # Try cache first
     cache_key = f"user:{user_id}"
     user = cache.get(cache_key)
-    
+
     if user is None:
         user = await User.objects.aget(id=user_id)
         cache.set(cache_key, user, 300)  # Cache 5 minutes
-    
+
     return user
 ```
 
@@ -357,7 +357,7 @@ class ArticleViewSet(APIViewSet):
     model = Article
     api = api
     auth = None  # CRUD endpoints public
-    
+
     def views(self):
         # Authenticated custom endpoint
         @self.router.post("/publish/{pk}/", auth=JWTAuth())
@@ -366,7 +366,7 @@ class ArticleViewSet(APIViewSet):
             article.is_published = True
             await article.asave()
             return {"message": "Article published"}
-        
+
         # Public custom endpoint
         @self.router.get("/stats/")
         async def stats(request):
@@ -381,7 +381,7 @@ Combine different authentication strategies:
 ```python
 class AdminAuth(AsyncJwtBearer):
     jwt_public = jwk.RSAKey.import_key(PUBLIC_KEY)
-    
+
     async def auth_handler(self, request):
         user_id = self.dcd.claims.get("sub")
         user = await User.objects.aget(id=user_id)
@@ -407,17 +407,17 @@ class ArticleViewSet(APIViewSet):
 class RoleAuth(AsyncJwtBearer):
     jwt_public = jwk.RSAKey.import_key(PUBLIC_KEY)
     required_roles: list[str] = []
-    
+
     async def auth_handler(self, request):
         user_id = self.dcd.claims.get("sub")
         user = await User.objects.aget(id=user_id)
-        
+
         # Check roles
         user_roles = self.dcd.claims.get("roles", [])
         if self.required_roles:
             if not any(role in user_roles for role in self.required_roles):
                 return False
-        
+
         request.user_roles = user_roles
         return user
 
@@ -444,16 +444,16 @@ class ArticleViewSet(APIViewSet):
 class PermissionAuth(AsyncJwtBearer):
     jwt_public = jwk.RSAKey.import_key(PUBLIC_KEY)
     required_permissions: list[str] = []
-    
+
     async def auth_handler(self, request):
         user_id = self.dcd.claims.get("sub")
         user = await User.objects.select_related('role').aget(id=user_id)
-        
+
         # Get user permissions
         permissions = await sync_to_async(list)(
             user.role.permissions.values_list('code', flat=True)
         )
-        
+
         # Check permissions
         if self.required_permissions:
             missing = set(self.required_permissions) - set(permissions)
@@ -483,20 +483,20 @@ class ArticleViewSet(APIViewSet):
 ```python
 class TenantAuth(AsyncJwtBearer):
     jwt_public = jwk.RSAKey.import_key(PUBLIC_KEY)
-    
+
     async def auth_handler(self, request):
         user_id = self.dcd.claims.get("sub")
         tenant_id = self.dcd.claims.get("tenant_id")
-        
+
         if not tenant_id:
             return False
-        
+
         user = await User.objects.aget(
             id=user_id,
             tenant_id=tenant_id,
             is_active=True
         )
-        
+
         request.tenant_id = tenant_id
         return user
 
@@ -504,7 +504,7 @@ class TenantAuth(AsyncJwtBearer):
 class Article(ModelSerializer):
     title = models.CharField(max_length=200)
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
-    
+
     @classmethod
     async def queryset_request(cls, request):
         # Automatically filter by tenant
@@ -526,21 +526,21 @@ class ArticleViewSet(APIViewSet):
 class ScopeAuth(AsyncJwtBearer):
     jwt_public = jwk.RSAKey.import_key(PUBLIC_KEY)
     required_scopes: list[str] = []
-    
+
     async def auth_handler(self, request):
         # Get scopes from token
         scope_str = self.dcd.claims.get("scope", "")
         scopes = scope_str.split()
-        
+
         # Check required scopes
         if self.required_scopes:
             missing = set(self.required_scopes) - set(scopes)
             if missing:
                 return False
-        
+
         user_id = self.dcd.claims.get("sub")
         user = await User.objects.aget(id=user_id)
-        
+
         request.scopes = scopes
         return user
 
@@ -572,22 +572,22 @@ from ninja.security import APIKeyHeader
 
 class APIKeyAuth(APIKeyHeader):
     param_name = "X-API-Key"
-    
+
     async def authenticate(self, request, key):
         try:
             api_key = await APIKey.objects.select_related('user').aget(
                 key=key,
                 is_active=True
             )
-            
+
             # Check expiration
             if api_key.expires_at and api_key.expires_at < timezone.now():
                 return None
-            
+
             # Update last used
             api_key.last_used_at = timezone.now()
             await api_key.asave(update_fields=['last_used_at'])
-            
+
             return api_key.user
         except APIKey.DoesNotExist:
             return None
@@ -670,19 +670,19 @@ Automatically validated by AsyncJwtBearer.
 ```python
 class StrictAuth(AsyncJwtBearer):
     jwt_public = jwk.RSAKey.import_key(PUBLIC_KEY)
-    
+
     async def auth_handler(self, request):
         # Check token type
         token_type = self.dcd.claims.get("typ")
         if token_type != "access":
             return False
-        
+
         # Check IP whitelist
         allowed_ips = self.dcd.claims.get("allowed_ips", [])
         client_ip = request.META.get('REMOTE_ADDR')
         if allowed_ips and client_ip not in allowed_ips:
             return False
-        
+
         # Continue with normal auth
         user_id = self.dcd.claims.get("sub")
         return await User.objects.aget(id=user_id)
@@ -714,26 +714,26 @@ def create_token(user_id: int, **claims) -> str:
 @pytest.mark.asyncio
 async def test_authenticated_request():
     client = TestAsyncClient(api)
-    
+
     # Create user
     user = await User.objects.acreate(username="testuser")
-    
+
     # Create token
     token = create_token(user.id)
-    
+
     # Make authenticated request
     response = await client.get(
         "/article/",
         headers={"Authorization": f"Bearer {token}"}
     )
-    
+
     assert response.status_code == 200
 
 
 @pytest.mark.asyncio
 async def test_missing_token():
     client = TestAsyncClient(api)
-    
+
     response = await client.get("/article/")
     assert response.status_code == 401
     assert "detail" in response.json()
@@ -742,7 +742,7 @@ async def test_missing_token():
 @pytest.mark.asyncio
 async def test_expired_token():
     client = TestAsyncClient(api)
-    
+
     # Create expired token
     payload = {
         "sub": "123",
@@ -750,28 +750,28 @@ async def test_expired_token():
         "iat": datetime.utcnow() - timedelta(hours=2)
     }
     token = jwt.encode(payload, PRIVATE_KEY, algorithm="RS256")
-    
+
     response = await client.get(
         "/article/",
         headers={"Authorization": f"Bearer {token}"}
     )
-    
+
     assert response.status_code == 401
 
 
 @pytest.mark.asyncio
 async def test_invalid_signature():
     client = TestAsyncClient(api)
-    
+
     # Create token with wrong key
     payload = {"sub": "123", "exp": datetime.utcnow() + timedelta(hours=1)}
     token = jwt.encode(payload, "wrong-secret", algorithm="HS256")
-    
+
     response = await client.get(
         "/article/",
         headers={"Authorization": f"Bearer {token}"}
     )
-    
+
     assert response.status_code == 401
 ```
 
@@ -789,10 +789,10 @@ async def test_with_mock_auth(mock_auth):
     # Mock auth to return test user
     user = await User.objects.acreate(username="testuser")
     mock_auth.return_value = user
-    
+
     client = TestAsyncClient(api)
     response = await client.get("/article/")
-    
+
     assert response.status_code == 200
 ```
 
@@ -855,7 +855,7 @@ async def test_with_mock_auth(mock_auth):
 7. **Implement rate limiting for auth endpoints:**
    ```python
    from ninja.throttling import AnonRateThrottle
-   
+
    @api.post("/login/", throttle=[AnonRateThrottle('5/minute')])
    async def login(request, credentials: LoginSchema):
        # Login logic
@@ -873,25 +873,25 @@ from joserfc import jwk
 
 class Auth0JWT(AsyncJwtBearer):
     jwt_alg = "RS256"
-    
+
     def __init__(self):
         super().__init__()
         # Fetch JWKS from Auth0
         self.domain = "your-domain.auth0.com"
         self.audience = "your-api-identifier"
-    
+
     async def get_jwks(self):
         async with httpx.AsyncClient() as client:
             response = await client.get(
                 f"https://{self.domain}/.well-known/jwks.json"
             )
             return response.json()
-    
+
     claims = {
         "iss": {"essential": True, "value": "https://your-domain.auth0.com/"},
         "aud": {"essential": True, "value": "your-api-identifier"}
     }
-    
+
     async def auth_handler(self, request):
         user_id = self.dcd.claims.get("sub")
         # Extract user info from token or fetch from database
@@ -903,22 +903,22 @@ class Auth0JWT(AsyncJwtBearer):
 ```python
 class KeycloakJWT(AsyncJwtBearer):
     jwt_alg = "RS256"
-    
+
     def __init__(self):
         super().__init__()
         self.realm_url = "https://keycloak.example.com/realms/your-realm"
-    
+
     async def get_public_key(self):
         async with httpx.AsyncClient() as client:
             response = await client.get(f"{self.realm_url}")
             data = response.json()
             return jwk.RSAKey.import_key(data["public_key"])
-    
+
     claims = {
         "iss": {"essential": True, "value": "https://keycloak.example.com/realms/your-realm"},
         "azp": {"essential": True, "value": "your-client-id"}
     }
-    
+
     async def auth_handler(self, request):
         user_id = self.dcd.claims.get("sub")
         roles = self.dcd.claims.get("realm_access", {}).get("roles", [])
@@ -939,7 +939,7 @@ from google.oauth2 import id_token
 class FirebaseAuth(HttpBearer):
     def __init__(self):
         self.project_id = "your-firebase-project"
-    
+
     async def authenticate(self, request, token):
         try:
             # Verify Firebase ID token
@@ -948,7 +948,7 @@ class FirebaseAuth(HttpBearer):
                 google.auth.transport.requests.Request(),
                 audience=self.project_id
             )
-            
+
             user_id = decoded_token["uid"]
             user = await User.objects.aget(firebase_uid=user_id)
             return user

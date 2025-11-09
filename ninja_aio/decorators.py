@@ -46,10 +46,12 @@ def aatomic(func):
           your async ORM / database backend.
         - Only use on async functions.
     """
+
     @wraps(func)
     async def wrapper(*args, **kwargs):
         async with AsyncAtomicContextManager():
             return await func(*args, **kwargs)
+
     return wrapper
 
 
@@ -117,6 +119,7 @@ def unique_view(self: object | str, plural: bool = False):
     - Ensure that the modified name does not conflict with other functions after decoration.
     - Use cautiously when decorators relying on original __name__ appear earlier in the chain.
     """
+
     def decorator(func):
         # Allow usage as unique_view(self_instance) or unique_view("model_name")
         if isinstance(self, str):

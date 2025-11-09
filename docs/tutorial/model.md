@@ -33,7 +33,7 @@ class Article(ModelSerializer):
     is_published = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     def __str__(self):
         return self.title
 ```
@@ -56,10 +56,10 @@ class Article(ModelSerializer):
     is_published = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     class ReadSerializer:
         fields = ["id", "title", "content", "is_published", "created_at", "updated_at"]
-    
+
     def __str__(self):
         return self.title
 ```
@@ -88,16 +88,16 @@ class Article(ModelSerializer):
     is_published = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     class ReadSerializer:
         fields = ["id", "title", "content", "is_published", "created_at", "updated_at"]
-    
+
     class CreateSerializer:
         fields = ["title", "content"]
         optionals = [
             ("is_published", bool),
         ]
-    
+
     def __str__(self):
         return self.title
 ```
@@ -133,14 +133,14 @@ class Article(ModelSerializer):
     is_published = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     class ReadSerializer:
         fields = ["id", "title", "content", "is_published", "created_at", "updated_at"]
-    
+
     class CreateSerializer:
         fields = ["title", "content"]
         optionals = [("is_published", bool)]
-    
+
     class UpdateSerializer:
         optionals = [
             ("title", str),
@@ -148,7 +148,7 @@ class Article(ModelSerializer):
             ("is_published", bool),
         ]
         excludes = ["created_at", "updated_at"]
-    
+
     def __str__(self):
         return self.title
 ```
@@ -179,21 +179,21 @@ class Author(ModelSerializer):
     name = models.CharField(max_length=200)
     email = models.EmailField(unique=True)
     bio = models.TextField(blank=True)
-    
+
     class ReadSerializer:
         fields = ["id", "name", "email", "bio"]
-    
+
     class CreateSerializer:
         fields = ["name", "email"]
         optionals = [("bio", str)]
-    
+
     class UpdateSerializer:
         optionals = [
             ("name", str),
             ("email", str),
             ("bio", str),
         ]
-    
+
     def __str__(self):
         return self.name
 
@@ -205,14 +205,14 @@ class Article(ModelSerializer):
     is_published = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     class ReadSerializer:
         fields = ["id", "title", "content", "author", "is_published", "created_at"]
-    
+
     class CreateSerializer:
         fields = ["title", "content", "author"]
         optionals = [("is_published", bool)]
-    
+
     class UpdateSerializer:
         optionals = [
             ("title", str),
@@ -220,7 +220,7 @@ class Article(ModelSerializer):
             ("is_published", bool),
         ]
         excludes = ["author"]  # Can't change author after creation
-    
+
     def __str__(self):
         return self.title
 ```
@@ -264,13 +264,13 @@ Let's add tags to articles:
 class Tag(ModelSerializer):
     name = models.CharField(max_length=50, unique=True)
     slug = models.SlugField(unique=True)
-    
+
     class ReadSerializer:
         fields = ["id", "name", "slug"]
-    
+
     class CreateSerializer:
         fields = ["name", "slug"]
-    
+
     def __str__(self):
         return self.name
 
@@ -282,17 +282,17 @@ class Article(ModelSerializer):
     tags = models.ManyToManyField(Tag, related_name="articles", blank=True)
     is_published = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
-    
+
     class ReadSerializer:
         fields = ["id", "title", "content", "author", "tags", "is_published", "created_at"]
-    
+
     class CreateSerializer:
         fields = ["title", "content", "author"]
         optionals = [
             ("is_published", bool),
             ("tags", list[int]),  # List of tag IDs
         ]
-    
+
     class UpdateSerializer:
         optionals = [
             ("title", str),
@@ -300,7 +300,7 @@ class Article(ModelSerializer):
             ("is_published", bool),
             ("tags", list[int]),
         ]
-    
+
     def __str__(self):
         return self.title
 ```
@@ -346,7 +346,7 @@ class Article(ModelSerializer):
     views = models.IntegerField(default=0)
     is_published = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
-    
+
     class ReadSerializer:
         fields = ["id", "title", "content", "author", "views", "is_published", "created_at"]
         customs = [
@@ -354,14 +354,14 @@ class Article(ModelSerializer):
             ("reading_time", int, lambda obj: len(obj.content.split()) // 200),  # Assume 200 words/min
             ("author_name", str, lambda obj: obj.author.name),
         ]
-    
+
     class CreateSerializer:
         fields = ["title", "content", "author"]
         customs = [
             ("notify_subscribers", bool, True),  # Custom action flag
             ("schedule_publish", str, None),  # ISO datetime string
         ]
-    
+
     def __str__(self):
         return self.title
 ```
@@ -399,29 +399,29 @@ class Article(ModelSerializer):
     slug = models.SlugField(unique=True, blank=True)
     is_published = models.BooleanField(default=False)
     published_at = models.DateTimeField(null=True, blank=True)
-    
+
     class ReadSerializer:
         fields = ["id", "title", "slug", "is_published", "published_at"]
-    
+
     def before_save(self):
         """Called before every save (create and update)"""
         if not self.slug:
             from django.utils.text import slugify
             self.slug = slugify(self.title)
-    
+
     def on_create_before_save(self):
         """Called only on creation, before save"""
         print(f"Creating new article: {self.title}")
-    
+
     def after_save(self):
         """Called after every save"""
         from django.core.cache import cache
         cache.delete(f"article:{self.id}")
-    
+
     def on_create_after_save(self):
         """Called only after creation"""
         print(f"Article created with ID: {self.id}")
-    
+
     def on_delete(self):
         """Called after deletion"""
         print(f"Article deleted: {self.title}")
@@ -435,20 +435,20 @@ class Article(ModelSerializer):
     content = models.TextField()
     author = models.ForeignKey(Author, on_delete=models.CASCADE)
     is_published = models.BooleanField(default=False)
-    
+
     class CreateSerializer:
         fields = ["title", "content", "author"]
         customs = [
             ("notify_subscribers", bool, True),
             ("schedule_publish", str, None),
         ]
-    
+
     async def post_create(self):
         """Called after object creation (async)"""
         # Send notification email
         from myapp.tasks import send_new_article_notification
         await send_new_article_notification(self.id)
-        
+
         # Create activity log
         from myapp.models import ActivityLog
         await ActivityLog.objects.acreate(
@@ -456,13 +456,13 @@ class Article(ModelSerializer):
             article_id=self.id,
             user_id=self.author_id
         )
-    
+
     async def custom_actions(self, payload: dict):
         """Process custom fields from CreateSerializer"""
         if payload.get("notify_subscribers"):
             from myapp.tasks import notify_subscribers
             await notify_subscribers(self.id)
-        
+
         if payload.get("schedule_publish"):
             from datetime import datetime
             schedule_time = datetime.fromisoformat(payload["schedule_publish"])
@@ -472,7 +472,7 @@ class Article(ModelSerializer):
 
 !!! warning "Execution Order"
     **Create**: `on_create_before_save()` → `before_save()` → `save()` → `on_create_after_save()` → `after_save()` → `custom_actions()` → `post_create()`
-    
+
     **Update**: `before_save()` → `save()` → `after_save()` → `custom_actions()`
 
 ## Complete Example
@@ -492,17 +492,17 @@ class Author(ModelSerializer):
     bio = models.TextField(blank=True)
     avatar = models.URLField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    
+
     class ReadSerializer:
         fields = ["id", "name", "email", "bio", "avatar", "created_at"]
         customs = [
             ("article_count", int, lambda obj: obj.articles.count()),
         ]
-    
+
     class CreateSerializer:
         fields = ["name", "email"]
         optionals = [("bio", str), ("avatar", str)]
-    
+
     class UpdateSerializer:
         optionals = [
             ("name", str),
@@ -510,7 +510,7 @@ class Author(ModelSerializer):
             ("avatar", str),
         ]
         excludes = ["email", "created_at"]
-    
+
     def __str__(self):
         return self.name
 
@@ -519,18 +519,18 @@ class Category(ModelSerializer):
     name = models.CharField(max_length=100)
     slug = models.SlugField(unique=True, blank=True)
     description = models.TextField(blank=True)
-    
+
     class ReadSerializer:
         fields = ["id", "name", "slug", "description"]
-    
+
     class CreateSerializer:
         fields = ["name"]
         optionals = [("description", str)]
-    
+
     def before_save(self):
         if not self.slug:
             self.slug = slugify(self.name)
-    
+
     def __str__(self):
         return self.name
 
@@ -538,17 +538,17 @@ class Category(ModelSerializer):
 class Tag(ModelSerializer):
     name = models.CharField(max_length=50, unique=True)
     slug = models.SlugField(unique=True, blank=True)
-    
+
     class ReadSerializer:
         fields = ["id", "name", "slug"]
-    
+
     class CreateSerializer:
         fields = ["name"]
-    
+
     def before_save(self):
         if not self.slug:
             self.slug = slugify(self.name)
-    
+
     def __str__(self):
         return self.name
 
@@ -567,7 +567,7 @@ class Article(ModelSerializer):
     views = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     class ReadSerializer:
         fields = [
             "id", "title", "slug", "content", "excerpt",
@@ -579,7 +579,7 @@ class Article(ModelSerializer):
             ("word_count", int, lambda obj: len(obj.content.split())),
             ("reading_time", int, lambda obj: max(1, len(obj.content.split()) // 200)),
         ]
-    
+
     class CreateSerializer:
         fields = ["title", "content", "author", "category"]
         optionals = [
@@ -591,7 +591,7 @@ class Article(ModelSerializer):
         customs = [
             ("notify_subscribers", bool, True),
         ]
-    
+
     class UpdateSerializer:
         optionals = [
             ("title", str),
@@ -603,21 +603,21 @@ class Article(ModelSerializer):
             ("is_published", bool),
         ]
         excludes = ["author", "created_at", "views"]
-    
+
     def before_save(self):
         # Generate slug from title
         if not self.slug:
             self.slug = slugify(self.title)
-        
+
         # Auto-generate excerpt
         if not self.excerpt and self.content:
             self.excerpt = self.content[:297] + "..."
-        
+
         # Set published_at when publishing
         if self.is_published and not self.published_at:
             from django.utils import timezone
             self.published_at = timezone.now()
-    
+
     async def post_create(self):
         # Log creation
         from myapp.models import ActivityLog
@@ -626,13 +626,13 @@ class Article(ModelSerializer):
             article_id=self.id,
             user_id=self.author_id
         )
-    
+
     async def custom_actions(self, payload: dict):
         if payload.get("notify_subscribers"):
             # Send notifications (implement your notification logic)
             from myapp.tasks import notify_article_published
             await notify_article_published(self.id)
-    
+
     def __str__(self):
         return self.title
 ```

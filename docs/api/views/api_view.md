@@ -41,12 +41,12 @@ class UserAPIView(APIView):
     api = api_instance
     router_tag = "Users"
     api_route_path = "/users"
-    
+
     def views(self):
         @self.router.get("/stats")
         async def get_stats(request):
             return {"total_users": 100}
-        
+
         @self.router.post("/bulk-create")
         async def bulk_create(request, data: list[UserSchema]):
             # bulk creation logic
@@ -61,13 +61,13 @@ class ProtectedAPIView(APIView):
     router_tag = "Protected"
     api_route_path = "/protected"
     auth = [JWTAuth()]
-    
+
     def views(self):
         # Authenticated endpoint
         @self.router.get("/private", auth=self.auth)
         async def private_data(request):
             return {"user_id": request.auth.user_id}
-        
+
         # Public endpoint
         @self.router.get("/public")
         async def public_data(request):
@@ -104,7 +104,7 @@ class AnalyticsView(APIView):
     api = api
     router_tag = "Analytics"
     api_route_path = "/analytics"
-    
+
     def views(self):
         @self.router.get("/dashboard", response=StatsSchema)
         async def dashboard(request):
@@ -112,7 +112,7 @@ class AnalyticsView(APIView):
                 "total": 1000,
                 "active": 750
             }
-        
+
         @self.router.post("/track")
         async def track_event(request, event: str):
             # tracking logic

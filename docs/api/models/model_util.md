@@ -52,7 +52,7 @@ class User(ModelSerializer):
     username = models.CharField(max_length=150)
     password = models.CharField(max_length=128)
     email = models.EmailField()
-    
+
     class ReadSerializer:
         fields = ["id", "username", "email"]
 
@@ -280,7 +280,7 @@ print(customs)
 class User(ModelSerializer):
     username = models.CharField(max_length=150)
     email = models.EmailField()
-    
+
     class CreateSerializer:
         fields = ["username", "email"]
         customs = [
@@ -593,15 +593,15 @@ print(result)
 class User(ModelSerializer):
     username = models.CharField(max_length=150)
     email = models.EmailField()
-    
+
     class CreateSerializer:
         fields = ["username", "email"]
         customs = [("send_welcome", bool, True)]
-    
+
     async def custom_actions(self, payload):
         if payload.get("send_welcome"):
             await send_welcome_email(self.email)
-    
+
     async def post_create(self):
         await AuditLog.objects.acreate(
             action="user_created",
@@ -766,7 +766,7 @@ class User(ModelSerializer):
     class UpdateSerializer:
         optionals = [("email", str)]
         customs = [("reset_password", bool, False)]
-    
+
     async def custom_actions(self, payload):
         if payload.get("reset_password"):
             await self.send_password_reset_email()
@@ -933,7 +933,7 @@ from ninja_aio.views import APIViewSet
 class UserViewSet(APIViewSet):
     model = User
     api = api
-    
+
     # Internally creates ModelUtil(User)
     # All CRUD operations use ModelUtil methods
 ```
@@ -950,10 +950,10 @@ from django.http import HttpRequest
 class Author(ModelSerializer):
     name = models.CharField(max_length=200)
     email = models.EmailField(unique=True)
-    
+
     class CreateSerializer:
         fields = ["name", "email"]
-    
+
     class ReadSerializer:
         fields = ["id", "name", "email"]
 
@@ -963,28 +963,28 @@ class Book(ModelSerializer):
     isbn = models.CharField(max_length=13, unique=True)
     cover_image = models.BinaryField(null=True)
     is_published = models.BooleanField(default=False)
-    
+
     class CreateSerializer:
         fields = ["title", "author", "isbn"]
         optionals = [("cover_image", str)]  # base64
         customs = [("notify_author", bool, True)]
-    
+
     class ReadSerializer:
         fields = ["id", "title", "author", "isbn", "is_published"]
-    
+
     class UpdateSerializer:
         optionals = [
             ("title", str),
             ("is_published", bool),
         ]
-    
+
     async def custom_actions(self, payload):
         if payload.get("notify_author"):
             await send_email(
                 self.author.email,
                 f"New book created: {self.title}"
             )
-    
+
     async def post_create(self):
         await AuditLog.objects.acreate(
             action="book_created",
@@ -994,7 +994,7 @@ class Book(ModelSerializer):
 # Usage
 async def example(request: HttpRequest):
     util = ModelUtil(Book)
-    
+
     # Create
     book_data = BookCreateSchema(
         title="Django Unleashed",
@@ -1004,15 +1004,15 @@ async def example(request: HttpRequest):
         notify_author=True
     )
     created = await util.create_s(request, book_data, BookReadSchema)
-    
+
     # Read
     book = await util.get_object(request, pk=created["id"])
     serialized = await util.read_s(request, book, BookReadSchema)
-    
+
     # Update
     update_data = BookUpdateSchema(is_published=True)
     updated = await util.update_s(request, update_data, created["id"], BookReadSchema)
-    
+
     # Delete
     await util.delete_s(request, created["id"])
 ```
@@ -1044,7 +1044,7 @@ async def example(request: HttpRequest):
 4. **Handle SerializeError appropriately:**
    ```python
    from ninja_aio.exceptions import SerializeError
-   
+
    try:
        result = await util.create_s(request, data, schema)
    except SerializeError as e:

@@ -13,22 +13,22 @@ class User(ModelSerializer):
     @property
     def full_name(self):
         return f"{self.first_name} {self.last_name}"
-    
+
     class ReadSerializer:
-        fields = ['id', 'username', 'email']
+        fields = ["id", "username", "email"]
         customs = [
-            ('full_name', str, ""),
+            ("full_name", str, ""),
         ]
 
     class CreateSerializer:
-        fields = ['username', 'email']
-        optionals = [('first_name', str), ('last_name', str)]
-    
+        fields = ["username", "email"]
+        optionals = [("first_name", str), ("last_name", str)]
+
     class UpdateSerializer:
         optionals = [
-            ('email', str),
-            ('first_name', str),
-            ('last_name', str),
+            ("email", str),
+            ("first_name", str),
+            ("last_name", str),
         ]
 
     def __str__(self):
