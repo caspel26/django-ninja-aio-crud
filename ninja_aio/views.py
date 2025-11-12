@@ -245,7 +245,7 @@ class APIViewSet:
         Schema containing only the primary key field for path resolution.
         """
         return self._generate_schema(
-            {self.model_util.model_pk_name: (int | str, ...)}, "PathSchema"
+            {self.model_util.model_pk_name: self.model_util.pk_field_type}, "PathSchema"
         )
 
     def _generate_filters_schema(self):

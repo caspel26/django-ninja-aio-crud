@@ -3,7 +3,8 @@ import base64
 from typing import Any, ClassVar
 
 from ninja import Schema
-from ninja.orm import create_schema
+from ninja.orm import create_schema, fields
+from ninja.errors import ConfigError
 
 from django.db import models
 from django.http import HttpRequest
@@ -19,8 +20,6 @@ from django.db.models.fields.related_descriptors import (
 
 from .exceptions import SerializeError, NotFoundError
 from .types import S_TYPES, F_TYPES, SCHEMA_TYPES, ModelSerializerMeta
-import uuid
-from decimal import Decimal
 
 
 async def agetattr(obj, name: str, default=None):
@@ -98,6 +97,37 @@ class ModelUtil:
             Target model class.
         """
         self.model = model
+
+    @property
+    def pk_field_type(self):
+        """
+        Python type corresponding to the model's primary key field.
+
+        Resolution
+        ----------
+        Uses the Django field's internal type and ninja.orm.fields.TYPES mapping.
+        If the internal type is unknown, instructs how to register a custom mapping.
+
+        Returns
+        -------
+        type
+            Native Python type for the PK suitable for schema generation.
+
+        Raises
+        ------
+        ConfigError
+            If the internal type is not registered in ninja.orm.fields.TYPES.
+        """
+        try:
+            internal_type = self.model._meta.pk.get_internal_type()
+            return fields.TYPES[internal_type]
+        except KeyError as e:
+            msg = [
+                f"Do not know how to convert django field '{internal_type}'.",
+                "Try: from ninja.orm import register_field",
+                "register_field('{internal_type}', <your-python-type>)",
+            ]
+            raise ConfigError("\n".join(msg)) from e
 
     @property
     def serializable_fields(self):
