@@ -1,36 +1,9 @@
 from typing import Optional, Type
 
 from ninja import Schema
-from .models import ModelSerializer
+from ninja_aio.models import ModelSerializer
 from django.db.models import Model
-from pydantic import BaseModel, RootModel, ConfigDict, model_validator
-
-
-class GenericMessageSchema(RootModel[dict[str, str]]):
-    root: dict[str, str]
-
-
-class M2MDetailSchema(Schema):
-    count: int
-    details: list[str]
-
-
-class M2MSchemaOut(Schema):
-    errors: M2MDetailSchema
-    results: M2MDetailSchema
-
-
-class M2MAddSchemaIn(Schema):
-    add: list = []
-
-
-class M2MRemoveSchemaIn(Schema):
-    remove: list = []
-
-
-class M2MSchemaIn(Schema):
-    add: list = []
-    remove: list = []
+from pydantic import BaseModel, ConfigDict, model_validator
 
 
 class M2MRelationSchema(BaseModel):
