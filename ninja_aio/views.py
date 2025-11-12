@@ -178,7 +178,11 @@ class APIViewSet:
 
     def __init__(self) -> None:
         self.error_codes = ERROR_CODES
-        self.model_util = ModelUtil(self.model)
+        self.model_util = (
+            ModelUtil(self.model)
+            if not isinstance(self.model, ModelSerializerMeta)
+            else self.model.util
+        )
         self.schema_out, self.schema_in, self.schema_update = self.get_schemas()
         self.path_schema = self._generate_path_schema()
         self.filters_schema = self._generate_filters_schema()
