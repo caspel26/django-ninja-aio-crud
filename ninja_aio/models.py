@@ -591,12 +591,6 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
     class Meta:
         abstract = True
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.schema_in = self.generate_create_s()
-        self.schema_out = self.generate_read_s()
-        self.schema_update = self.generate_update_s()
-
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         # Bind a ModelUtil instance to the subclass for convenient access
