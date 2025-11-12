@@ -1,9 +1,10 @@
 import asyncio
 import base64
-from typing import Any
+from typing import Any, ClassVar
 
 from ninja import Schema
-from ninja.orm import create_schema
+from ninja.orm import create_schema, fields
+from ninja.errors import ConfigError
 
 from django.db import models
 from django.http import HttpRequest
@@ -96,6 +97,37 @@ class ModelUtil:
             Target model class.
         """
         self.model = model
+
+    @property
+    def pk_field_type(self):
+        """
+        Python type corresponding to the model's primary key field.
+
+        Resolution
+        ----------
+        Uses the Django field's internal type and ninja.orm.fields.TYPES mapping.
+        If the internal type is unknown, instructs how to register a custom mapping.
+
+        Returns
+        -------
+        type
+            Native Python type for the PK suitable for schema generation.
+
+        Raises
+        ------
+        ConfigError
+            If the internal type is not registered in ninja.orm.fields.TYPES.
+        """
+        try:
+            internal_type = self.model._meta.pk.get_internal_type()
+            return fields.TYPES[internal_type]
+        except KeyError as e:
+            msg = [
+                f"Do not know how to convert django field '{internal_type}'.",
+                "Try: from ninja.orm import register_field",
+                "register_field('{internal_type}', <your-python-type>)",
+            ]
+            raise ConfigError("\n".join(msg)) from e
 
     @property
     def serializable_fields(self):
@@ -554,8 +586,21 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
     See inline docstrings for per-method behavior.
     """
 
+    util: ClassVar[ModelUtil]
+
     class Meta:
         abstract = True
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.schema_in = self.generate_create_s()
+        self.schema_out = self.generate_read_s()
+        self.schema_update = self.generate_update_s()
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        # Bind a ModelUtil instance to the subclass for convenient access
+        cls.util = ModelUtil(cls)
 
     class CreateSerializer:
         """Configuration container describing how to build a create (input) schema for a model.
