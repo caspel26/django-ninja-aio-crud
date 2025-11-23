@@ -251,7 +251,7 @@ class ModelUtil:
         if getters:
             get_q |= getters
 
-        obj_qs = self.model.objects.select_related()
+        obj_qs = self.model.objects.select_related(*self.get_select_relateds())
         if isinstance(self.model, ModelSerializerMeta) and with_qs_request:
             obj_qs = await self.model.queryset_request(request)
 
@@ -290,6 +290,25 @@ class ModelUtil:
             if isinstance(field_obj, ReverseOneToOneDescriptor):
                 reverse_rels.append(field_obj.related.name)
         return reverse_rels
+
+    def get_select_relateds(self) -> list[str]:
+        """
+        Discover forward relation names for safe select_related.
+
+        Returns
+        -------
+        list[str]
+            Relation attribute names.
+        """
+        select_rels = []
+        for f in self.serializable_fields:
+            field_obj = getattr(self.model, f)
+            if isinstance(field_obj, ForwardManyToOneDescriptor):
+                select_rels.append(f)
+                continue
+            if isinstance(field_obj, ForwardOneToOneDescriptor):
+                select_rels.append(f)
+        return select_rels
 
     async def _get_field(self, k: str):
         return (await agetattr(self.model, k)).field
