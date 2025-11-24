@@ -18,9 +18,10 @@ from django.db.models.fields.related_descriptors import (
     ForwardOneToOneDescriptor,
 )
 
-from .exceptions import SerializeError, NotFoundError
-from .types import S_TYPES, F_TYPES, SCHEMA_TYPES, ModelSerializerMeta
-from .schemas.helpers import ModelQuerySchema
+from ninja_aio.exceptions import SerializeError, NotFoundError
+from ninja_aio.types import S_TYPES, F_TYPES, SCHEMA_TYPES, ModelSerializerMeta
+from ninja_aio.schemas.helpers import ModelQuerySetSchema, QuerySchema
+from ninja_aio.helpers.query import QueryUtil
 
 
 async def agetattr(obj, name: str, default=None):
@@ -212,7 +213,7 @@ class ModelUtil:
         self,
         request: HttpRequest,
         pk: int | str = None,
-        query_data: ModelQuerySchema = None,
+        query_data: QuerySchema = None,
         with_qs_request=True,
         is_for_read: bool = False,
     ) -> (
@@ -254,7 +255,7 @@ class ModelUtil:
         - Filters from query_data are applied before performing the lookup
         """
         if query_data is None:
-            query_data = ModelQuerySchema()
+            query_data = QuerySchema()
 
         get_q = self._build_lookup_query(pk, query_data.getters)
 
@@ -306,7 +307,7 @@ class ModelUtil:
     def _apply_query_optimizations(
         self,
         queryset: models.QuerySet,
-        query_data: ModelQuerySchema,
+        query_data: QuerySchema,
         is_for_read: bool,
     ) -> models.QuerySet:
         """
@@ -557,7 +558,7 @@ class ModelUtil:
         obj_schema: Schema,
         request: HttpRequest = None,
         obj: type["ModelSerializer"] = None,
-        query_data: ModelQuerySchema = None,
+        query_data: QuerySchema = None,
         is_for_read: bool = False,
     ):
         """
@@ -681,6 +682,7 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
     """
 
     util: ClassVar[ModelUtil]
+    query_util: ClassVar[QueryUtil]
 
     class Meta:
         abstract = True
@@ -689,6 +691,11 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
         super().__init_subclass__(**kwargs)
         # Bind a ModelUtil instance to the subclass for convenient access
         cls.util = ModelUtil(cls)
+        cls.query_util = QueryUtil(cls)
+
+    class QuerySet:
+        read = ModelQuerySetSchema()
+        queryset_request = ModelQuerySetSchema()
 
     class CreateSerializer:
         """Configuration container describing how to build a create (input) schema for a model.
@@ -955,7 +962,10 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
         -------
         QuerySet
         """
-        return cls.objects.select_related().all()
+        return cls.query_util.apply_queryset_optimizations(
+            queryset=cls.objects.all(),
+            scope=cls.query_util.SCOPES.QUERYSET_REQUEST,
+        )
 
     async def post_create(self) -> None:
         """

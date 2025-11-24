@@ -55,8 +55,11 @@ class M2MRelationSchema(BaseModel):
         return data
 
 
-class ModelQuerySchema(BaseModel):
-    filters: Optional[dict] = {}
-    getters: Optional[dict] = {}
+class ModelQuerySetSchema(BaseModel):
     select_related: Optional[list[str]] = []
     prefetch_related: Optional[list[str]] = []
+
+
+class QuerySchema(BaseModel):
+    filters: Optional[dict] = {}
+    getters: Optional[dict] = {}
