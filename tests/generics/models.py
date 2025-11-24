@@ -172,11 +172,6 @@ class Tests:
             self.assertEqual(payload, self.parsed_input_data.get("payload", {}))
             self.assertEqual(customs, self.parsed_input_data.get("customs", {}))
 
-        async def test_parse_output_data(self):
-            data: Schema = self.schema_out.from_orm(self.obj)
-            payload = await self.model_util.parse_output_data(self.request.get(), data)
-            self.assertEqual(payload, self.read_data)
-
         @mock.patch(
             "ninja_aio.models.ModelSerializer.custom_actions",
             new_callable=mock.AsyncMock,

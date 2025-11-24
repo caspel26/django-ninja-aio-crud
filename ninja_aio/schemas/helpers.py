@@ -1,7 +1,7 @@
 from typing import Optional, Type
 
 from ninja import Schema
-from ninja_aio.models import ModelSerializer
+from ninja_aio.types import ModelSerializerMeta
 from django.db.models import Model
 from pydantic import BaseModel, ConfigDict, model_validator
 
@@ -28,7 +28,7 @@ class M2MRelationSchema(BaseModel):
         )
     """
 
-    model: Type[ModelSerializer] | Type[Model]
+    model: ModelSerializerMeta | Type[Model]
     related_name: str
     add: bool = True
     remove: bool = True
@@ -47,9 +47,16 @@ class M2MRelationSchema(BaseModel):
         if related_schema is not None:
             return data
         model = data.get("model")
-        if not issubclass(model, ModelSerializer):
+        if not isinstance(model, ModelSerializerMeta):
             raise ValueError(
                 "related_schema must be provided if model is not a ModelSerializer",
             )
         data["related_schema"] = model.generate_related_s()
         return data
+
+
+class ModelQuerySchema(BaseModel):
+    filters: Optional[dict] = {}
+    getters: Optional[dict] = {}
+    select_related: Optional[list[str]] = []
+    prefetch_related: Optional[list[str]] = []

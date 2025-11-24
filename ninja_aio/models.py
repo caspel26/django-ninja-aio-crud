@@ -20,6 +20,7 @@ from django.db.models.fields.related_descriptors import (
 
 from .exceptions import SerializeError, NotFoundError
 from .types import S_TYPES, F_TYPES, SCHEMA_TYPES, ModelSerializerMeta
+from .schemas.helpers import ModelQuerySchema
 
 
 async def agetattr(obj, name: str, default=None):
@@ -211,67 +212,137 @@ class ModelUtil:
         self,
         request: HttpRequest,
         pk: int | str = None,
-        filters: dict = None,
-        getters: dict = None,
+        query_data: ModelQuerySchema = None,
         with_qs_request=True,
+        is_for_read: bool = False,
     ) -> (
         type["ModelSerializer"]
         | models.Model
         | models.QuerySet[type["ModelSerializer"] | models.Model]
     ):
         """
-        Retrieve a single instance (by pk/getters) or a queryset if no lookup criteria.
+        Retrieve a single object or queryset with optimized database queries.
 
-        Applies queryset_request (if ModelSerializerMeta), select_related, and
-        prefetch_related on discovered reverse relations.
+        This method handles both single-object retrieval (when pk or getters are provided)
+        and queryset retrieval (when no lookup criteria are specified). It automatically
+        applies query optimizations including select_related and prefetch_related based on
+        the model's relationships and the query parameters.
 
-        Parameters
-        ----------
-        request : HttpRequest
-        pk : int | str, optional
-            Primary key lookup.
-        filters : dict, optional
-            Additional filter kwargs.
-        getters : dict, optional
-            Field lookups combined with pk lookup.
-        with_qs_request : bool
-            Whether to apply model-level queryset_request hook.
+            The HTTP request object, used for queryset_request hooks.
+            Primary key value for single object lookup. Defaults to None.
+        query_data : ModelQuerySchema, optional
+            Schema containing filters, getters, and query optimization parameters.
+            Defaults to an empty ModelQuerySchema instance.
+        with_qs_request : bool, optional
+            Whether to apply the model's queryset_request hook if available.
+            Defaults to True.
+        is_for_read : bool, optional
+            Flag indicating if the query is for read operations, which may affect
+            query optimization strategies. Defaults to False.
 
-        Returns
-        -------
-        Model | QuerySet
-            Instance if lookup provided; otherwise queryset.
+        type["ModelSerializer"] | models.Model | models.QuerySet[type["ModelSerializer"] | models.Model]
+            - A single model instance if pk or getters are provided
+            - A QuerySet if no lookup criteria are specified
 
-        Raises
-        ------
-        NotFoundError
-            If instance not found by lookup criteria.
+            If a single object is requested (via pk or getters) but no matching
+            object exists in the database.
+
+        Notes
+        -----
+        - Query optimizations are automatically applied based on discovered relationships
+        - The queryset_request hook is called if the model implements ModelSerializerMeta
+        - Filters from query_data are applied before performing the lookup
         """
-        get_q = {self.model_pk_name: pk} if pk is not None else {}
-        if getters:
-            get_q |= getters
+        if query_data is None:
+            query_data = ModelQuerySchema()
 
+        get_q = self._build_lookup_query(pk, query_data.getters)
+
+        # Start with base queryset
         obj_qs = self.model.objects.all()
 
-        if (relateds := self.get_select_relateds()):
-            obj_qs = self.model.objects.select_related(*relateds)
-        if (prefetchs := self.get_reverse_relations()):
-            obj_qs = obj_qs.prefetch_related(*prefetchs)
+        # Apply select_related and prefetch_related
+        obj_qs = self._apply_query_optimizations(obj_qs, query_data, is_for_read)
+
         if isinstance(self.model, ModelSerializerMeta) and with_qs_request:
             obj_qs = await self.model.queryset_request(request)
 
-        if filters:
+        if filters := query_data.filters:
             obj_qs = obj_qs.filter(**filters)
 
+        # Return queryset if no lookup criteria
         if not get_q:
             return obj_qs
 
+        # Fetch single object
         try:
             obj = await obj_qs.aget(**get_q)
         except ObjectDoesNotExist:
             raise NotFoundError(self.model)
 
         return obj
+
+    def _build_lookup_query(self, pk: int | str = None, getters: dict = None) -> dict:
+        """
+        Build lookup query dict from pk and additional getters.
+
+        Parameters
+        ----------
+        pk : int | str, optional
+            Primary key value.
+        getters : dict, optional
+            Additional field lookups.
+
+        Returns
+        -------
+        dict
+            Combined lookup criteria.
+        """
+        get_q = {self.model_pk_name: pk} if pk is not None else {}
+        if getters:
+            get_q |= getters
+        return get_q
+
+    def _apply_query_optimizations(
+        self,
+        queryset: models.QuerySet,
+        query_data: ModelQuerySchema,
+        is_for_read: bool,
+    ) -> models.QuerySet:
+        """
+        Apply select_related and prefetch_related optimizations to queryset.
+
+        Parameters
+        ----------
+        queryset : QuerySet
+            Base queryset to optimize.
+        query_data : ModelQuerySchema
+            Query configuration with select_related/prefetch_related lists.
+        is_for_read : bool
+            Whether to include model-level relation discovery.
+
+        Returns
+        -------
+        QuerySet
+            Optimized queryset.
+        """
+        select_related = (
+            query_data.select_related + self.get_select_relateds()
+            if is_for_read
+            else query_data.select_related
+        )
+        prefetch_related = (
+            query_data.prefetch_related + self.get_reverse_relations()
+            if is_for_read
+            else query_data.prefetch_related
+        )
+
+        if select_related:
+            queryset = queryset.select_related(*select_related)
+        if prefetch_related:
+            queryset = queryset.prefetch_related(*prefetch_related)
+
+        return queryset
 
     def get_reverse_relations(self) -> list[str]:
         """
@@ -382,6 +453,11 @@ class ModelUtil:
             new_nested[f"{old_k}_id"] = new_nested.pop(old_k)
         return new_nested
 
+    async def _bump_object_from_schema(
+        self, obj: type["ModelSerializer"] | models.Model, schema: Schema
+    ):
+        return (await sync_to_async(schema.from_orm)(obj)).model_dump(mode="json")
+
     async def parse_input_data(self, request: HttpRequest, data: Schema):
         """
         Transform inbound schema data to a model-ready payload.
@@ -450,37 +526,6 @@ class ModelUtil:
 
         return new_payload, customs
 
-    async def parse_output_data(self, request: HttpRequest, data: Schema):
-        """
-        Post-process serialized output.
-
-        For nested FK / OneToOne dicts:
-        - Replace dict with authoritative related instance.
-        - Rewrite nested FK keys to <name>_id for nested foreign keys.
-
-        Parameters
-        ----------
-        request : HttpRequest
-        data : Schema
-            Schema (from_orm) instance.
-
-        Returns
-        -------
-        dict
-            Normalized output payload.
-        """
-        payload = data.model_dump(mode="json")
-
-        for k, v in payload.items():
-            field_obj = await self._extract_field_obj(k)
-            if not self._should_process_nested(v, field_obj):
-                continue
-            rel_instance = await self._fetch_related_instance(request, field_obj, v)
-            if isinstance(field_obj, models.ForeignKey):
-                v = await self._rewrite_nested_foreign_keys(rel_instance, v)
-            payload[k] = rel_instance
-        return payload
-
     async def create_s(self, request: HttpRequest, data: Schema, obj_schema: Schema):
         """
         Create a new instance and return serialized output.
@@ -509,35 +554,62 @@ class ModelUtil:
 
     async def read_s(
         self,
-        request: HttpRequest,
-        obj: type["ModelSerializer"],
         obj_schema: Schema,
+        request: HttpRequest = None,
+        obj: type["ModelSerializer"] = None,
+        query_data: ModelQuerySchema = None,
+        is_for_read: bool = False,
     ):
         """
-        Serialize an existing instance with the provided read schema.
+        Serialize an existing instance or queryset with the provided read schema.
+
+        This method handles serialization of model instances into their schema representation.
+        If no instance is provided, it will fetch one using get_object() with the given
+        query parameters.
 
         Parameters
         ----------
-        request : HttpRequest
-        obj : Model
-            Target instance.
         obj_schema : Schema
-            Read schema class.
+            Read schema class used for serialization output.
+        request : HttpRequest, optional
+            The HTTP request object, used when fetching an object if obj is None.
+            Defaults to None.
+        obj : type["ModelSerializer"] | models.Model, optional
+            Target instance to serialize. If None, will be fetched using get_object().
+            Defaults to None.
+        query_data : ModelQuerySchema, optional
+            Query parameters (filters, getters, optimizations) used when fetching
+            the object if obj is None. Defaults to None.
+        is_for_read : bool, optional
+            Flag indicating if query optimizations for read operations should be applied
+            when fetching the object. Defaults to False.
 
         Returns
         -------
         dict
-            Serialized payload.
+            Serialized payload containing the object data in JSON-compatible format.
 
         Raises
         ------
         SerializeError
-            If obj_schema not provided.
+            If obj_schema is not provided (status 400).
+        NotFoundError
+            If obj is None and no matching object is found during get_object().
+
+        Notes
+        -----
+        - The serialization uses Pydantic's from_orm() method with mode="json"
+        - If obj is provided, request and query_data are ignored
         """
         if obj_schema is None:
-            raise SerializeError({"obj_schema": "must be provided"}, 400)
-        data = await sync_to_async(obj_schema.from_orm)(obj)
-        return data.model_dump(mode="json")
+            raise SerializeError({"schema": "must be provided"}, 400)
+
+        if obj is None:
+            obj = await self.get_object(
+                request, query_data=query_data, is_for_read=is_for_read
+            )
+
+        return await self._bump_object_from_schema(obj, obj_schema)
 
     async def update_s(
         self, request: HttpRequest, data: Schema, pk: int | str, obj_schema: Schema
