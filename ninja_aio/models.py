@@ -251,11 +251,15 @@ class ModelUtil:
         if getters:
             get_q |= getters
 
-        obj_qs = self.model.objects.select_related(*self.get_select_relateds())
+        obj_qs = self.model.objects.all()
+
+        if (relateds := self.get_select_relateds()):
+            obj_qs = self.model.objects.select_related(*relateds)
+        if (prefetchs := self.get_reverse_relations()):
+            obj_qs = obj_qs.prefetch_related(*prefetchs)
         if isinstance(self.model, ModelSerializerMeta) and with_qs_request:
             obj_qs = await self.model.queryset_request(request)
 
-        obj_qs = obj_qs.prefetch_related(*self.get_reverse_relations())
         if filters:
             obj_qs = obj_qs.filter(**filters)
 
