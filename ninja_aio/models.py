@@ -532,9 +532,8 @@ class ModelUtil:
         """
         if obj_schema is None:
             raise SerializeError({"obj_schema": "must be provided"}, 400)
-        return await self.parse_output_data(
-            request, await sync_to_async(obj_schema.from_orm)(obj)
-        )
+        data = await sync_to_async(obj_schema.from_orm)(obj)
+        return data.model_dump(mode="json")
 
     async def update_s(
         self, request: HttpRequest, data: Schema, pk: int | str, obj_schema: Schema
