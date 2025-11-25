@@ -525,18 +525,18 @@ class ModelUtil:
         self,
         request: HttpRequest,
         query_data: QuerySchema,
-        obj_schema: Schema,
+        schema: Schema,
         is_for_read: bool,
     ):
         """Handle different query modes (filters vs getters)."""
         if query_data.filters:
             return await self._serialize_queryset(
-                request, query_data, obj_schema, is_for_read
+                request, query_data, schema, is_for_read
             )
 
         if query_data.getters:
             return await self._serialize_single_object(
-                request, query_data, obj_schema, is_for_read
+                request, query_data, schema, is_for_read
             )
 
         raise SerializeError(
@@ -547,16 +547,14 @@ class ModelUtil:
         self,
         request: HttpRequest,
         query_data: QuerySchema,
-        obj_schema: Schema,
+        schema: Schema,
         is_for_read: bool,
     ):
         """Serialize a queryset of objects."""
-        obj_qs = await self.get_objects(
+        objs = await self.get_objects(
             request, query_data=query_data, is_for_read=is_for_read
         )
-        return [
-            await self._bump_object_from_schema(o, obj_schema) async for o in obj_qs
-        ]
+        return [await self._bump_object_from_schema(obj, schema) async for obj in objs]
 
     async def _serialize_single_object(
         self,
@@ -665,82 +663,164 @@ class ModelUtil:
             await asyncio.gather(obj.custom_actions(customs), obj.post_create())
         return await self.read_s(obj_schema, request, obj)
 
-    async def read_s(
+    async def _read_s(
         self,
-        obj_schema: Schema,
+        schema: Schema,
         request: HttpRequest = None,
-        obj: type["ModelSerializer"] | models.QuerySet[type["ModelSerializer"]] = None,
+        instance: models.QuerySet[type["ModelSerializer"] | models.Model] | type["ModelSerializer"] | models.Model= None,
         query_data: QuerySchema = None,
         is_for_read: bool = False,
-    ) -> dict | list[dict]:
+    ):
         """
-        Serialize model instance(s) or fetch and serialize based on query parameters.
-
-        This method provides flexible serialization handling for both single objects
-        and querysets. It can serialize provided instances directly or fetch and
-        serialize based on query parameters (filters for multiple objects, getters
-        for single object).
+        Internal serialization method handling both single instances and querysets.
 
         Parameters
         ----------
-        obj_schema : Schema
-            Read schema class used for serialization output.
+        schema : Schema
+            Read schema class for serialization.
         request : HttpRequest, optional
-            The HTTP request object, required when obj is None.
-            Defaults to None.
-        obj : type["ModelSerializer"] | models.QuerySet[type["ModelSerializer"]], optional
-            Instance or queryset to serialize. If None, objects will be fetched
-            based on query_data. Defaults to None.
+            HTTP request object, required when instance is None.
+        instance : QuerySet | Model, optional
+            Instance(s) to serialize. If None, fetches based on query_data.
         query_data : QuerySchema, optional
-            Query parameters containing either:
-            - filters: for fetching multiple objects (queryset)
-            - getters: for fetching a single object
-            Required when obj is None. Defaults to None.
+            Query parameters for fetching objects when instance is None.
         is_for_read : bool, optional
-            Flag indicating if query optimizations for read operations should be applied.
-            Defaults to False.
+            Whether to apply read-specific query optimizations.
 
         Returns
         -------
         dict | list[dict]
-            - Single dict if obj is a model instance or query_data contains getters
-            - List of dicts if obj is a QuerySet or query_data contains filters
+            Serialized instance(s).
 
         Raises
         ------
         SerializeError
-            - If obj_schema is None (status 400)
-            - If obj is None and request is None (status 400)
-            - If obj is None and query_data is None (status 400)
-            - If query_data contains both filters and getters (status 400)
-            - If query_data contains neither filters nor getters (status 400)
+            If schema is None or validation fails.
+        """
+        if schema is None:
+            raise SerializeError({"schema": "must be provided"}, 400)
+        
+        if instance is not None:
+            if isinstance(instance, models.QuerySet):
+                return [
+                    await self._bump_object_from_schema(obj, schema)
+                    async for obj in instance
+                ]
+            return await self._bump_object_from_schema(instance, schema)
+        
+        self._validate_read_params(request, query_data)
+        return await self._handle_query_mode(request, query_data, schema, is_for_read)
+
+
+    async def read_s(
+        self,
+        schema: Schema,
+        request: HttpRequest = None,
+        instance: type["ModelSerializer"] = None,
+        query_data: ObjectQuerySchema = None,
+        is_for_read: bool = False,
+    ) -> dict:
+        """
+        Serialize a single model instance or fetch and serialize using query parameters.
+
+        This method handles single-object serialization. It can serialize a provided
+        instance directly or fetch and serialize a single object using query_data.getters.
+
+        Parameters
+        ----------
+        schema : Schema
+            Read schema class for serialization output.
+        request : HttpRequest, optional
+            HTTP request object, required when instance is None.
+        instance : ModelSerializer | Model, optional
+            Single instance to serialize. If None, fetched based on query_data.
+        query_data : ObjectQuerySchema, optional
+            Query parameters with getters for single object lookup.
+            Required when instance is None.
+        is_for_read : bool, optional
+            Whether to apply read-specific query optimizations. Defaults to False.
+
+        Returns
+        -------
+        dict
+            Serialized model instance as dictionary.
+
+        Raises
+        ------
+        SerializeError
+            - If schema is None
+            - If instance is None and request or query_data is None
+            - If query_data validation fails
         NotFoundError
             If using getters and no matching object is found.
 
         Notes
         -----
-        - Serialization uses Pydantic's from_orm() with mode="json"
-        - When obj is provided, request and query_data are ignored
-        - Query optimizations (select_related/prefetch_related) are applied when is_for_read=True
+        - Uses Pydantic's from_orm() with mode="json" for serialization
+        - When instance is provided, request and query_data are ignored
+        - Query optimizations applied when is_for_read=True
         """
-        if obj_schema is None:
-            raise SerializeError({"schema": "must be provided"}, 400)
+        return await self._read_s(
+            schema,
+            request,
+            instance,
+            query_data,
+            is_for_read,
+        )
 
-        # If object is provided, serialize it directly
-        if obj is not None:
-            if isinstance(obj, models.QuerySet):
-                return [
-                    await self._bump_object_from_schema(o, obj_schema)
-                    async for o in obj
-                ]
-            return await self._bump_object_from_schema(obj, obj_schema)
+    async def list_read_s(
+        self,
+        schema: Schema,
+        request: HttpRequest = None,
+        instances: models.QuerySet[type["ModelSerializer"] | models.Model] = None,
+        query_data: ObjectsQuerySchema = None,
+        is_for_read: bool = False,
+    ) -> list[dict]:
+        """
+        Serialize multiple model instances or fetch and serialize using query parameters.
 
-        # Object not provided - validate required parameters
-        self._validate_read_params(request, query_data)
+        This method handles queryset serialization. It can serialize provided instances
+        directly or fetch and serialize multiple objects using query_data.filters.
 
-        # Handle different query modes
-        return await self._handle_query_mode(
-            request, query_data, obj_schema, is_for_read
+        Parameters
+        ----------
+        schema : Schema
+            Read schema class for serialization output.
+        request : HttpRequest, optional
+            HTTP request object, required when instances is None.
+        instances : QuerySet, optional
+            Queryset of instances to serialize. If None, fetched based on query_data.
+        query_data : ObjectsQuerySchema, optional
+            Query parameters with filters for multiple object lookup.
+            Required when instances is None.
+        is_for_read : bool, optional
+            Whether to apply read-specific query optimizations. Defaults to False.
+
+        Returns
+        -------
+        list[dict]
+            List of serialized model instances as dictionaries.
+
+        Raises
+        ------
+        SerializeError
+            - If schema is None
+            - If instances is None and request or query_data is None
+            - If query_data validation fails
+
+        Notes
+        -----
+        - Uses Pydantic's from_orm() with mode="json" for serialization
+        - When instances is provided, request and query_data are ignored
+        - Query optimizations applied when is_for_read=True
+        - Processes queryset asynchronously for efficiency
+        """
+        return await self._read_s(
+            schema,
+            request,
+            instances,
+            query_data,
+            is_for_read,
         )
 
     async def update_s(
