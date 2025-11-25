@@ -323,19 +323,10 @@ class APIViewSet:
             request: HttpRequest,
             filters: Query[self.filters_schema] = None,  # type: ignore
         ):
-            qs = self.model.objects.select_related()
-            if isinstance(self.model, ModelSerializerMeta):
-                qs = await self.model.queryset_request(request)
-            rels = self.model_util.get_reverse_relations()
-            if len(rels) > 0:
-                qs = qs.prefetch_related(*rels)
+            qs = await self.model_util.get_objects(request, is_for_read=True)
             if filters is not None:
                 qs = await self.query_params_handler(qs, filters.model_dump())
-            objs = [
-                await self.model_util.read_s(self.schema_out, request, obj)
-                async for obj in qs.all()
-            ]
-            return objs
+            return await self.model_util.read_s(self.schema_out, request, qs)
 
         return list
 
@@ -356,9 +347,7 @@ class APIViewSet:
             return await self.model_util.read_s(
                 self.schema_out,
                 request,
-                query_data=QuerySchema(
-                    getters={"pk": self._get_pk(pk)}
-                ),
+                query_data=QuerySchema(getters={"pk": self._get_pk(pk)}),
             )
 
         return retrieve

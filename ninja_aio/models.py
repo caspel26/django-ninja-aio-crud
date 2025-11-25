@@ -20,7 +20,12 @@ from django.db.models.fields.related_descriptors import (
 
 from ninja_aio.exceptions import SerializeError, NotFoundError
 from ninja_aio.types import S_TYPES, F_TYPES, SCHEMA_TYPES, ModelSerializerMeta
-from ninja_aio.schemas.helpers import ModelQuerySetSchema, QuerySchema
+from ninja_aio.schemas.helpers import (
+    ModelQuerySetSchema,
+    QuerySchema,
+    ObjectQuerySchema,
+    ObjectsQuerySchema,
+)
 from ninja_aio.helpers.query import QueryUtil
 
 
@@ -209,31 +214,69 @@ class ModelUtil:
         """
         return self.model_verbose_name_plural.replace(" ", "")
 
-    async def get_object(
+    async def _get_base_queryset(
         self,
         request: HttpRequest,
-        pk: int | str = None,
-        query_data: QuerySchema = None,
+        query_data: QuerySchema,
+        with_qs_request: bool,
+        is_for_read: bool,
+    ) -> models.QuerySet[type["ModelSerializer"] | models.Model]:
+        """
+        Build base queryset with optimizations and filters.
+
+        Parameters
+        ----------
+        request : HttpRequest
+            The HTTP request object.
+        query_data : QuerySchema
+            Query configuration with filters and optimizations.
+        with_qs_request : bool
+            Whether to apply queryset_request hook.
+        is_for_read : bool
+            Whether this is a read operation.
+
+        Returns
+        -------
+        models.QuerySet
+            Optimized and filtered queryset.
+        """
+        # Start with base queryset
+        obj_qs = self.model.objects.all()
+
+        # Apply query optimizations
+        obj_qs = self._apply_query_optimizations(obj_qs, query_data, is_for_read)
+
+        # Apply queryset_request hook if available
+        if isinstance(self.model, ModelSerializerMeta) and with_qs_request:
+            obj_qs = await self.model.queryset_request(request)
+
+        # Apply filters if present
+        if hasattr(query_data, "filters") and query_data.filters:
+            obj_qs = obj_qs.filter(**query_data.filters)
+
+        return obj_qs
+
+    async def get_objects(
+        self,
+        request: HttpRequest,
+        query_data: ObjectsQuerySchema = None,
         with_qs_request=True,
         is_for_read: bool = False,
-    ) -> (
-        type["ModelSerializer"]
-        | models.Model
-        | models.QuerySet[type["ModelSerializer"] | models.Model]
-    ):
+    ) -> models.QuerySet[type["ModelSerializer"] | models.Model]:
         """
-        Retrieve a single object or queryset with optimized database queries.
+        Retrieve a queryset with optimized database queries.
 
-        This method handles both single-object retrieval (when pk or getters are provided)
-        and queryset retrieval (when no lookup criteria are specified). It automatically
-        applies query optimizations including select_related and prefetch_related based on
-        the model's relationships and the query parameters.
+        This method fetches a queryset applying query optimizations including
+        select_related and prefetch_related based on the model's relationships
+        and the query parameters.
 
+        Parameters
+        ----------
+        request : HttpRequest
             The HTTP request object, used for queryset_request hooks.
-            Primary key value for single object lookup. Defaults to None.
-        query_data : ModelQuerySchema, optional
-            Schema containing filters, getters, and query optimization parameters.
-            Defaults to an empty ModelQuerySchema instance.
+        query_data : ObjectsQuerySchema, optional
+            Schema containing filters and query optimization parameters.
+            Defaults to an empty ObjectsQuerySchema instance.
         with_qs_request : bool, optional
             Whether to apply the model's queryset_request hook if available.
             Defaults to True.
@@ -241,41 +284,86 @@ class ModelUtil:
             Flag indicating if the query is for read operations, which may affect
             query optimization strategies. Defaults to False.
 
-        type["ModelSerializer"] | models.Model | models.QuerySet[type["ModelSerializer"] | models.Model]
-            - A single model instance if pk or getters are provided
-            - A QuerySet if no lookup criteria are specified
-
-            If a single object is requested (via pk or getters) but no matching
-            object exists in the database.
+        Returns
+        -------
+        models.QuerySet[type["ModelSerializer"] | models.Model]
+            A QuerySet of model instances.
 
         Notes
         -----
         - Query optimizations are automatically applied based on discovered relationships
         - The queryset_request hook is called if the model implements ModelSerializerMeta
-        - Filters from query_data are applied before performing the lookup
         """
         if query_data is None:
-            query_data = QuerySchema()
+            query_data = ObjectsQuerySchema()
 
+        return await self._get_base_queryset(
+            request, query_data, with_qs_request, is_for_read
+        )
+
+    async def get_object(
+        self,
+        request: HttpRequest,
+        pk: int | str = None,
+        query_data: ObjectQuerySchema = None,
+        with_qs_request=True,
+        is_for_read: bool = False,
+    ) -> type["ModelSerializer"] | models.Model:
+        """
+        Retrieve a single object with optimized database queries.
+
+        This method handles single-object retrieval with automatic query optimizations
+        including select_related and prefetch_related based on the model's relationships
+        and the query parameters.
+
+        Parameters
+        ----------
+        request : HttpRequest
+            The HTTP request object, used for queryset_request hooks.
+        pk : int | str, optional
+            Primary key value for single object lookup. Defaults to None.
+        query_data : ObjectQuerySchema, optional
+            Schema containing getters and query optimization parameters.
+            Defaults to an empty ObjectQuerySchema instance.
+        with_qs_request : bool, optional
+            Whether to apply the model's queryset_request hook if available.
+            Defaults to True.
+        is_for_read : bool, optional
+            Flag indicating if the query is for read operations, which may affect
+            query optimization strategies. Defaults to False.
+
+        Returns
+        -------
+        type["ModelSerializer"] | models.Model
+            A single model instance.
+
+        Raises
+        ------
+        ValueError
+            If neither pk nor getters are provided.
+        NotFoundError
+            If no matching object exists in the database.
+
+        Notes
+        -----
+        - Query optimizations are automatically applied based on discovered relationships
+        - The queryset_request hook is called if the model implements ModelSerializerMeta
+        """
+        if query_data is None:
+            query_data = ObjectQuerySchema()
+
+        if not query_data.getters and pk is None:
+            raise ValueError(
+                "Either pk or getters must be provided for single object retrieval."
+            )
+
+        # Build lookup query and get optimized queryset
         get_q = self._build_lookup_query(pk, query_data.getters)
+        obj_qs = await self._get_base_queryset(
+            request, query_data, with_qs_request, is_for_read
+        )
 
-        # Start with base queryset
-        obj_qs = self.model.objects.all()
-
-        # Apply select_related and prefetch_related
-        obj_qs = self._apply_query_optimizations(obj_qs, query_data, is_for_read)
-
-        if isinstance(self.model, ModelSerializerMeta) and with_qs_request:
-            obj_qs = await self.model.queryset_request(request)
-
-        if filters := query_data.filters:
-            obj_qs = obj_qs.filter(**filters)
-
-        # Return queryset if no lookup criteria
-        if not get_q:
-            return obj_qs
-
-        # Fetch single object
+        # Perform lookup
         try:
             obj = await obj_qs.aget(**get_q)
         except ObjectDoesNotExist:
@@ -416,6 +504,73 @@ class ModelUtil:
     ):
         return (await sync_to_async(schema.from_orm)(obj)).model_dump(mode="json")
 
+    def _validate_read_params(self, request: HttpRequest, query_data: QuerySchema):
+        """Validate required parameters for read operations."""
+        if request is None:
+            raise SerializeError(
+                {"request": "must be provided when object is not given"}, 400
+            )
+
+        if query_data is None:
+            raise SerializeError(
+                {"query_data": "must be provided when object is not given"}, 400
+            )
+
+        if query_data.filters and query_data.getters:
+            raise SerializeError(
+                {"query_data": "cannot contain both filters and getters"}, 400
+            )
+
+    async def _handle_query_mode(
+        self,
+        request: HttpRequest,
+        query_data: QuerySchema,
+        obj_schema: Schema,
+        is_for_read: bool,
+    ):
+        """Handle different query modes (filters vs getters)."""
+        if query_data.filters:
+            return await self._serialize_queryset(
+                request, query_data, obj_schema, is_for_read
+            )
+
+        if query_data.getters:
+            return await self._serialize_single_object(
+                request, query_data, obj_schema, is_for_read
+            )
+
+        raise SerializeError(
+            {"query_data": "must contain either filters or getters"}, 400
+        )
+
+    async def _serialize_queryset(
+        self,
+        request: HttpRequest,
+        query_data: QuerySchema,
+        obj_schema: Schema,
+        is_for_read: bool,
+    ):
+        """Serialize a queryset of objects."""
+        obj_qs = await self.get_objects(
+            request, query_data=query_data, is_for_read=is_for_read
+        )
+        return [
+            await self._bump_object_from_schema(o, obj_schema) async for o in obj_qs
+        ]
+
+    async def _serialize_single_object(
+        self,
+        request: HttpRequest,
+        query_data: QuerySchema,
+        obj_schema: Schema,
+        is_for_read: bool,
+    ):
+        """Serialize a single object."""
+        obj = await self.get_object(
+            request, query_data=query_data, is_for_read=is_for_read
+        )
+        return await self._bump_object_from_schema(obj, obj_schema)
+
     async def parse_input_data(self, request: HttpRequest, data: Schema):
         """
         Transform inbound schema data to a model-ready payload.
@@ -514,60 +669,79 @@ class ModelUtil:
         self,
         obj_schema: Schema,
         request: HttpRequest = None,
-        obj: type["ModelSerializer"] = None,
+        obj: type["ModelSerializer"] | models.QuerySet[type["ModelSerializer"]] = None,
         query_data: QuerySchema = None,
         is_for_read: bool = False,
-    ):
+    ) -> dict | list[dict]:
         """
-        Serialize an existing instance or queryset with the provided read schema.
+        Serialize model instance(s) or fetch and serialize based on query parameters.
 
-        This method handles serialization of model instances into their schema representation.
-        If no instance is provided, it will fetch one using get_object() with the given
-        query parameters.
+        This method provides flexible serialization handling for both single objects
+        and querysets. It can serialize provided instances directly or fetch and
+        serialize based on query parameters (filters for multiple objects, getters
+        for single object).
 
         Parameters
         ----------
         obj_schema : Schema
             Read schema class used for serialization output.
         request : HttpRequest, optional
-            The HTTP request object, used when fetching an object if obj is None.
+            The HTTP request object, required when obj is None.
             Defaults to None.
-        obj : type["ModelSerializer"] | models.Model, optional
-            Target instance to serialize. If None, will be fetched using get_object().
-            Defaults to None.
-        query_data : ModelQuerySchema, optional
-            Query parameters (filters, getters, optimizations) used when fetching
-            the object if obj is None. Defaults to None.
+        obj : type["ModelSerializer"] | models.QuerySet[type["ModelSerializer"]], optional
+            Instance or queryset to serialize. If None, objects will be fetched
+            based on query_data. Defaults to None.
+        query_data : QuerySchema, optional
+            Query parameters containing either:
+            - filters: for fetching multiple objects (queryset)
+            - getters: for fetching a single object
+            Required when obj is None. Defaults to None.
         is_for_read : bool, optional
-            Flag indicating if query optimizations for read operations should be applied
-            when fetching the object. Defaults to False.
+            Flag indicating if query optimizations for read operations should be applied.
+            Defaults to False.
 
         Returns
         -------
-        dict
-            Serialized payload containing the object data in JSON-compatible format.
+        dict | list[dict]
+            - Single dict if obj is a model instance or query_data contains getters
+            - List of dicts if obj is a QuerySet or query_data contains filters
 
         Raises
         ------
         SerializeError
-            If obj_schema is not provided (status 400).
+            - If obj_schema is None (status 400)
+            - If obj is None and request is None (status 400)
+            - If obj is None and query_data is None (status 400)
+            - If query_data contains both filters and getters (status 400)
+            - If query_data contains neither filters nor getters (status 400)
         NotFoundError
-            If obj is None and no matching object is found during get_object().
+            If using getters and no matching object is found.
 
         Notes
         -----
-        - The serialization uses Pydantic's from_orm() method with mode="json"
-        - If obj is provided, request and query_data are ignored
+        - Serialization uses Pydantic's from_orm() with mode="json"
+        - When obj is provided, request and query_data are ignored
+        - Query optimizations (select_related/prefetch_related) are applied when is_for_read=True
         """
         if obj_schema is None:
             raise SerializeError({"schema": "must be provided"}, 400)
 
-        if obj is None:
-            obj = await self.get_object(
-                request, query_data=query_data, is_for_read=is_for_read
-            )
+        # If object is provided, serialize it directly
+        if obj is not None:
+            if isinstance(obj, models.QuerySet):
+                return [
+                    await self._bump_object_from_schema(o, obj_schema)
+                    async for o in obj
+                ]
+            return await self._bump_object_from_schema(obj, obj_schema)
 
-        return await self._bump_object_from_schema(obj, obj_schema)
+        # Object not provided - validate required parameters
+        self._validate_read_params(request, query_data)
+
+        # Handle different query modes
+        return await self._handle_query_mode(
+            request, query_data, obj_schema, is_for_read
+        )
 
     async def update_s(
         self, request: HttpRequest, data: Schema, pk: int | str, obj_schema: Schema

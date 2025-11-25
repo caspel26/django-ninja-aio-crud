@@ -6,7 +6,7 @@ from .api import (
     M2MRemoveSchemaIn,
     M2MSchemaIn,
 )
-from .helpers import M2MRelationSchema, QuerySchema, ModelQuerySetSchema
+from .helpers import M2MRelationSchema, QuerySchema, ModelQuerySetSchema, ObjectQuerySchema, ObjectsQuerySchema
 
 __all__ = [
     "GenericMessageSchema",
@@ -18,4 +18,6 @@ __all__ = [
     "M2MRelationSchema",
     "QuerySchema",
     "ModelQuerySetSchema",
+    "ObjectQuerySchema",
+    "ObjectsQuerySchema",
 ]
