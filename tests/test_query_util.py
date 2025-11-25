@@ -8,14 +8,7 @@ from ninja_aio.helpers.query import QueryScopes
 class QueryUtilDedicatedTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
-        # Configure read (select_related) on FK serializer (forward FK -> select_related)
-        app_models.TestModelSerializerForeignKey.QuerySet.read.select_related = [
-            "test_model_serializer"
-        ]
         # Configure queryset_request (prefetch_related) on M2M serializer (ManyToMany -> prefetch_related)
-        app_models.TestModelSerializerManyToMany.QuerySet.queryset_request.prefetch_related = [
-            "test_model_serializers"
-        ]
         cls.query_util_fk = app_models.TestModelSerializerForeignKey.query_util
         cls.query_util_m2m = app_models.TestModelSerializerManyToMany.query_util
         # Create FK related objects

@@ -151,6 +151,12 @@ class TestModelSerializerManyToMany(BaseTestModelSerializer):
         related_name="test_model_serializer_many_to_many",
     )
 
+    class QuerySet:
+        queryset_request = ModelQuerySetSchema(
+            select_related=[],
+            prefetch_related=["test_model_serializers"],
+        )
+
     class ReadSerializer:
         fields = BaseTestModelSerializer.ReadSerializer.fields + [
             "test_model_serializers"
