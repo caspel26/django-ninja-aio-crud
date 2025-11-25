@@ -26,7 +26,7 @@ class CustomOptionalSerializer(ModelSerializer):
         app_label = app_models.TestModelSerializer._meta.app_label
 
 
-@tag("model_util_relations")
+@tag("model_util_relations", "model_util")
 class ModelUtilRelationsTestCase(TestCase):
     def test_select_relateds_foreign_key(self):
         util = ModelUtil(app_models.TestModelSerializerForeignKey)
@@ -39,14 +39,14 @@ class ModelUtilRelationsTestCase(TestCase):
         self.assertIn("test_model_serializer_foreign_keys", revs)
 
 
-@tag("model_util_pk_field_type")
+@tag("model_util_pk_field_type", "model_util")
 class ModelUtilPKFieldTypeTestCase(TestCase):
     def test_pk_field_type_is_int(self):
         util = ModelUtil(app_models.TestModelSerializer)
         self.assertIn(util.pk_field_type, (int,))  # BigAutoField maps to int
 
 
-@tag("model_util_parse_input")
+@tag("model_util_parse_input", "model_util")
 class ModelUtilParseInputTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -109,7 +109,7 @@ class ModelUtilParseInputTestCase(TestCase):
             await util.parse_input_data(None, data_bad)
 
 
-@tag("model_serializer_get_custom_fields")
+@tag("model_serializer_get_custom_fields", "model_serializer")
 class ModelSerializerGetCustomFieldsTestCase(TestCase):
     def test_invalid_custom_field_spec_raises(self):
         class BadSpec(ModelSerializer):
@@ -125,7 +125,42 @@ class ModelSerializerGetCustomFieldsTestCase(TestCase):
             BadSpec.get_custom_fields("create")
 
 
-@tag("model_util_read_s_queryset_error")
+@tag("model_serializer_verbose_name_path", "model_serializer")
+class ModelSerializerVerboseNamePathTestCase(TestCase):
+    def test_verbose_name_path_generation(self):
+        class VNModelSerializer(ModelSerializer):
+            title = models.CharField(max_length=50)
+
+            class Meta:
+                app_label = app_models.TestModelSerializer._meta.app_label
+
+        self.assertEqual(
+            VNModelSerializer.verbose_name_path_resolver(),
+            "vn-model-serializers",
+        )
+
+
+@tag("model_serializer_has_changed", "model_serializer")
+class ModelSerializerHasChangedTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.obj = app_models.TestModelSerializer.objects.create(
+            name="original", description="original"
+        )
+
+    def test_has_changed_detection(self):
+        self.obj.name = "new"
+        self.assertTrue(self.obj.has_changed("name"))
+    
+    def test_has_changed_before_create(self):
+        new_obj = app_models.TestModelSerializer(
+            name="new", description="new"
+        )
+        self.assertFalse(new_obj.has_changed("name"))
+        self.assertFalse(new_obj.has_changed("description"))
+
+
+@tag("model_util_read_s_queryset_error", "model_util")
 class ModelUtilReadSQuerysetErrorTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -147,7 +182,7 @@ class ModelUtilReadSQuerysetErrorTestCase(TestCase):
             )
 
 
-@tag("model_serializer_update_hooks")
+@tag("model_serializer_update_hooks", "model_serializer")
 class ModelSerializerUpdateHooksTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -184,7 +219,7 @@ class ModelSerializerUpdateHooksTestCase(TestCase):
         )
 
 
-@tag("model_util_apply_query_opts")
+@tag("model_util_apply_query_opts", "model_util")
 class ModelUtilApplyQueryOptimizationsTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):

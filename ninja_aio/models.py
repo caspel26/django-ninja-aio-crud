@@ -977,48 +977,6 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
         optionals: list[tuple[str, type]] = []
         excludes: list[str] = []
 
-    @property
-    def has_custom_fields_create(self):
-        """
-        Whether CreateSerializer declares custom fields.
-        """
-        return hasattr(self.CreateSerializer, "customs")
-
-    @property
-    def has_custom_fields_update(self):
-        """
-        Whether UpdateSerializer declares custom fields.
-        """
-        return hasattr(self.UpdateSerializer, "customs")
-
-    @property
-    def has_custom_fields(self):
-        """
-        Whether any serializer declares custom fields.
-        """
-        return self.has_custom_fields_create or self.has_custom_fields_update
-
-    @property
-    def has_optional_fields_create(self):
-        """
-        Whether CreateSerializer declares optional fields.
-        """
-        return hasattr(self.CreateSerializer, "optionals")
-
-    @property
-    def has_optional_fields_update(self):
-        """
-        Whether UpdateSerializer declares optional fields.
-        """
-        return hasattr(self.UpdateSerializer, "optionals")
-
-    @property
-    def has_optional_fields(self):
-        """
-        Whether any serializer declares optional fields.
-        """
-        return self.has_optional_fields_create or self.has_optional_fields_update
-
     @classmethod
     def _get_fields(cls, s_type: type[S_TYPES], f_type: type[F_TYPES]):
         """
