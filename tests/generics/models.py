@@ -2,7 +2,7 @@ from unittest import mock
 
 from ninja import Schema
 from ninja_aio.models import ModelUtil
-from ninja_aio.schemas.helpers import QuerySchema
+from ninja_aio.schemas.helpers import ObjectQuerySchema, QuerySchema
 from ninja_aio.types import ModelSerializerMeta
 from ninja_aio.exceptions import NotFoundError, SerializeError
 from django.db.models import Model
@@ -211,7 +211,7 @@ class Tests:
             auto = await self.model_util.read_s(
                 self.schema_out,
                 self.request.get(),
-                obj=None,
+                instance=None,
                 query_data=QuerySchema(getters={self.pk_att: self.obj.pk}),
                 is_for_read=True,
             )
@@ -220,13 +220,6 @@ class Tests:
         async def test_read_s_missing_schema(self):
             with self.assertRaises(SerializeError):
                 await self.model_util.read_s(None, self.request.get(), self.obj)
-
-        async def test_get_object_queryset_return(self):
-            # No pk / getters => returns queryset
-            qs = await self.model_util.get_object(
-                self.request.get(), query_data=QuerySchema(filters={})
-            )
-            self.assertTrue(hasattr(qs, "model"))
 
         async def test_get_object_filters_and_getters(self):
             obj = await self.model_util.get_object(
@@ -261,9 +254,10 @@ class Tests:
             if not isinstance(self.model, ModelSerializerMeta):
                 return
             # Provide explicit lists to merge with auto-discovered ones
-            query_data = QuerySchema(
+            query_data = ObjectQuerySchema(
                 select_related=self.model_util.get_select_relateds(),
                 prefetch_related=self.model_util.get_reverse_relations(),
+                getters={self.pk_att: self.obj.pk},
             )
             with (
                 mock.patch(
