@@ -516,7 +516,12 @@ class ModelUtil:
                 {"query_data": "must be provided when object is not given"}, 400
             )
 
-        if query_data.filters and query_data.getters:
+        if (
+            hasattr(query_data, "filters")
+            and hasattr(query_data, "getters")
+            and query_data.filters
+            and query_data.getters
+        ):
             raise SerializeError(
                 {"query_data": "cannot contain both filters and getters"}, 400
             )
@@ -529,12 +534,12 @@ class ModelUtil:
         is_for_read: bool,
     ):
         """Handle different query modes (filters vs getters)."""
-        if query_data.filters:
+        if hasattr(query_data, "filters") and query_data.filters:
             return await self._serialize_queryset(
                 request, query_data, schema, is_for_read
             )
 
-        if query_data.getters:
+        if hasattr(query_data, "getters") and query_data.getters:
             return await self._serialize_single_object(
                 request, query_data, schema, is_for_read
             )
@@ -667,7 +672,9 @@ class ModelUtil:
         self,
         schema: Schema,
         request: HttpRequest = None,
-        instance: models.QuerySet[type["ModelSerializer"] | models.Model] | type["ModelSerializer"] | models.Model= None,
+        instance: models.QuerySet[type["ModelSerializer"] | models.Model]
+        | type["ModelSerializer"]
+        | models.Model = None,
         query_data: QuerySchema = None,
         is_for_read: bool = False,
     ):
@@ -699,7 +706,7 @@ class ModelUtil:
         """
         if schema is None:
             raise SerializeError({"schema": "must be provided"}, 400)
-        
+
         if instance is not None:
             if isinstance(instance, models.QuerySet):
                 return [
@@ -707,10 +714,9 @@ class ModelUtil:
                     async for obj in instance
                 ]
             return await self._bump_object_from_schema(instance, schema)
-        
+
         self._validate_read_params(request, query_data)
         return await self._handle_query_mode(request, query_data, schema, is_for_read)
-
 
     async def read_s(
         self,

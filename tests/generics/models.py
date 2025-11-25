@@ -2,7 +2,7 @@ from unittest import mock
 
 from ninja import Schema
 from ninja_aio.models import ModelUtil
-from ninja_aio.schemas.helpers import ObjectQuerySchema, QuerySchema
+from ninja_aio.schemas.helpers import ObjectQuerySchema, ObjectsQuerySchema, QuerySchema
 from ninja_aio.types import ModelSerializerMeta
 from ninja_aio.exceptions import NotFoundError, SerializeError
 from django.db.models import Model
@@ -235,6 +235,19 @@ class Tests:
                     query_data=QuerySchema(getters={self.pk_att: 999999}),
                 )
 
+        async def test_get_object_without_getters(self):
+            if not isinstance(self.model, ModelSerializerMeta):
+                return
+            with self.assertRaises(
+                ValueError,
+                msg="Either pk or getters must be provided for single object retrieval.",
+            ):
+                await self.model_util.get_object(
+                    self.request.get(),
+                    query_data=QuerySchema(),
+                    with_qs_request=False,
+                )
+
         async def test_get_object_without_qs_request(self):
             if not isinstance(self.model, ModelSerializerMeta):
                 return
@@ -314,3 +327,90 @@ class Tests:
                 self.request.delete(), self.obj.pk
             )
             self.assertEqual(response, None)
+
+        async def test_list_read_s(self):
+            response = await self.model_util.list_read_s(
+                self.schema_out, self.request.get(), self.model.objects.all()
+            )
+            self.assertEqual(response, [self.read_data])
+
+        async def test_read_s_without_request_and_instance(self):
+            with self.assertRaises(SerializeError) as exc:
+                await self.model_util.read_s(self.schema_out, None, None)
+                self.assertEqual(
+                    exc.error,
+                    {"request": "must be provided when object is not given"},
+                )
+
+        async def test_read_s_without_query_data_and_object(self):
+            with self.assertRaises(SerializeError) as exc:
+                await self.model_util.read_s(
+                    self.schema_out, self.request.get(), None
+                )
+                self.assertEqual(
+                    exc.error,
+                    {"query_data": "must be provided when object is not given"},
+                )
+
+        async def test_read_s_with_filters_and_getters(self):
+            with self.assertRaises(SerializeError) as exc:
+                await self.model_util.read_s(
+                    self.schema_out,
+                    self.request.get(),
+                    instance=None,
+                    query_data=QuerySchema(
+                        filters={self.pk_att: self.obj.pk},
+                        getters={self.pk_att: self.obj.pk},
+                    ),
+                    is_for_read=True,
+                )
+                self.assertEqual(
+                    exc.error,
+                    {"query_data": "cannot contain both filters and getters"},
+                )
+
+        async def test_list_read_s_with_filters(self):
+            response = await self.model_util.list_read_s(
+                self.schema_out,
+                self.request.get(),
+                query_data=ObjectsQuerySchema(
+                    filters={self.pk_att: self.obj.pk}
+                ),
+                is_for_read=True,
+            )
+            self.assertEqual(response, [self.read_data])
+
+        async def test_read_s_without_filters_and_getters(self):
+            with self.assertRaises(SerializeError) as exc:
+                await self.model_util.read_s(
+                    self.schema_out,
+                    self.request.get(),
+                    query_data=ObjectsQuerySchema(),
+                    is_for_read=True,
+                )
+                self.assertEqual(
+                    exc.error,
+                    {"query_data": "must contain either filters or getters"},
+                )
+
+        async def test_read_s_with_reverse_relations(self):
+            if not self.reverse_relations:
+                return  # Skip if no reverse relations defined
+            response = await self.model_util.read_s(
+                self.schema_out, self.request.get(), self.obj, is_for_read=True
+            )
+            for rel in self.reverse_relations:
+                self.assertIn(rel, response)
+
+        async def test_list_read_s_with_reverse_relations(self):
+            if not self.reverse_relations:
+                return  # Skip if no reverse relations defined
+            response = await self.model_util.list_read_s(
+                self.schema_out,
+                self.request.get(),
+                self.model.objects.all(),
+                is_for_read=True,
+            )
+            for item in response:
+                for rel in self.reverse_relations:
+                    self.assertIn(rel, item)
