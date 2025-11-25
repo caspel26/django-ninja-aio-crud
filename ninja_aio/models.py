@@ -411,49 +411,6 @@ class ModelUtil:
         rel = await rel_util.get_object(request, v, with_qs_request=False)
         payload[k] = rel
 
-    async def _extract_field_obj(self, field_name: str):
-        """
-        Return the underlying Django Field (if any) for a given attribute name.
-        """
-        descriptor = await agetattr(self.model, field_name, None)
-        if descriptor is None:
-            return None
-        return await agetattr(descriptor, "field", None) or await agetattr(
-            descriptor, "related", None
-        )
-
-    def _should_process_nested(self, value: Any, field_obj: Any) -> bool:
-        """
-        Determine if a payload entry represents a nested FK / O2O relation dict.
-        """
-        if not isinstance(value, dict):
-            return False
-        return isinstance(field_obj, (models.ForeignKey, models.OneToOneField))
-
-    async def _fetch_related_instance(
-        self, request, field_obj: models.Field, nested_dict: dict
-    ):
-        """
-        Resolve the related instance from its primary key inside the nested dict.
-        """
-        rel_util = ModelUtil(field_obj.related_model)
-        rel_pk = nested_dict.get(rel_util.model_pk_name)
-        return await rel_util.get_object(request, rel_pk)
-
-    async def _rewrite_nested_foreign_keys(self, rel_obj, nested_dict: dict):
-        """
-        Rewrite foreign key keys inside a nested dict from <key> to <key>_id.
-        """
-        keys_to_rewrite: list[str] = []
-        new_nested = nested_dict
-        for rel_k in nested_dict.keys():
-            attr = await agetattr(rel_obj, rel_k)
-            if isinstance(attr, models.ForeignKey):
-                keys_to_rewrite.append(rel_k)
-        for old_k in keys_to_rewrite:
-            new_nested[f"{old_k}_id"] = new_nested.pop(old_k)
-        return new_nested
-
     async def _bump_object_from_schema(
         self, obj: type["ModelSerializer"] | models.Model, schema: Schema
     ):
