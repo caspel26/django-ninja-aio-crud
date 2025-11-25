@@ -108,3 +108,31 @@ class ExceptionHandlersTestCase(TestCase):
             response = api._exception_handlers[ValidationError](request, ve)
             self.assertEqual(response.status_code, 400)
             self.assertIn(b"Validation Error", response.content)
+
+
+@tag("exceptions_handlers_jose")
+class JoseErrorHandlerTestCase(TestCase):
+    class FakeJoseError(JoseError):
+        def __init__(self, error: str, description: str | None = None):
+            self.error = error
+            self.description = description
+
+    def test_jose_error_handler_with_description(self):
+        api = NinjaAIO()
+        set_api_exception_handlers(api)
+        exc = self.FakeJoseError("invalid_token", "expired")
+        request = HttpRequest()
+        response = api._exception_handlers[JoseError](request, exc)
+        self.assertEqual(response.status_code, 401)
+        self.assertIn(b"invalid_token", response.content)
+        self.assertIn(b"expired", response.content)
+
+    def test_jose_error_handler_without_description(self):
+        api = NinjaAIO()
+        set_api_exception_handlers(api)
+        exc = self.FakeJoseError("invalid_signature", None)
+        request = HttpRequest()
+        response = api._exception_handlers[JoseError](request, exc)
+        self.assertEqual(response.status_code, 401)
+        self.assertIn(b"invalid_signature", response.content)
+        self.assertNotIn(b"details", response.content)
