@@ -326,7 +326,7 @@ class APIViewSet:
             qs = await self.model_util.get_objects(request, is_for_read=True)
             if filters is not None:
                 qs = await self.query_params_handler(qs, filters.model_dump())
-            return await self.model_util.read_s(self.schema_out, request, qs)
+            return await self.model_util.list_read_s(self.schema_out, request, qs)
 
         return list
 
