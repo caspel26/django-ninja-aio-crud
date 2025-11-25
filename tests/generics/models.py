@@ -4,7 +4,7 @@ from ninja import Schema
 from ninja_aio.models import ModelUtil
 from ninja_aio.schemas.helpers import QuerySchema
 from ninja_aio.types import ModelSerializerMeta
-from ninja_aio.exceptions import NotFoundError
+from ninja_aio.exceptions import NotFoundError, SerializeError
 from django.db.models import Model
 from django.test import TestCase, tag
 
@@ -204,6 +204,90 @@ class Tests:
                 self.schema_out, self.request.get(), self.obj
             )
             self.assertEqual(response, self.read_data)
+
+        async def test_read_s_auto_fetch(self):
+            if not isinstance(self.model, ModelSerializerMeta):
+                return  # focus on serializer models with schema generation
+            auto = await self.model_util.read_s(
+                self.schema_out,
+                self.request.get(),
+                obj=None,
+                query_data=QuerySchema(getters={self.pk_att: self.obj.pk}),
+                is_for_read=True,
+            )
+            self.assertEqual(auto[self.pk_att], self.obj.pk)
+
+        async def test_read_s_missing_schema(self):
+            with self.assertRaises(SerializeError):
+                await self.model_util.read_s(None, self.request.get(), self.obj)
+
+        async def test_get_object_queryset_return(self):
+            # No pk / getters => returns queryset
+            qs = await self.model_util.get_object(
+                self.request.get(), query_data=QuerySchema(filters={})
+            )
+            self.assertTrue(hasattr(qs, "model"))
+
+        async def test_get_object_filters_and_getters(self):
+            obj = await self.model_util.get_object(
+                self.request.get(),
+                query_data=QuerySchema(filters={}, getters={self.pk_att: self.obj.pk}),
+            )
+            self.assertEqual(getattr(obj, self.pk_att), self.obj.pk)
+
+        async def test_get_object_not_found_with_getters(self):
+            with self.assertRaises(NotFoundError):
+                await self.model_util.get_object(
+                    self.request.get(),
+                    query_data=QuerySchema(getters={self.pk_att: 999999}),
+                )
+
+        async def test_get_object_without_qs_request(self):
+            if not isinstance(self.model, ModelSerializerMeta):
+                return
+            with mock.patch(
+                "ninja_aio.models.ModelSerializer.queryset_request",
+                new_callable=mock.AsyncMock,
+            ) as m_qs:
+                await self.model_util.get_object(
+                    self.request.get(),
+                    self.obj.pk,
+                    query_data=QuerySchema(),
+                    with_qs_request=False,
+                )
+                m_qs.assert_not_awaited()
+
+        async def test_get_object_with_optimizations_union(self):
+            if not isinstance(self.model, ModelSerializerMeta):
+                return
+            # Provide explicit lists to merge with auto-discovered ones
+            query_data = QuerySchema(
+                select_related=self.model_util.get_select_relateds(),
+                prefetch_related=self.model_util.get_reverse_relations(),
+            )
+            with (
+                mock.patch(
+                    "django.db.models.query.QuerySet.select_related",
+                    side_effect=lambda qs, *_: qs,
+                    autospec=True,
+                ) as m_sel,
+                mock.patch(
+                    "django.db.models.query.QuerySet.prefetch_related",
+                    side_effect=lambda qs, *_: qs,
+                    autospec=True,
+                ) as m_pref,
+            ):
+                await self.model_util.get_object(
+                    self.request.get(),
+                    query_data=query_data,
+                    is_for_read=True,
+                )
+                sel_args = m_sel.call_args[0][1:] if m_sel.call_args else []
+                pref_args = m_pref.call_args[0][1:] if m_pref.call_args else []
+                for rel in self.model_util.get_select_relateds():
+                    self.assertIn(rel, sel_args)
+                for rel in self.model_util.get_reverse_relations():
+                    self.assertIn(rel, pref_args)
 
         async def test_update_s_object_not_found(self):
             with self.assertRaises(NotFoundError) as exc:

@@ -1,6 +1,8 @@
 from ninja_aio.models import ModelSerializer
 from django.db import models
 
+from ninja_aio.schemas.helpers import ModelQuerySetSchema
+
 
 # ==========================================================
 #                       MODELS
@@ -93,6 +95,12 @@ class TestModelSerializerForeignKey(BaseTestModelSerializer):
         on_delete=models.CASCADE,
         related_name="test_model_serializer_foreign_keys",
     )
+
+    class QuerySet:
+        read = ModelQuerySetSchema(
+            select_related=["test_model_serializer"],
+            prefetch_related=[],
+        )
 
     class ReadSerializer:
         fields = BaseTestModelSerializer.ReadSerializer.fields + [
