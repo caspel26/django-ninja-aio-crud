@@ -182,11 +182,11 @@ class Tests:
             for k, v in data.items():
                 if isinstance(v, ModelSerializer):
                     new_data[k] = await ModelUtil(v.__class__).read_s(
-                        self.get_request, v, v.__class__.generate_related_s()
+                        v.__class__.generate_related_s(), self.get_request, v
                     )
                 elif isinstance(v, models.Model):
                     new_data[k] = await ModelUtil(v.__class__).read_s(
-                        self.get_request, v, create_schema(v.__class__)
+                        create_schema(v.__class__), self.get_request, v
                     )
             return new_data
 
@@ -314,7 +314,7 @@ class Tests:
                 cls.relation_request, cls.relation_pk
             )
             cls.relation_read_s = async_to_sync(cls.relation_util.read_s)(
-                cls.relation_request, cls.relation_obj, cls.relation_viewset.schema_out
+                cls.relation_viewset.schema_out, cls.relation_request, cls.relation_obj
             )
             cls.relation_schema_data = cls.relation_read_s
             cls.obj_content = async_to_sync(cls()._create_view)()

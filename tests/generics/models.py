@@ -2,6 +2,7 @@ from unittest import mock
 
 from ninja import Schema
 from ninja_aio.models import ModelUtil
+from ninja_aio.schemas.helpers import QuerySchema
 from ninja_aio.types import ModelSerializerMeta
 from ninja_aio.exceptions import NotFoundError
 from django.db.models import Model
@@ -144,10 +145,9 @@ class Tests:
             )
             obj = await self.model_util.get_object(
                 self.request.get(),
-                **{
-                    "filters": self.additional_filters,
-                    "getters": self.additional_getters,
-                },
+                query_data=QuerySchema(
+                    filters=self.additional_filters, getters=self.additional_getters
+                ),
             )
             _obj = (
                 await self.model.objects.select_related()
@@ -201,7 +201,7 @@ class Tests:
 
         async def test_read_s(self):
             response = await self.model_util.read_s(
-                self.request.get(), self.obj, self.schema_out
+                self.schema_out, self.request.get(), self.obj
             )
             self.assertEqual(response, self.read_data)
 

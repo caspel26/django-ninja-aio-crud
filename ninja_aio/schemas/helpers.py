@@ -60,6 +60,6 @@ class ModelQuerySetSchema(BaseModel):
     prefetch_related: Optional[list[str]] = []
 
 
-class QuerySchema(BaseModel):
+class QuerySchema(ModelQuerySetSchema):
     filters: Optional[dict] = {}
     getters: Optional[dict] = {}

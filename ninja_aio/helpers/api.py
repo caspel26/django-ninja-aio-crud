@@ -6,6 +6,7 @@ from ninja import Path, Query
 from ninja.pagination import paginate
 from ninja_aio.decorators import unique_view
 from ninja_aio.models import ModelSerializer, ModelUtil
+from ninja_aio.schemas.helpers import QuerySchema
 from ninja_aio.schemas import (
     GenericMessageSchema,
     M2MRelationSchema,
@@ -260,7 +261,9 @@ class ManyToManyAPI:
         rel_model_name = model._meta.verbose_name.capitalize()
         for obj_pk in objs_pks:
             rel_obj = await (
-                await ModelUtil(model).get_object(request, filters={"pk": obj_pk})
+                await ModelUtil(model).get_object(
+                    request, query_data=QuerySchema(filters={"pk": obj_pk})
+                )
             ).afirst()
             if rel_obj is None:
                 errors.append(f"{rel_model_name} with pk {obj_pk} not found.")

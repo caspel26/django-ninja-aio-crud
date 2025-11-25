@@ -7,12 +7,14 @@ from django.http import HttpRequest
 from django.db.models import Model, QuerySet
 from pydantic import create_model
 
+from ninja_aio.schemas.helpers import QuerySchema
+
 from .models import ModelSerializer, ModelUtil
 from .schemas import (
     GenericMessageSchema,
     M2MRelationSchema,
 )
-from .helpers import ManyToManyAPI
+from .helpers.api import ManyToManyAPI
 from .types import ModelSerializerMeta, VIEW_TYPES
 from .decorators import unique_view
 
@@ -330,7 +332,7 @@ class APIViewSet:
             if filters is not None:
                 qs = await self.query_params_handler(qs, filters.model_dump())
             objs = [
-                await self.model_util.read_s(request, obj, self.schema_out)
+                await self.model_util.read_s(self.schema_out, request, obj)
                 async for obj in qs.all()
             ]
             return objs
@@ -351,8 +353,13 @@ class APIViewSet:
         )
         @unique_view(self)
         async def retrieve(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
-            obj = await self.model_util.get_object(request, self._get_pk(pk))
-            return await self.model_util.read_s(request, obj, self.schema_out)
+            return await self.model_util.read_s(
+                self.schema_out,
+                request,
+                query_data=QuerySchema(
+                    getters={"pk": self._get_pk(pk)}
+                ),
+            )
 
         return retrieve
 

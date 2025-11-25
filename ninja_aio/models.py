@@ -551,7 +551,7 @@ class ModelUtil:
         obj = await self.get_object(request, pk)
         if isinstance(self.model, ModelSerializerMeta):
             await asyncio.gather(obj.custom_actions(customs), obj.post_create())
-        return await self.read_s(request, obj, obj_schema)
+        return await self.read_s(obj_schema, request, obj)
 
     async def read_s(
         self,
@@ -644,7 +644,7 @@ class ModelUtil:
             await obj.custom_actions(customs)
         await obj.asave()
         updated_object = await self.get_object(request, pk)
-        return await self.read_s(request, updated_object, obj_schema)
+        return await self.read_s(obj_schema, request, updated_object)
 
     async def delete_s(self, request: HttpRequest, pk: int | str):
         """
