@@ -1321,11 +1321,12 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
         """
         Override save lifecycle to inject create/update hooks.
         """
-        if self._state.adding:
+        state_adding = self._state.adding
+        if state_adding:
             self.on_create_before_save()
         self.before_save()
         super().save(*args, **kwargs)
-        if self._state.adding:
+        if state_adding:
             self.on_create_after_save()
         self.after_save()
 
