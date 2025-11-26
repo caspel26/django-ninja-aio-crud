@@ -60,6 +60,10 @@ class ModelQuerySetSchema(BaseModel):
     prefetch_related: Optional[list[str]] = []
 
 
+class ModelQuerySetExtraSchema(ModelQuerySetSchema):
+    scope: str
+
+
 class ObjectQuerySchema(ModelQuerySetSchema):
     getters: Optional[dict] = {}
 
@@ -71,3 +75,8 @@ class ObjectsQuerySchema(ModelQuerySetSchema):
 class QuerySchema(ModelQuerySetSchema):
     filters: Optional[dict] = {}
     getters: Optional[dict] = {}
+
+
+class QueryUtilBaseScopesSchema(BaseModel):
+    READ: str = "read"
+    QUERYSET_REQUEST: str = "queryset_request"

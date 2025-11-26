@@ -1,7 +1,6 @@
 from unittest import mock
 from django.test import TestCase, tag
 from tests.test_app import models as app_models
-from ninja_aio.helpers.query import QueryScopes
 
 
 @tag("query_util_dedicated")
@@ -27,9 +26,19 @@ class QueryUtilDedicatedTestCase(TestCase):
         )
         cls.obj_m2m.test_model_serializers.add(cls.rev_m2m)
 
-    def test_scopes_enum(self):
-        self.assertIn(QueryScopes.READ, list(QueryScopes))
-        self.assertEqual(QueryScopes.READ.value, "read")
+    def test_scopes(self):
+        self.assertIn("read", self.query_util_fk._configs)
+        self.assertIn("queryset_request", self.query_util_fk._configs)
+        self.assertIn("custom_scope", self.query_util_fk._configs)
+        self.assertEqual(
+            self.query_util_fk.SCOPES.READ, "read"
+        )
+        self.assertEqual(
+            self.query_util_fk.SCOPES.QUERYSET_REQUEST, "queryset_request"
+        )
+        self.assertEqual(
+            self.query_util_fk.SCOPES.custom_scope, "custom_scope"
+        )
 
     def test_read_scope_select_related_applied(self):
         qs = app_models.TestModelSerializerForeignKey.objects.all()
@@ -38,7 +47,9 @@ class QueryUtilDedicatedTestCase(TestCase):
             side_effect=lambda self, *args: self,
             autospec=True,
         ) as m_sel:
-            _ = self.query_util_fk.apply_queryset_optimizations(qs, QueryScopes.READ)
+            _ = self.query_util_fk.apply_queryset_optimizations(
+                qs, app_models.TestModelSerializerForeignKey.query_util.SCOPES.READ
+            )
             sel_args = m_sel.call_args[0][1:]
             self.assertEqual(sel_args, ("test_model_serializer",))
 
@@ -50,7 +61,8 @@ class QueryUtilDedicatedTestCase(TestCase):
             autospec=True,
         ) as m_pref:
             _ = self.query_util_m2m.apply_queryset_optimizations(
-                qs, QueryScopes.QUERYSET_REQUEST
+                qs,
+                app_models.TestModelSerializerManyToMany.query_util.SCOPES.QUERYSET_REQUEST,
             )
             pref_args = m_pref.call_args[0][1:]
             self.assertEqual(pref_args, ("test_model_serializers",))
@@ -78,6 +90,6 @@ class QueryUtilDedicatedTestCase(TestCase):
                 autospec=True,
             ) as m_pref,
         ):
-            _ = util_simple.apply_queryset_optimizations(qs, QueryScopes.READ)
+            _ = util_simple.apply_queryset_optimizations(qs, util_simple.SCOPES.READ)
             m_sel.assert_not_called()
             m_pref.assert_not_called()

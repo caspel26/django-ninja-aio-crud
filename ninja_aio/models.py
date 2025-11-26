@@ -22,6 +22,7 @@ from ninja_aio.exceptions import SerializeError, NotFoundError
 from ninja_aio.types import S_TYPES, F_TYPES, SCHEMA_TYPES, ModelSerializerMeta
 from ninja_aio.schemas.helpers import (
     ModelQuerySetSchema,
+    ModelQuerySetExtraSchema,
     QuerySchema,
     ObjectQuerySchema,
     ObjectsQuerySchema,
@@ -911,8 +912,25 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
         cls.query_util = QueryUtil(cls)
 
     class QuerySet:
+        """
+        Configuration container describing how to build query schemas for a model.
+        Purpose
+        -------
+        Describes which fields and extras are available when querying for model
+        instances. A factory/metaclass can read this configuration to generate
+        Pydantic / Ninja query schemas.
+        Attributes
+        ----------
+        read : ModelQuerySetSchema
+            Schema configuration for read operations.
+        queryset_request : ModelQuerySetSchema
+            Schema configuration for queryset_request hook.
+        extras : list[ModelQuerySetExtraSchema]
+            Additional computed / synthetic query parameters.
+        """
         read = ModelQuerySetSchema()
         queryset_request = ModelQuerySetSchema()
+        extras: list[ModelQuerySetExtraSchema] = []
 
     class CreateSerializer:
         """Configuration container describing how to build a create (input) schema for a model.
