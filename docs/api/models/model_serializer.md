@@ -102,9 +102,9 @@ Describes how to build a read (output) schema for a model.
 
 | Attribute  | Type            | Description |
 |-----------|-----------------|-------------|
-| `fields`   | `list[str]`     | **REQUIRED.** Model field / related names esplicitamente inclusi nello schema di lettura (output). |
-| `excludes` | `list[str]`     | Field / related names da omettere sempre (ha precedenza su `fields` e `optionals`). Usare per dati sensibili o rumorosi (es. password, flag interni). |
-| `customs`  | `list[tuple]`   | Valori computati / sintetici in output. Formati delle tuple:<br>• `(name, type)` = attributo richiesto (campo o property). Errore se non risolvibile.<br>• `(name, type, default)` = opzionale; il default può essere una callable (`lambda obj: ...`) o un valore letterale. |
+| `fields`   | `list[str]`     | **REQUIRED.** Model fields / related names explicitly included in the read (output) schema. |
+| `excludes` | `list[str]`     | Fields / related names to always omit (takes precedence over `fields` and `optionals`). Use for sensitive or noisy data (e.g., passwords, internal flags). |
+| `customs`  | `list[tuple]`   | Computed / synthetic output values. Tuple formats:<br>• `(name, type)` = required resolvable attribute (object attribute or property). Serialization error if not resolvable.<br>• `(name, type, default)` = optional; default may be a callable (`lambda obj: ...`) or a literal value. |
 
 **Example:**
 
