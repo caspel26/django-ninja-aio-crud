@@ -1645,12 +1645,33 @@
 </span></code></pre></div>
 <h3 id="readserializer">ReadSerializer<a class="headerlink" href="#readserializer" title="Permanent link">&para;</a></h3>
 <p>Describes how to build a read (output) schema for a model.</p>
-<p><strong>Attributes:</strong>
-| Attribute   | Type                     | Description                                                                                                                                                                                                                                       |
-| ----------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| <code>fields</code>    | <code>list[str]</code>              | REQUIRED model field / related names explicitly included in the read (output) schema.                                                                                                                                                             |
-| <code>excludes</code>  | <code>list[str]</code>              | Field / related names to always omit (takes precedence over <code>fields</code> and <code>optionals</code>). Use for sensitive or noisy data (e.g., passwords, internal flags).                                                                                          |
-| <code>customs</code>   | <code>list[tuple]</code>            | Computed / synthetic output values. Tuples:<br><code>(name, type)</code> = required resolvable attribute (object attribute or property) else serialization error.<br><code>(name, type, default)</code> = optional; default may be callable (<code>lambda obj: ...</code>) or literal. |</p>
+<p><strong>Attributes</strong></p>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>fields</code></td>
+<td><code>list[str]</code></td>
+<td><strong>REQUIRED.</strong> Model field / related names esplicitamente inclusi nello schema di lettura (output).</td>
+</tr>
+<tr>
+<td><code>excludes</code></td>
+<td><code>list[str]</code></td>
+<td>Field / related names da omettere sempre (ha precedenza su <code>fields</code> e <code>optionals</code>). Usare per dati sensibili o rumorosi (es. password, flag interni).</td>
+</tr>
+<tr>
+<td><code>customs</code></td>
+<td><code>list[tuple]</code></td>
+<td>Valori computati / sintetici in output. Formati delle tuple:<br>• <code>(name, type)</code> = attributo richiesto (campo o property). Errore se non risolvibile.<br>• <code>(name, type, default)</code> = opzionale; il default può essere una callable (<code>lambda obj: ...</code>) o un valore letterale.</td>
+</tr>
+</tbody>
+</table>
 <p><strong>Example:</strong></p>
 <div class="language-python highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">User</span><span class="p">(</span><span class="n">ModelSerializer</span><span class="p">):</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="n">first_name</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">CharField</span><span class="p">(</span><span class="n">max_length</span><span class="o">=</span><span class="mi">150</span><span class="p">)</span>
