@@ -1,6 +1,8 @@
 from ninja_aio.models import ModelSerializer
 from django.db import models
 
+from ninja_aio.schemas.helpers import ModelQuerySetExtraSchema, ModelQuerySetSchema
+
 
 # ==========================================================
 #                       MODELS
@@ -94,6 +96,19 @@ class TestModelSerializerForeignKey(BaseTestModelSerializer):
         related_name="test_model_serializer_foreign_keys",
     )
 
+    class QuerySet:
+        read = ModelQuerySetSchema(
+            select_related=["test_model_serializer"],
+            prefetch_related=[],
+        )
+        extras = [
+            ModelQuerySetExtraSchema(
+                scope="custom_scope",
+                select_related=["test_model_serializer"],
+                prefetch_related=[],
+            )
+        ]
+
     class ReadSerializer:
         fields = BaseTestModelSerializer.ReadSerializer.fields + [
             "test_model_serializer"
@@ -142,6 +157,12 @@ class TestModelSerializerManyToMany(BaseTestModelSerializer):
         TestModelSerializerReverseManyToMany,
         related_name="test_model_serializer_many_to_many",
     )
+
+    class QuerySet:
+        queryset_request = ModelQuerySetSchema(
+            select_related=[],
+            prefetch_related=["test_model_serializers"],
+        )
 
     class ReadSerializer:
         fields = BaseTestModelSerializer.ReadSerializer.fields + [
