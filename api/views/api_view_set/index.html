@@ -1558,19 +1558,21 @@ If <code>filters</code> is provided a per-relation filters schema is auto-genera
 <code>GET /{base}/{pk}/{related_path}?param=value</code></p>
 <p>Custom filter hook naming convention:
 <code>&lt;related_name&gt;_query_params_handler(self, queryset, filters_dict)</code></p>
-<blockquote>
-<p>⚠ <strong>Warning (Model Support)</strong></p>
+<div class="admonition warning">
+<p class="admonition-title">Model Support</p>
 <p>You can now supply a standard Django <code>Model</code> (not a <code>ModelSerializer</code>) in <code>M2MRelationSchema.model</code>. When doing so <strong>you must provide</strong> <code>related_schema</code> manually:</p>
 <div class="language-python highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">M2MRelationSchema</span><span class="p">(</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="n">model</span><span class="o">=</span><span class="n">Tag</span><span class="p">,</span>                <span class="c1"># plain django.db.models.Model</span>
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">related_name</span><span class="o">=</span><span class="s2">&quot;tags&quot;</span><span class="p">,</span>
 </span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">related_schema</span><span class="o">=</span><span class="n">TagOut</span><span class="p">,</span>    <span class="c1"># a Pydantic/Ninja Schema you define</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">add</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">remove</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">get</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="p">)</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">add</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="n">remove</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="n">get</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="p">)</span>  
 </span></code></pre></div>
-<p>If <code>related_schema</code> is omitted for a plain <code>Model</code>, validation will raise an error. This path is <strong>experimental</strong> and its behavior or requirements may change without notice.</p>
-<p>For <code>ModelSerializer</code> models nothing changes: <code>related_schema</code> is inferred automatically via <code>generate_related_s()</code>.</p>
-</blockquote>
+<p>If <code>related_schema</code> is omitted for a plain <code>Model</code>, validation will raise an error. This path is <strong>experimental</strong> and its behavior or requirements may change without notice.
+For <code>ModelSerializer</code> models nothing changes: <code>related_schema</code> is inferred automatically via <code>generate_related_s()</code>.</p>
+</div>
 <p>Example with filters:</p>
 <div class="language-python highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">UserViewSet</span><span class="p">(</span><span class="n">APIViewSet</span><span class="p">):</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="n">model</span> <span class="o">=</span> <span class="n">User</span>
