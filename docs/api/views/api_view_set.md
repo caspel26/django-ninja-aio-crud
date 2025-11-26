@@ -115,22 +115,23 @@ If `filters` is provided a per-relation filters schema is auto-generated and exp
 Custom filter hook naming convention:
 `<related_name>_query_params_handler(self, queryset, filters_dict)`
 
-> ⚠ **Warning (Model Support)**
->
-> You can now supply a standard Django `Model` (not a `ModelSerializer`) in `M2MRelationSchema.model`. When doing so **you must provide** `related_schema` manually:
->
-> ```python
-> M2MRelationSchema(
->     model=Tag,                # plain django.db.models.Model
->     related_name="tags",
->     related_schema=TagOut,    # a Pydantic/Ninja Schema you define
->     add=True, remove=True, get=True,
-> )
-> ```
->
-> If `related_schema` is omitted for a plain `Model`, validation will raise an error. This path is **experimental** and its behavior or requirements may change without notice.
->
-> For `ModelSerializer` models nothing changes: `related_schema` is inferred automatically via `generate_related_s()`.
+!!! warning "Model Support"
+
+    You can now supply a standard Django `Model` (not a `ModelSerializer`) in `M2MRelationSchema.model`. When doing so **you must provide** `related_schema` manually:
+
+    ```python
+    M2MRelationSchema(
+        model=Tag,                # plain django.db.models.Model
+        related_name="tags",
+        related_schema=TagOut,    # a Pydantic/Ninja Schema you define
+        add=True,
+        remove=True,
+        get=True,
+    )  
+    ```
+
+    If `related_schema` is omitted for a plain `Model`, validation will raise an error. This path is **experimental** and its behavior or requirements may change without notice.
+    For `ModelSerializer` models nothing changes: `related_schema` is inferred automatically via `generate_related_s()`.
 
 Example with filters:
 
