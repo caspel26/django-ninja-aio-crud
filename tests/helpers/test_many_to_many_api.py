@@ -39,7 +39,7 @@ class ManyToManyAPITestCase(TestCase):
         cls.request = Request(cls.viewset.path)
         # Create base object
         create_view = cls.viewset.create_view()
-        status, content = async_to_sync(create_view)(
+        _, content = async_to_sync(create_view)(
             cls.request.post(), cls.viewset.schema_in(name="base", description="base")
         )
         cls.base_pk = content[cls.viewset.model_util.model_pk_name]
@@ -77,25 +77,24 @@ class ManyToManyAPITestCase(TestCase):
         self.assertEqual(content["results"]["count"], 2)
         self.assertEqual(content["errors"]["count"], 0)
 
-    # async def test_get_related(self):
-    #     # Ensure some are added first
-    #     await self.test_add_related()
-    #     content = await self.get_view(self.request.get())
-    #     print(content)
-    #     self.assertEqual(set(content.keys()), {"items", "count"})
-    #     self.assertEqual(content["count"], 2)
-    #     names = {item["name"] for item in content["items"]}
-    #     self.assertEqual(names, {"a", "target"})
+    async def test_get_related(self):
+        # Ensure some are added first
+        await self.test_add_related()
+        content = await self.get_view(request=self.request.get(), pk=self.path_schema)
+        self.assertEqual(set(content.keys()), {"items", "count"})
+        self.assertEqual(content["count"], 2)
+        names = {item["name"] for item in content["items"]}
+        self.assertEqual(names, {"a", "target"})
 
-    # async def test_get_related_with_filters(self):
-    #     await self.test_add_related()
-    #     filters_schema = self.viewset.m2m_api.relations_filters_schemas[
-    #         "test_model_serializers"
-    #     ]
-    #     filters = filters_schema(name="target")
-    #     content = await self.get_view(self.request.get(), self.path_schema, filters)
-    #     self.assertEqual(content["count"], 1)
-    #     self.assertEqual(content["items"][0]["name"], "target")
+    async def test_get_related_with_filters(self):
+        await self.test_add_related()
+        filters_schema = self.viewset.m2m_api.relations_filters_schemas[
+            "test_model_serializers"
+        ]
+        filters = filters_schema(name="target")
+        content = await self.get_view(request=self.request.get(), pk=self.path_schema, filters=filters)
+        self.assertEqual(content["count"], 1)
+        self.assertEqual(content["items"][0]["name"], "target")
 
     async def test_remove_related(self):
         await self.test_add_related()

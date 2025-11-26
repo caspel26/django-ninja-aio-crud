@@ -148,7 +148,7 @@ class TestModelSerializerOneToOne(BaseTestModelSerializer):
 class TestModelSerializerReverseManyToMany(BaseTestModelSerializer):
     class ReadSerializer:
         fields = BaseTestModelSerializer.ReadSerializer.fields + [
-            "test_model_serializer_many_to_many"
+            "test_model_serializer_many_to_many",
         ]
 
 
