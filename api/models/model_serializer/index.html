@@ -1658,17 +1658,17 @@
 <tr>
 <td><code>fields</code></td>
 <td><code>list[str]</code></td>
-<td><strong>REQUIRED.</strong> Model field / related names esplicitamente inclusi nello schema di lettura (output).</td>
+<td><strong>REQUIRED.</strong> Model fields / related names explicitly included in the read (output) schema.</td>
 </tr>
 <tr>
 <td><code>excludes</code></td>
 <td><code>list[str]</code></td>
-<td>Field / related names da omettere sempre (ha precedenza su <code>fields</code> e <code>optionals</code>). Usare per dati sensibili o rumorosi (es. password, flag interni).</td>
+<td>Fields / related names to always omit (takes precedence over <code>fields</code> and <code>optionals</code>). Use for sensitive or noisy data (e.g., passwords, internal flags).</td>
 </tr>
 <tr>
 <td><code>customs</code></td>
 <td><code>list[tuple]</code></td>
-<td>Valori computati / sintetici in output. Formati delle tuple:<br>• <code>(name, type)</code> = attributo richiesto (campo o property). Errore se non risolvibile.<br>• <code>(name, type, default)</code> = opzionale; il default può essere una callable (<code>lambda obj: ...</code>) o un valore letterale.</td>
+<td>Computed / synthetic output values. Tuple formats:<br>• <code>(name, type)</code> = required resolvable attribute (object attribute or property). Serialization error if not resolvable.<br>• <code>(name, type, default)</code> = optional; default may be a callable (<code>lambda obj: ...</code>) or a literal value.</td>
 </tr>
 </tbody>
 </table>
