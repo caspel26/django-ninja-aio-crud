@@ -330,10 +330,9 @@ class ManyToManyAPI:
             if filters is not None and query_handler:
                 related_qs = await query_handler(related_qs, filters.model_dump())
 
-            return [
-                await rel_util.read_s(request, rel_obj, related_schema)
-                async for rel_obj in related_qs
-            ]
+            return await rel_util.list_read_s(
+                related_schema, request, related_qs
+            )
 
     def _resolve_action_schema(self, add: bool, remove: bool):
         return self.views_action_map[(add, remove)]
