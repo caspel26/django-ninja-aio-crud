@@ -328,7 +328,10 @@ class ManyToManyAPI:
 
             query_handler = self._get_query_handler(related_name)
             if filters is not None and query_handler:
-                related_qs = await query_handler(related_qs, filters.model_dump())
+                if asyncio.iscoroutinefunction(query_handler):
+                    related_qs = await query_handler(related_qs, filters.model_dump())
+                else:
+                    related_qs = query_handler(related_qs, filters.model_dump())
 
             return await rel_util.list_read_s(
                 related_schema, request, related_qs

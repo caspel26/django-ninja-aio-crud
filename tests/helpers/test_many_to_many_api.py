@@ -20,7 +20,7 @@ class TestM2MViewSet(GenericAPIViewSet):
         )
     ]
 
-    async def test_model_serializers_query_params_handler(self, queryset, filters):
+    def test_model_serializers_query_params_handler(self, queryset, filters):
         name_filter = filters.get("name")
         if name_filter:
             queryset = queryset.filter(name=name_filter)
