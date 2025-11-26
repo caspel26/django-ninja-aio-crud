@@ -335,25 +335,24 @@ class Tests:
             self.assertEqual(response, [self.read_data])
 
         async def test_read_s_without_request_and_instance(self):
-            with self.assertRaises(SerializeError) as exc:
+            with self.assertRaises(
+                SerializeError,
+                msg={"request": "must be provided when object is not given"},
+            ):
                 await self.model_util.read_s(self.schema_out, None, None)
-                self.assertEqual(
-                    exc.error,
-                    {"request": "must be provided when object is not given"},
-                )
 
         async def test_read_s_without_query_data_and_object(self):
-            with self.assertRaises(SerializeError) as exc:
-                await self.model_util.read_s(
-                    self.schema_out, self.request.get(), None
-                )
-                self.assertEqual(
-                    exc.error,
-                    {"query_data": "must be provided when object is not given"},
-                )
+            with self.assertRaises(
+                SerializeError,
+                msg={"query_data": "must be provided when object is not given"},
+            ):
+                await self.model_util.read_s(self.schema_out, self.request.get(), None)
 
         async def test_read_s_with_filters_and_getters(self):
-            with self.assertRaises(SerializeError) as exc:
+            with self.assertRaises(
+                SerializeError,
+                msg={"query_data": "cannot contain both filters and getters"},
+            ):
                 await self.model_util.read_s(
                     self.schema_out,
                     self.request.get(),
@@ -364,33 +363,26 @@ class Tests:
                     ),
                     is_for_read=True,
                 )
-                self.assertEqual(
-                    exc.error,
-                    {"query_data": "cannot contain both filters and getters"},
-                )
 
         async def test_list_read_s_with_filters(self):
             response = await self.model_util.list_read_s(
                 self.schema_out,
                 self.request.get(),
-                query_data=ObjectsQuerySchema(
-                    filters={self.pk_att: self.obj.pk}
-                ),
+                query_data=ObjectsQuerySchema(filters={self.pk_att: self.obj.pk}),
                 is_for_read=True,
             )
             self.assertEqual(response, [self.read_data])
 
         async def test_read_s_without_filters_and_getters(self):
-            with self.assertRaises(SerializeError) as exc:
+            with self.assertRaises(
+                SerializeError,
+                msg={"query_data": "must contain either filters or getters"},
+            ):
                 await self.model_util.read_s(
                     self.schema_out,
                     self.request.get(),
                     query_data=ObjectsQuerySchema(),
                     is_for_read=True,
-                )
-                self.assertEqual(
-                    exc.error,
-                    {"query_data": "must contain either filters or getters"},
                 )
 
         async def test_read_s_with_reverse_relations(self):
