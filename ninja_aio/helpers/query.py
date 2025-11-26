@@ -66,8 +66,8 @@ class QueryUtil:
             **{scope: self._get_config(scope) for scope in self._BASE_SCOPES.values()},
             **self.extra_configs,
         }
-        self.read_config = self._configs.get(self.SCOPES.READ, ModelQuerySetSchema())
-        self.queryset_request_config = self._configs.get(
+        self.read_config: ModelQuerySetSchema = self._configs.get(self.SCOPES.READ, ModelQuerySetSchema())
+        self.queryset_request_config: ModelQuerySetSchema = self._configs.get(
             self.SCOPES.QUERYSET_REQUEST, ModelQuerySetSchema()
         )
 

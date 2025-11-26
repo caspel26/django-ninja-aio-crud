@@ -7,7 +7,7 @@ from django.http import HttpRequest
 from django.db.models import Model, QuerySet
 from pydantic import create_model
 
-from ninja_aio.schemas.helpers import QuerySchema
+from ninja_aio.schemas.helpers import ModelQuerySetSchema, QuerySchema
 
 from .models import ModelSerializer, ModelUtil
 from .schemas import (
@@ -262,6 +262,16 @@ class APIViewSet:
         """
         return data.model_dump()[self.model_util.model_pk_name]
 
+    def _get_query_data(self) -> ModelQuerySetSchema:
+        """
+        Return default query data for list/retrieve views.
+        """
+        return (
+            ModelQuerySetSchema()
+            if not isinstance(self.model, ModelSerializerMeta)
+            else self.model.query_util.read_config
+        )
+
     def get_schemas(self):
         """
         Return (schema_out, schema_in, schema_update), generating them if model is a ModelSerializer.
@@ -323,7 +333,11 @@ class APIViewSet:
             request: HttpRequest,
             filters: Query[self.filters_schema] = None,  # type: ignore
         ):
-            qs = await self.model_util.get_objects(request, is_for_read=True)
+            qs = await self.model_util.get_objects(
+                request,
+                query_data=self._get_query_data(),
+                is_for_read=True,
+            )
             if filters is not None:
                 qs = await self.query_params_handler(qs, filters.model_dump())
             return await self.model_util.list_read_s(self.schema_out, request, qs)
@@ -344,10 +358,13 @@ class APIViewSet:
         )
         @unique_view(self)
         async def retrieve(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
+            query_data = self._get_query_data()
             return await self.model_util.read_s(
                 self.schema_out,
                 request,
-                query_data=QuerySchema(getters={"pk": self._get_pk(pk)}),
+                query_data=QuerySchema(
+                    getters={"pk": self._get_pk(pk)}, **query_data.model_dump()
+                ),
             )
 
         return retrieve
