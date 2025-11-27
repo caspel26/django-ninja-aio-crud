@@ -90,6 +90,10 @@ extra:
       name: PyPI
   analytics:
     provider: google
+  version:
+    provider: mike
+    repo: caspel26/django-ninja-aio-crud
+    stable: true
 
 plugins:
   - macros:
