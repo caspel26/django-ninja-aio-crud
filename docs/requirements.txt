@@ -5,3 +5,4 @@ mkdocstrings-python==1.18.2
 mkdocs-section-index==0.3.10
 mkdocs-macros-plugin==1.4.1
 mkdocs==1.6.1
+mike==2.1.3

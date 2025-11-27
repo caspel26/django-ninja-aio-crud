@@ -21,8 +21,8 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Install MkDocs and theme
+      - name: Install MkDocs Mike and theme
         run: pip install -r docs/requirements.txt
 
       - name: Deploy to GitHub Pages
-        run: git fetch --all --tags  && git pull && mkdocs gh-deploy
+        run: git fetch --all --tags  && git pull && mike deploy --push --update-aliases ${{ secrets.DOCS_VERSION }} latest --ignore-remote-status && mike set-default ${{ secrets.DOCS_VERSION }}
