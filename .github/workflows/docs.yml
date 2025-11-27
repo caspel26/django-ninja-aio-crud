@@ -21,6 +21,9 @@ jobs:
         with:
           python-version: "3.13"
 
+      - name: Configure git
+        run: git config user.name "github-actions[bot]" && git config user.email "github-actions[bot]@users.noreply.github.com"
+
       - name: Install MkDocs Mike and theme
         run: pip install -r docs/requirements.txt
 
