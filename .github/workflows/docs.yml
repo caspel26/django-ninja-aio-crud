@@ -28,4 +28,4 @@ jobs:
         run: pip install -r docs/requirements.txt
 
       - name: Deploy to GitHub Pages
-        run: git fetch --all --tags  && git fetch origin gh-pages --depth=1 && git pull && mike deploy --push --update-aliases ${{ secrets.DOCS_VERSION }} latest --ignore-remote-status && mike set-default ${{ secrets.DOCS_VERSION }}
+        run: git fetch --all --tags  && git fetch origin gh-pages --depth=1 && git worktree add gh-pages gh-pages && mike deploy --push --update-aliases ${{ secrets.DOCS_VERSION }} latest --ignore-remote-status && mike set-default ${{ secrets.DOCS_VERSION }} && git worktree remove gh-pages --force
