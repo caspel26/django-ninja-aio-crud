@@ -3,9 +3,15 @@ import subprocess
 import re
 from datetime import datetime
 from html import escape
+import json
+import urllib.request
+import os
+from markdown import markdown
+import ssl
 
 SEMVER_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$")
 REPO_SLUG = "caspel26/django-ninja-aio-crud"
+_RELEASES_CACHE = None
 
 
 def _run(cmd: list[str]) -> str:
@@ -13,6 +19,37 @@ def _run(cmd: list[str]) -> str:
         return subprocess.check_output(cmd, stderr=subprocess.DEVNULL).decode().strip()
     except Exception:
         return ""
+
+
+def _fetch_all_releases() -> dict[str, str]:
+    """
+    Fetch all GitHub releases once and return a dict {tag_name: body}.
+    """
+    url = f"https://api.github.com/repos/{REPO_SLUG}/releases"
+    req = urllib.request.Request(url)
+
+    token = os.environ.get("GITHUB_TOKEN")
+    ssl_context = ssl._create_unverified_context()
+    if token:
+        req.add_header("Authorization", f"Bearer {token}")
+
+    try:
+        with urllib.request.urlopen(req, context=ssl_context) as response:
+            data = json.loads(response.read().decode())
+            return {
+                release["tag_name"]: release.get("body", "").strip() for release in data
+            }
+    except Exception as e:
+        print("Failed to fetch GitHub releases:", e)
+        return {}
+
+
+def _get_release_notes(tag: str) -> str:
+    global _RELEASES_CACHE
+    if _RELEASES_CACHE is None:
+        _RELEASES_CACHE = _fetch_all_releases()
+    return _RELEASES_CACHE.get(tag, "")
+
 
 
 def _get_tags() -> list[str]:
@@ -81,8 +118,6 @@ def generate_release_table() -> str:
     if not tags:
         return '<div style="font-style:italic;">No git tags found. Create one with <code>git tag -a v0.1.0 -m "Release v0.1.0" && git push --tags</code>.</div>'
 
-    EMOJI = {"feat": "✨", "fix": "🐛", "other": "📦"}
-
     def badge(label: str, count: int, color: str):
         if count == 0:
             return ""
@@ -99,8 +134,8 @@ def generate_release_table() -> str:
     for i, tag in enumerate(tags):
         prev = tags[i + 1] if i + 1 < len(tags) else None
         date_fmt = _fmt_date_iso(_tag_date(tag))
-        msgs = _commit_messages(tag, prev)
-        feat, fix, other = _classify(msgs)
+        notes = _get_release_notes(tag)
+        notes_html = markdown(notes) if notes else "<p>No release notes.</p>"
         version_dir = _normalize_version(tag)
         doc_link = f"/{version_dir}/"
         diff_link = (
@@ -109,20 +144,18 @@ def generate_release_table() -> str:
             else f"https://github.com/{REPO_SLUG}/tree/{tag}"
         )
         summary_badges = (
-            badge("feat", len(feat), "brightgreen")
-            + badge("fix", len(fix), "orange")
-            + badge("other", len(other), "blue")
-        ) or "<span style='opacity:.6;'>-</span>"
+            "<img alt='notes' "
+            "src='https://img.shields.io/badge/notes-available-blue?style=flat' "
+            "style='margin-right:6px;vertical-align:middle;height:20px;' />"
+            if notes
+            else "<span style='opacity:.6;'>-</span>"
+        )
 
         details_html = (
             "<details style='margin-top:.45rem;font-size:.7rem;'>"
-            "<summary style='cursor:pointer;'>Details</summary>"
-            "<div style='display:grid;grid-template-columns:auto 1fr;row-gap:.25rem;column-gap:.5rem;"
-            "margin:.45rem 0 .2rem;'>"
-            f"<div><strong>Features {EMOJI['feat']}</strong></div><ul style='margin:0;padding-left:1rem;'>{li(feat)}</ul>"
-            f"<div><strong>Fixes {EMOJI['fix']}</strong></div><ul style='margin:0;padding-left:1rem;'>{li(fix)}</ul>"
-            f"<div><strong>Other {EMOJI['other']}</strong></div><ul style='margin:0;padding-left:1rem;'>{li(other)}</ul>"
-            "</div></details>"
+            "<summary style='cursor:pointer;'>Release notes</summary>"
+            f"<div style='margin-top:.5rem;'>{notes_html}</div>"
+            "</details>"
         )
 
         rows_html.append(
@@ -160,23 +193,11 @@ def generate_full_changelog() -> str:
         return "No versions yet."
     out: list[str] = []
     for i, tag in enumerate(tags):
-        prev = tags[i + 1] if i + 1 < len(tags) else None
-        feat, fix, other = _classify(_commit_messages(tag, prev))
+        notes = _get_release_notes(tag)
         date_fmt = _fmt_date_iso(_tag_date(tag))
-        out.append(f"### {tag} ({date_fmt})\n")
-
-        def block(title: str, items: list[str]):
-            if not items:
-                return f"*No {title.lower()}*\n"
-            return "".join(f"- {escape(i)}\n" for i in items)
-
-        if feat:
-            out.append("#### Features\n" + block("Features", feat) + "\n")
-        if fix:
-            out.append("#### Fixes\n" + block("Fixes", fix) + "\n")
-        rem_other = [m for m in other if not _CONV_PREFIX.match(m)]
-        if rem_other:
-            out.append("#### Other\n" + block("Other", rem_other) + "\n")
+        out.append(f"## {tag} ({date_fmt})\n")
+        out.append(notes or "_No release notes for this release._")
+        out.append("\n---\n")
     return "\n".join(out)
 
 
@@ -190,7 +211,8 @@ def generate_release_cards() -> str:
     ]
     for i, tag in enumerate(tags):
         prev = tags[i + 1] if i + 1 < len(tags) else None
-        feat, fix, other = _classify(_commit_messages(tag, prev))
+        notes = _get_release_notes(tag)
+        notes_html = markdown(notes) if notes else "<p>No release notes.</p>"
         date_fmt = _fmt_date_iso(_tag_date(tag))
         diff_link = (
             f"https://github.com/{REPO_SLUG}/compare/{prev}...{tag}"
@@ -203,17 +225,12 @@ def generate_release_cards() -> str:
 <div class="release-card" style="border:1px solid #ddd;border-radius:6px;padding:0.75rem;">
   <h4 style="margin:0 0 .25rem;"><a href="/{version_dir}/">{escape(tag)}</a></h4>
   <div style="font-size:.8rem;color:#666;margin-bottom:.5rem;">{date_fmt} · <a href="{diff_link}">diff</a></div>
-  <ul style="margin:0 0 .5rem;padding-left:1.2rem;font-size:.85rem;">
-    <li><strong>feat:</strong> {len(feat)}</li>
-    <li><strong>fix:</strong> {len(fix)}</li>
-    <li><strong>other:</strong> {len(other)}</li>
-  </ul>
-  <details style="font-size:.75rem;">
-    <summary>Details</summary>
-    <ul style="padding-left:1rem;margin:.25rem 0;">
-      {"".join(f"<li>{escape(m)}</li>" for m in (feat + fix + other)) or "<li>None</li>"}
-    </ul>
-  </details>
+<details style="font-size:.75rem;">
+  <summary>Release notes</summary>
+  <div style="padding-left:1rem;margin:.25rem 0;">
+    {notes_html}
+  </div>
+</details>
 </div>
 """.strip()
         )

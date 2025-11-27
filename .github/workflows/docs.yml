@@ -30,4 +30,5 @@ jobs:
       - name: Deploy to GitHub Pages
         env:
           VERSION: ${{ secrets.DOCS_VERSION }}
+          GITHUB_TOKEN: ${{ secrets.API_READ_ONLY_TOKEN }}
         run: git fetch --all --tags  && git fetch origin gh-pages --depth=1 && git worktree add gh-pages gh-pages && mike deploy --push --update-aliases "$VERSION" latest --ignore-remote-status && mike set-default "$VERSION" && git worktree remove gh-pages --force
