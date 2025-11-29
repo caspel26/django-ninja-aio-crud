@@ -9,14 +9,14 @@ from pydantic import create_model
 
 from ninja_aio.schemas.helpers import ModelQuerySetSchema, QuerySchema
 
-from .models import ModelSerializer, ModelUtil
-from .schemas import (
+from ninja_aio.models import ModelSerializer, ModelUtil
+from ninja_aio.schemas import (
     GenericMessageSchema,
     M2MRelationSchema,
 )
-from .helpers.api import ManyToManyAPI
-from .types import ModelSerializerMeta, VIEW_TYPES
-from .decorators import unique_view
+from ninja_aio.helpers.api import ManyToManyAPI
+from ninja_aio.types import ModelSerializerMeta, VIEW_TYPES
+from ninja_aio.decorators import unique_view
 
 ERROR_CODES = frozenset({400, 401, 404, 428})
 
@@ -28,7 +28,7 @@ class APIView:
     auth: list | None = NOT_SET
 
     def __init__(self) -> None:
-        self.router = Router(tags=[self.router_tag])
+        self.router = Router(tags=[self.router_tag], auth=self.auth)
         self.error_codes = ERROR_CODES
 
     def views(self):
