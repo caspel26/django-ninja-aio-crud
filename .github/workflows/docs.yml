@@ -23,29 +23,52 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v5
         with:
           python-version: "3.13"
 
       - name: Configure git
-        run: git config user.name "github-actions[bot]" && git config user.email "github-actions[bot]@users.noreply.github.com"
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Install MkDocs Mike and theme
         run: pip install -r docs/requirements.txt
 
+      - name: Compute VERSION and MAKE_LATEST
+        id: vars
+        shell: bash
+        run: |
+          # VERSION: use workflow input if present, else dev on push (or a fallback tag/sha)
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.docs_version }}" ]; then
+            VERSION="${{ inputs.docs_version }}"
+          else
+            VERSION="dev"
+          fi
+
+          # Boolean input defaults to true; normalize to "true"/"false"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            MAKE_LATEST="${{ inputs.make_latest }}"  # already "true"/"false"
+          else
+            MAKE_LATEST="true"
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "make_latest=$MAKE_LATEST" >> "$GITHUB_OUTPUT"
+
       - name: Deploy to GitHub Pages
         env:
-          VERSION: ${{ github.event.inputs.docs_version || format('v{0}', github.sha) }}
-          GITHUB_TOKEN: ${{ secrets.API_READ_ONLY_TOKEN }}
-          MAKE_LATEST: ${{ inputs.make_latest || true }}
-          run: |
+          VERSION: ${{ steps.vars.outputs.version }}
+          MAKE_LATEST: ${{ steps.vars.outputs.make_latest }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
           git fetch --all --tags
-          git fetch origin gh-pages --depth=1
-          git worktree add gh-pages gh-pages
-          
+          git fetch origin gh-pages --depth=1 || true
+          git worktree add gh-pages gh-pages || git worktree add gh-pages origin/gh-pages
+
           if [ "$MAKE_LATEST" = "true" ]; then
             echo "Deploying $VERSION as latest and default"
             mike deploy --push --update-aliases "$VERSION" latest --ignore-remote-status
@@ -54,5 +77,5 @@ jobs:
             echo "Deploying $VERSION (non-latest)"
             mike deploy --push "$VERSION" --ignore-remote-status
           fi
-          
+
           git worktree remove gh-pages --force
