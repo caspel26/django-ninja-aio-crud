@@ -33,52 +33,58 @@ Traditional Django REST development requires:
 **Django Ninja Aio CRUD** eliminates this complexity:
 
 === "Traditional Approach"
-```python # schema.py
-class UserSchemaOut(ModelSchema):
-class Meta:
-model = User
-fields = ['id', 'username', 'email']
-
-    class UserSchemaIn(ModelSchema):
+    ```python
+    # serializers.py
+    class UserSerializer(serializers.ModelSerializer):
+        class Meta:
+            model = User
+            fields = ['id', 'username', 'email']
+    
+    class UserCreateSerializer(serializers.ModelSerializer):
         class Meta:
             model = User
             fields = ['username', 'email', 'password']
-
+    
     # views.py
-    @api.get("users", response={200: UserSchemaOut})
-    async def list_users(request):
-        return [user async for user in User.objects.all()]
-
-
-    @api.post("users/", response{201: UserSchemaOut})
-    async def create_user(request, data: UserSchemaIn):
-        user_pk = (await User.objects.acreate(**data.model_dump())).pk
-        return 201, await User.objects.aget(pk=pk)
-
+    class UserListView(APIView):
+        async def get(self, request):
+            users = await sync_to_async(list)(User.objects.all())
+            serializer = UserSerializer(users, many=True)
+            return Response(serializer.data)
+    
+    class UserCreateView(APIView):
+        async def post(self, request):
+            serializer = UserCreateSerializer(data=request.data)
+            if serializer.is_valid():
+                user = await sync_to_async(serializer.save)()
+                return Response(UserSerializer(user).data)
+            return Response(serializer.errors, status=400)
+    
     # ... more views for retrieve, update, delete
     ```
 
 === "Django Ninja Aio CRUD"
-```python # models.py
-class User(ModelSerializer):
-username = models.CharField(max_length=150)
-email = models.EmailField()
-password = models.CharField(max_length=128)
-
+    ```python
+    # models.py
+    class User(ModelSerializer):
+        username = models.CharField(max_length=150)
+        email = models.EmailField()
+        password = models.CharField(max_length=128)
+        
         class ReadSerializer:
             fields = ["id", "username", "email"]
-
+        
         class CreateSerializer:
             fields = ["username", "email", "password"]
-
+        
         class UpdateSerializer:
             optionals = [("email", str)]
-
+    
     # views.py
     class UserViewSet(APIViewSet):
         model = User
         api = api
-
+    
     UserViewSet().add_views_to_route()
     # Done! List, Create, Retrieve, Update, Delete endpoints ready
     ```
