@@ -1228,10 +1228,12 @@
 <h1 id="api-view">API View<a class="headerlink" href="#api-view" title="Permanent link">&para;</a></h1>
 <p>The <code>APIView</code> class provides a base for creating simple API endpoints with custom views.</p>
 <h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
-<p><code>APIView</code> is a lightweight wrapper around Django Ninja's <code>Router</code> that provides:
-- Organized routing with tags
-- Custom authentication configuration
-- Error handling with standard HTTP status codes</p>
+<p><code>APIView</code> is a lightweight wrapper around Django Ninja's <code>Router</code> that provides:</p>
+<ul>
+<li>Organized routing with tags</li>
+<li>Custom authentication configuration</li>
+<li>Error handling with standard HTTP status codes</li>
+</ul>
 <h2 id="class-definition">Class Definition<a class="headerlink" href="#class-definition" title="Permanent link">&para;</a></h2>
 <div class="language-python highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">APIView</span><span class="p">:</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">api</span><span class="p">:</span> <span class="n">NinjaAPI</span>
@@ -1353,6 +1355,11 @@
 <li>For CRUD operations, use <a href="../api_view_set/"><code>APIViewSet</code></a> instead</li>
 <li>All views are automatically async-compatible</li>
 <li>Error codes <code>{400, 401, 404, 428}</code> are available via <code>self.error_codes</code></li>
+</ul>
+<p>Note:</p>
+<ul>
+<li>Path schema PK type is inferred from the model’s primary key for ViewSets.</li>
+<li>NinjaAIO remains API-compatible; global CSRF argument is no longer required in initialization.</li>
 </ul>
 <h2 id="see-also">See Also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
 <ul>
