@@ -7,11 +7,11 @@ on:
   workflow_dispatch:
     inputs:
       docs_version:
-        description: 'Versione docs da deployare (es. v1.0.0)'
+        description: 'Docs version to deploy (e.g. v1.0.0)'
         required: true
         default: 'dev'
       make_latest:
-        description: 'Imposta come "latest" e default?'
+        description: 'Set as "latest" and default?'
         type: boolean
         default: true
 
@@ -21,6 +21,9 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    
+    # SonarQube-safe: only allow push and manual dispatch
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
 
     steps:
       - uses: actions/checkout@v4
@@ -38,25 +41,41 @@ jobs:
       - name: Install MkDocs Mike and theme
         run: pip install -r docs/requirements.txt
 
-      - name: Compute VERSION and MAKE_LATEST
+      - name: Validate and compute VERSION
         id: vars
         shell: bash
         run: |
-          # VERSION: use workflow input if present, else dev on push (or a fallback tag/sha)
+          # Get raw input (potentially malicious)
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.docs_version }}" ]; then
-            VERSION="${{ inputs.docs_version }}"
+            RAW_VERSION="${{ inputs.docs_version }}"
           else
-            VERSION="dev"
+            RAW_VERSION="dev"
           fi
 
-          # Boolean input defaults to true; normalize to "true"/"false"
+          # Strict validation: only semver-safe characters
+          if ! echo "$RAW_VERSION" | grep -qE '^[a-zA-Z0-9._-]+$'; then
+            echo "❌ Invalid version: $RAW_VERSION"
+            echo "Must contain only: letters, numbers, ., _, -"
+            exit 1
+          fi
+
+          # Double-check sanitization (removes shell metachars)
+          SAFE_VERSION=$(echo "$RAW_VERSION" | sed 's/[;&|><`$()]//g')
+          if [ "$RAW_VERSION" != "$SAFE_VERSION" ]; then
+            echo "❌ Dangerous characters detected!"
+            exit 1
+          fi
+
+          echo "✅ Version validated: $SAFE_VERSION"
+          
+          # MAKE_LATEST logic (boolean input is safe)
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            MAKE_LATEST="${{ inputs.make_latest }}"  # already "true"/"false"
+            MAKE_LATEST="${{ inputs.make_latest }}"
           else
             MAKE_LATEST="true"
           fi
 
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "version=$SAFE_VERSION" >> "$GITHUB_OUTPUT"
           echo "make_latest=$MAKE_LATEST" >> "$GITHUB_OUTPUT"
 
       - name: Deploy to GitHub Pages
@@ -67,14 +86,19 @@ jobs:
         run: |
           git fetch --all --tags
           git fetch origin gh-pages --depth=1 || true
-          git worktree add gh-pages gh-pages || git worktree add gh-pages origin/gh-pages
+          
+          # Idempotent gh-pages worktree setup
+          if git worktree list | grep -q " gh-pages "; then
+            git worktree remove gh-pages --force
+          fi
+          git worktree add gh-pages gh-pages 2>/dev/null || git worktree add gh-pages origin/gh-pages
 
           if [ "$MAKE_LATEST" = "true" ]; then
-            echo "Deploying $VERSION as latest and default"
+            echo "🚀 Deploying $VERSION as latest and default"
             mike deploy --push --update-aliases "$VERSION" latest --ignore-remote-status
             mike set-default "$VERSION"
           else
-            echo "Deploying $VERSION (non-latest)"
+            echo "📦 Deploying $VERSION (non-latest)"
             mike deploy --push "$VERSION" --ignore-remote-status
           fi
 
