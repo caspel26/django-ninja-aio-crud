@@ -5,6 +5,15 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      docs_version:
+        description: 'Versione docs da deployare (es. v1.0.0)'
+        required: true
+        default: 'dev'
+      make_latest:
+        description: 'Imposta come "latest" e default?'
+        type: boolean
+        default: true
 
 permissions:
   contents: write
@@ -29,6 +38,21 @@ jobs:
 
       - name: Deploy to GitHub Pages
         env:
-          VERSION: ${{ secrets.DOCS_VERSION }}
+          VERSION: ${{ github.event.inputs.docs_version || format('v{0}', github.sha) }}
           GITHUB_TOKEN: ${{ secrets.API_READ_ONLY_TOKEN }}
-        run: git fetch --all --tags  && git fetch origin gh-pages --depth=1 && git worktree add gh-pages gh-pages && mike deploy --push --update-aliases "$VERSION" latest --ignore-remote-status && mike set-default "$VERSION" && git worktree remove gh-pages --force
+          MAKE_LATEST: ${{ inputs.make_latest || true }}
+          run: |
+          git fetch --all --tags
+          git fetch origin gh-pages --depth=1
+          git worktree add gh-pages gh-pages
+          
+          if [ "$MAKE_LATEST" = "true" ]; then
+            echo "Deploying $VERSION as latest and default"
+            mike deploy --push --update-aliases "$VERSION" latest --ignore-remote-status
+            mike set-default "$VERSION"
+          else
+            echo "Deploying $VERSION (non-latest)"
+            mike deploy --push "$VERSION" --ignore-remote-status
+          fi
+          
+          git worktree remove gh-pages --force
