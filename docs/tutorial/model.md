@@ -13,6 +13,7 @@ In this first step, you'll learn how to define Django models using `ModelSeriali
 ## Prerequisites
 
 Make sure you have:
+
 - Django 4.1+ installed
 - `django-ninja-aio-crud` installed
 - A Django project set up
@@ -39,7 +40,7 @@ class Article(ModelSerializer):
 ```
 
 !!! tip "Why ModelSerializer?"
-    `ModelSerializer` is a powerful mixin that combines Django's `Model` with automatic schema generation capabilities. Instead of creating separate serializer classes, you define everything on the model itself.
+`ModelSerializer` is a powerful mixin that combines Django's `Model` with automatic schema generation capabilities. Instead of creating separate serializer classes, you define everything on the model itself.
 
 ## Adding Serializer Classes
 
@@ -120,7 +121,7 @@ class Article(ModelSerializer):
 ```
 
 !!! note "Auto-generated Fields"
-    Fields like `id`, `created_at`, and `updated_at` are automatically handled by Django and shouldn't be in `CreateSerializer.fields`.
+Fields like `id`, `created_at`, and `updated_at` are automatically handled by Django and shouldn't be in `CreateSerializer.fields`.
 
 ### UpdateSerializer
 
@@ -231,7 +232,7 @@ class Article(ModelSerializer):
 {
   "title": "My Article",
   "content": "Content here...",
-  "author": 5  // Author ID
+  "author": 5 // Author ID
 }
 ```
 
@@ -254,7 +255,7 @@ class Article(ModelSerializer):
 ```
 
 !!! tip "Automatic Nested Serialization"
-    When `Author` is also a `ModelSerializer`, Django Ninja Aio CRUD automatically serializes it in the response!
+When `Author` is also a `ModelSerializer`, Django Ninja Aio CRUD automatically serializes it in the response!
 
 ### ManyToMany Relationships
 
@@ -312,7 +313,7 @@ class Article(ModelSerializer):
   "title": "My Article",
   "content": "Content...",
   "author": 5,
-  "tags": [1, 2, 3]  // Tag IDs
+  "tags": [1, 2, 3] // Tag IDs
 }
 ```
 
@@ -384,7 +385,69 @@ class Article(ModelSerializer):
 ```
 
 !!! info "Custom Fields in CreateSerializer"
-    Custom fields in `CreateSerializer` are used for **instructions** (like flags or metadata), not stored in the database. They're passed to `custom_actions()` hook.
+Custom fields in `CreateSerializer` are used for **instructions** (like flags or metadata), not stored in the database. They're passed to `custom_actions()` hook.
+
+## Query optimizations (QuerySet)
+
+Configure select_related/prefetch_related for read and queryset_request hooks:
+
+```python
+from ninja_aio.schemas.helpers import ModelQuerySetSchema, ModelQuerySetExtraSchema
+
+class Article(ModelSerializer):
+    # ...existing fields...
+
+    class QuerySet:
+        read = ModelQuerySetSchema(
+            select_related=["author", "category"],
+            prefetch_related=["tags"],
+        )
+        queryset_request = ModelQuerySetSchema(
+            select_related=[],
+            prefetch_related=["tags"],
+        )
+        extras = [
+            ModelQuerySetExtraSchema(
+                scope="cards",
+                select_related=["author"],
+                prefetch_related=[],
+            )
+        ]
+```
+
+Use the QueryUtil for custom scopes:
+
+```python
+qs = Article.query_util.apply_queryset_optimizations(
+    Article.objects.all(),
+    Article.query_util.SCOPES.cards,  # from extras
+)
+```
+
+## Fetch and serialize with ModelUtil
+
+```python
+from ninja_aio.models import ModelUtil
+from ninja_aio.schemas.helpers import ObjectsQuerySchema, ObjectQuerySchema
+
+util = ModelUtil(Article)
+
+# List published with default read optimizations
+items = await util.list_read_s(
+    Article.generate_read_s(),
+    request,
+    query_data=ObjectsQuerySchema(filters={"is_published": True}),
+    is_for_read=True,
+)
+
+# Retrieve by slug with getters
+item = await util.read_s(
+    Article.generate_read_s(),
+    request,
+    query_data=ObjectQuerySchema(getters={"slug": "my-article"}),
+    is_for_read=True,
+)
+```
 
 ## Lifecycle Hooks
 
@@ -471,7 +534,7 @@ class Article(ModelSerializer):
 ```
 
 !!! warning "Execution Order"
-    **Create**: `on_create_before_save()` → `before_save()` → `save()` → `on_create_after_save()` → `after_save()` → `custom_actions()` → `post_create()`
+**Create**: `on_create_before_save()` → `before_save()` → `save()` → `on_create_after_save()` → `after_save()` → `custom_actions()` → `post_create()`
 
     **Update**: `before_save()` → `save()` → `after_save()` → `custom_actions()`
 
@@ -653,12 +716,7 @@ python manage.py migrate
 
 Now that you have your models defined, let's create CRUD views in [Step 2: Create CRUD Views](crud.md).
 
-!!! success "What You've Learned"
-    - ✅ Creating models with `ModelSerializer`
-    - ✅ Defining Read, Create, and Update serializers
-    - ✅ Working with ForeignKey and ManyToMany relationships
-    - ✅ Adding custom computed fields
-    - ✅ Implementing lifecycle hooks
+!!! success "What You've Learned" - ✅ Creating models with `ModelSerializer` - ✅ Defining Read, Create, and Update serializers - ✅ Working with ForeignKey and ManyToMany relationships - ✅ Adding custom computed fields - ✅ Implementing lifecycle hooks
 
 ## See Also
 

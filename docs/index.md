@@ -24,6 +24,7 @@
 ## 🎯 Why Django Ninja Aio CRUD?
 
 Traditional Django REST development requires:
+
 - Separate serializer classes
 - Manual CRUD view implementation
 - Repetitive boilerplate code
@@ -32,12 +33,11 @@ Traditional Django REST development requires:
 **Django Ninja Aio CRUD** eliminates this complexity:
 
 === "Traditional Approach"
-    ```python
-    # schema.py
-    class UserSchemaOut(ModelSchema):
-        class Meta:
-            model = User
-            fields = ['id', 'username', 'email']
+```python # schema.py
+class UserSchemaOut(ModelSchema):
+class Meta:
+model = User
+fields = ['id', 'username', 'email']
 
     class UserSchemaIn(ModelSchema):
         class Meta:
@@ -59,12 +59,11 @@ Traditional Django REST development requires:
     ```
 
 === "Django Ninja Aio CRUD"
-    ```python
-    # models.py
-    class User(ModelSerializer):
-        username = models.CharField(max_length=150)
-        email = models.EmailField()
-        password = models.CharField(max_length=128)
+```python # models.py
+class User(ModelSerializer):
+username = models.CharField(max_length=150)
+email = models.EmailField()
+password = models.CharField(max_length=128)
 
         class ReadSerializer:
             fields = ["id", "username", "email"]
@@ -89,16 +88,44 @@ Traditional Django REST development requires:
 Explore detailed documentation for each component:
 
 #### Models
+
 - **[Model Serializer](api/models/model_serializer.md)** - Schema generation and serialization
 - **[Model Util](api/models/model_util.md)** - Async CRUD utilities
 
 #### Views
+
 - **[API View](api/views/api_view.md)** - Simple custom views
 - **[API View Set](api/views/api_view_set.md)** - Complete CRUD operations
 
 #### Advanced Topics
+
 - **[Authentication](api/authentication.md)** - JWT and custom auth
 - **[Pagination](api/pagination.md)** - Customize pagination behavior
+
+## Query optimization and schemas
+
+- Declare query optimizations on models via `class QuerySet` (read, queryset_request, extras).
+- Use `QueryUtil` to apply scope-based `select_related` / `prefetch_related`.
+- Standard query schemas:
+  - `ObjectsQuerySchema(filters=..., select_related=..., prefetch_related=...)`
+  - `ObjectQuerySchema(getters=..., select_related=..., prefetch_related=...)`
+  - `QuerySchema(filters=... | getters=...)`
+
+ViewSets internally use these to:
+
+- Build optimized querysets in list/retrieve.
+- Serialize via `list_read_s` and `read_s`.
+
+Example:
+
+```python
+items = await ModelUtil(Article).list_read_s(
+    Article.generate_read_s(),
+    request,
+    query_data=ObjectsQuerySchema(filters={"category": 3}),
+    is_for_read=True,
+)
+```
 
 ## 💡 Example: Complete Blog API
 
@@ -226,6 +253,7 @@ TagViewSet().add_views_to_route()
 ```
 
 This creates a complete blog API with:
+
 - 4 models with relationships
 - Automatic nested serialization
 - Query filtering

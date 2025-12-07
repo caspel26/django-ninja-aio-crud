@@ -94,6 +94,43 @@ async def query_params_handler(self, queryset, filters: dict):
 
 A dynamic Pydantic model (`FiltersSchema`) is built with `pydantic.create_model` from `query_params`.
 
+## List and Retrieve implementations
+
+List now leverages ModelUtil.get_objects and list_read_s, automatically applying read optimizations and optional filters:
+
+```python
+class ArticleViewSet(APIViewSet):
+    model = Article
+    api = api
+
+    def views(self):
+        @self.router.get("/")
+        async def list(request, filters: self.filters_schema = None):
+            qs = await self.model_util.get_objects(
+                request,
+                query_data=self._get_query_data(),  # defaults from ModelSerializer.QuerySet.read
+                is_for_read=True,
+            )
+            if filters is not None:
+                qs = await self.query_params_handler(qs, filters.model_dump())
+            return await self.model_util.list_read_s(self.schema_out, request, qs)
+```
+
+Retrieve uses read_s with getters, deriving PK type from the model:
+
+```python
+@self.router.get("/{pk}/")
+async def retrieve(request, pk: self.path_schema):
+    return await self.model_util.read_s(
+        self.schema_out,
+        request,
+        query_data=QuerySchema(getters={"pk": self._get_pk(pk)}),
+        is_for_read=True,
+    )
+```
+
+- Path schema PK type is inferred from the model’s primary key field.
+
 ## Many-to-Many Relations
 
 Relations are declared via `M2MRelationSchema` objects (not tuples). Each schema can include:
@@ -115,6 +152,26 @@ If `filters` is provided a per-relation filters schema is auto-generated and exp
 Custom filter hook naming convention:
 `<related_name>_query_params_handler(self, queryset, filters_dict)`
 
+The M2M helper now:
+
+- Returns `{items: [...], count: N}` for GET related endpoints.
+- Supports both sync and async custom filter handlers.
+- Uses list_read_s for related items serialization.
+
+Example filter handler (sync or async):
+
+```python
+def tags_query_params_handler(self, queryset, filters_dict):
+    name = filters_dict.get("name")
+    return queryset.filter(name=name) if name else queryset
+
+# or
+
+async def tags_query_params_handler(self, queryset, filters_dict):
+    # perform async lookups if needed, then return queryset
+    return queryset
+```
+
 !!! warning "Model Support"
 
     You can now supply a standard Django `Model` (not a `ModelSerializer`) in `M2MRelationSchema.model`. When doing so **you must provide** `related_schema` manually:
@@ -127,7 +184,7 @@ Custom filter hook naming convention:
         add=True,
         remove=True,
         get=True,
-    )  
+    )
     ```
 
     If `related_schema` is omitted for a plain `Model`, validation will raise an error. This path is **experimental** and its behavior or requirements may change without notice.

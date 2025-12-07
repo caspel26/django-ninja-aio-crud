@@ -5,6 +5,7 @@ The `APIView` class provides a base for creating simple API endpoints with custo
 ## Overview
 
 `APIView` is a lightweight wrapper around Django Ninja's `Router` that provides:
+
 - Organized routing with tags
 - Custom authentication configuration
 - Error handling with standard HTTP status codes
@@ -21,12 +22,12 @@ class APIView:
 
 ## Attributes
 
-| Attribute | Type | Description |
-|-----------|------|-------------|
-| `api` | `NinjaAPI` | The NinjaAPI instance to register routes |
-| `router_tag` | `str` | Tag name for grouping endpoints in OpenAPI docs |
-| `api_route_path` | `str` | Base path for all routes in this view |
-| `auth` | `list \| None` | Authentication classes (optional) |
+| Attribute        | Type           | Description                                     |
+| ---------------- | -------------- | ----------------------------------------------- |
+| `api`            | `NinjaAPI`     | The NinjaAPI instance to register routes        |
+| `router_tag`     | `str`          | Tag name for grouping endpoints in OpenAPI docs |
+| `api_route_path` | `str`          | Base path for all routes in this view           |
+| `auth`           | `list \| None` | Authentication classes (optional)               |
 
 ## Methods
 
@@ -128,6 +129,11 @@ AnalyticsView().add_views_to_route()
 - For CRUD operations, use [`APIViewSet`](api_view_set.md) instead
 - All views are automatically async-compatible
 - Error codes `{400, 401, 404, 428}` are available via `self.error_codes`
+
+Note:
+
+- Path schema PK type is inferred from the model’s primary key for ViewSets.
+- NinjaAIO remains API-compatible; global CSRF argument is no longer required in initialization.
 
 ## See Also
 

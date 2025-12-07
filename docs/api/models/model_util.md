@@ -5,6 +5,7 @@
 ## Overview
 
 ModelUtil acts as a bridge between Django Ninja schemas and Django ORM, handling:
+
 - **Data normalization** (input/output)
 - **Relationship resolution** (FK/M2M)
 - **Binary field handling** (base64 encoding/decoding)
@@ -20,6 +21,7 @@ util = ModelUtil(model)
 ```
 
 **Parameters:**
+
 - `model` (`type[ModelSerializer] | models.Model`): Django model or ModelSerializer subclass
 
 ## Properties
@@ -70,98 +72,146 @@ if util.serializer_meta:
     fields = util.serializer_meta.get_fields("create")
 ```
 
+## QuerySet configuration on ModelSerializer
+
+You can declare query optimizations directly on your ModelSerializer via a nested QuerySet:
+
+```python
+from ninja_aio.models import ModelSerializer
+from ninja_aio.schemas.helpers import ModelQuerySetSchema, ModelQuerySetExtraSchema
+
+class Book(ModelSerializer):
+    # ...existing fields...
+
+    class QuerySet:
+        read = ModelQuerySetSchema(
+            select_related=["author", "category"],
+            prefetch_related=["tags"],
+        )
+        queryset_request = ModelQuerySetSchema(
+            select_related=[],
+            prefetch_related=["related_items"],
+        )
+        extras = [
+            ModelQuerySetExtraSchema(
+                scope="detail_cards",
+                select_related=["author"],
+                prefetch_related=["tags"],
+            )
+        ]
+```
+
+- read: applied to read operations (list/retrieve).
+- queryset_request: applied inside queryset_request hook.
+- extras: named configurations available via QueryUtil.SCOPES.
+
+## QueryUtil
+
+Each ModelSerializer now exposes a query_util helper:
+
+```python
+util = MyModel.query_util
+qs = util.apply_queryset_optimizations(MyModel.objects.all(), util.SCOPES.READ)
+```
+
+- SCOPES: includes READ, QUERYSET_REQUEST, plus any extras you've defined.
+- apply_queryset_optimizations: applies select_related/prefetch_related for a scope.
+
+## Query schemas
+
+New helper schemas standardize filters and getters:
+
+```python
+from ninja_aio.schemas.helpers import (
+    QuerySchema,           # generic: filters or getters
+    ObjectQuerySchema,     # getters + select/prefetch
+    ObjectsQuerySchema,    # filters + select/prefetch
+    ModelQuerySetSchema,   # select/prefetch only
+)
+```
+
 ## Core Methods
 
-### `get_object()`
+### `get_objects`
 
-Fetch single object or queryset with optimized queries.
-
-#### Signature
+Fetch an optimized queryset with optional filters and select/prefetch hints:
 
 ```python
-async def get_object(
-    request: HttpRequest,
-    pk: int | str = None,
-    filters: dict = None,
-    getters: dict = None,
-    with_qs_request: bool = True,
-) -> ModelSerializer | models.Model | QuerySet
-```
+from ninja_aio.models import ModelUtil
+from ninja_aio.schemas.helpers import ObjectsQuerySchema
 
-#### Parameters
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `request` | `HttpRequest` | Required | Current HTTP request |
-| `pk` | `int \| str` | `None` | Primary key for single object |
-| `filters` | `dict` | `None` | Queryset filters (`field__lookup: value`) |
-| `getters` | `dict` | `None` | Get single object by custom fields |
-| `with_qs_request` | `bool` | `True` | Apply `queryset_request()` filtering |
-
-#### Return Value
-
-- If `pk` or `getters` provided → Single model instance
-- Otherwise → QuerySet
-
-#### Features
-
-- **Automatic query optimization:** Applies `select_related()` for ForeignKey and `prefetch_related()` for reverse relations
-- **Request-based filtering:** Respects model's `queryset_request()` method
-- **Error handling:** Raises `SerializeError` (404) if object not found
-
-#### Examples
-
-**Get single object by ID:**
-
-```python
-user = await util.get_object(request, pk=1)
-# SELECT * FROM user WHERE id = 1
-```
-
-**Get with filters:**
-
-```python
-active_users = await util.get_object(
+qs = await ModelUtil(Book).get_objects(
     request,
-    filters={"is_active": True, "role": "admin"}
+    query_data=ObjectsQuerySchema(
+        filters={"is_published": True},
+        select_related=["author"],
+        prefetch_related=["tags"],
+    ),
+    is_for_read=True,  # union with auto-discovered relations
 )
-# Returns QuerySet: SELECT * FROM user WHERE is_active = TRUE AND role = 'admin'
 ```
 
-**Get by custom field:**
+### `get_object`
+
+Fetch a single object by pk or getters with optimizations:
 
 ```python
-user = await util.get_object(
+from ninja_aio.schemas.helpers import ObjectQuerySchema, QuerySchema
+
+# by pk + select/prefetch
+obj = await ModelUtil(Book).get_object(
     request,
-    getters={"email": "john@example.com"}
+    pk=42,
+    query_data=ObjectQuerySchema(select_related=["author"]),
+    is_for_read=True,
 )
-# SELECT * FROM user WHERE email = 'john@example.com'
+
+# by getters (required if pk omitted)
+obj = await ModelUtil(Book).get_object(
+    request,
+    query_data=QuerySchema(getters={"slug": "my-book-slug"}),
+)
 ```
 
-**Without queryset_request filtering:**
+Errors:
+
+- ValueError if neither pk nor getters provided.
+- NotFoundError if no match.
+
+### `read_s` and `list_read_s`
+
+Uniform serialization methods that accept either instances or query data:
 
 ```python
-# Bypass request-based filtering (e.g., for internal operations)
-all_users = await util.get_object(request, with_qs_request=False)
+schema = Book.generate_read_s()
+
+# single instance
+data = await ModelUtil(Book).read_s(schema, request, instance=obj)
+
+# single via getters
+data = await ModelUtil(Book).read_s(
+    schema,
+    request,
+    query_data=ObjectQuerySchema(getters={"pk": 42}),
+    is_for_read=True,
+)
+
+# list from queryset
+items = await ModelUtil(Book).list_read_s(schema, request, instances=qs)
+
+# list via filters
+items = await ModelUtil(Book).list_read_s(
+    schema,
+    request,
+    query_data=ObjectsQuerySchema(filters={"is_published": True}),
+    is_for_read=True,
+)
 ```
 
-**With relationships:**
+Behavior:
 
-```python
-class Article(ModelSerializer):
-    author = models.ForeignKey(User, on_delete=models.CASCADE)
-    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True)
-    tags = models.ManyToManyField(Tag, related_name="articles")
-
-util = ModelUtil(Article)
-article = await util.get_object(request, pk=1)
-
-# Automatically executes:
-# SELECT * FROM article
-# LEFT JOIN user ON article.author_id = user.id
-# LEFT JOIN category ON article.category_id = category.id
-# WITH prefetch for tags
-```
+- When is_for_read=True, select_related and prefetch_related are merged with model-discovered relations.
+- Passing instances skips fetching; passing query_data fetches automatically.
 
 ### `get_reverse_relations()`
 
@@ -193,13 +243,13 @@ print(reverse_rels)  # ["books"]
 
 #### Detected Relation Types
 
-| Django Descriptor | Example | Detected |
-|-------------------|---------|----------|
-| `ReverseManyToOneDescriptor` | `author.books` | ✓ |
-| `ReverseOneToOneDescriptor` | `user.profile` | ✓ |
-| `ManyToManyDescriptor` | `article.tags` | ✓ |
-| `ForwardManyToOneDescriptor` | `book.author` | ✗ |
-| `ForwardOneToOneDescriptor` | `profile.user` | ✗ |
+| Django Descriptor            | Example        | Detected |
+| ---------------------------- | -------------- | -------- |
+| `ReverseManyToOneDescriptor` | `author.books` | ✓        |
+| `ReverseOneToOneDescriptor`  | `user.profile` | ✓        |
+| `ManyToManyDescriptor`       | `article.tags` | ✓        |
+| `ForwardManyToOneDescriptor` | `book.author`  | ✗        |
+| `ForwardOneToOneDescriptor`  | `profile.user` | ✗        |
 
 #### Use Case
 
@@ -228,14 +278,15 @@ async def parse_input_data(
 
 #### Parameters
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `request` | `HttpRequest` | Current HTTP request |
-| `data` | `Schema` | Ninja schema instance |
+| Parameter | Type          | Description           |
+| --------- | ------------- | --------------------- |
+| `request` | `HttpRequest` | Current HTTP request  |
+| `data`    | `Schema`      | Ninja schema instance |
 
 #### Return Value
 
 `(payload, customs)` where:
+
 - `payload` (`dict`): Model-ready data with resolved relationships
 - `customs` (`dict`): Custom/synthetic fields stripped from payload
 
@@ -378,10 +429,10 @@ async def parse_output_data(
 
 #### Parameters
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `request` | `HttpRequest` | Current HTTP request |
-| `data` | `Schema` | Serialized schema instance |
+| Parameter | Type          | Description                |
+| --------- | ------------- | -------------------------- |
+| `request` | `HttpRequest` | Current HTTP request       |
+| `data`    | `Schema`      | Serialized schema instance |
 
 #### Return Value
 
@@ -532,11 +583,11 @@ async def create_s(
 
 #### Parameters
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `request` | `HttpRequest` | Current HTTP request |
-| `data` | `Schema` | Input schema with creation data |
-| `obj_schema` | `Schema` | Output schema for response |
+| Parameter    | Type          | Description                     |
+| ------------ | ------------- | ------------------------------- |
+| `request`    | `HttpRequest` | Current HTTP request            |
+| `data`       | `Schema`      | Input schema with creation data |
+| `obj_schema` | `Schema`      | Output schema for response      |
 
 #### Return Value
 
@@ -628,11 +679,11 @@ async def read_s(
 
 #### Parameters
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `request` | `HttpRequest` | Current HTTP request |
-| `obj` | `ModelSerializer \| models.Model` | Model instance to serialize |
-| `obj_schema` | `Schema` | Output schema |
+| Parameter    | Type                              | Description                 |
+| ------------ | --------------------------------- | --------------------------- |
+| `request`    | `HttpRequest`                     | Current HTTP request        |
+| `obj`        | `ModelSerializer \| models.Model` | Model instance to serialize |
+| `obj_schema` | `Schema`                          | Output schema               |
 
 #### Return Value
 
@@ -699,12 +750,12 @@ async def update_s(
 
 #### Parameters
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `request` | `HttpRequest` | Current HTTP request |
-| `data` | `Schema` | Input schema with update data |
-| `pk` | `int \| str` | Primary key of object to update |
-| `obj_schema` | `Schema` | Output schema for response |
+| Parameter    | Type          | Description                     |
+| ------------ | ------------- | ------------------------------- |
+| `request`    | `HttpRequest` | Current HTTP request            |
+| `data`       | `Schema`      | Input schema with update data   |
+| `pk`         | `int \| str`  | Primary key of object to update |
+| `obj_schema` | `Schema`      | Output schema for response      |
 
 #### Return Value
 
@@ -791,10 +842,10 @@ async def delete_s(
 
 #### Parameters
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `request` | `HttpRequest` | Current HTTP request |
-| `pk` | `int \| str` | Primary key of object to delete |
+| Parameter | Type          | Description                     |
+| --------- | ------------- | ------------------------------- |
+| `request` | `HttpRequest` | Current HTTP request            |
+| `pk`      | `int \| str`  | Primary key of object to delete |
 
 #### Return Value
 
@@ -1020,6 +1071,7 @@ async def example(request: HttpRequest):
 ## Best Practices
 
 1. **Always use with async views:**
+
    ```python
    async def my_view(request):
        util = ModelUtil(User)
@@ -1027,6 +1079,7 @@ async def example(request: HttpRequest):
    ```
 
 2. **Reuse util instances when possible:**
+
    ```python
    # Good: One util per view
    util = ModelUtil(User)
@@ -1035,6 +1088,7 @@ async def example(request: HttpRequest):
    ```
 
 3. **Let ModelUtil handle query optimization:**
+
    ```python
    # Don't manually optimize unless necessary
    user = await util.get_object(request, pk=1)
@@ -1042,6 +1096,7 @@ async def example(request: HttpRequest):
    ```
 
 4. **Handle SerializeError appropriately:**
+
    ```python
    from ninja_aio.exceptions import SerializeError
 
