@@ -21,6 +21,11 @@ on:
         type: boolean
         default: true
 
+      delete_version:
+          description: 'Version to DELETE (leave empty to skip)'
+          required: false
+          default: ''
+
 permissions:
   contents: write
 
@@ -96,3 +101,13 @@ jobs:
           fi
 
           git worktree remove gh-pages --force
+
+      - name: Delete version
+        if: inputs.delete_version != ''
+        run: |
+          echo "Deleting version: ${{ inputs.delete_version }}"
+          mike delete "${{ inputs.delete_version }}" --push
+          echo "Version ${{ inputs.delete_version }} deleted successfully"
+
+      - name: List versions
+        run: mike lis
