@@ -14,8 +14,8 @@ on:
         options:
           - dev
           - stable
-          - v1.0
-          - v2.0
+          - "1.0"
+          - "2.0"
       make_latest:
         description: 'Set as "latest" and default?'
         type: boolean
