@@ -146,17 +146,17 @@ Relations are declared via `M2MRelationSchema` objects (not tuples). Each schema
 - `related_schema`: optional pre-built schema for the related model (auto-generated if the `model` is a `ModelSerializer`)
 
 If `path` is empty it falls back to the related model verbose name (lowercase plural).
-If `filters` is provided a per-relation filters schema is auto-generated and exposed on the GET relation endpoint:
+If `filters` is provided, a per-relation filters schema is auto-generated and exposed on the GET relation endpoint:
 `GET /{base}/{pk}/{related_path}?param=value`
 
 Custom filter hook naming convention:
 `<related_name>_query_params_handler(self, queryset, filters_dict)`
 
-The M2M helper now:
+The M2M helper:
 
-- Returns `{items: [...], count: N}` for GET related endpoints.
+- Returns a paginated list of related items on GET.
 - Supports both sync and async custom filter handlers.
-- Uses list_read_s for related items serialization.
+- Uses `list_read_s` for related items serialization.
 
 Example filter handler (sync or async):
 
@@ -172,23 +172,22 @@ async def tags_query_params_handler(self, queryset, filters_dict):
     return queryset
 ```
 
-!!! warning "Model Support"
+Warning: Model support
 
-    You can now supply a standard Django `Model` (not a `ModelSerializer`) in `M2MRelationSchema.model`. When doing so **you must provide** `related_schema` manually:
+- You can supply a standard Django `Model` (not a `ModelSerializer`) in `M2MRelationSchema.model`. When doing so you must provide `related_schema` manually:
 
-    ```python
-    M2MRelationSchema(
-        model=Tag,                # plain django.db.models.Model
-        related_name="tags",
-        related_schema=TagOut,    # a Pydantic/Ninja Schema you define
-        add=True,
-        remove=True,
-        get=True,
-    )
-    ```
+```python
+M2MRelationSchema(
+    model=Tag,                # plain django.db.models.Model
+    related_name="tags",
+    related_schema=TagOut,    # a Pydantic/Ninja Schema you define
+    add=True,
+    remove=True,
+    get=True,
+)
+```
 
-    If `related_schema` is omitted for a plain `Model`, validation will raise an error. This path is **experimental** and its behavior or requirements may change without notice.
-    For `ModelSerializer` models nothing changes: `related_schema` is inferred automatically via `generate_related_s()`.
+For `ModelSerializer` models, `related_schema` can be inferred automatically (via internal helpers).
 
 Example with filters:
 
@@ -200,9 +199,7 @@ class UserViewSet(APIViewSet):
         M2MRelationSchema(
             model=Tag,
             related_name="tags",
-            filters={
-                "name": (str, "")
-            }
+            filters={"name": (str, "")}
         )
     ]
 
@@ -213,20 +210,54 @@ class UserViewSet(APIViewSet):
         return queryset
 ```
 
-### Generated M2M Endpoints (per relation)
+### Relation Handlers: GET filters vs POST per-PK resolution
 
-| Method | Path                       | Feature                                            |
-| ------ | -------------------------- | -------------------------------------------------- |
-| GET    | `/{base}/{pk}/{rel_path}`  | List related objects (paginated, optional filters) |
-| POST   | `/{base}/{pk}/{rel_path}/` | Add/remove related objects                         |
+- GET filters handler (per relation):
+
+  - Name: `<related_name>_query_params_handler(self, queryset, filters_dict)`
+  - Purpose: apply filters to the related list queryset (GET endpoint).
+  - Supports both synchronous and asynchronous functions.
+
+- POST per-PK resolution handler (per relation):
+  - Name: `<related_name>_query_handler(self, request, pk, instance)`
+  - Purpose: resolve a single related object (for add/remove validation) before mutation.
+  - Must return a queryset; the object is resolved with `.afirst()`.
+  - Automatic fallback if missing: `ModelUtil(related_model).get_objects(request, ObjectsQuerySchema(filters={"pk": pk}))` + `.afirst()`.
+
+Example:
+
+```python
+class MyViewSet(APIViewSet):
+    model = Article
+    api = api
+
+    async def tags_query_params_handler(self, qs, filters: dict):
+        name = filters.get("name")
+        return qs.filter(name__icontains=name) if name else qs
+
+    async def tags_query_handler(self, request, pk, instance):
+        # allow only tags belonging to the same project as the instance
+        return Tag.objects.filter(pk=pk, project_id=instance.project_id)
+```
+
+### Endpoint paths and operation naming
+
+- GET relation: `/{base}/{pk}/{rel_path}` (no trailing slash)
+
+  - OperationId: `get_{base_model_name}_{rel_path}`
+
+- POST relation: `/{base}/{pk}/{rel_path}/` (trailing slash)
+  - OperationId: `manage_{base_model_name}_{rel_path}`
+
+### Request/Response and concurrency
 
 Request bodies:
 
-- Both add & remove enabled: `{ "add": [ids], "remove": [ids] }`
-- Only add: `{ "add": [ids] }`
-- Only remove: `{ "remove": [ids] }`
+- Add & Remove: `{ "add": number[], "remove": number[] }`
+- Add only: `{ "add": number[] }`
+- Remove only: `{ "remove": number[] }`
 
-Success/manage response (`M2MSchemaOut`):
+Standard response (M2MSchemaOut):
 
 ```json
 {
@@ -235,9 +266,18 @@ Success/manage response (`M2MSchemaOut`):
 }
 ```
 
-Operations use async managers (`aadd`, `aremove`) and run concurrently via `asyncio.gather`.
+- Concurrency: `aadd(...)` and `aremove(...)` run in parallel via `asyncio.gather` when both lists are non-empty.
+- Per-PK errors include: object not found, state mismatch (removing non-related, adding already-related).
+- Per-PK success messages indicate the executed action.
 
-### M2M Example
+### Generated M2M Endpoints (per relation)
+
+| Method | Path                       | Feature                                            |
+| ------ | -------------------------- | -------------------------------------------------- |
+| GET    | `/{base}/{pk}/{rel_path}`  | List related objects (paginated, optional filters) |
+| POST   | `/{base}/{pk}/{rel_path}/` | Add/remove related objects                         |
+
+Example:
 
 ```python
 class ArticleViewSet(APIViewSet):
