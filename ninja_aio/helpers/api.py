@@ -306,12 +306,12 @@ class ManyToManyAPI:
                 continue
             if remove ^ (rel_obj in rel_objs):
                 errors.append(
-                    f"{rel_model_name} with id {obj_pk} is {'not ' if remove else ''}in {self.related_model_util.model_name}"
+                    f"{rel_model_name} with pk {obj_pk} is {'not ' if remove else ''}in {self.related_model_util.model_name}"
                 )
                 continue
             objs.append(rel_obj)
             objs_detail.append(
-                f"{rel_model_name} with id {obj_pk} successfully {'removed' if remove else 'added'}"
+                f"{rel_model_name} with pk {obj_pk} successfully {'removed' if remove else 'added'}"
             )
         return errors, objs_detail, objs
 
