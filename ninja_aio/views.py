@@ -7,7 +7,7 @@ from django.http import HttpRequest
 from django.db.models import Model, QuerySet
 from pydantic import create_model
 
-from ninja_aio.schemas.helpers import ModelQuerySetSchema, QuerySchema
+from ninja_aio.schemas.helpers import ModelQuerySetSchema, QuerySchema, DecoratorsSchema
 
 from .models import ModelSerializer, ModelUtil
 from .schemas import (
@@ -16,7 +16,7 @@ from .schemas import (
 )
 from .helpers.api import ManyToManyAPI
 from .types import ModelSerializerMeta, VIEW_TYPES
-from .decorators import unique_view
+from .decorators import unique_view, decorate_view
 
 ERROR_CODES = frozenset({400, 401, 404, 428})
 
@@ -178,6 +178,7 @@ class APIViewSet:
     delete_docs = "Delete an object by its primary key."
     m2m_relations: list[M2MRelationSchema] = []
     m2m_auth: list | None = NOT_SET
+    extra_decorators: DecoratorsSchema = DecoratorsSchema()
 
     def __init__(self) -> None:
         self.error_codes = ERROR_CODES
@@ -309,7 +310,7 @@ class APIViewSet:
             description=self.create_docs,
             response={201: self.schema_out, self.error_codes: GenericMessageSchema},
         )
-        @unique_view(self)
+        @decorate_view(unique_view(self), *self.extra_decorators.create)
         async def create(request: HttpRequest, data: self.schema_in):  # type: ignore
             return 201, await self.model_util.create_s(request, data, self.schema_out)
 
@@ -330,8 +331,11 @@ class APIViewSet:
                 self.error_codes: GenericMessageSchema,
             },
         )
-        @unique_view(self, plural=True)
-        @paginate(self.pagination_class)
+        @decorate_view(
+            paginate(self.pagination_class),
+            unique_view(self, plural=True),
+            *self.extra_decorators.list,
+        )
         async def list(
             request: HttpRequest,
             filters: Query[self.filters_schema] = None,  # type: ignore
@@ -359,7 +363,7 @@ class APIViewSet:
             description=self.retrieve_docs,
             response={200: self.schema_out, self.error_codes: GenericMessageSchema},
         )
-        @unique_view(self)
+        @decorate_view(unique_view(self), *self.extra_decorators.retrieve)
         async def retrieve(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
             query_data = self._get_query_data()
             return await self.model_util.read_s(
@@ -384,7 +388,7 @@ class APIViewSet:
             description=self.update_docs,
             response={200: self.schema_out, self.error_codes: GenericMessageSchema},
         )
-        @unique_view(self)
+        @decorate_view(unique_view(self), *self.extra_decorators.update)
         async def update(
             request: HttpRequest,
             data: self.schema_update,  # type: ignore
@@ -408,7 +412,7 @@ class APIViewSet:
             description=self.delete_docs,
             response={204: None, self.error_codes: GenericMessageSchema},
         )
-        @unique_view(self)
+        @decorate_view(unique_view(self), *self.extra_decorators.delete)
         async def delete(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
             return 204, await self.model_util.delete_s(request, self._get_pk(pk))
 
