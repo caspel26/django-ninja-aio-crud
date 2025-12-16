@@ -143,3 +143,76 @@ def unique_view(self: object | str, plural: bool = False):
         return func  # Return original function (no wrapper)
 
     return decorator
+
+
+def decorate_view(*decorators):
+    """
+    Compose and apply multiple decorators to a view (sync or async) without adding an extra wrapper.
+
+    This utility was introduced to support class-based patterns where Django Ninja’s
+    built-in `decorate_view` does not fit well. For APIs implemented with vanilla
+    Django Ninja (function-based style), you should continue using Django Ninja’s
+    native `decorate_view`.
+
+    Behavior:
+    - Applies decorators in the same order as Python’s stacking syntax:
+        @d1
+        @d2
+      is equivalent to: view = d1(d2(view))
+    - Supports both synchronous and asynchronous views.
+    - Ignores None values, enabling conditional decoration.
+    - Does not introduce an additional wrapper; composition depends on each
+      decorator for signature/metadata preservation (e.g., using functools.wraps).
+
+        *decorators: Decorator callables to apply to the target view. Any None values
+            are skipped.
+
+        Callable: A decorator that applies the provided decorators in Python stacking order.
+
+        Method usage in class-based patterns:
+
+    Args:
+        *decorators: Decorator callables to apply to the target view. Any None
+            values are skipped.
+
+    Returns:
+        A decorator that applies the provided decorators in Python stacking order.
+
+    Examples:
+        Basic usage:
+            class MyAPIViewSet(APIViewSet):
+                api = api
+                model = MyModel
+
+                def views(self):
+                    @self.router.get('some-endpoint/')
+                    @decorate_view(authenticate, log_request)
+                    async def some_view(request):
+                        ...
+        
+        Conditional decoration (skips None):
+            class MyAPIViewSet(APIViewSet):
+                api = api
+                model = MyModel
+                cache_dec = cache_page(60) if settings.ENABLE_CACHE else None
+                def views(self):
+                    @self.router.get('data/')
+                    @decorate_view(self.cache_dec, authenticate)
+                    async def data_view(request):
+                        ...
+
+    Notes:
+        - Each decorator is applied in the order provided, with the first decorator
+          wrapping the result of the second, and so on.
+        - Ensure that each decorator is compatible with the view’s sync/async nature.
+    """
+
+    def _decorator(view):
+        wrapped = view
+        for dec in reversed(decorators):
+            if dec is None:
+                continue
+            wrapped = dec(wrapped)
+        return wrapped
+
+    return _decorator
