@@ -1,4 +1,4 @@
-from typing import Optional, Type
+from typing import List, Optional, Type
 
 from ninja import Schema
 from ninja_aio.types import ModelSerializerMeta
@@ -80,3 +80,11 @@ class QuerySchema(ModelQuerySetSchema):
 class QueryUtilBaseScopesSchema(BaseModel):
     READ: str = "read"
     QUERYSET_REQUEST: str = "queryset_request"
+
+
+class DecoratorsSchema(Schema):
+    list: Optional[List] = []
+    retrieve: Optional[List] = []
+    create: Optional[List] = []
+    update: Optional[List] = []
+    delete: Optional[List] = []
