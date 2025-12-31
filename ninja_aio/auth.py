@@ -176,8 +176,9 @@ def encode_jwt(
     pkey = validate_key(private_key, "JWT_PRIVATE_KEY")
     algorithm = algorithm or "RS256"
     claims = validate_mandatory_claims(claims)
+    kid_h = {"kid": pkey.kid} if pkey.kid else {}
     return jwt.encode(
-        header={"alg": algorithm, "typ": "JWT", "kid": pkey.kid},
+        header={"alg": algorithm, "typ": "JWT"} | kid_h,
         claims={
             "iat": now,
             "nbf": nbf,
