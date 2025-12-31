@@ -25,6 +25,8 @@ nav:
       - ModelUtil: api/models/model_util.md
     - Authentication: api/authentication.md
     - Pagination: api/pagination.md
+  - Authentication:
+      - JWT & AsyncJwtBearer: auth.md
   - Contributing: contributing.md
   - Release Notes: release_notes.md
 
