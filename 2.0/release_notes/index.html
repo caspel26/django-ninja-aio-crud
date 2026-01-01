@@ -347,6 +347,28 @@
   
   
   
+    
+    
+      <li class="md-tabs__item">
+        <a href="../auth/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Authentication
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
     <li class="md-tabs__item">
       <a href="../contributing/" class="md-tabs__link">
         
@@ -772,6 +794,8 @@
       
         
       
+        
+      
     
     
     
@@ -867,6 +891,29 @@
   
   <span class="md-ellipsis">
     Decorators
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/mixins.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Mixins
     
   </span>
   
@@ -1047,6 +1094,83 @@
   
   
   
+    
+    
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Authentication
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Authentication
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../auth/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    JWT & AsyncJwtBearer
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
     <li class="md-nav__item">
       <a href="../contributing/" class="md-nav__link">
         
@@ -1115,7 +1239,76 @@
 
 
 <h1 id="release-notes">Release Notes<a class="headerlink" href="#release-notes" title="Permanent link">&para;</a></h1>
-<div style='width:100%;overflow-x:auto;'><table style='width:100%;min-width:900px;border-collapse:collapse;table-layout:auto;font-size:.8rem;'><thead style='background:transparent;'><tr><th style='text-align:left;padding:.75rem 1rem;border-bottom:2px solid #ccc;width:15%;font-size:.85rem;'>Version</th><th style='text-align:left;padding:.75rem 1rem;border-bottom:2px solid #ccc;width:15%;font-size:.85rem;'>Date</th><th style='text-align:left;padding:.75rem 1rem;border-bottom:2px solid #ccc;width:70%;font-size:.85rem;'>Summary</th></tr></thead><tbody><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v2.0.0/'><strong>v2.0.0</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v2.0.0-rc1...v2.0.0'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-12-16</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><img alt='notes' src='https://img.shields.io/badge/notes-available-blue?style=flat' style='margin-right:6px;vertical-align:middle;height:20px;' /><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><h1>Release Notes</h1>
+<div style='width:100%;overflow-x:auto;'><table style='width:100%;min-width:900px;border-collapse:collapse;table-layout:auto;font-size:.8rem;'><thead style='background:transparent;'><tr><th style='text-align:left;padding:.75rem 1rem;border-bottom:2px solid #ccc;width:15%;font-size:.85rem;'>Version</th><th style='text-align:left;padding:.75rem 1rem;border-bottom:2px solid #ccc;width:15%;font-size:.85rem;'>Date</th><th style='text-align:left;padding:.75rem 1rem;border-bottom:2px solid #ccc;width:70%;font-size:.85rem;'>Summary</th></tr></thead><tbody><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v2.1.0/'><strong>v2.1.0</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v2.0.0...v2.1.0'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2026-01-02</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><img alt='notes' src='https://img.shields.io/badge/notes-available-blue?style=flat' style='margin-right:6px;vertical-align:middle;height:20px;' /><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><h1>Release Notes</h1>
+<h2>[2.1.0] - 2026-01-01</h2>
+<hr />
+<h2>✨ Added</h2>
+<ul>
+<li>Views:</li>
+<li>ReadOnlyViewSet: list and retrieve-only endpoints.</li>
+<li>WriteOnlyViewSet: create, update, and delete-only endpoints.</li>
+<li>Exported via <code>ninja_aio.views.__init__</code> for cleaner imports.</li>
+<li>Mixins:</li>
+<li>New filtering mixins under <code>ninja_aio/views/mixins.py</code>: IcontainsFilterViewSetMixin, BooleanFilterViewSetMixin, NumericFilterViewSetMixin, DateFilterViewSetMixin, and specialized Greater/Less variants.</li>
+<li>Auth docs:</li>
+<li>New <code>docs/auth.md</code> with JWT helpers and <code>AsyncJwtBearer</code> usage and configuration.</li>
+<li>Tests:</li>
+<li>Extended test model with <code>age</code>, <code>active</code>, and <code>active_from</code> fields.</li>
+<li>Added viewset tests for mixins (icontains, boolean, numeric, date comparisons).</li>
+<li>Added auth tests for JWT encode/decode and AsyncJwtBearer claim validation.</li>
+<li>Docs navigation:</li>
+<li>Added Mixins page and JWT &amp; AsyncJwtBearer page to MkDocs nav.</li>
+<li>MkDocs <code>mike</code> config sets <code>default: latest</code>.</li>
+</ul>
+<hr />
+<h2>🛠 Changed</h2>
+<ul>
+<li>Docs workflow (<code>.github/workflows/docs.yml</code>):</li>
+<li>Safer deletion: requires explicit <code>delete_version</code> choice and <code>delete_confirm</code>, protects <code>latest</code>, <code>stable</code>, and current default.</li>
+<li><code>make_latest</code> default set to false.</li>
+<li>Coverage workflow:</li>
+<li>Bump <code>codecov/codecov-action</code> from v5.5.1 to v5.5.2.</li>
+<li>API helpers:</li>
+<li>Use <code>decorate_view</code> to compose <code>unique_view</code> and <code>paginate</code> for related GET endpoints.</li>
+<li>APIViewSet (imports and behavior):</li>
+<li>Module reorganized to <code>ninja_aio/views/api.py</code> with updated internal imports.</li>
+<li><code>get_schemas</code>: generates schemas only if missing when model is a <code>ModelSerializerMeta</code>, else returns explicitly set schemas.</li>
+<li>Hook docs clarified to allow sync or async handlers for query params.</li>
+<li>Auth:</li>
+<li><code>encode_jwt</code>: header now includes <code>kid</code> only when present (conditional merge).</li>
+<li>Docs:</li>
+<li><code>docs/api/views/api_view_set.md</code> updated to document ReadOnlyViewSet and WriteOnlyViewSet.</li>
+<li><code>docs/mixins.md</code> aligned with implemented mixins and examples.</li>
+</ul>
+<hr />
+<h2>📝 Documentation</h2>
+<ul>
+<li>New:</li>
+<li>JWT &amp; AsyncJwtBearer guide with examples for settings and direct JWK usage.</li>
+<li>Updated:</li>
+<li>Mixins reference to match implemented classes and recommended query param types.</li>
+<li>APIViewSet docs extended with ReadOnly/WriteOnly usage.</li>
+</ul>
+<hr />
+<h2>⚠ Notes / Potential Impact</h2>
+<ul>
+<li>Docs deployment:</li>
+<li>Deletion requires explicit confirmation and cannot remove protected aliases or current default.</li>
+<li>Mixins:</li>
+<li>Date filters expect values that implement <code>isoformat</code>; prefer Pydantic <code>date</code>/<code>datetime</code> in query params.</li>
+</ul>
+<hr />
+<h2>🔍 Migration / Action</h2>
+<ol>
+<li>Update imports:</li>
+<li><code>from ninja_aio.views import APIViewSet, ReadOnlyViewSet, WriteOnlyViewSet</code></li>
+<li><code>from ninja_aio.views import mixins</code> for filter mixins.</li>
+<li>For related list endpoints using custom decorators, consider adopting <code>decorate_view</code> for consistent composition.</li>
+<li>If using JWT:</li>
+<li>Optionally set <code>JWT_PRIVATE_KEY</code>, <code>JWT_PUBLIC_KEY</code>, <code>JWT_ISSUER</code>, <code>JWT_AUDIENCE</code> in Django settings.</li>
+<li>Validate claims via <code>AsyncJwtBearer.claims</code> registry and verify allowed algorithms.</li>
+<li>Review docs workflow inputs before deleting versions; use <code>delete_confirm: true</code>.</li>
+</ol></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v2.0.0/'><strong>v2.0.0</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v2.0.0-rc1...v2.0.0'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-12-16</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><img alt='notes' src='https://img.shields.io/badge/notes-available-blue?style=flat' style='margin-right:6px;vertical-align:middle;height:20px;' /><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><h1>Release Notes</h1>
 <h2>[2.0.0] - 2025-12-16</h2>
 <hr />
 <h2>✨ Added</h2>
@@ -1210,17 +1403,7 @@
 <li>Verify path PK handling in custom routes that relied on a generic PK type.</li>
 <li>Review <code>QuerySet.read</code> / <code>QuerySet.queryset_request</code> for desired select/prefetch behavior.</li>
 <li>Optionally configure ORJSON via <code>NINJA_AIO_ORJSON_RENDERER_OPTION</code>.</li>
-</ol>
-<hr />
-<h2>✅ Suggested Follow-Ups</h2>
-<ul>
-<li>Add perf checks around list/retrieve with merged relations.</li>
-<li>Expand tests for:</li>
-<li>PK type inference in path schemas.</li>
-<li>Sync vs async relation filter handlers.</li>
-<li>QueryUtil extras scopes resolution and application.</li>
-<li>Decorator ordering and ORJSON option usage.</li>
-</ul></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v2.0.0-rc1/'><strong>v2.0.0-rc1</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v2.0.0-rc2...v2.0.0-rc1'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-12-07</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><img alt='notes' src='https://img.shields.io/badge/notes-available-blue?style=flat' style='margin-right:6px;vertical-align:middle;height:20px;' /><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><h1>Release Notes</h1>
+</ol></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v2.0.0-rc1/'><strong>v2.0.0-rc1</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v2.0.0-rc2...v2.0.0-rc1'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-12-07</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><img alt='notes' src='https://img.shields.io/badge/notes-available-blue?style=flat' style='margin-right:6px;vertical-align:middle;height:20px;' /><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><h1>Release Notes</h1>
 <h2>[2.0.0-rc1] - 2025-12-07</h2>
 <hr />
 <h2>✨ Added</h2>
@@ -2253,26 +2436,7 @@ m2m_path = "custom-tags"  # no longer supported</p>
 <ul>
 <li>Added support for IPAddress serialization by @caspel26 </li>
 </ul>
-<p><strong>Full Changelog</strong>: https://github.com/caspel26/django-ninja-aio-crud/compare/v0.8.0...v0.8.1</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.8.0/'><strong>v0.8.0</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.7.8...v0.8.0'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-05-15</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><img alt='notes' src='https://img.shields.io/badge/notes-available-blue?style=flat' style='margin-right:6px;vertical-align:middle;height:20px;' /><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><h1>What's Changed</h1>
-<h2>News:</h2>
-<ul>
-<li>Added save methods:</li>
-<li>on_create_before_save;</li>
-<li>on_create_after_save;</li>
-<li>before_save;</li>
-<li>
-<p>after_save.  by @caspel26.</p>
-</li>
-<li>
-<p>Added on_delete method by @caspel26.</p>
-</li>
-<li>
-<p>Updated <a href="https://github.com/caspel26/django-ninja-aio-crud/blob/main/README.md">README.md</a> by @caspel26.</p>
-</li>
-<li>Optimized async post object creation operations by @caspel26.</li>
-<li>Updated code docstrings by @caspel26 .</li>
-</ul>
-<p><strong>Full Changelog</strong>: https://github.com/caspel26/django-ninja-aio-crud/compare/v0.7.8...v0.8.0</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.7.8/'><strong>v0.7.8</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.7.7...v0.7.8'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-03-21</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.7.7/'><strong>v0.7.7</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.7.6...v0.7.7'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-03-05</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.7.6/'><strong>v0.7.6</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.7.5...v0.7.6'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-02-24</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.7.5/'><strong>v0.7.5</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.7.4...v0.7.5'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-02-22</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.7.4/'><strong>v0.7.4</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.7.3...v0.7.4'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-02-20</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.7.3/'><strong>v0.7.3</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.7.2...v0.7.3'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-02-19</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.7.2/'><strong>v0.7.2</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.7.1...v0.7.2'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-01-30</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.7.1/'><strong>v0.7.1</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.7.0...v0.7.1'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-01-29</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.7.0/'><strong>v0.7.0</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.6.4...v0.7.0'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-01-29</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.6.4/'><strong>v0.6.4</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.6.3...v0.6.4'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-01-22</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.6.3/'><strong>v0.6.3</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.6.2...v0.6.3'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-01-22</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.6.2/'><strong>v0.6.2</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.6.1...v0.6.2'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-01-19</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.6.1/'><strong>v0.6.1</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.6.0...v0.6.1'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-01-13</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.6.0/'><strong>v0.6.0</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.5.0...v0.6.0'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-01-12</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.5.0/'><strong>v0.5.0</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.4.0...v0.5.0'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-01-09</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.4.0/'><strong>v0.4.0</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.3.1...v0.4.0'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-01-08</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.3.1/'><strong>v0.3.1</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.3.0...v0.3.1'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2024-11-07</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.3.0/'><strong>v0.3.0</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.2.2...v0.3.0'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2024-10-10</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.2.2/'><strong>v0.2.2</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.2.1...v0.2.2'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2024-10-03</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.2.1/'><strong>v0.2.1</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.2.0...v0.2.1'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2024-10-02</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.2.0/'><strong>v0.2.0</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.1.4...v0.2.0'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2024-10-01</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.1.4/'><strong>v0.1.4</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.1.3...v0.1.4'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2024-09-29</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.1.3/'><strong>v0.1.3</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.1.2...v0.1.3'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2024-09-28</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.1.2/'><strong>v0.1.2</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.1.1...v0.1.2'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2024-09-26</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.1.1/'><strong>v0.1.1</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/tree/v0.1.1'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2024-09-26</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr></tbody></table></div>
+<p><strong>Full Changelog</strong>: https://github.com/caspel26/django-ninja-aio-crud/compare/v0.8.0...v0.8.1</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.8.0/'><strong>v0.8.0</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.7.8...v0.8.0'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-05-15</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.7.8/'><strong>v0.7.8</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.7.7...v0.7.8'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-03-21</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.7.7/'><strong>v0.7.7</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.7.6...v0.7.7'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-03-05</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.7.6/'><strong>v0.7.6</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.7.5...v0.7.6'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-02-24</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.7.5/'><strong>v0.7.5</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.7.4...v0.7.5'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-02-22</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.7.4/'><strong>v0.7.4</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.7.3...v0.7.4'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-02-20</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.7.3/'><strong>v0.7.3</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.7.2...v0.7.3'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-02-19</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.7.2/'><strong>v0.7.2</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.7.1...v0.7.2'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-01-30</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.7.1/'><strong>v0.7.1</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.7.0...v0.7.1'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-01-29</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.7.0/'><strong>v0.7.0</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.6.4...v0.7.0'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-01-29</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.6.4/'><strong>v0.6.4</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.6.3...v0.6.4'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-01-22</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.6.3/'><strong>v0.6.3</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.6.2...v0.6.3'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-01-22</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.6.2/'><strong>v0.6.2</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.6.1...v0.6.2'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-01-19</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.6.1/'><strong>v0.6.1</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.6.0...v0.6.1'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-01-13</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.6.0/'><strong>v0.6.0</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.5.0...v0.6.0'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-01-12</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.5.0/'><strong>v0.5.0</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.4.0...v0.5.0'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-01-09</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.4.0/'><strong>v0.4.0</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.3.1...v0.4.0'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-01-08</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.3.1/'><strong>v0.3.1</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.3.0...v0.3.1'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2024-11-07</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.3.0/'><strong>v0.3.0</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.2.2...v0.3.0'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2024-10-10</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.2.2/'><strong>v0.2.2</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.2.1...v0.2.2'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2024-10-03</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.2.1/'><strong>v0.2.1</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.2.0...v0.2.1'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2024-10-02</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.2.0/'><strong>v0.2.0</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.1.4...v0.2.0'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2024-10-01</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.1.4/'><strong>v0.1.4</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.1.3...v0.1.4'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2024-09-29</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.1.3/'><strong>v0.1.3</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.1.2...v0.1.3'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2024-09-28</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.1.2/'><strong>v0.1.2</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.1.1...v0.1.2'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2024-09-26</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.1.1/'><strong>v0.1.1</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/tree/v0.1.1'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2024-09-26</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr></tbody></table></div>
 
 
 
@@ -2376,7 +2540,7 @@ m2m_path = "custom-tags"  # no longer supported</p>
     
     
       
-      <script id="__config" type="application/json">{"base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.top", "navigation.footer", "navigation.sections", "navigation.indexes", "header.autohide", "toc.follow", "toc.integrate", "content.code.copy", "content.code.select", "content.code.annotate", "content.tabs.link", "content.tooltips", "content.footnote.tooltips", "search.suggest", "search.highlight", "search.share"], "search": "../assets/javascripts/workers/search.973d3a69.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike", "repo": "caspel26/django-ninja-aio-crud", "stable": true}}</script>
+      <script id="__config" type="application/json">{"base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.top", "navigation.footer", "navigation.sections", "navigation.indexes", "header.autohide", "toc.follow", "toc.integrate", "content.code.copy", "content.code.select", "content.code.annotate", "content.tabs.link", "content.tooltips", "content.footnote.tooltips", "search.suggest", "search.highlight", "search.share"], "search": "../assets/javascripts/workers/search.973d3a69.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"default": "latest", "provider": "mike", "repo": "caspel26/django-ninja-aio-crud", "stable": true}}</script>
     
     
       <script src="../assets/javascripts/bundle.f55a23d4.min.js"></script>
