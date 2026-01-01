@@ -7,7 +7,7 @@ on:
         description: 'Docs version to deploy (e.g. v1.0.0)'
         required: true
         default: 'dev'
-        type: choice  # ← SonarQube compliant: predefined safe options
+        type: choice
         options:
           - dev
           - stable
@@ -19,9 +19,20 @@ on:
         default: true
 
       delete_version:
-          description: 'Version to DELETE (leave empty to skip)'
-          required: false
-          default: ''
+        description: 'Docs version to delete'
+        required: false
+        default: ''
+        type: choice
+        options:
+          - ''
+          - dev
+          - stable
+          - "1.0"
+          - "2.0"
+      delete_confirm:
+        description: 'Confirm deletion of the selected version'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -29,8 +40,6 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    
-    # Only trusted events (SonarQube safe)
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
 
     steps:
@@ -52,18 +61,15 @@ jobs:
       - name: Compute VERSION and MAKE_LATEST
         id: vars
         env:
-          # Assign untrusted input to env var FIRST (SonarQube compliant)
           INPUT_VERSION: ${{ inputs.docs_version }}
         shell: bash
         run: |
-          # Now use safe shell variable $INPUT_VERSION
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "$INPUT_VERSION" ]; then
             VERSION="$INPUT_VERSION"
           else
             VERSION="dev"
           fi
 
-          # Boolean input is always safe ("true"/"false")
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             MAKE_LATEST="${{ inputs.make_latest }}"
           else
@@ -82,29 +88,54 @@ jobs:
           git fetch --all --tags
           git fetch origin gh-pages --depth=1 || true
           
-          # Idempotent worktree setup
           if git worktree list | grep -q " gh-pages "; then
             git worktree remove gh-pages --force
           fi
           git worktree add gh-pages gh-pages 2>/dev/null || git worktree add gh-pages origin/gh-pages
 
           if [ "$MAKE_LATEST" = "true" ]; then
-            echo "🚀 Deploying $VERSION as latest and default"
+            echo "Deploying $VERSION as latest and default"
             mike deploy --push --update-aliases "$VERSION" latest --ignore-remote-status
             mike set-default "$VERSION"
           else
-            echo "📦 Deploying $VERSION (non-latest)"
+            echo "Deploying $VERSION (non-latest)"
             mike deploy --push "$VERSION" --ignore-remote-status
           fi
 
           git worktree remove gh-pages --force
 
-      - name: Delete version
-        if: inputs.delete_version != ''
+      - name: Delete version (safe)
+        if: github.event_name == 'workflow_dispatch' && inputs.delete_version != '' && inputs.delete_confirm == true
+        env:
+          DELETE_VERSION: ${{ inputs.delete_version }}
+        shell: bash
         run: |
-          echo "Deleting version: ${{ inputs.delete_version }}"
-          mike delete "${{ inputs.delete_version }}" --push
-          echo "Version ${{ inputs.delete_version }} deleted successfully"
+          set -euo pipefail
+
+          echo "Requested delete: $DELETE_VERSION"
+
+          # Protect aliases and default
+          if [ "$DELETE_VERSION" = "latest" ] || [ "$DELETE_VERSION" = "stable" ]; then
+            echo "Refusing to delete protected alias: $DELETE_VERSION"
+            exit 1
+          fi
+
+          # Load current default; fail if attempting to delete it
+          CURRENT_DEFAULT="$(mike default || true)"
+          if [ -n "$CURRENT_DEFAULT" ] && [ "$DELETE_VERSION" = "$CURRENT_DEFAULT" ]; then
+            echo "Refusing to delete current default docs version: $DELETE_VERSION"
+            exit 1
+          fi
+
+          # Ensure version exists before deleting
+          if ! mike list | awk '{print $1}' | grep -Fxq "$DELETE_VERSION"; then
+            echo "Version '$DELETE_VERSION' not found. Nothing to delete."
+            exit 0
+          fi
+
+          echo "Deleting version: $DELETE_VERSION"
+          mike delete "$DELETE_VERSION" --push
+          echo "Version '$DELETE_VERSION' deleted successfully"
 
       - name: List versions
         run: mike list
