@@ -9,14 +9,14 @@ from pydantic import create_model
 
 from ninja_aio.schemas.helpers import ModelQuerySetSchema, QuerySchema, DecoratorsSchema
 
-from .models import ModelSerializer, ModelUtil
-from .schemas import (
+from ninja_aio.models import ModelSerializer, ModelUtil
+from ninja_aio.schemas import (
     GenericMessageSchema,
     M2MRelationSchema,
 )
-from .helpers.api import ManyToManyAPI
-from .types import ModelSerializerMeta, VIEW_TYPES
-from .decorators import unique_view, decorate_view
+from ninja_aio.helpers.api import ManyToManyAPI
+from ninja_aio.types import ModelSerializerMeta, VIEW_TYPES
+from ninja_aio.decorators import unique_view, decorate_view
 
 ERROR_CODES = frozenset({400, 401, 404, 428})
 
@@ -452,3 +452,33 @@ class APIViewSet:
         Attach router with registered endpoints to the NinjaAPI instance.
         """
         return self.api.add_router(f"{self.api_route_path}", self._add_views())
+
+
+
+class ReadOnlyViewSet(APIViewSet):
+    """
+    ReadOnly viewset generating async List + Retrieve endpoints for a Django model.
+
+    Usage:
+        class MyModelReadOnlyViewSet(ReadOnlyViewSet):
+            model = MyModel
+            api = api
+        MyModelReadOnlyViewSet().add_views_to_route()
+    """
+
+    disable = ["create", "update", "delete"]
+
+
+
+class WriteOnlyViewSet(APIViewSet):
+    """
+    WriteOnly viewset generating async Create + Update + Delete endpoints for a Django model.
+
+    Usage:
+        class MyModelWriteOnlyViewSet(WriteOnlyViewSet):
+            model = MyModel
+            api = api
+        MyModelWriteOnlyViewSet().add_views_to_route()
+    """
+
+    disable = ["list", "retrieve"]
