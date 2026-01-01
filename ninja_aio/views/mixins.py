@@ -98,46 +98,6 @@ class BooleanFilterViewSetMixin(APIViewSet):
         )
 
 
-class ReverseBooleanFilterViewSetMixin(APIViewSet):
-    """
-    Mixin that applies reverse boolean filters to a Django queryset.
-
-    This mixin is intended for use with API viewsets that need to invert boolean
-    filters: instead of selecting records where a boolean field matches the given
-    value, it excludes them. For example, providing {"is_active": True} will
-    exclude all records where `is_active` is True.
-
-    Designed to be composed with a viewset class that provides `queryset` and
-    invokes `query_params_handler` with parsed filters.
-
-    Apply reverse boolean filters to the queryset.
-
-    Parameters:
-    - queryset: A Django QuerySet to be filtered.
-    - filters: A mapping of field names to values. Only boolean values are considered.
-
-    Behavior:
-    - Identifies keys in `filters` whose values are booleans.
-    - Excludes records from `queryset` where those fields match the provided boolean values.
-
-    Returns:
-    - A new QuerySet with the matching boolean rows excluded.
-
-    Example:
-    - Given filters {"is_active": True, "name": "Alice"}, only the boolean filter
-        on `is_active` is applied, resulting in queryset.exclude(is_active=True).
-    """
-
-    async def query_params_handler(self, queryset, filters):
-        """
-        Apply reverse boolean filter to the queryset based on provided filters.
-        """
-        base_qs = await super().query_params_handler(queryset, filters)
-        return base_qs.exclude(
-            **{key: value for key, value in filters.items() if isinstance(value, bool)}
-        )
-
-
 class NumericFilterViewSetMixin(APIViewSet):
     """
     Mixin providing numeric filtering for Django QuerySets.
@@ -222,7 +182,7 @@ class DateFilterViewSetMixin(APIViewSet):
         )
 
 
-class GreaterThenDateFilterViewSetMixin(DateFilterViewSetMixin):
+class GreaterThanDateFilterViewSetMixin(DateFilterViewSetMixin):
     """
     Mixin that configures date filtering to return records with dates strictly greater than a given value.
     This class extends DateFilterViewSetMixin and sets the internal comparison attribute to `__gt`,
@@ -234,7 +194,7 @@ class GreaterThenDateFilterViewSetMixin(DateFilterViewSetMixin):
           greater than the provided date value.
         - Typically used in endpoints that need to fetch items created/updated after a certain timestamp.
     Example:
-        class MyViewSet(GreaterThenDateFilterViewSetMixin, ModelViewSet):
+        class MyViewSet(GreaterThanDateFilterViewSetMixin, ModelViewSet):
             date_filter_field = "created_at"
             ...
         # Filtering will apply: queryset.filter(created_at__gt=<provided_date>)
@@ -243,7 +203,7 @@ class GreaterThenDateFilterViewSetMixin(DateFilterViewSetMixin):
     _compare_attr = "__gt"
 
 
-class LessThenDateFilterViewSetMixin(DateFilterViewSetMixin):
+class LessThanDateFilterViewSetMixin(DateFilterViewSetMixin):
     """
     Mixin that configures date filtering to return records with dates strictly less than a given value.
     This class extends DateFilterViewSetMixin and sets the internal comparison attribute to `__lt`,
@@ -255,7 +215,7 @@ class LessThenDateFilterViewSetMixin(DateFilterViewSetMixin):
           less than the provided date value.
         - Typically used in endpoints that need to fetch items created/updated before a certain timestamp.
     Example:
-        class MyViewSet(LessThenDateFilterViewSetMixin, ModelViewSet):
+        class MyViewSet(LessThanDateFilterViewSetMixin, ModelViewSet):
             date_filter_field = "created_at"
             ...
         # Filtering will apply: queryset.filter(created_at__lt=<provided_date>)
