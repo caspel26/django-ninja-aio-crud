@@ -1,3 +1,6 @@
+import datetime
+from ninja_aio.views import mixins
+
 from tests.generics.views import GenericAPIViewSet
 from tests.test_app import models
 from tests.test_app import schema
@@ -7,8 +10,57 @@ from tests.test_app import schema
 # ==========================================================
 
 
-class TestModelSerializerAPI(GenericAPIViewSet):
+class TestModelSerializerAPI(
+    GenericAPIViewSet,
+    mixins.IcontainsFilterViewSetMixin,
+    mixins.BooleanFilterViewSetMixin,
+    mixins.NumericFilterViewSetMixin,
+    mixins.DateFilterViewSetMixin,
+):
     model = models.TestModelSerializer
+    query_params = {
+        "name": (str, None),
+        "description": (str, None),
+        "active": (bool, None),
+        "age": (int, None),
+        "active_from": (datetime.datetime, None),
+    }
+
+
+class TestModelSerializerGreaterThanMixinAPI(
+    GenericAPIViewSet, mixins.GreaterDateFilterViewSetMixin
+):
+    model = models.TestModelSerializer
+    query_params = {
+        "active_from": (datetime.datetime, None),
+    }
+
+
+class TestModelSerializerLessThanMixinAPI(
+    GenericAPIViewSet, mixins.LessDateFilterViewSetMixin
+):
+    model = models.TestModelSerializer
+    query_params = {
+        "active_from": (datetime.datetime, None),
+    }
+
+
+class TestModelSerializerGreaterEqualMixinAPI(
+    GenericAPIViewSet, mixins.GreaterEqualDateFilterViewSetMixin
+):
+    model = models.TestModelSerializer
+    query_params = {
+        "active_from": (datetime.datetime, None),
+    }
+
+
+class TestModelSerializerLessEqualMixinAPI(
+    GenericAPIViewSet, mixins.LessEqualDateFilterViewSetMixin
+):
+    model = models.TestModelSerializer
+    query_params = {
+        "active_from": (datetime.datetime, None),
+    }
 
 
 class TestModelSerializerReverseForeignKeyAPI(GenericAPIViewSet):
