@@ -182,7 +182,7 @@ class DateFilterViewSetMixin(APIViewSet):
         )
 
 
-class GreaterThanDateFilterViewSetMixin(DateFilterViewSetMixin):
+class GreaterDateFilterViewSetMixin(DateFilterViewSetMixin):
     """
     Mixin that configures date filtering to return records with dates strictly greater than a given value.
     This class extends DateFilterViewSetMixin and sets the internal comparison attribute to `__gt`,
@@ -194,7 +194,7 @@ class GreaterThanDateFilterViewSetMixin(DateFilterViewSetMixin):
           greater than the provided date value.
         - Typically used in endpoints that need to fetch items created/updated after a certain timestamp.
     Example:
-        class MyViewSet(GreaterThanDateFilterViewSetMixin, ModelViewSet):
+        class MyViewSet(GreaterDateFilterViewSetMixin, ModelViewSet):
             date_filter_field = "created_at"
             ...
         # Filtering will apply: queryset.filter(created_at__gt=<provided_date>)
@@ -203,7 +203,7 @@ class GreaterThanDateFilterViewSetMixin(DateFilterViewSetMixin):
     _compare_attr = "__gt"
 
 
-class LessThanDateFilterViewSetMixin(DateFilterViewSetMixin):
+class LessDateFilterViewSetMixin(DateFilterViewSetMixin):
     """
     Mixin that configures date filtering to return records with dates strictly less than a given value.
     This class extends DateFilterViewSetMixin and sets the internal comparison attribute to `__lt`,
@@ -215,7 +215,7 @@ class LessThanDateFilterViewSetMixin(DateFilterViewSetMixin):
           less than the provided date value.
         - Typically used in endpoints that need to fetch items created/updated before a certain timestamp.
     Example:
-        class MyViewSet(LessThanDateFilterViewSetMixin, ModelViewSet):
+        class MyViewSet(LessDateFilterViewSetMixin, ModelViewSet):
             date_filter_field = "created_at"
             ...
         # Filtering will apply: queryset.filter(created_at__lt=<provided_date>)
