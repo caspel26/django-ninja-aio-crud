@@ -40,22 +40,7 @@ class FeatureViewSet(BooleanFilterViewSetMixin, APIViewSet):
     query_params = {"enabled": (bool, False)}
 ```
 
-## ReverseBooleanFilterViewSetMixin
-
-Excludes records matching provided boolean values.
-
-- Behavior: Uses `queryset.exclude(**{key: value})` for `bool` entries.
-
-Example:
-
-```python
-from ninja_aio.views.mixins import ReverseBooleanFilterViewSetMixin
-
-class FeatureViewSet(ReverseBooleanFilterViewSetMixin, APIViewSet):
-    model = models.FeatureFlag
-    api = api
-    query_params = {"enabled": (bool, False)}
-```
+<!-- Removed ReverseBooleanFilterViewSetMixin: not implemented in code -->
 
 ## NumericFilterViewSetMixin
 
@@ -76,12 +61,11 @@ class OrderViewSet(NumericFilterViewSetMixin, APIViewSet):
 
 ## DateFilterViewSetMixin
 
-Base mixin for date/datetime filtering with aliasing and custom comparisons.
+Base mixin for date/datetime filtering with custom comparisons.
 
 - Attributes:
-  - `field_alias`: map incoming filter keys to actual model field names.
   - `_compare_attr`: comparison operator suffix (e.g., `__gt`, `__lt`, `__gte`, `__lte`).
-- Behavior: Applies filters for values that implement `isoformat` (date/datetime-like).
+- Behavior: Applies filters for values that implement `isoformat` (date/datetime-like). Prefer using Pydantic `date`/`datetime` types in `query_params`.
 
 Example:
 
@@ -91,40 +75,39 @@ from ninja_aio.views.mixins import DateFilterViewSetMixin
 class EventViewSet(DateFilterViewSetMixin, APIViewSet):
     model = models.Event
     api = api
-    # Pydantic types recommended for dates (e.g., datetime/date) in query_params.
-    query_params = {"createdAfter": (str, "")}
-    field_alias = {"createdAfter": "created_at"}
+    # Use date/datetime types so values have `isoformat`.
+    query_params = {"created_at": (datetime, None)}
     _compare_attr = "__gt"
 ```
 
-## GreaterThenDateFilterViewSetMixin
+## GreaterDateFilterViewSetMixin
 
 Sets comparison to strict greater-than (`__gt`).
 
 Example:
 
 ```python
-from ninja_aio.views.mixins import GreaterThenDateFilterViewSetMixin
+from ninja_aio.views.mixins import GreaterDateFilterViewSetMixin
 
-class EventViewSet(GreaterThenDateFilterViewSetMixin, APIViewSet):
+class EventViewSet(GreaterDateFilterViewSetMixin, APIViewSet):
     model = models.Event
     api = api
-    query_params = {"created_at": (str, "")}
+    query_params = {"created_at": (datetime, None)}
 ```
 
-## LessThenDateFilterViewSetMixin
+## LessDateFilterViewSetMixin
 
 Sets comparison to strict less-than (`__lt`).
 
 Example:
 
 ```python
-from ninja_aio.views.mixins import LessThenDateFilterViewSetMixin
+from ninja_aio.views.mixins import LessDateFilterViewSetMixin
 
-class EventViewSet(LessThenDateFilterViewSetMixin, APIViewSet):
+class EventViewSet(LessDateFilterViewSetMixin, APIViewSet):
     model = models.Event
     api = api
-    query_params = {"created_at": (str, "")}
+    query_params = {"created_at": (datetime, None)}
 ```
 
 ## GreaterEqualDateFilterViewSetMixin
@@ -139,7 +122,7 @@ from ninja_aio.views.mixins import GreaterEqualDateFilterViewSetMixin
 class EventViewSet(GreaterEqualDateFilterViewSetMixin, APIViewSet):
     model = models.Event
     api = api
-    query_params = {"created_at": (str, "")}
+    query_params = {"created_at": (datetime, None)}
 ```
 
 ## LessEqualDateFilterViewSetMixin
@@ -154,11 +137,11 @@ from ninja_aio.views.mixins import LessEqualDateFilterViewSetMixin
 class EventViewSet(LessEqualDateFilterViewSetMixin, APIViewSet):
     model = models.Event
     api = api
-    query_params = {"created_at": (str, "")}
+    query_params = {"created_at": (datetime, None)}
 ```
 
 ## Tips
 
-- Align `query_params` types with expected filter values; prefer Pydantic `date`/`datetime` for date filters.
+- Align `query_params` types with expected filter values; prefer Pydantic `date`/`datetime` for date filters so values implement `isoformat`.
 - Validate field names and lookups to avoid runtime errors.
 - For multiple mixins, implement your own `async def query_params_handler(...)` and chain with `await super().query_params_handler(...)` to combine behaviors.
