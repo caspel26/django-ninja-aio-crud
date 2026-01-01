@@ -103,6 +103,7 @@ jobs:
           fi
 
           git worktree remove gh-pages --force
+          mike default
 
       - name: Delete version (safe)
         if: github.event_name == 'workflow_dispatch' && inputs.delete_version != '' && inputs.delete_confirm == true
