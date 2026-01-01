@@ -124,7 +124,7 @@ def validate_key(key: Optional[JwtKeys], setting_name: str) -> JwtKeys:
         key = getattr(settings, setting_name, None)
     if key is None:
         raise ValueError(f"{setting_name} is required")
-    if not isinstance(key, (jwk.RSAKey, jwk.ECKey)):
+    if not isinstance(key, (jwk.RSAKey, jwk.ECKey, jwk.OctKey)):
         raise ValueError(
             f"{setting_name} must be an instance of jwk.RSAKey or jwk.ECKey"
         )
@@ -143,7 +143,7 @@ def validate_mandatory_claims(claims: dict) -> dict:
 
 
 def encode_jwt(
-    claims: dict, duration: int, private_key: jwk.RSAKey = None, algorithm: str = None
+    claims: dict, duration: int, private_key: JwtKeys = None, algorithm: str = None
 ) -> str:
     """
     Encode and sign a JWT.
@@ -192,7 +192,7 @@ def encode_jwt(
 
 def decode_jwt(
     token: str,
-    public_key: jwk.RSAKey | jwk.ECKey = None,
+    public_key: JwtKeys = None,
     algorithms: list[str] = None,
 ) -> jwt.Token:
     """
