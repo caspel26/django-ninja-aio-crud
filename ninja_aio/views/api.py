@@ -1,4 +1,3 @@
-import asyncio
 from typing import List
 
 from ninja import NinjaAPI, Router, Schema, Path, Query
@@ -350,10 +349,7 @@ class APIViewSet:
                 is_for_read=True,
             )
             if filters is not None:
-                if asyncio.iscoroutinefunction(self.query_params_handler):
-                    qs = await self.query_params_handler(qs, filters.model_dump())
-                else:
-                    qs = self.query_params_handler(qs, filters.model_dump())
+                qs = await self.query_params_handler(qs, filters.model_dump())
             return await self.model_util.list_read_s(self.schema_out, request, qs)
 
         return list
