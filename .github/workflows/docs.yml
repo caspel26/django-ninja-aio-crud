@@ -16,7 +16,7 @@ on:
       make_latest:
         description: 'Set as "latest" and default?'
         type: boolean
-        default: true
+        default: false
 
       delete_version:
         description: 'Docs version to delete'
