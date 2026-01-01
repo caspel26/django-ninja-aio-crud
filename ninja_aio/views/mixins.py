@@ -1,4 +1,7 @@
-class IcontainsFilterViewSetMixin:
+from ninja_aio.views.api import APIViewSet
+
+
+class IcontainsFilterViewSetMixin(APIViewSet):
     """
     Mixin providing a convenience method to apply case-insensitive substring filters
     to a Django queryset based on request query parameters.
@@ -43,11 +46,12 @@ class IcontainsFilterViewSetMixin:
               evaluation time.
     """
 
-    def query_params_handler(self, queryset, filters):
+    async def query_params_handler(self, queryset, filters):
         """
         Apply icontains filter to the queryset based on provided filters.
         """
-        return queryset.filter(
+        base_qs = await super().query_params_handler(queryset, filters)
+        return base_qs.filter(
             **{
                 f"{key}__icontains": value
                 for key, value in filters.items()
@@ -56,7 +60,7 @@ class IcontainsFilterViewSetMixin:
         )
 
 
-class BooleanFilterViewSetMixin:
+class BooleanFilterViewSetMixin(APIViewSet):
     """
     Mixin providing boolean-based filtering for Django QuerySets.
 
@@ -84,16 +88,17 @@ class BooleanFilterViewSetMixin:
                   filtered clone.
     """
 
-    def query_params_handler(self, queryset, filters):
+    async def query_params_handler(self, queryset, filters):
         """
         Apply boolean filter to the queryset based on provided filters.
         """
-        return queryset.filter(
+        base_qs = await super().query_params_handler(queryset, filters)
+        return base_qs.filter(
             **{key: value for key, value in filters.items() if isinstance(value, bool)}
         )
 
 
-class ReverseBooleanFilterViewSetMixin:
+class ReverseBooleanFilterViewSetMixin(APIViewSet):
     """
     Mixin that applies reverse boolean filters to a Django queryset.
 
@@ -123,16 +128,17 @@ class ReverseBooleanFilterViewSetMixin:
         on `is_active` is applied, resulting in queryset.exclude(is_active=True).
     """
 
-    def query_params_handler(self, queryset, filters):
+    async def query_params_handler(self, queryset, filters):
         """
         Apply reverse boolean filter to the queryset based on provided filters.
         """
-        return queryset.exclude(
+        base_qs = await super().query_params_handler(queryset, filters)
+        return base_qs.exclude(
             **{key: value for key, value in filters.items() if isinstance(value, bool)}
         )
 
 
-class NumericFilterViewSetMixin:
+class NumericFilterViewSetMixin(APIViewSet):
     """
     Mixin providing numeric filtering for Django QuerySets.
 
@@ -160,11 +166,12 @@ class NumericFilterViewSetMixin:
                   filtered clone.
     """
 
-    def query_params_handler(self, queryset, filters):
+    async def query_params_handler(self, queryset, filters):
         """
         Apply numeric filter to the queryset based on provided filters.
         """
-        return queryset.filter(
+        base_qs = await super().query_params_handler(queryset, filters)
+        return base_qs.filter(
             **{
                 key: value
                 for key, value in filters.items()
@@ -173,7 +180,7 @@ class NumericFilterViewSetMixin:
         )
 
 
-class DateFilterViewSetMixin:
+class DateFilterViewSetMixin(APIViewSet):
     """
     Mixin for API view sets that provides date-based filtering for querysets.
 
@@ -213,11 +220,12 @@ class DateFilterViewSetMixin:
     field_alias: dict[str, str] = {}
     _compare_attr: str = ""
 
-    def query_params_handler(self, queryset, filters):
+    async def query_params_handler(self, queryset, filters):
         """
         Apply date filter to the queryset based on provided filters.
         """
-        return queryset.filter(
+        base_qs = await super().query_params_handler(queryset, filters)
+        return base_qs.filter(
             **{
                 f"{self.field_alias.get(key, key)}{self._compare_attr}": value
                 for key, value in filters.items()
