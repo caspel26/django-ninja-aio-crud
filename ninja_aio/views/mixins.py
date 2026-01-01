@@ -182,54 +182,42 @@ class NumericFilterViewSetMixin(APIViewSet):
 
 class DateFilterViewSetMixin(APIViewSet):
     """
-    Mixin for API view sets that provides date-based filtering for querysets.
+    Mixin enabling date/datetime-based filtering for Django QuerySets.
 
-    This mixin allows subclasses to apply dynamic date or datetime filters to a
-    queryset based on incoming filter parameters. It supports field aliasing and
-    customizable comparison lookups for flexible query construction.
+    Purpose:
+    - Apply dynamic date/datetime filters based on incoming query parameters.
+    - Support customizable comparison operators via `_compare_attr` (e.g., "__gt", "__lt", "__gte", "__lte").
+
+    Behavior:
+    - Filters only entries whose values implement `isoformat` (dates or datetimes).
+    - Builds lookups as "<field><_compare_attr>" with the provided value.
 
     Attributes:
-        field_alias (dict[str, str]):
-            A mapping of incoming filter keys to actual model field names. If a key
-            is present in this mapping, its value will be used as the field name in
-            the filter; otherwise, the original key is used.
+    - _compare_attr (str): Django ORM comparison operator suffix to append to field names.
 
-    Methods:
-        query_params_handler(queryset, filters):
-            Apply date or datetime filters to the provided queryset.
-
-            Args:
-                queryset:
-                    A Django queryset to be filtered.
-                filters (dict):
-                    A dictionary of filter parameters where keys represent field names
-                    (or aliases) and values are expected to be date or datetime-like
-                    objects (i.e., objects implementing `isoformat`).
-
-            Returns:
-                A Django queryset filtered using the provided date/datetime parameters.
-
-            Notes:
-                - Only filter entries whose values implement `isoformat` are applied,
-                  ensuring non-date parameters are ignored.
-                - Field names are resolved via `field_alias` when present.
-                - Subclasses can define the comparison behavior (e.g., greater-than,
-                  less-than, etc.) used for building lookups.
+    Notes:
+    - Ensure provided filter values are compatible with the target model fields.
+    - Subclasses should set `_compare_attr` to control comparison semantics.
     """
 
-    field_alias: dict[str, str] = {}
     _compare_attr: str = ""
 
     async def query_params_handler(self, queryset, filters):
         """
-        Apply date filter to the queryset based on provided filters.
+        Apply date/datetime filters using `_compare_attr`.
+
+        - Delegates to `super().query_params_handler` first.
+        - Applies filters for keys whose values implement `isoformat`.
+
+        Returns:
+        - QuerySet filtered with lookups in the form: field<_compare_attr>=value.
         """
         base_qs = await super().query_params_handler(queryset, filters)
         return base_qs.filter(
             **{
-                f"{self.field_alias.get(key, key)}{self._compare_attr}": value
+                f"{key}{self._compare_attr}": value
                 for key, value in filters.items()
-                if hasattr(value, "isoformat")  # checks for date or datetime
+                if hasattr(value, "isoformat")
             }
         )
 
