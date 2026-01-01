@@ -402,6 +402,57 @@ class UserViewSet(APIViewSet):
         return queryset
 ```
 
+---
+
+## ReadOnlyViewSet
+
+ReadOnlyViewSet is a convenience subclass of APIViewSet that enables only list and retrieve endpoints. It is equivalent to setting `disable = ["create", "update", "delete"]`.
+
+Generated endpoints:
+
+- GET `/{base}/` -> List
+- GET `/{base}/{pk}` -> Retrieve
+
+Minimal usage:
+
+```python
+class MyModelReadOnlyViewSet(ReadOnlyViewSet):
+    model = MyModel
+    api = api
+
+MyModelReadOnlyViewSet().add_views_to_route()
+```
+
+Notes:
+
+- Supports all features of APIViewSet relevant to read operations (pagination, list filters, auth per verb, dynamic schema generation when using ModelSerializer).
+- M2M endpoints can still be added via `m2m_relations` if desired.
+
+## WriteOnlyViewSet
+
+WriteOnlyViewSet is a convenience subclass of APIViewSet that enables only create, update, and delete endpoints. It is equivalent to setting `disable = ["list", "retrieve"]`.
+
+Generated endpoints:
+
+- POST `/{base}/` -> Create
+- PATCH `/{base}/{pk}/` -> Update
+- DELETE `/{base}/{pk}/` -> Delete
+
+Minimal usage:
+
+```python
+class MyModelWriteOnlyViewSet(WriteOnlyViewSet):
+    model = MyModel
+    api = api
+
+MyModelWriteOnlyViewSet().add_views_to_route()
+```
+
+Notes:
+
+- Supports auth per verb and dynamic schema generation for write operations when using ModelSerializer.
+- M2M endpoints can still be added via `m2m_relations` if desired.
+
 ## See Also
 
 - [ModelSerializer](../models/model_serializer.md)
