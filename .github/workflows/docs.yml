@@ -96,7 +96,7 @@ jobs:
           if [ "$MAKE_LATEST" = "true" ]; then
             echo "Deploying $VERSION as latest and default"
             mike deploy --push --update-aliases "$VERSION" latest --ignore-remote-status
-            mike set-default "$VERSION" --push latest
+            mike set-default --push latest
           else
             echo "Deploying $VERSION (non-latest)"
             mike deploy --push "$VERSION" --ignore-remote-status
