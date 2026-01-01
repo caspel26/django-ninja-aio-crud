@@ -13,10 +13,6 @@
          <lastmod>2026-01-01</lastmod>
     </url>
     <url>
-         <loc>https://django-ninja-aio.com/2.0/mixins/</loc>
-         <lastmod>2026-01-01</lastmod>
-    </url>
-    <url>
          <loc>https://django-ninja-aio.com/2.0/release_notes/</loc>
          <lastmod>2026-01-01</lastmod>
     </url>
@@ -50,6 +46,10 @@
     </url>
     <url>
          <loc>https://django-ninja-aio.com/2.0/api/views/decorators/</loc>
+         <lastmod>2026-01-01</lastmod>
+    </url>
+    <url>
+         <loc>https://django-ninja-aio.com/2.0/api/views/mixins/</loc>
          <lastmod>2026-01-01</lastmod>
     </url>
     <url>
