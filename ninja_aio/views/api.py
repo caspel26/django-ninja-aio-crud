@@ -1,3 +1,4 @@
+import asyncio
 from typing import List
 
 from ninja import NinjaAPI, Router, Schema, Path, Query
@@ -103,7 +104,7 @@ class APIViewSet:
             filters = { "field_name": (type, default) }
         A dynamic Pydantic Filters schema is generated and exposed as query params
         on the related GET endpoint: /{pk}/{related_path}?field_name=value.
-        To apply custom filter logic implement an async hook named:
+        To apply custom filter logic implement an hook named:
             <related_name>_query_params_handler(self, queryset, filters_dict)
         It receives the initial related queryset and the validated/dumped filters
         dict, and must return the (optionally) filtered queryset.
@@ -121,7 +122,7 @@ class APIViewSet:
                     )
                 ]
 
-                async def tags_query_params_handler(self, queryset, filters):
+                def tags_query_params_handler(self, queryset, filters):
                     name_filter = filters.get("name")
                     if name_filter:
                         queryset = queryset.filter(name__icontains=name_filter)
@@ -145,7 +146,7 @@ class APIViewSet:
 
     Overridable hooks:
         views(): Register extra custom endpoints on self.router.
-        query_params_handler(queryset, filters): Async hook to apply list filters.
+        query_params_handler(queryset, filters): Sync/Async hook to apply list filters.
         <related_name>_query_params_handler(queryset, filters): Async hook for per-M2M filtering.
 
     Error responses:
@@ -346,7 +347,10 @@ class APIViewSet:
                 is_for_read=True,
             )
             if filters is not None:
-                qs = await self.query_params_handler(qs, filters.model_dump())
+                if asyncio.iscoroutinefunction(self.query_params_handler):
+                    qs = await self.query_params_handler(qs, filters.model_dump())
+                else:
+                    qs = self.query_params_handler(qs, filters.model_dump())
             return await self.model_util.list_read_s(self.schema_out, request, qs)
 
         return list
@@ -454,7 +458,6 @@ class APIViewSet:
         return self.api.add_router(f"{self.api_route_path}", self._add_views())
 
 
-
 class ReadOnlyViewSet(APIViewSet):
     """
     ReadOnly viewset generating async List + Retrieve endpoints for a Django model.
@@ -467,7 +470,6 @@ class ReadOnlyViewSet(APIViewSet):
     """
 
     disable = ["create", "update", "delete"]
-
 
 
 class WriteOnlyViewSet(APIViewSet):
