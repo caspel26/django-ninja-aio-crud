@@ -9,14 +9,14 @@ from pydantic import create_model
 
 from ninja_aio.schemas.helpers import ModelQuerySetSchema, QuerySchema, DecoratorsSchema
 
-from .models import ModelSerializer, ModelUtil
-from .schemas import (
+from ninja_aio.models import ModelSerializer, ModelUtil
+from ninja_aio.schemas import (
     GenericMessageSchema,
     M2MRelationSchema,
 )
-from .helpers.api import ManyToManyAPI
-from .types import ModelSerializerMeta, VIEW_TYPES
-from .decorators import unique_view, decorate_view
+from ninja_aio.helpers.api import ManyToManyAPI
+from ninja_aio.types import ModelSerializerMeta, VIEW_TYPES
+from ninja_aio.decorators import unique_view, decorate_view
 
 ERROR_CODES = frozenset({400, 401, 404, 428})
 
@@ -103,7 +103,7 @@ class APIViewSet:
             filters = { "field_name": (type, default) }
         A dynamic Pydantic Filters schema is generated and exposed as query params
         on the related GET endpoint: /{pk}/{related_path}?field_name=value.
-        To apply custom filter logic implement an async hook named:
+        To apply custom filter logic implement an hook named:
             <related_name>_query_params_handler(self, queryset, filters_dict)
         It receives the initial related queryset and the validated/dumped filters
         dict, and must return the (optionally) filtered queryset.
@@ -121,7 +121,7 @@ class APIViewSet:
                     )
                 ]
 
-                async def tags_query_params_handler(self, queryset, filters):
+                def tags_query_params_handler(self, queryset, filters):
                     name_filter = filters.get("name")
                     if name_filter:
                         queryset = queryset.filter(name__icontains=name_filter)
@@ -145,7 +145,7 @@ class APIViewSet:
 
     Overridable hooks:
         views(): Register extra custom endpoints on self.router.
-        query_params_handler(queryset, filters): Async hook to apply list filters.
+        query_params_handler(queryset, filters): Sync/Async hook to apply list filters.
         <related_name>_query_params_handler(queryset, filters): Async hook for per-M2M filtering.
 
     Error responses:
@@ -278,15 +278,18 @@ class APIViewSet:
 
     def get_schemas(self):
         """
-        Return (schema_out, schema_in, schema_update), generating them if model is a ModelSerializer.
+        Compute and return (schema_out, schema_in, schema_update).
+
+        - If model is a ModelSerializer (ModelSerializerMeta), auto-generate read/create/update schemas.
+        - Otherwise, return the schemas already set on the viewset (may be None).
         """
-        if isinstance(self.model, ModelSerializerMeta):
-            return (
-                self.model.generate_read_s(),
-                self.model.generate_create_s(),
-                self.model.generate_update_s(),
-            )
-        return self.schema_out, self.schema_in, self.schema_update
+        if not isinstance(self.model, ModelSerializerMeta):
+            return self.schema_out, self.schema_in, self.schema_update
+        return (
+            self.schema_out or self.model.generate_read_s(),
+            self.schema_in or self.model.generate_create_s(),
+            self.schema_update or self.model.generate_update_s(),
+        )
 
     async def query_params_handler(
         self, queryset: QuerySet[ModelSerializer], filters: dict
@@ -452,3 +455,31 @@ class APIViewSet:
         Attach router with registered endpoints to the NinjaAPI instance.
         """
         return self.api.add_router(f"{self.api_route_path}", self._add_views())
+
+
+class ReadOnlyViewSet(APIViewSet):
+    """
+    ReadOnly viewset generating async List + Retrieve endpoints for a Django model.
+
+    Usage:
+        class MyModelReadOnlyViewSet(ReadOnlyViewSet):
+            model = MyModel
+            api = api
+        MyModelReadOnlyViewSet().add_views_to_route()
+    """
+
+    disable = ["create", "update", "delete"]
+
+
+class WriteOnlyViewSet(APIViewSet):
+    """
+    WriteOnly viewset generating async Create + Update + Delete endpoints for a Django model.
+
+    Usage:
+        class MyModelWriteOnlyViewSet(WriteOnlyViewSet):
+            model = MyModel
+            api = api
+        MyModelWriteOnlyViewSet().add_views_to_route()
+    """
+
+    disable = ["list", "retrieve"]

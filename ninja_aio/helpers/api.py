@@ -4,7 +4,7 @@ from typing import Coroutine
 from django.http import HttpRequest
 from ninja import Path, Query
 from ninja.pagination import paginate
-from ninja_aio.decorators import unique_view
+from ninja_aio.decorators import unique_view, decorate_view
 from ninja_aio.models import ModelSerializer, ModelUtil
 from ninja_aio.schemas.helpers import ObjectsQuerySchema
 from ninja_aio.schemas import (
@@ -357,8 +357,10 @@ class ManyToManyAPI:
             summary=f"Get {rel_util.model._meta.verbose_name_plural.capitalize()}",
             description=f"Get all related {rel_util.model._meta.verbose_name_plural.capitalize()}",
         )
-        @unique_view(f"get_{self.related_model_util.model_name}_{rel_path}")
-        @paginate(self.pagination_class)
+        @decorate_view(
+            unique_view(f"get_{self.related_model_util.model_name}_{rel_path}"),
+            paginate(self.pagination_class),
+        )
         async def get_related(
             request: HttpRequest,
             pk: Path[self.path_schema],  # type: ignore

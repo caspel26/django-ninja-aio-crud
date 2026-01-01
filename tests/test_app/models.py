@@ -79,7 +79,9 @@ class BaseTestModelSerializer(ModelSerializer):
 
 
 class TestModelSerializer(BaseTestModelSerializer):
-    pass
+    age = models.PositiveIntegerField(default=0)
+    active = models.BooleanField(default=True)
+    active_from = models.DateTimeField(auto_now_add=True)
 
 
 class TestModelSerializerReverseForeignKey(BaseTestModelSerializer):

@@ -1,4 +1,7 @@
+import datetime
+
 from django.test import tag
+from django.utils import timezone
 
 from tests.generics.views import Tests
 from tests.test_app import schema, models, views
@@ -117,6 +120,180 @@ class ApiViewSetModelSerializerTestCase(
     namespace = "test_model_serializer_viewset"
     model = models.TestModelSerializer
     viewset = views.TestModelSerializerAPI()
+
+    async def _drop_all_objects(self):
+        await self.model.objects.all().adelete()
+
+    async def test_query_params_icontains_mixin(self):
+        await self._drop_all_objects()
+        obj = await self.model.objects.acreate(**self.payload_create)
+        res = await self.viewset.query_params_handler(
+            self.model.objects.all(), {"name": f"{self.model._meta.model_name}"}
+        )
+        self.assertEqual(await res.acount(), 1)
+        self.assertEqual((await res.afirst()), obj)
+
+    async def test_query_params_boolean_mixin(self):
+        await self._drop_all_objects()
+        obj_active = await self.model.objects.acreate(**self.payload_create)
+        obj_inactive = await self.model.objects.acreate(
+            **{**self.payload_create, "active": False}
+        )
+        res_active = await self.viewset.query_params_handler(
+            self.model.objects.all(), {"active": True}
+        )
+        self.assertEqual(await res_active.acount(), 1)
+        self.assertEqual((await res_active.afirst()), obj_active)
+        res_inactive = await self.viewset.query_params_handler(
+            self.model.objects.all(), {"active": False}
+        )
+        self.assertEqual(await res_inactive.acount(), 1)
+        self.assertEqual((await res_inactive.afirst()), obj_inactive)
+
+    async def test_query_params_numeric_mixin(self):
+        await self._drop_all_objects()
+        obj_age_25 = await self.model.objects.acreate(
+            **{**self.payload_create, "age": 25}
+        )
+        obj_age_30 = await self.model.objects.acreate(
+            **{**self.payload_create, "age": 30}
+        )
+        res_age_25 = await self.viewset.query_params_handler(
+            self.model.objects.all(), {"age": 25}
+        )
+        self.assertEqual(await res_age_25.acount(), 1)
+        self.assertEqual((await res_age_25.afirst()), obj_age_25)
+        res_age_30 = await self.viewset.query_params_handler(
+            self.model.objects.all(), {"age": 30}
+        )
+        self.assertEqual(await res_age_30.acount(), 1)
+        self.assertEqual((await res_age_30.afirst()), obj_age_30)
+
+    async def test_query_params_date_mixin(self):
+        await self._drop_all_objects()
+        obj_today = await self.model.objects.acreate(**self.payload_create)
+        res_today = await self.viewset.query_params_handler(
+            self.model.objects.all(),
+            {"active_from": obj_today.active_from},
+        )
+        self.assertEqual(await res_today.acount(), 1)
+        self.assertEqual((await res_today.afirst()), obj_today)
+
+
+@tag("model_serializer_greater_than_date_viewset")
+class ApiViewSetModelSerializerGreaterThanDateTestCase(
+    BaseTests.ModelSerializerViewSetTestCaseBase,
+    Tests.ViewSetTestCase,
+):
+    namespace = "test_model_serializer_greater_than_date_viewset"
+    model = models.TestModelSerializer
+    viewset = views.TestModelSerializerGreaterThanMixinAPI()
+
+    async def _drop_all_objects(self):
+        await self.model.objects.all().adelete()
+
+    async def test_query_params_greater_than_date_mixin(self):
+        await self._drop_all_objects()
+        past_date = timezone.now() - datetime.timedelta(days=1)
+        future_date = timezone.now() + datetime.timedelta(days=1)
+        obj_past = await self.model.objects.acreate(**self.payload_create)
+        obj_past.active_from = past_date
+        await obj_past.asave()
+        obj_future = await self.model.objects.acreate(**self.payload_create)
+        obj_future.active_from = future_date
+        await obj_future.asave()
+        res_greater_than_now = await self.viewset.query_params_handler(
+            self.model.objects.all(), {"active_from": timezone.now()}
+        )
+        self.assertEqual(await res_greater_than_now.acount(), 1)
+        self.assertEqual((await res_greater_than_now.afirst()), obj_future)
+
+
+@tag("model_serializer_less_than_date_viewset")
+class ApiViewSetModelSerializerLessThanDateTestCase(
+    BaseTests.ModelSerializerViewSetTestCaseBase,
+    Tests.ViewSetTestCase,
+):
+    namespace = "test_model_serializer_less_than_date_viewset"
+    model = models.TestModelSerializer
+    viewset = views.TestModelSerializerLessThanMixinAPI()
+
+    async def _drop_all_objects(self):
+        await self.model.objects.all().adelete()
+
+    async def test_query_params_less_than_date_mixin(self):
+        await self._drop_all_objects()
+        past_date = timezone.now() - datetime.timedelta(days=1)
+        future_date = timezone.now() + datetime.timedelta(days=1)
+        obj_past = await self.model.objects.acreate(**self.payload_create)
+        obj_past.active_from = past_date
+        await obj_past.asave()
+        obj_future = await self.model.objects.acreate(**self.payload_create)
+        obj_future.active_from = future_date
+        await obj_future.asave()
+        res_less_than_now = await self.viewset.query_params_handler(
+            self.model.objects.all(), {"active_from": timezone.now()}
+        )
+        self.assertEqual(await res_less_than_now.acount(), 1)
+        self.assertEqual((await res_less_than_now.afirst()), obj_past)
+
+
+@tag("model_serializer_greater_equal_date_viewset")
+class ApiViewSetModelSerializerGreaterEqualDateTestCase(
+    BaseTests.ModelSerializerViewSetTestCaseBase,
+    Tests.ViewSetTestCase,
+):
+    namespace = "test_model_serializer_greater_equal_date_viewset"
+    model = models.TestModelSerializer
+    viewset = views.TestModelSerializerGreaterEqualMixinAPI()
+
+    async def _drop_all_objects(self):
+        await self.model.objects.all().adelete()
+
+    async def test_query_params_greater_equal_date_mixin(self):
+        await self._drop_all_objects()
+        past_date = timezone.now() - datetime.timedelta(days=1)
+        future_date = timezone.now() + datetime.timedelta(days=1)
+        obj_past = await self.model.objects.acreate(**self.payload_create)
+        obj_past.active_from = past_date
+        await obj_past.asave()
+        obj_future = await self.model.objects.acreate(**self.payload_create)
+        obj_future.active_from = future_date
+        await obj_future.asave()
+        res_greater_equal_now = await self.viewset.query_params_handler(
+            self.model.objects.all(), {"active_from": timezone.now()}
+        )
+        self.assertEqual(await res_greater_equal_now.acount(), 1)
+        self.assertEqual((await res_greater_equal_now.afirst()), obj_future)
+
+
+@tag("model_serializer_less_equal_date_viewset")
+class ApiViewSetModelSerializerLessEqualDateTestCase(
+    BaseTests.ModelSerializerViewSetTestCaseBase,
+    Tests.ViewSetTestCase,
+):
+    namespace = "test_model_serializer_less_equal_date_viewset"
+    model = models.TestModelSerializer
+    viewset = views.TestModelSerializerLessEqualMixinAPI()
+
+    async def _drop_all_objects(self):
+        await self.model.objects.all().adelete()
+
+    async def test_query_params_less_equal_date_mixin(self):
+        await self._drop_all_objects()
+        past_date = timezone.now() - datetime.timedelta(days=1)
+        future_date = timezone.now() + datetime.timedelta(days=1)
+        obj_past = await self.model.objects.acreate(**self.payload_create)
+        obj_past.active_from = past_date
+        await obj_past.asave()
+        obj_future = await self.model.objects.acreate(**self.payload_create)
+        obj_future.active_from = future_date
+        await obj_future.asave()
+        res_less_equal_now = await self.viewset.query_params_handler(
+            self.model.objects.all(), {"active_from": timezone.now()}
+        )
+        self.assertEqual(await res_less_equal_now.acount(), 1)
+        self.assertEqual((await res_less_equal_now.afirst()), obj_past)
 
 
 @tag("model_serializer_foreign_key_viewset")

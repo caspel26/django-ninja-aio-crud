@@ -20,6 +20,7 @@ nav:
       - APIView: api/views/api_view.md
       - APIViewSet: api/views/api_view_set.md
       - Decorators: api/views/decorators.md
+      - Mixins: docs/mixins.md
     - Models:
       - ModelSerializer: api/models/model_serializer.md
       - ModelUtil: api/models/model_util.md
