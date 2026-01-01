@@ -96,14 +96,13 @@ jobs:
           if [ "$MAKE_LATEST" = "true" ]; then
             echo "Deploying $VERSION as latest and default"
             mike deploy --push --update-aliases "$VERSION" latest --ignore-remote-status
-            mike set-default "$VERSION"
+            mike set-default "$VERSION" --push latest
           else
             echo "Deploying $VERSION (non-latest)"
             mike deploy --push "$VERSION" --ignore-remote-status
           fi
 
           git worktree remove gh-pages --force
-          mike default
 
       - name: Delete version (safe)
         if: github.event_name == 'workflow_dispatch' && inputs.delete_version != '' && inputs.delete_confirm == true
