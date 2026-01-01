@@ -1,7 +1,4 @@
-from ninja_aio.views.api import APIViewSet
-
-
-class IcontainsFilterViewSetMixin(APIViewSet):
+class IcontainsFilterViewSetMixin:
     """
     Mixin providing a convenience method to apply case-insensitive substring filters
     to a Django queryset based on request query parameters.
@@ -59,7 +56,7 @@ class IcontainsFilterViewSetMixin(APIViewSet):
         )
 
 
-class BooleanFilterViewSetMixin(APIViewSet):
+class BooleanFilterViewSetMixin:
     """
     Mixin providing boolean-based filtering for Django QuerySets.
 
@@ -96,7 +93,7 @@ class BooleanFilterViewSetMixin(APIViewSet):
         )
 
 
-class ReverseBooleanFilterViewSetMixin(APIViewSet):
+class ReverseBooleanFilterViewSetMixin:
     """
     Mixin that applies reverse boolean filters to a Django queryset.
 
@@ -135,7 +132,7 @@ class ReverseBooleanFilterViewSetMixin(APIViewSet):
         )
 
 
-class NumericFilterViewSetMixin(APIViewSet):
+class NumericFilterViewSetMixin:
     """
     Mixin providing numeric filtering for Django QuerySets.
 
@@ -176,7 +173,7 @@ class NumericFilterViewSetMixin(APIViewSet):
         )
 
 
-class DateFilterViewSetMixin(APIViewSet):
+class DateFilterViewSetMixin:
     """
     Mixin for API view sets that provides date-based filtering for querysets.
 
