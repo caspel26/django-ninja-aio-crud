@@ -279,15 +279,18 @@ class APIViewSet:
 
     def get_schemas(self):
         """
-        Return (schema_out, schema_in, schema_update), generating them if model is a ModelSerializer.
+        Compute and return (schema_out, schema_in, schema_update).
+
+        - If model is a ModelSerializer (ModelSerializerMeta), auto-generate read/create/update schemas.
+        - Otherwise, return the schemas already set on the viewset (may be None).
         """
-        if isinstance(self.model, ModelSerializerMeta):
-            return (
-                self.model.generate_read_s(),
-                self.model.generate_create_s(),
-                self.model.generate_update_s(),
-            )
-        return self.schema_out, self.schema_in, self.schema_update
+        if not isinstance(self.model, ModelSerializerMeta):
+            return self.schema_out, self.schema_in, self.schema_update
+        return (
+            self.schema_out or self.model.generate_read_s(),
+            self.schema_in or self.model.generate_create_s(),
+            self.schema_update or self.model.generate_update_s(),
+        )
 
     async def query_params_handler(
         self, queryset: QuerySet[ModelSerializer], filters: dict
