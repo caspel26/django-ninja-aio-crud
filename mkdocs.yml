@@ -97,6 +97,7 @@ extra:
     provider: mike
     repo: caspel26/django-ninja-aio-crud
     stable: true
+    default: latest
 
 plugins:
   - macros:
