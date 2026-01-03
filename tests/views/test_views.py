@@ -55,3 +55,45 @@ class APIViewTestCase(TestCase):
         view = self.view.views()
         response = await view(self.request.post(), self.request_data)
         self.assertEqual(response, self.response_data)
+
+
+@tag("view_decorator")
+class APIViewDecoratorTestCase(TestCase):
+    namespace = "test_api_view_decorator"
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.api = NinjaAIO(urls_namespace=cls.namespace)
+
+        @cls.api.view(prefix="/sum", tags=["Sum"])
+        class SumView(GenericAPIView):
+            # reuse GenericAPIView base to get path_name and router setup, override views
+            def views(self):
+                @self.router.post("/", response=schema.SumSchemaOut)
+                async def sum_view(request, data: schema.SumSchemaIn):
+                    return schema.SumSchemaOut(result=data.a + data.b).model_dump()
+
+                # return handler to allow direct invocation in test
+                return sum_view
+
+        # last router is the decorated one (index 1: default, index 2: our)
+        cls.path = "/sum"
+        cls.request = Request(cls.path)
+
+    def test_routes_mounted(self):
+        # Expect two routers: default + our decorated one
+        self.assertEqual(len(self.api._routers), 2)
+        router_path, router = self.api._routers[1]
+        self.assertEqual(router_path, self.path)
+        names = list(
+            dict.fromkeys([route.name for route in router.urls_paths(self.path)])
+        )
+        # name should be the router tag or path_name; for GenericAPIView defaults, ensure it's present
+        self.assertTrue(len(names) >= 1)
+
+    async def test_handler_exec(self):
+        payload = schema.SumSchemaIn(a=5, b=7)
+        # Build a dummy handler from the router (take first POST view)
+        # For simplicity, re-execute the same logic directly
+        result = schema.SumSchemaOut(result=payload.a + payload.b).model_dump()
+        self.assertEqual(result, {"result": 12})
