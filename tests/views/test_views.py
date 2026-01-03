@@ -127,7 +127,7 @@ class APIViewDecoratorOperationsTestCase(TestCase):
 
     def test_routes_mounted(self):
         self.assertEqual(len(self.api._routers), 2)
-        router_path, router = self.api._routers[1]
+        router_path, _ = self.api._routers[1]
         self.assertEqual(router_path, self.path)
 
     async def test_handlers_logic(self):
