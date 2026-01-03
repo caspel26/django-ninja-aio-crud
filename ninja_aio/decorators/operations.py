@@ -1,3 +1,4 @@
+import asyncio
 from typing import (
     Dict,
     List,
@@ -97,12 +98,18 @@ def _api_method(
             if router is None:
                 raise RuntimeError("The view instance does not have a router")
 
-            async def clean_handler(request, *args, **kwargs):
-                if inspect.iscoroutinefunction(func):
-                    return await func(view_instance, request, *args, **kwargs)
-                return await sync_to_async(func)(
-                    view_instance, request, *args, **kwargs
-                )
+            if asyncio.iscoroutinefunction(func):
+
+                async def clean_handler(request, *args, **kwargs):
+                    if inspect.iscoroutinefunction(func):
+                        return await func(view_instance, request, *args, **kwargs)
+                    return await sync_to_async(func)(
+                        view_instance, request, *args, **kwargs
+                    )
+            else:
+
+                def clean_handler(request, *args, **kwargs):
+                    return (func)(view_instance, request, *args, **kwargs)
 
             # Keep a meaningful name
             try:
