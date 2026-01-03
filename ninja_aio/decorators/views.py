@@ -1,5 +1,6 @@
-from django.db.transaction import Atomic
 from functools import wraps
+
+from django.db.transaction import Atomic
 from asgiref.sync import sync_to_async
 
 
@@ -189,7 +190,7 @@ def decorate_view(*decorators):
                     @decorate_view(authenticate, log_request)
                     async def some_view(request):
                         ...
-        
+
         Conditional decoration (skips None):
             class MyAPIViewSet(APIViewSet):
                 api = api
