@@ -18,17 +18,23 @@ from ninja_aio.helpers.api import ManyToManyAPI
 from ninja_aio.types import ModelSerializerMeta, VIEW_TYPES
 from ninja_aio.decorators import unique_view, decorate_view
 
-ERROR_CODES = frozenset({400, 401, 404, 428})
+ERROR_CODES = frozenset({400, 401, 404})
 
 
 class APIView:
     api: NinjaAPI
     router_tag: str
+    router_tags: list[str] = []
     api_route_path: str
     auth: list | None = NOT_SET
 
-    def __init__(self) -> None:
-        self.router = Router(tags=[self.router_tag])
+    def __init__(
+        self, api: NinjaAPI = None, prefix: str = None, tags: list[str] = None
+    ) -> None:
+        self.api = api or self.api
+        self.api_route_path = prefix or self.api_route_path
+        self.router_tags = tags or self.router_tags or [self.router_tag]
+        self.router = Router(tags=self.router_tags)
         self.error_codes = ERROR_CODES
 
     def views(self):
