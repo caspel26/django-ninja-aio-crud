@@ -81,14 +81,11 @@ Registers all defined views to the API instance.
 
 **Returns:** The router instance
 
-**Usage:**
-
-```python
-view = UserAPIView()
-view.add_views_to_route()
-```
+**Note:** When using `@api.view(prefix="/path", tags=[...])`, manual registration via `add_views_to_route()` is not required; the router is mounted automatically.
 
 ## Complete Example
+
+**Recommended:**
 
 ```python
 from ninja_aio import NinjaAIO
@@ -101,6 +98,23 @@ class StatsSchema(Schema):
     total: int
     active: int
 
+@api.view(prefix="/analytics", tags=["Analytics"])
+class AnalyticsView(APIView):
+    def views(self):
+        @self.router.get("/dashboard", response=StatsSchema)
+        async def dashboard(request):
+            return {"total": 1000, "active": 750}
+
+        @self.router.post("/track")
+        async def track_event(request, event: str):
+            return {"tracked": event}
+```
+
+**Alternative implementation:**
+
+```python
+api = NinjaAIO(title="My API")
+
 class AnalyticsView(APIView):
     api = api
     router_tag = "Analytics"
@@ -109,26 +123,21 @@ class AnalyticsView(APIView):
     def views(self):
         @self.router.get("/dashboard", response=StatsSchema)
         async def dashboard(request):
-            return {
-                "total": 1000,
-                "active": 750
-            }
+            return {"total": 1000, "active": 750}
 
         @self.router.post("/track")
         async def track_event(request, event: str):
-            # tracking logic
             return {"tracked": event}
 
-# Register views
 AnalyticsView().add_views_to_route()
 ```
 
 ## Notes
 
 - Use `APIView` for simple, non-CRUD endpoints
-- For CRUD operations, use [`APIViewSet`](api_view_set.md) instead
-- All views are automatically async-compatible
-- Error codes `{400, 401, 404, 428}` are available via `self.error_codes`
+- For CRUD operations, use [`APIViewSet`](api_view_set.md)
+- All views are async-compatible
+- Standard error codes are available via `self.error_codes`
 
 Note:
 

@@ -1,10 +1,13 @@
 import datetime
 
-from django.test import tag
+from django.test import tag, TestCase
 from django.utils import timezone
 
+from ninja_aio.models import ModelUtil
 from tests.generics.views import Tests
 from tests.test_app import schema, models, views
+from ninja_aio import NinjaAIO
+from ninja_aio.views import APIViewSet
 
 
 class BaseTests:
@@ -524,3 +527,53 @@ class ApiViewSetModelReverseManyToManyTestCase(
             schema.TestModelSchemaIn,
             schema.TestModelSchemaPatch,
         )
+
+
+@tag("viewset_decorator_modelserializer")
+class ViewSetDecoratorModelSerializerTestCase(TestCase):
+    namespace = "test_viewset_decorator_modelserializer"
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.api = NinjaAIO(urls_namespace=cls.namespace)
+
+        @cls.api.viewset(model=models.TestModelSerializer)
+        class DecoratedMSViewSet(APIViewSet):
+            pass
+
+        # base path inferred from verbose_name plural
+        cls.base = f"{models.TestModelSerializer.util.verbose_name_path_resolver()}"
+
+    def test_crud_routes_mounted(self):
+        # default router + our viewset router
+        self.assertEqual(len(self.api._routers), 2)
+        path, router = self.api._routers[1]
+        self.assertEqual(path, cls.base if (cls := self).base else self.base)
+        urls = [str(r.pattern) for r in router.urls_paths(path)]
+        # Expect list and create at base, retrieve/update/delete at /{pk}/ variants
+        self.assertIn(path, urls)  # list/create
+
+@tag("viewset_decorator_plain_model")
+class ViewSetDecoratorPlainModelTestCase(TestCase):
+    namespace = "test_viewset_decorator_plain_model"
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.api = NinjaAIO(urls_namespace=cls.namespace)
+
+        @cls.api.viewset(model=models.TestModel)
+        class DecoratedModelViewSet(APIViewSet):
+            # Provide manual schemas since this is a plain Model
+            schema_out = schema.TestModelSchemaOut
+            schema_in = schema.TestModelSchemaIn
+            schema_update = schema.TestModelSchemaPatch
+
+        cls.base = ModelUtil(models.TestModel).verbose_name_path_resolver()
+
+    def test_crud_routes_mounted(self):
+        self.assertEqual(len(self.api._routers), 2)
+        path, router = self.api._routers[1]
+        self.assertEqual(path, self.base)
+        urls = [str(r.pattern) for r in router.urls_paths(path)]
+        # Check base and pk routes exist
+        self.assertIn(self.base, urls)

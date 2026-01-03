@@ -18,18 +18,15 @@ from ninja_aio.helpers.api import ManyToManyAPI
 from ninja_aio.types import ModelSerializerMeta, VIEW_TYPES
 from ninja_aio.decorators import unique_view, decorate_view
 
-ERROR_CODES = frozenset({400, 401, 404, 428})
+ERROR_CODES = frozenset({400, 401, 404})
 
 
-class APIView:
-    api: NinjaAPI
-    router_tag: str
-    api_route_path: str
+class API:
+    api: NinjaAPI = None
+    router_tag: str = ""
+    router_tags: list[str] = []
+    api_route_path: str = ""
     auth: list | None = NOT_SET
-
-    def __init__(self) -> None:
-        self.router = Router(tags=[self.router_tag])
-        self.error_codes = ERROR_CODES
 
     def views(self):
         """
@@ -38,7 +35,7 @@ class APIView:
         async def some_method(request, *args, **kwargs):
             pass
 
-        You can add multilple views just doing:
+        You can add views just doing:
 
         @self.router.get(some_path, response=some_schema)
         async def some_method(request, *args, **kwargs):
@@ -63,20 +60,80 @@ class APIView:
         async def some_method(request, *args, **kwargs):
             pass
         """
+        pass
 
     def _add_views(self):
-        self.views()
-        return self.router
+        raise NotImplementedError("_add_views must be implemented in subclasses")
 
     def add_views_to_route(self):
         return self.api.add_router(f"{self.api_route_path}", self._add_views())
 
 
-class APIViewSet:
+class APIView(API):
+    """
+    Base class to register custom, non-CRUD endpoints on a Ninja Router.
+
+    Usage:
+        @api.view(prefix="/custom", tags=["Custom"])
+        class CustomAPIView(APIView):
+            def views(self):
+                @self.router.get("/hello", response=SomeSchema)
+                async def hello(request):
+                    return SomeSchema(...)
+
+        or
+
+        class CustomAPIView(APIView):
+            api = api
+            api_route_path = "/custom"
+            router_tags = ["Custom"]
+
+            def views(self):
+                @self.router.get("/hello", response=SomeSchema)
+                async def hello(request):
+                    return SomeSchema(...)
+
+
+        CustomAPIView().add_views_to_route()
+
+    Attributes:
+        api: NinjaAPI instance used to mount the router.
+        router_tag: Single tag used if router_tags is not provided.
+        router_tags: List of tags assigned to the router.
+        api_route_path: Base path where the router is mounted.
+        auth: Default auth list or NOT_SET for unauthenticated endpoints.
+        router: Router instance where views are registered.
+        error_codes: Common error codes returned by endpoints.
+
+    Overridable methods:
+        views(): Register your endpoints using self.router.get/post/patch/delete.
+    """
+
+    def __init__(
+        self, api: NinjaAPI = None, prefix: str = None, tags: list[str] = None
+    ) -> None:
+        self.api = api or self.api
+        self.api_route_path = prefix or self.api_route_path
+        self.router_tags = tags or self.router_tags or [self.router_tag]
+        self.router = Router(tags=self.router_tags)
+        self.error_codes = ERROR_CODES
+
+    def _add_views(self):
+        self.views()
+        return self.router
+
+
+class APIViewSet(API):
     """
     Base viewset generating async CRUD + optional M2M endpoints for a Django model.
 
     Usage:
+        @api.viewset(model=MyModel)
+        class MyModelViewSet(APIViewSet):
+            pass
+
+        or
+
         class MyModelViewSet(APIViewSet):
             model = MyModel
             api = api
@@ -109,8 +166,8 @@ class APIViewSet:
         dict, and must return the (optionally) filtered queryset.
 
         Example:
+            @api.viewset(model=models.User)
             class UserViewSet(APIViewSet):
-                model = models.User
                 m2m_relations = [
                     M2MRelationSchema(
                         model=models.Tag,
@@ -149,7 +206,7 @@ class APIViewSet:
         <related_name>_query_params_handler(queryset, filters): Async hook for per-M2M filtering.
 
     Error responses:
-        All endpoints may return GenericMessageSchema for codes in ERROR_CODES (400,401,404,428).
+        All endpoints may return GenericMessageSchema for codes in ERROR_CODES (400,401,404).
 
     Internal:
         Dynamic path/filter schemas built with pydantic.create_model.
@@ -157,12 +214,9 @@ class APIViewSet:
     """
 
     model: ModelSerializer | Model
-    api: NinjaAPI
-    router_tag: str = ""
     schema_in: Schema | None = None
     schema_out: Schema | None = None
     schema_update: Schema | None = None
-    auth: list | None = NOT_SET
     get_auth: list | None = NOT_SET
     post_auth: list | None = NOT_SET
     patch_auth: list | None = NOT_SET
@@ -170,7 +224,6 @@ class APIViewSet:
     pagination_class: type[AsyncPaginationBase] = PageNumberPagination
     query_params: dict[str, tuple[type, ...]] = {}
     disable: list[type[VIEW_TYPES]] = []
-    api_route_path: str = ""
     list_docs = "List all objects."
     create_docs = "Create a new object."
     retrieve_docs = "Retrieve a specific object by its primary key."
@@ -180,8 +233,16 @@ class APIViewSet:
     m2m_auth: list | None = NOT_SET
     extra_decorators: DecoratorsSchema = DecoratorsSchema()
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        api: NinjaAPI = None,
+        model: Model | ModelSerializer = None,
+        prefix: str = None,
+        tags: list[str] = None,
+    ) -> None:
+        self.api = api or self.api
         self.error_codes = ERROR_CODES
+        self.model = model or self.model
         self.model_util = (
             ModelUtil(self.model)
             if not isinstance(self.model, ModelSerializerMeta)
@@ -191,16 +252,17 @@ class APIViewSet:
         self.path_schema = self._generate_path_schema()
         self.filters_schema = self._generate_filters_schema()
         self.model_verbose_name = self.model._meta.verbose_name.capitalize()
-        self.router_tag = (
-            self.model_verbose_name if not self.router_tag else self.router_tag
-        )
-        self.router = Router(tags=[self.router_tag])
+        self.router_tag = self.router_tag or self.model_verbose_name
+        self.router_tags = self.router_tags or tags or [self.router_tag]
+        self.router = Router(tags=self.router_tags)
         self.path = "/"
         self.get_path = ""
         self.path_retrieve = f"{{{self.model_util.model_pk_name}}}/"
         self.get_path_retrieve = f"{{{self.model_util.model_pk_name}}}"
         self.api_route_path = (
-            self.api_route_path or self.model_util.verbose_name_path_resolver()
+            self.api_route_path
+            or prefix
+            or self.model_util.verbose_name_path_resolver()
         )
         self.m2m_api = (
             None
@@ -450,18 +512,18 @@ class APIViewSet:
 
         return self._set_additional_views()
 
-    def add_views_to_route(self):
-        """
-        Attach router with registered endpoints to the NinjaAPI instance.
-        """
-        return self.api.add_router(f"{self.api_route_path}", self._add_views())
-
 
 class ReadOnlyViewSet(APIViewSet):
     """
     ReadOnly viewset generating async List + Retrieve endpoints for a Django model.
 
     Usage:
+        @api.viewset(model=MyModel)
+        class MyModelReadOnlyViewSet(ReadOnlyViewSet):
+            pass
+
+        or
+
         class MyModelReadOnlyViewSet(ReadOnlyViewSet):
             model = MyModel
             api = api
@@ -476,10 +538,15 @@ class WriteOnlyViewSet(APIViewSet):
     WriteOnly viewset generating async Create + Update + Delete endpoints for a Django model.
 
     Usage:
+        @api.viewset(model=MyModel)
+        class MyModelWriteOnlyViewSet(WriteOnlyViewSet):
+            pass
+
+        or
+
         class MyModelWriteOnlyViewSet(WriteOnlyViewSet):
             model = MyModel
             api = api
-        MyModelWriteOnlyViewSet().add_views_to_route()
     """
 
     disable = ["list", "retrieve"]
