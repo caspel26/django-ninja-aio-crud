@@ -329,37 +329,36 @@ All CRUD and M2M endpoints may respond with `GenericMessageSchema` for error cod
 
 ## Minimal Usage
 
-Recommended:
+=== "Recommended"
+    ```python
+    from ninja_aio import NinjaAIO
+    from ninja_aio.views import APIViewSet
+    from .models import User
 
-```python
-from ninja_aio import NinjaAIO
-from ninja_aio.views import APIViewSet
-from .models import User
+    api = NinjaAIO(title="My API")
 
-api = NinjaAIO(title="My API")
+    @api.viewset(model=User)
+    class UserViewSet(APIViewSet):
+        pass
+    ```
 
-@api.viewset(model=User)
-class UserViewSet(APIViewSet):
-    pass
-```
+    Note: prefix and tags are optional. If omitted, the base path is inferred from the model verbose name plural and tags default to the model verbose name.
+    
 
-Note: prefix and tags are optional. If omitted, the base path is inferred from the model verbose name plural and tags default to the model verbose name.
+=== "Alternative implementation"
+    ```python
+    from ninja_aio import NinjaAIO
+    from ninja_aio.views import APIViewSet
+    from .models import User
 
-Alternative implementation:
+    api = NinjaAIO(title="My API")
 
-```python
-from ninja_aio import NinjaAIO
-from ninja_aio.views import APIViewSet
-from .models import User
+    class UserViewSet(APIViewSet):
+        model = User
+        api = api
 
-api = NinjaAIO(title="My API")
-
-class UserViewSet(APIViewSet):
-    model = User
-    api = api
-
-UserViewSet().add_views_to_route()
-```
+    UserViewSet().add_views_to_route()
+    ```
 
 ## Disable Selected Views
 
