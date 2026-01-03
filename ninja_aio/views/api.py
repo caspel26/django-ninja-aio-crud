@@ -206,7 +206,7 @@ class APIViewSet(API):
         <related_name>_query_params_handler(queryset, filters): Async hook for per-M2M filtering.
 
     Error responses:
-        All endpoints may return GenericMessageSchema for codes in ERROR_CODES (400,401,404,428).
+        All endpoints may return GenericMessageSchema for codes in ERROR_CODES (400,401,404).
 
     Internal:
         Dynamic path/filter schemas built with pydantic.create_model.

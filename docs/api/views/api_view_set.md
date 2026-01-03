@@ -16,7 +16,7 @@ Notes:
 
 - Retrieve path has no trailing slash; update/delete include a trailing slash.
 - `{base}` auto-resolves from model verbose name plural (lowercase) unless `api_route_path` is provided.
-- Error responses may use a unified generic schema for codes: 400, 401, 404, 428.
+- Error responses may use a unified generic schema for codes: 400, 401, 404.
 
 ## Core Attributes
 
@@ -317,7 +317,7 @@ All generated handlers are decorated with `@unique_view(...)` to ensure stable u
 
 ## Error Handling
 
-All CRUD and M2M endpoints may respond with `GenericMessageSchema` for error codes: 400 (validation), 401 (auth), 404 (not found), 428 (precondition required).
+All CRUD and M2M endpoints may respond with `GenericMessageSchema` for error codes: 400 (validation), 401 (auth), 404 (not found).
 
 ## Performance Tips
 
