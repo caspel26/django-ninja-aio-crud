@@ -1434,7 +1434,7 @@
 <h2 id="methods">Methods<a class="headerlink" href="#methods" title="Permanent link">&para;</a></h2>
 <h3 id="recommended-decorator-based-endpoints">Recommended: decorator-based endpoints<a class="headerlink" href="#recommended-decorator-based-endpoints" title="Permanent link">&para;</a></h3>
 <p>Prefer class method decorators to define non-CRUD endpoints. Decorators lazily bind instance methods to the router and automatically remove <code>self</code> from the OpenAPI signature while preserving type hints.</p>
-<p>Available decorators (from <code>ninja_aio.decorators.operations</code>):</p>
+<p>Available decorators (from <code>ninja_aio.decorators</code>):</p>
 <ul>
 <li><code>@api_get(path, ...)</code></li>
 <li><code>@api_post(path, ...)</code></li>
@@ -1447,7 +1447,7 @@
 <p>Example:</p>
 <div class="language-python highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ninja_aio</span><span class="w"> </span><span class="kn">import</span> <span class="n">NinjaAIO</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ninja_aio.views</span><span class="w"> </span><span class="kn">import</span> <span class="n">APIView</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ninja_aio.decorators.operations</span><span class="w"> </span><span class="kn">import</span> <span class="n">api_get</span><span class="p">,</span> <span class="n">api_post</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ninja_aio.decorators</span><span class="w"> </span><span class="kn">import</span> <span class="n">api_get</span><span class="p">,</span> <span class="n">api_post</span>
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ninja</span><span class="w"> </span><span class="kn">import</span> <span class="n">Schema</span>
 </span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>
 </span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="n">api</span> <span class="o">=</span> <span class="n">NinjaAIO</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">&quot;My API&quot;</span><span class="p">)</span>
@@ -1516,7 +1516,7 @@
 <p><strong>Recommended:</strong></p>
 <div class="language-python highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ninja_aio</span><span class="w"> </span><span class="kn">import</span> <span class="n">NinjaAIO</span>
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ninja_aio.views</span><span class="w"> </span><span class="kn">import</span> <span class="n">APIView</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ninja_aio.decorators.operations</span><span class="w"> </span><span class="kn">import</span> <span class="n">api_get</span><span class="p">,</span> <span class="n">api_post</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ninja_aio.decorators</span><span class="w"> </span><span class="kn">import</span> <span class="n">api_get</span><span class="p">,</span> <span class="n">api_post</span>
 </span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ninja</span><span class="w"> </span><span class="kn">import</span> <span class="n">Schema</span>
 </span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>
 </span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="n">api</span> <span class="o">=</span> <span class="n">NinjaAIO</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">&quot;My API&quot;</span><span class="p">)</span>
