@@ -9,12 +9,12 @@ from tests.generics.views import GenericAPIView
 @tag("view")
 class APIViewTestCase(TestCase):
     namespace = "test_api_view"
-    view = GenericAPIView()
+    view = GenericAPIView
 
     @classmethod
     def setUpTestData(cls):
         cls.api = NinjaAIO(urls_namespace=cls.namespace)
-        cls.view.api = cls.api
+        cls.view = cls.view(api=cls.api)
         cls.view.add_views_to_route()
         cls.path = f"{cls.view.path_name}/"
         cls.request = Request(cls.path)

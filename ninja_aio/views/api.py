@@ -21,21 +21,12 @@ from ninja_aio.decorators import unique_view, decorate_view
 ERROR_CODES = frozenset({400, 401, 404})
 
 
-class APIView:
-    api: NinjaAPI
-    router_tag: str
+class API:
+    api: NinjaAPI = None
+    router_tag: str = ""
     router_tags: list[str] = []
-    api_route_path: str
+    api_route_path: str = ""
     auth: list | None = NOT_SET
-
-    def __init__(
-        self, api: NinjaAPI = None, prefix: str = None, tags: list[str] = None
-    ) -> None:
-        self.api = api or self.api
-        self.api_route_path = prefix or self.api_route_path
-        self.router_tags = tags or self.router_tags or [self.router_tag]
-        self.router = Router(tags=self.router_tags)
-        self.error_codes = ERROR_CODES
 
     def views(self):
         """
@@ -69,16 +60,48 @@ class APIView:
         async def some_method(request, *args, **kwargs):
             pass
         """
+        pass
 
     def _add_views(self):
-        self.views()
-        return self.router
+        raise NotImplementedError("_add_views must be implemented in subclasses")
 
     def add_views_to_route(self):
         return self.api.add_router(f"{self.api_route_path}", self._add_views())
 
 
-class APIViewSet:
+class APIView(API):
+    """
+    API that provides a helper to register view functions and
+    return the configured router.
+
+    Use this when you want to encapsulate view registration logic and expose the
+    resulting router for inclusion in your Django URL configuration.
+
+    Register all views on this API instance and return the underlying router.
+
+    This method calls `self.views()` to perform the registration of all view
+    functions/handlers, then returns `self.router` so it can be included in
+    the project's URL patterns.
+
+    Returns:
+        Router: The Ninja router populated with the registered views.
+    """
+
+    def __init__(
+        self, api: NinjaAPI = None, prefix: str = None, tags: list[str] = None
+    ) -> None:
+        self.api = api or self.api
+        self.api_route_path = prefix or self.api_route_path
+        self.router_tags = tags or self.router_tags or [self.router_tag]
+        self.router = Router(tags=self.router_tags)
+        self.error_codes = ERROR_CODES
+
+    def _add_views(self):
+        self.views()
+        return self.router
+
+
+class APIViewSet(API):
     """
     Base viewset generating async CRUD + optional M2M endpoints for a Django model.
 
@@ -163,13 +186,9 @@ class APIViewSet:
     """
 
     model: ModelSerializer | Model
-    api: NinjaAPI
-    router_tag: str = ""
-    router_tags: list[str] = []
     schema_in: Schema | None = None
     schema_out: Schema | None = None
     schema_update: Schema | None = None
-    auth: list | None = NOT_SET
     get_auth: list | None = NOT_SET
     post_auth: list | None = NOT_SET
     patch_auth: list | None = NOT_SET
@@ -177,7 +196,6 @@ class APIViewSet:
     pagination_class: type[AsyncPaginationBase] = PageNumberPagination
     query_params: dict[str, tuple[type, ...]] = {}
     disable: list[type[VIEW_TYPES]] = []
-    api_route_path: str = ""
     list_docs = "List all objects."
     create_docs = "Create a new object."
     retrieve_docs = "Retrieve a specific object by its primary key."
@@ -465,12 +483,6 @@ class APIViewSet:
                 view()
 
         return self._set_additional_views()
-
-    def add_views_to_route(self):
-        """
-        Attach router with registered endpoints to the NinjaAPI instance.
-        """
-        return self.api.add_router(f"{self.api_route_path}", self._add_views())
 
 
 class ReadOnlyViewSet(APIViewSet):
