@@ -65,11 +65,10 @@ from .models import Book
 
 api = NinjaAIO()
 
+@api.viewset(Book)
 class BookViewSet(APIViewSet):
-    model = Book
-    api = api
+    pass
 
-BookViewSet().add_views_to_route()
 ```
 
 Visit `/docs` → CRUD endpoints ready.
@@ -116,9 +115,8 @@ class Article(ModelSerializer):
     class ReadSerializer:
         fields = ["id", "title", "tags"]
 
+@api.viewset(Article)
 class ArticleViewSet(APIViewSet):
-    model = Article
-    api = api
     m2m_relations = [
         M2MRelationSchema(
             model=Tag,
@@ -133,7 +131,6 @@ class ArticleViewSet(APIViewSet):
             queryset = queryset.filter(name__icontains=n)
         return queryset
 
-ArticleViewSet().add_views_to_route()
 ```
 
 Endpoints:
@@ -160,9 +157,8 @@ class JWTAuth(AsyncJwtBearer):
         book_id = self.dcd.claims.get("sub")
         return await Book.objects.aget(id=book_id)
 
+@api.viewset(Book)
 class SecureBookViewSet(APIViewSet):
-    model = Book
-    api = api
     auth = [JWTAuth()]
     get_auth = None  # list/retrieve public
 ```
@@ -185,10 +181,8 @@ Available on every save/delete:
 ## 🧩 Adding Custom Endpoints
 
 ```python
+@api.viewset(Book)
 class BookViewSet(APIViewSet):
-    model = Book
-    api = api
-
     def views(self):
         @self.router.get("/stats/")
         async def stats(request):
@@ -253,9 +247,8 @@ count = await Book.objects.acount()
 ## 🚫 Disable Operations
 
 ```python
+@api.viewset(Book)
 class ReadOnlyBookViewSet(APIViewSet):
-    model = Book
-    api = api
     disable = ["update", "delete"]
 ```
 
