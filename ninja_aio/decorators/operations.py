@@ -92,31 +92,34 @@ def _api_method(
     def decorator(func):
         from ninja_aio.views.api import API
 
-        def _build_handler(view_instance, func):
-            if asyncio.iscoroutinefunction(func):
+        def _build_handler(view_instance, original):
+            is_async = asyncio.iscoroutinefunction(original)
+
+            if is_async:
                 async def clean_handler(request, *args, **kwargs):
-                    return await func(view_instance, request, *args, **kwargs)
+                    return await original(view_instance, request, *args, **kwargs)
             else:
                 def clean_handler(request, *args, **kwargs):
-                    return func(view_instance, request, *args, **kwargs)
+                    return original(view_instance, request, *args, **kwargs)
             return clean_handler
 
-        def _apply_metadata(clean_handler, func):
-            # Keep a meaningful name
+        def _apply_metadata(clean_handler, original):
+            # name
             try:
-                clean_handler.__name__ = getattr(func, "__name__", clean_handler.__name__)
+                clean_handler.__name__ = getattr(original, "__name__", clean_handler.__name__)
             except Exception:
                 pass
 
-            # Expose the original signature minus `self` so Ninja infers params correctly
+            # signature and annotations without self/cls
             try:
-                sig = inspect.signature(func)
-                params = list(sig.parameters.values())
-                if params and params[0].name in {"self", "cls"}:
-                    params = params[1:]
-                clean_handler.__signature__ = sig.replace(parameters=params)  # type: ignore[attr-defined]
+                sig = inspect.signature(original)
+                params = sig.parameters
+                params_list = list(params.values())
+                if params_list and params_list[0].name in {"self", "cls"}:
+                    params_list = params_list[1:]
+                clean_handler.__signature__ = sig.replace(parameters=params_list)  # type: ignore[attr-defined]
 
-                anns = dict(getattr(func, "__annotations__", {}))
+                anns = dict(getattr(original, "__annotations__", {}))
                 anns.pop("self", None)
                 clean_handler.__annotations__ = anns
             except Exception:
@@ -130,7 +133,8 @@ def _api_method(
             clean_handler = _build_handler(view_instance, func)
             _apply_metadata(clean_handler, func)
 
-            getattr(router, method_name)(
+            route_adder = getattr(router, method_name)
+            route_adder(
                 path=path,
                 auth=auth,
                 throttle=throttle,
