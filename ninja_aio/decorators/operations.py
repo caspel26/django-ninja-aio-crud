@@ -92,25 +92,19 @@ def _api_method(
     def decorator(func):
         from ninja_aio.views.api import API
 
-        def register_on_instance(view_instance: API):
-            router: Router = getattr(view_instance, "router", None)
-            if router is None:
-                raise RuntimeError("The view instance does not have a router")
-
+        def _build_handler(view_instance, func):
             if asyncio.iscoroutinefunction(func):
-
                 async def clean_handler(request, *args, **kwargs):
                     return await func(view_instance, request, *args, **kwargs)
             else:
-
                 def clean_handler(request, *args, **kwargs):
-                    return (func)(view_instance, request, *args, **kwargs)
+                    return func(view_instance, request, *args, **kwargs)
+            return clean_handler
 
+        def _apply_metadata(clean_handler, func):
             # Keep a meaningful name
             try:
-                clean_handler.__name__ = getattr(
-                    func, "__name__", clean_handler.__name__
-                )
+                clean_handler.__name__ = getattr(func, "__name__", clean_handler.__name__)
             except Exception:
                 pass
 
@@ -120,20 +114,23 @@ def _api_method(
                 params = list(sig.parameters.values())
                 if params and params[0].name in {"self", "cls"}:
                     params = params[1:]
-                new_sig = sig.replace(parameters=params)
-                clean_handler.__signature__ = new_sig  # type: ignore[attr-defined]
-                # Copy annotations excluding `self`
-                if hasattr(func, "__annotations__"):
-                    anns = dict(getattr(func, "__annotations__", {}))
-                    anns.pop("self", None)
-                    clean_handler.__annotations__ = anns
+                clean_handler.__signature__ = sig.replace(parameters=params)  # type: ignore[attr-defined]
+
+                anns = dict(getattr(func, "__annotations__", {}))
+                anns.pop("self", None)
+                clean_handler.__annotations__ = anns
             except Exception:
-                # Best-effort; if anything fails, Ninja will fallback to runtime signature
                 pass
 
-            # Dispatch to the correct router method
-            router_method = getattr(router, method_name)
-            router_method(
+        def register_on_instance(view_instance: API):
+            router: Router = getattr(view_instance, "router", None)
+            if router is None:
+                raise RuntimeError("The view instance does not have a router")
+
+            clean_handler = _build_handler(view_instance, func)
+            _apply_metadata(clean_handler, func)
+
+            getattr(router, method_name)(
                 path=path,
                 auth=auth,
                 throttle=throttle,
