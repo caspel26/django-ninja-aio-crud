@@ -57,6 +57,7 @@ class NinjaAIO(NinjaAPI):
         def wrapper(view: type[APIView]):
             instance = view(api=self, prefix=prefix, tags=tags)
             instance.add_views_to_route()
+            return instance
 
         return wrapper
 
@@ -69,5 +70,6 @@ class NinjaAIO(NinjaAPI):
         def wrapper(viewset: type[APIViewSet]):
             instance = viewset(api=self, model=model, prefix=prefix, tags=tags)
             instance.add_views_to_route()
+            return instance
 
         return wrapper
