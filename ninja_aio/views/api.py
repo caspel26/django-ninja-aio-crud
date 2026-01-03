@@ -71,20 +71,42 @@ class API:
 
 class APIView(API):
     """
-    API that provides a helper to register view functions and
-    return the configured router.
+    Base class to register custom, non-CRUD endpoints on a Ninja Router.
 
-    Use this when you want to encapsulate view registration logic and expose the
-    resulting router for inclusion in your Django URL configuration.
+    Usage:
+        @api.view(prefix="/custom", tags=["Custom"])
+        class CustomAPIView(APIView):
+            def views(self):
+                @self.router.get("/hello", response=SomeSchema)
+                async def hello(request):
+                    return SomeSchema(...)
 
-    Register all views on this API instance and return the underlying router.
+        or
 
-    This method calls `self.views()` to perform the registration of all view
-    functions/handlers, then returns `self.router` so it can be included in
-    the project's URL patterns.
+        class CustomAPIView(APIView):
+            api = api
+            api_route_path = "/custom"
+            router_tags = ["Custom"]
 
-    Returns:
-        Router: The Ninja router populated with the registered views.
+            def views(self):
+                @self.router.get("/hello", response=SomeSchema)
+                async def hello(request):
+                    return SomeSchema(...)
+
+
+        CustomAPIView().add_views_to_route()
+
+    Attributes:
+        api: NinjaAPI instance used to mount the router.
+        router_tag: Single tag used if router_tags is not provided.
+        router_tags: List of tags assigned to the router.
+        api_route_path: Base path where the router is mounted.
+        auth: Default auth list or NOT_SET for unauthenticated endpoints.
+        router: Router instance where views are registered.
+        error_codes: Common error codes returned by endpoints.
+
+    Overridable methods:
+        views(): Register your endpoints using self.router.get/post/patch/delete.
     """
 
     def __init__(
@@ -106,6 +128,12 @@ class APIViewSet(API):
     Base viewset generating async CRUD + optional M2M endpoints for a Django model.
 
     Usage:
+        @api.viewset(model=MyModel)
+        class MyModelViewSet(APIViewSet):
+            pass
+
+        or
+
         class MyModelViewSet(APIViewSet):
             model = MyModel
             api = api
@@ -138,8 +166,8 @@ class APIViewSet(API):
         dict, and must return the (optionally) filtered queryset.
 
         Example:
+            @api.viewset(model=models.User)
             class UserViewSet(APIViewSet):
-                model = models.User
                 m2m_relations = [
                     M2MRelationSchema(
                         model=models.Tag,
@@ -490,6 +518,12 @@ class ReadOnlyViewSet(APIViewSet):
     ReadOnly viewset generating async List + Retrieve endpoints for a Django model.
 
     Usage:
+        @api.viewset(model=MyModel)
+        class MyModelReadOnlyViewSet(ReadOnlyViewSet):
+            pass
+
+        or
+
         class MyModelReadOnlyViewSet(ReadOnlyViewSet):
             model = MyModel
             api = api
@@ -504,10 +538,15 @@ class WriteOnlyViewSet(APIViewSet):
     WriteOnly viewset generating async Create + Update + Delete endpoints for a Django model.
 
     Usage:
+        @api.viewset(model=MyModel)
+        class MyModelWriteOnlyViewSet(WriteOnlyViewSet):
+            pass
+
+        or
+
         class MyModelWriteOnlyViewSet(WriteOnlyViewSet):
             model = MyModel
             api = api
-        MyModelWriteOnlyViewSet().add_views_to_route()
     """
 
     disable = ["list", "retrieve"]
