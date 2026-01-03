@@ -8,7 +8,6 @@ from typing import (
 )
 import inspect
 
-from asgiref.sync import sync_to_async
 from ninja.constants import NOT_SET, NOT_SET_TYPE
 from ninja.throttling import BaseThrottle
 from ninja import Router
@@ -101,11 +100,7 @@ def _api_method(
             if asyncio.iscoroutinefunction(func):
 
                 async def clean_handler(request, *args, **kwargs):
-                    if inspect.iscoroutinefunction(func):
-                        return await func(view_instance, request, *args, **kwargs)
-                    return await sync_to_async(func)(
-                        view_instance, request, *args, **kwargs
-                    )
+                    return await func(view_instance, request, *args, **kwargs)
             else:
 
                 def clean_handler(request, *args, **kwargs):
