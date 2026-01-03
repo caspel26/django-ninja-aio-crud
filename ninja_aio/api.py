@@ -54,10 +54,13 @@ class NinjaAIO(NinjaAPI):
         super().set_default_exception_handlers()
 
     def viewset(
-        self, model: models.Model | ModelSerializer, prefix: str = None
+        self,
+        model: models.Model | ModelSerializer,
+        prefix: str = None,
+        tags: list[str] = None,
     ) -> None:
         def wrapper(viewset: type[APIViewSet]):
-            instance = viewset(api=self, prefix=prefix, model=model)
+            instance = viewset(api=self, model=model, prefix=prefix, tags=tags)
             instance.add_views_to_route()
 
         return wrapper

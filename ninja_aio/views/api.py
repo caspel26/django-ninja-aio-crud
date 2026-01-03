@@ -159,6 +159,7 @@ class APIViewSet:
     model: ModelSerializer | Model
     api: NinjaAPI
     router_tag: str = ""
+    router_tags: list[str] = []
     schema_in: Schema | None = None
     schema_out: Schema | None = None
     schema_update: Schema | None = None
@@ -183,8 +184,9 @@ class APIViewSet:
     def __init__(
         self,
         api: NinjaAPI = None,
-        prefix: str = None,
         model: Model | ModelSerializer = None,
+        prefix: str = None,
+        tags: list[str] = None,
     ) -> None:
         self.api = api or self.api
         self.error_codes = ERROR_CODES
@@ -198,10 +200,9 @@ class APIViewSet:
         self.path_schema = self._generate_path_schema()
         self.filters_schema = self._generate_filters_schema()
         self.model_verbose_name = self.model._meta.verbose_name.capitalize()
-        self.router_tag = (
-            self.model_verbose_name if not self.router_tag else self.router_tag
-        )
-        self.router = Router(tags=[self.router_tag])
+        self.router_tag = self.router_tag or self.model_verbose_name
+        self.router_tags = self.router_tags or tags or [self.router_tag]
+        self.router = Router(tags=self.router_tags)
         self.path = "/"
         self.get_path = ""
         self.path_retrieve = f"{{{self.model_util.model_pk_name}}}/"
