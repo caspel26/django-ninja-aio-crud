@@ -34,31 +34,27 @@ Traditional Django REST development requires:
 
 === "Traditional Approach"
     ```python
-    # serializers.py
-    class UserSerializer(serializers.ModelSerializer):
+    # schema.py
+    class UserSchemaOut(ModelSchema)
         class Meta:
             model = User
             fields = ['id', 'username', 'email']
     
-    class UserCreateSerializer(serializers.ModelSerializer):
+    class UserSchemaIn(ModelSchema):
         class Meta:
             model = User
             fields = ['username', 'email', 'password']
     
     # views.py
-    class UserListView(APIView):
-        async def get(self, request):
-            users = await sync_to_async(list)(User.objects.all())
-            serializer = UserSerializer(users, many=True)
-            return Response(serializer.data)
+    @api.get("/users", response={200: list[UserSchemaOut]})
+    async def list_users(request):
+        return [user async for user in User.objects.select_related().all()]
     
-    class UserCreateView(APIView):
-        async def post(self, request):
-            serializer = UserCreateSerializer(data=request.data)
-            if serializer.is_valid():
-                user = await sync_to_async(serializer.save)()
-                return Response(UserSerializer(user).data)
-            return Response(serializer.errors, status=400)
+    @api.post("/users/", response={201: UserSchemaOut})
+    async def create_user(request, data: UserSchemaIn):
+        user = await User.objects.select_related().acreate(**data.model_dump())
+        return 201, user
+
     
     # ... more views for retrieve, update, delete
     ```
