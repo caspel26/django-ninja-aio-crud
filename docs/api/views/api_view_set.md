@@ -329,7 +329,31 @@ All CRUD and M2M endpoints may respond with `GenericMessageSchema` for error cod
 
 ## Minimal Usage
 
+Recommended:
+
 ```python
+from ninja_aio import NinjaAIO
+from ninja_aio.views import APIViewSet
+from .models import User
+
+api = NinjaAIO(title="My API")
+
+@api.viewset(model=User)
+class UserViewSet(APIViewSet):
+    pass
+```
+
+Note: prefix and tags are optional. If omitted, the base path is inferred from the model verbose name plural and tags default to the model verbose name.
+
+Alternative implementation:
+
+```python
+from ninja_aio import NinjaAIO
+from ninja_aio.views import APIViewSet
+from .models import User
+
+api = NinjaAIO(title="My API")
+
 class UserViewSet(APIViewSet):
     model = User
     api = api
@@ -340,18 +364,16 @@ UserViewSet().add_views_to_route()
 ## Disable Selected Views
 
 ```python
+@api.viewset(model=User)
 class ReadOnlyUserViewSet(APIViewSet):
-    model = User
-    api = api
     disable = ["create", "update", "delete"]
 ```
 
 ## Authentication Example
 
 ```python
+@api.viewset(model=User)
 class UserViewSet(APIViewSet):
-    model = User
-    api = api
     auth = [JWTAuth()]      # global fallback
     get_auth = None         # list/retrieve public
     delete_auth = [AdminAuth()]  # delete restricted
@@ -359,7 +381,16 @@ class UserViewSet(APIViewSet):
 
 ## Complete M2M + Filters Example
 
+Recommended:
+
 ```python
+from ninja_aio import NinjaAIO
+from ninja_aio.views import APIViewSet
+from ninja_aio.models import ModelSerializer
+from django.db import models
+
+api = NinjaAIO(title="My API")
+
 class Tag(ModelSerializer):
     name = models.CharField(max_length=100)
     class ReadSerializer:
@@ -371,12 +402,9 @@ class User(ModelSerializer):
     class ReadSerializer:
         fields = ["id", "username", "tags"]
 
+@api.viewset(model=User)
 class UserViewSet(APIViewSet):
-    model = User
-    api = api
-    query_params = {
-        "search": (str, None)
-    }
+    query_params = {"search": (str, None)}
     m2m_relations = [
         M2MRelationSchema(
             model=Tag,
@@ -384,7 +412,7 @@ class UserViewSet(APIViewSet):
             filters={"name": (str, "")},
             add=True,
             remove=True,
-            get=True
+            get=True,
         )
     ]
 
@@ -402,56 +430,59 @@ class UserViewSet(APIViewSet):
         return queryset
 ```
 
----
+Alternative implementation:
+
+```python
+class UserViewSet(APIViewSet):
+    model = User
+    api = api
+    query_params = {"search": (str, None)}
+    m2m_relations = [
+        M2MRelationSchema(
+            model=Tag,
+            related_name="tags",
+            filters={"name": (str, "")},
+            add=True,
+            remove=True,
+            get=True,
+        )
+    ]
+
+    async def query_params_handler(self, queryset, filters):
+        if filters.get("search"):
+            from django.db.models import Q
+            s = filters["search"]
+            return queryset.filter(Q(username__icontains=s))
+        return queryset
+
+    async def tags_query_params_handler(self, queryset, filters):
+        name_filter = filters.get("name")
+        if name_filter:
+            queryset = queryset.filter(name__icontains=name_filter)
+        return queryset
+
+UserViewSet().add_views_to_route()
+```
 
 ## ReadOnlyViewSet
 
-ReadOnlyViewSet is a convenience subclass of APIViewSet that enables only list and retrieve endpoints. It is equivalent to setting `disable = ["create", "update", "delete"]`.
-
-Generated endpoints:
-
-- GET `/{base}/` -> List
-- GET `/{base}/{pk}` -> Retrieve
-
-Minimal usage:
+ReadOnlyViewSet enables only list and retrieve endpoints.
 
 ```python
+@api.viewset(model=MyModel)
 class MyModelReadOnlyViewSet(ReadOnlyViewSet):
-    model = MyModel
-    api = api
-
-MyModelReadOnlyViewSet().add_views_to_route()
+    pass
 ```
-
-Notes:
-
-- Supports all features of APIViewSet relevant to read operations (pagination, list filters, auth per verb, dynamic schema generation when using ModelSerializer).
-- M2M endpoints can still be added via `m2m_relations` if desired.
 
 ## WriteOnlyViewSet
 
-WriteOnlyViewSet is a convenience subclass of APIViewSet that enables only create, update, and delete endpoints. It is equivalent to setting `disable = ["list", "retrieve"]`.
-
-Generated endpoints:
-
-- POST `/{base}/` -> Create
-- PATCH `/{base}/{pk}/` -> Update
-- DELETE `/{base}/{pk}/` -> Delete
-
-Minimal usage:
+WriteOnlyViewSet enables only create, update, and delete endpoints.
 
 ```python
+@api.viewset(model=MyModel)
 class MyModelWriteOnlyViewSet(WriteOnlyViewSet):
-    model = MyModel
-    api = api
-
-MyModelWriteOnlyViewSet().add_views_to_route()
+    pass
 ```
-
-Notes:
-
-- Supports auth per verb and dynamic schema generation for write operations when using ModelSerializer.
-- M2M endpoints can still be added via `m2m_relations` if desired.
 
 ## See Also
 
