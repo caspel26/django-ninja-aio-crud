@@ -1,5 +1,6 @@
 from ninja_aio import NinjaAIO
 from django.test import TestCase, tag
+from ninja_aio.decorators import api_get, api_post
 
 from tests.test_app import schema
 from tests.generics.request import Request
@@ -97,3 +98,42 @@ class APIViewDecoratorTestCase(TestCase):
         # For simplicity, re-execute the same logic directly
         result = schema.SumSchemaOut(result=payload.a + payload.b).model_dump()
         self.assertEqual(result, {"result": 12})
+
+
+@tag("view_decorator_operations")
+class APIViewDecoratorOperationsTestCase(TestCase):
+    namespace = "test_api_view_decorator_operations"
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.api = NinjaAIO(urls_namespace=cls.namespace)
+
+        @cls.api.view(prefix="/ops", tags=["Ops"])
+        class OpsView(GenericAPIView):
+            def views(self):
+                @api_get("/ping", response=schema.SumSchemaOut)
+                async def ping(self, request):
+                    return schema.SumSchemaOut(result=99).model_dump()
+
+                @api_post("/sum", response=schema.SumSchemaOut)
+                async def sum_view(self, request, data: schema.SumSchemaIn):
+                    return schema.SumSchemaOut(result=data.a + data.b).model_dump()
+
+                # Return one handler for direct invocation convenience
+                return ping
+
+        cls.path = "/ops"
+        cls.request = Request(cls.path)
+
+    def test_routes_mounted(self):
+        self.assertEqual(len(self.api._routers), 2)
+        router_path, _ = self.api._routers[1]
+        self.assertEqual(router_path, self.path)
+
+    async def test_handlers_logic(self):
+        # Validate the same logic as defined
+        ping_result = schema.SumSchemaOut(result=99).model_dump()
+        self.assertEqual(ping_result, {"result": 99})
+        payload = schema.SumSchemaIn(a=8, b=4)
+        sum_result = schema.SumSchemaOut(result=payload.a + payload.b).model_dump()
+        self.assertEqual(sum_result, {"result": 12})

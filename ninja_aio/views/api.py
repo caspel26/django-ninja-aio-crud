@@ -27,6 +27,7 @@ class API:
     router_tags: list[str] = []
     api_route_path: str = ""
     auth: list | None = NOT_SET
+    router: Router = None
 
     def views(self):
         """
@@ -63,7 +64,10 @@ class API:
         pass
 
     def _add_views(self):
-        raise NotImplementedError("_add_views must be implemented in subclasses")
+        for name in dir(self.__class__):
+            method = getattr(self.__class__, name)
+            if hasattr(method, '_api_register'):
+                method._api_register(self)
 
     def add_views_to_route(self):
         return self.api.add_router(f"{self.api_route_path}", self._add_views())
@@ -119,6 +123,7 @@ class APIView(API):
         self.error_codes = ERROR_CODES
 
     def _add_views(self):
+        super()._add_views()
         self.views()
         return self.router
 
@@ -501,6 +506,7 @@ class APIViewSet(API):
         Register CRUD (unless disabled), custom views, and M2M endpoints.
         If 'all' in disable only CRUD is skipped; M2M + custom still added.
         """
+        super()._add_views()
         if "all" in self.disable:
             return self._set_additional_views()
 

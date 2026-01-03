@@ -18,6 +18,74 @@ Notes:
 - `{base}` auto-resolves from model verbose name plural (lowercase) unless `api_route_path` is provided.
 - Error responses may use a unified generic schema for codes: 400, 401, 404.
 
+## Recommended: Decorator-based extra endpoints
+
+Use class method decorators to add non-CRUD endpoints to your ViewSet. This is the preferred way to extend a ViewSet with custom routes. The decorators lazily bind instance methods to the router and ensure correct OpenAPI signatures (no `self` in parameters).
+
+Available decorators (from `ninja_aio.decorators.operations`):
+
+- `@api_get(path, ...)`
+- `@api_post(path, ...)`
+- `@api_put(path, ...)`
+- `@api_patch(path, ...)`
+- `@api_delete(path, ...)`
+- `@api_options(path, ...)`
+- `@api_head(path, ...)`
+
+Example:
+
+```python
+from ninja_aio import NinjaAIO
+from ninja_aio.views import APIViewSet
+from ninja_aio.decorators.operations import api_get, api_post
+from .models import Article
+
+api = NinjaAIO(title="Blog API")
+
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    @api_get("/stats/")
+    async def stats(self, request):
+        total = await self.model.objects.acount()
+        return {"total": total}
+
+    @api_post("/{pk}/publish/")
+    async def publish(self, request, pk: int):
+        obj = await self.model.objects.aget(pk=pk)
+        obj.is_published = True
+        await obj.asave()
+        return {"message": "published"}
+```
+
+Notes:
+
+- Decorators support per-endpoint `auth`, `response`, `tags`, `summary`, `description`, and more.
+- Sync methods are executed via `sync_to_async` automatically.
+- Signatures and type hints are preserved for OpenAPI (excluding `self`).
+
+## Legacy: views() method (still supported)
+
+The previous pattern of injecting endpoints inside `views()` is still supported, but the decorator-based approach above is now recommended.
+
+```python
+class ArticleViewSet(APIViewSet):
+    model = Article
+    api = api
+
+    def views(self):
+        @self.router.get("/stats/")
+        async def stats(request):
+            total = await self.model.objects.acount()
+            return {"total": total}
+
+        @self.router.post("/{pk}/publish/")
+        async def publish(request, pk: int):
+            obj = await self.model.objects.aget(pk=pk)
+            obj.is_published = True
+            await obj.asave()
+            return {"message": "published"}
+```
+
 ## Core Attributes
 
 | Attribute          | Type                          | Default                                            | Description                                                             |
@@ -293,7 +361,9 @@ class ArticleViewSet(APIViewSet):
 
 ## Custom Views
 
-Override `views()` to register extra endpoints:
+Preferred (decorators): see the section above.
+
+Legacy (still supported):
 
 ```python
 def views(self):
@@ -329,37 +399,45 @@ All CRUD and M2M endpoints may respond with `GenericMessageSchema` for error cod
 
 ## Minimal Usage
 
-Recommended:
+=== "Recommended"
+```python
+from ninja_aio import NinjaAIO
+from ninja_aio.views import APIViewSet
+from .models import User
+from ninja_aio.decorators.operations import api_get
 
+    api = NinjaAIO(title="My API")
+
+    @api.viewset(model=User)
+    class UserViewSet(APIViewSet):
+        @api_get("/stats/")
+        async def stats(self, request):
+            total = await self.model.objects.acount()
+            return {"total": total}
+    ```
+
+    Note: prefix and tags are optional. If omitted, the base path is inferred from the model verbose name plural and tags default to the model verbose name.
+
+=== "Alternative implementation"
 ```python
 from ninja_aio import NinjaAIO
 from ninja_aio.views import APIViewSet
 from .models import User
 
-api = NinjaAIO(title="My API")
+    api = NinjaAIO(title="My API")
 
-@api.viewset(model=User)
-class UserViewSet(APIViewSet):
-    pass
-```
+    class UserViewSet(APIViewSet):
+        model = User
+        api = api
 
-Note: prefix and tags are optional. If omitted, the base path is inferred from the model verbose name plural and tags default to the model verbose name.
+        def views(self):
+            @self.router.get("/stats/")
+            async def stats(request):
+                total = await self.model.objects.acount()
+                return {"total": total}
 
-Alternative implementation:
-
-```python
-from ninja_aio import NinjaAIO
-from ninja_aio.views import APIViewSet
-from .models import User
-
-api = NinjaAIO(title="My API")
-
-class UserViewSet(APIViewSet):
-    model = User
-    api = api
-
-UserViewSet().add_views_to_route()
-```
+    UserViewSet().add_views_to_route()
+    ```
 
 ## Disable Selected Views
 
@@ -387,6 +465,7 @@ Recommended:
 from ninja_aio import NinjaAIO
 from ninja_aio.views import APIViewSet
 from ninja_aio.models import ModelSerializer
+from ninja_aio.decorators.operations import api_get
 from django.db import models
 
 api = NinjaAIO(title="My API")

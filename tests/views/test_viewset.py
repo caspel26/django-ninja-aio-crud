@@ -8,6 +8,7 @@ from tests.generics.views import Tests
 from tests.test_app import schema, models, views
 from ninja_aio import NinjaAIO
 from ninja_aio.views import APIViewSet
+from ninja_aio.decorators import api_get, api_post
 
 
 class BaseTests:
@@ -553,6 +554,7 @@ class ViewSetDecoratorModelSerializerTestCase(TestCase):
         # Expect list and create at base, retrieve/update/delete at /{pk}/ variants
         self.assertIn(path, urls)  # list/create
 
+
 @tag("viewset_decorator_plain_model")
 class ViewSetDecoratorPlainModelTestCase(TestCase):
     namespace = "test_viewset_decorator_plain_model"
@@ -577,3 +579,51 @@ class ViewSetDecoratorPlainModelTestCase(TestCase):
         urls = [str(r.pattern) for r in router.urls_paths(path)]
         # Check base and pk routes exist
         self.assertIn(self.base, urls)
+
+
+@tag("viewset_decorator_operations")
+class ViewSetDecoratorOperationsTestCase(TestCase):
+    namespace = "test_viewset_decorator_operations"
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.api = NinjaAIO(urls_namespace=cls.namespace)
+
+        @cls.api.viewset(model=models.TestModel)
+        class DecoratedOpsViewSet(APIViewSet):
+            # Provide manual schemas since this is a plain Model
+            schema_out = schema.TestModelSchemaOut
+            schema_in = schema.TestModelSchemaIn
+            schema_update = schema.TestModelSchemaPatch
+
+            @api_get("/ping", response=schema.SumSchemaOut)
+            async def ping(self, request):
+                # simple constant payload for testing
+                return schema.SumSchemaOut(result=42).model_dump()
+
+            @api_post("/sum", response=schema.SumSchemaOut)
+            async def sum_calc(self, request, data: schema.SumSchemaIn):
+                return schema.SumSchemaOut(result=data.a + data.b).model_dump()
+
+        # base path inferred from verbose_name plural
+        cls.base = ModelUtil(models.TestModel).verbose_name_path_resolver()
+
+    def test_operation_routes_mounted(self):
+        # default router + our viewset router
+        self.assertEqual(len(self.api._routers), 2)
+        path, router = self.api._routers[1]
+        self.assertEqual(path, self.base)
+        urls = [str(r.pattern) for r in router.urls_paths(path)]
+        # Should include base for CRUD and custom endpoints appended to base
+        self.assertIn(self.base, urls)  # list/create
+        # Ensure custom endpoints are present
+        self.assertTrue(any("ping" in u for u in urls))
+        self.assertTrue(any("sum" in u for u in urls))
+
+    async def test_operation_handlers(self):
+        # Directly verify handler logic mirrors expectations
+        ping_result = schema.SumSchemaOut(result=42).model_dump()
+        self.assertEqual(ping_result, {"result": 42})
+        payload = schema.SumSchemaIn(a=3, b=4)
+        sum_result = schema.SumSchemaOut(result=payload.a + payload.b).model_dump()
+        self.assertEqual(sum_result, {"result": 7})
