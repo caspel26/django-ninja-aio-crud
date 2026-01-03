@@ -400,11 +400,11 @@ All CRUD and M2M endpoints may respond with `GenericMessageSchema` for error cod
 ## Minimal Usage
 
 === "Recommended"
-```python
-from ninja_aio import NinjaAIO
-from ninja_aio.views import APIViewSet
-from .models import User
-from ninja_aio.decorators.operations import api_get
+    ```python
+    from ninja_aio import NinjaAIO
+    from ninja_aio.views import APIViewSet
+    from .models import User
+    from ninja_aio.decorators.operations import api_get
 
     api = NinjaAIO(title="My API")
 
@@ -416,13 +416,11 @@ from ninja_aio.decorators.operations import api_get
             return {"total": total}
     ```
 
-    Note: prefix and tags are optional. If omitted, the base path is inferred from the model verbose name plural and tags default to the model verbose name.
-
 === "Alternative implementation"
-```python
-from ninja_aio import NinjaAIO
-from ninja_aio.views import APIViewSet
-from .models import User
+    ```python
+    from ninja_aio import NinjaAIO
+    from ninja_aio.views import APIViewSet
+    from .models import User
 
     api = NinjaAIO(title="My API")
 
@@ -438,6 +436,8 @@ from .models import User
 
     UserViewSet().add_views_to_route()
     ```
+
+Note: prefix and tags are optional. If omitted, the base path is inferred from the model verbose name plural and tags default to the model verbose name.
 
 ## Disable Selected Views
 
