@@ -35,7 +35,7 @@ class API:
         async def some_method(request, *args, **kwargs):
             pass
 
-        You can add multilple views just doing:
+        You can add views just doing:
 
         @self.router.get(some_path, response=some_schema)
         async def some_method(request, *args, **kwargs):
