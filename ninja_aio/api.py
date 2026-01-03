@@ -5,10 +5,13 @@ from ninja.throttling import BaseThrottle
 from ninja import NinjaAPI
 from ninja.openapi.docs import DocsBase, Swagger
 from ninja.constants import NOT_SET, NOT_SET_TYPE
+from django.db import models
 
 from .parsers import ORJSONParser
 from .renders import ORJSONRenderer
 from .exceptions import set_api_exception_handlers
+from .views import APIView, APIViewSet
+from .models import ModelSerializer
 
 
 class NinjaAIO(NinjaAPI):
@@ -49,3 +52,12 @@ class NinjaAIO(NinjaAPI):
     def set_default_exception_handlers(self):
         set_api_exception_handlers(self)
         super().set_default_exception_handlers()
+
+    def viewset(
+        self, model: models.Model | ModelSerializer, prefix: str = None
+    ) -> None:
+        def wrapper(viewset: type[APIViewSet]):
+            instance = viewset(api=self, prefix=prefix, model=model)
+            instance.add_views_to_route()
+
+        return wrapper

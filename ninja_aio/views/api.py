@@ -180,8 +180,15 @@ class APIViewSet:
     m2m_auth: list | None = NOT_SET
     extra_decorators: DecoratorsSchema = DecoratorsSchema()
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        api: NinjaAPI = None,
+        prefix: str = None,
+        model: Model | ModelSerializer = None,
+    ) -> None:
+        self.api = api or self.api
         self.error_codes = ERROR_CODES
+        self.model = model or self.model
         self.model_util = (
             ModelUtil(self.model)
             if not isinstance(self.model, ModelSerializerMeta)
@@ -200,7 +207,9 @@ class APIViewSet:
         self.path_retrieve = f"{{{self.model_util.model_pk_name}}}/"
         self.get_path_retrieve = f"{{{self.model_util.model_pk_name}}}"
         self.api_route_path = (
-            self.api_route_path or self.model_util.verbose_name_path_resolver()
+            self.api_route_path
+            or prefix
+            or self.model_util.verbose_name_path_resolver()
         )
         self.m2m_api = (
             None
