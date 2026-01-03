@@ -35,7 +35,7 @@ class APIView:
 
 Prefer class method decorators to define non-CRUD endpoints. Decorators lazily bind instance methods to the router and automatically remove `self` from the OpenAPI signature while preserving type hints.
 
-Available decorators (from `ninja_aio.decorators.operations`):
+Available decorators (from `ninja_aio.decorators`):
 
 - `@api_get(path, ...)`
 - `@api_post(path, ...)`
@@ -50,7 +50,7 @@ Example:
 ```python
 from ninja_aio import NinjaAIO
 from ninja_aio.views import APIView
-from ninja_aio.decorators.operations import api_get, api_post
+from ninja_aio.decorators import api_get, api_post
 from ninja import Schema
 
 api = NinjaAIO(title="My API")
@@ -135,7 +135,7 @@ Registers all defined views to the API instance.
 ```python
 from ninja_aio import NinjaAIO
 from ninja_aio.views import APIView
-from ninja_aio.decorators.operations import api_get, api_post
+from ninja_aio.decorators import api_get, api_post
 from ninja import Schema
 
 api = NinjaAIO(title="My API")

@@ -22,7 +22,7 @@ Notes:
 
 Use class method decorators to add non-CRUD endpoints to your ViewSet. This is the preferred way to extend a ViewSet with custom routes. The decorators lazily bind instance methods to the router and ensure correct OpenAPI signatures (no `self` in parameters).
 
-Available decorators (from `ninja_aio.decorators.operations`):
+Available decorators (from `ninja_aio.decorators`):
 
 - `@api_get(path, ...)`
 - `@api_post(path, ...)`
@@ -37,7 +37,7 @@ Example:
 ```python
 from ninja_aio import NinjaAIO
 from ninja_aio.views import APIViewSet
-from ninja_aio.decorators.operations import api_get, api_post
+from ninja_aio.decorators import api_get, api_post
 from .models import Article
 
 api = NinjaAIO(title="Blog API")
@@ -400,11 +400,11 @@ All CRUD and M2M endpoints may respond with `GenericMessageSchema` for error cod
 ## Minimal Usage
 
 === "Recommended"
-    ```python
-    from ninja_aio import NinjaAIO
-    from ninja_aio.views import APIViewSet
-    from .models import User
-    from ninja_aio.decorators.operations import api_get
+```python
+from ninja_aio import NinjaAIO
+from ninja_aio.views import APIViewSet
+from .models import User
+from ninja_aio.decorators import api_get
 
     api = NinjaAIO(title="My API")
 
@@ -417,10 +417,10 @@ All CRUD and M2M endpoints may respond with `GenericMessageSchema` for error cod
     ```
 
 === "Alternative implementation"
-    ```python
-    from ninja_aio import NinjaAIO
-    from ninja_aio.views import APIViewSet
-    from .models import User
+```python
+from ninja_aio import NinjaAIO
+from ninja_aio.views import APIViewSet
+from .models import User
 
     api = NinjaAIO(title="My API")
 
@@ -465,7 +465,7 @@ Recommended:
 from ninja_aio import NinjaAIO
 from ninja_aio.views import APIViewSet
 from ninja_aio.models import ModelSerializer
-from ninja_aio.decorators.operations import api_get
+from ninja_aio.decorators import api_get
 from django.db import models
 
 api = NinjaAIO(title="My API")
