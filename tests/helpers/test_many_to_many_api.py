@@ -33,7 +33,6 @@ class ManyToManyAPITestCase(TestCase):
     def setUpTestData(cls):
         cls.api = NinjaAIO(urls_namespace="m2m_test")
         cls.viewset = TestM2MViewSet(api=cls.api)
-        cls.viewset.api = cls.api
         cls.rel_util = ModelUtil(models.TestModelSerializerReverseManyToMany)
         cls.viewset.add_views_to_route()
         cls.request = Request(cls.viewset.path)
