@@ -8,10 +8,12 @@ from ninja_aio.schemas.helpers import (
 
 class ScopeNamespace:
     def __init__(self, **scopes):
+        """Create a simple namespace where each provided scope becomes an attribute."""
         for key, value in scopes.items():
             setattr(self, key, value)
 
     def __iter__(self):
+        """Iterate over the stored scope values."""
         return iter(self.__dict__.values())
 
 
@@ -51,6 +53,7 @@ class QueryUtil:
     SCOPES: QueryUtilBaseScopesSchema
 
     def __init__(self, model: ModelSerializerMeta):
+        """Initialize QueryUtil, resolving base and extra scope configurations for a model."""
         self.model = model
         self._configuration = getattr(self.model, "QuerySet", None)
         self._extra_configuration: list[ModelQuerySetExtraSchema] = getattr(
