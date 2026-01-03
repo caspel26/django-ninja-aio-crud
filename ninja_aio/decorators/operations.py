@@ -157,7 +157,6 @@ def _api_method(
 
 
 def api_get(
-    self,
     path: str,
     *,
     auth: Any = NOT_SET,
@@ -226,7 +225,6 @@ def api_get(
 
 
 def api_post(
-    self,
     path: str,
     *,
     auth: Any = NOT_SET,
@@ -278,7 +276,6 @@ def api_post(
 
 
 def api_put(
-    self,
     path: str,
     *,
     auth: Any = NOT_SET,
@@ -330,7 +327,6 @@ def api_put(
 
 
 def api_patch(
-    self,
     path: str,
     *,
     auth: Any = NOT_SET,
@@ -342,9 +338,9 @@ def api_patch(
     tags: Optional[List[str]] = None,
     deprecated: Optional[bool] = None,
     by_alias: Optional[bool] = None,
-    exclude_unset: Optional[bool] = None,
-    exclude_defaults: Optional[bool] = None,
-    exclude_none: Optional[bool] = None,
+    exclude_unset: Optional[bool] = NOT_SET,
+    exclude_defaults: Optional[bool] = NOT_SET,
+    exclude_none: Optional[bool] = NOT_SET,
     url_name: Optional[str] = None,
     include_in_schema: bool = True,
     openapi_extra: Optional[Dict[str, Any]] = None,
@@ -382,7 +378,6 @@ def api_patch(
 
 
 def api_delete(
-    self,
     path: str,
     *,
     auth: Any = NOT_SET,
@@ -394,9 +389,9 @@ def api_delete(
     tags: Optional[List[str]] = None,
     deprecated: Optional[bool] = None,
     by_alias: Optional[bool] = None,
-    exclude_unset: Optional[bool] = None,
-    exclude_defaults: Optional[bool] = None,
-    exclude_none: Optional[bool] = None,
+    exclude_unset: Optional[bool] = NOT_SET,
+    exclude_defaults: Optional[bool] = NOT_SET,
+    exclude_none: Optional[bool] = NOT_SET,
     url_name: Optional[str] = None,
     include_in_schema: bool = True,
     openapi_extra: Optional[Dict[str, Any]] = None,
@@ -434,7 +429,6 @@ def api_delete(
 
 
 def api_options(
-    self,
     path: str,
     *,
     auth: Any = NOT_SET,
@@ -446,9 +440,9 @@ def api_options(
     tags: Optional[List[str]] = None,
     deprecated: Optional[bool] = None,
     by_alias: Optional[bool] = None,
-    exclude_unset: Optional[bool] = None,
-    exclude_defaults: Optional[bool] = None,
-    exclude_none: Optional[bool] = None,
+    exclude_unset: Optional[bool] = NOT_SET,
+    exclude_defaults: Optional[bool] = NOT_SET,
+    exclude_none: Optional[bool] = NOT_SET,
     url_name: Optional[str] = None,
     include_in_schema: bool = True,
     openapi_extra: Optional[Dict[str, Any]] = None,
@@ -485,7 +479,6 @@ def api_options(
 
 
 def api_head(
-    self,
     path: str,
     *,
     auth: Any = NOT_SET,
@@ -497,9 +490,9 @@ def api_head(
     tags: Optional[List[str]] = None,
     deprecated: Optional[bool] = None,
     by_alias: Optional[bool] = None,
-    exclude_unset: Optional[bool] = None,
-    exclude_defaults: Optional[bool] = None,
-    exclude_none: Optional[bool] = None,
+    exclude_unset: Optional[bool] = NOT_SET,
+    exclude_defaults: Optional[bool] = NOT_SET,
+    exclude_none: Optional[bool] = NOT_SET,
     url_name: Optional[str] = None,
     include_in_schema: bool = True,
     openapi_extra: Optional[Dict[str, Any]] = None,
