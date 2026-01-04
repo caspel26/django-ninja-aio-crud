@@ -215,9 +215,8 @@ class LargePagination(PageNumberPagination):
     page_size = 50
     max_page_size = 200
 
+@api.viewset(Book)
 class BookViewSet(APIViewSet):
-    model = Book
-    api = api
     pagination_class = LargePagination
 ```
 
