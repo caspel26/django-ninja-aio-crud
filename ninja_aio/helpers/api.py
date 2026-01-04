@@ -337,6 +337,17 @@ class ManyToManyAPI:
             remove=remove,
         )
 
+    def _get_api_path(self, rel_path: str, append_slash: bool = None) -> str:
+        append_slash = append_slash if append_slash is not None else True
+        path = (
+            f"{self.view_set.path_retrieve}{rel_path}/"
+            if rel_path.startswith("/")
+            else f"{self.view_set.path_retrieve}/{rel_path}/"
+        )
+        if not append_slash:
+            path = path.rstrip("/")
+        return path
+
     def _register_get_relation_view(
         self,
         *,
@@ -346,9 +357,10 @@ class ManyToManyAPI:
         rel_path: str,
         related_schema,
         filters_schema,
+        append_slash: bool,
     ):
         @self.router.get(
-            f"{self.view_set.path_retrieve}{rel_path}",
+            self._get_api_path(rel_path, append_slash=append_slash),
             response={
                 200: list[related_schema],
                 self.view_set.error_codes: GenericMessageSchema,
@@ -400,7 +412,7 @@ class ManyToManyAPI:
         summary = f"{action} {plural}"
 
         @self.router.post(
-            f"{self.view_set.path_retrieve}{rel_path}/",
+            self._get_api_path(rel_path),
             response={
                 200: M2MSchemaOut,
                 self.view_set.error_codes: GenericMessageSchema,
@@ -465,6 +477,7 @@ class ManyToManyAPI:
         related_schema = relation.related_schema
         m2m_add, m2m_remove, m2m_get = relation.add, relation.remove, relation.get
         filters_schema = self.relations_filters_schemas.get(related_name)
+        append_slash = relation.append_slash
 
         if m2m_get:
             self._register_get_relation_view(
@@ -474,6 +487,7 @@ class ManyToManyAPI:
                 rel_path=rel_path,
                 related_schema=related_schema,
                 filters_schema=filters_schema,
+                append_slash=append_slash,
             )
 
         if m2m_add or m2m_remove:

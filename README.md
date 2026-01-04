@@ -78,9 +78,8 @@ Visit `/docs` → CRUD endpoints ready.
 ## 🔄 Query Filtering
 
 ```python
+@api.viewset(Book)
 class BookViewSet(APIViewSet):
-    model = Book
-    api = api
     query_params = {"published": (bool, None), "title": (str, None)}
 
     async def query_params_handler(self, queryset, filters):
