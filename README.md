@@ -180,6 +180,19 @@ Available on every save/delete:
 ## 🧩 Adding Custom Endpoints
 
 ```python
+from ninja_aio.decorators import api_get
+
+@api.viewset(Book)
+class BookViewSet(APIViewSet):
+    @api_get("/stats/")
+    async def stats(request):
+        total = await Book.objects.acount()
+        return {"total": total}
+```
+
+Or
+
+```python
 @api.viewset(Book)
 class BookViewSet(APIViewSet):
     def views(self):
