@@ -79,12 +79,13 @@ class APIView(API):
     Base class to register custom, non-CRUD endpoints on a Ninja Router.
 
     Usage:
+        from ninja_aio.decorations import api_get
+
         @api.view(prefix="/custom", tags=["Custom"])
         class CustomAPIView(APIView):
-            def views(self):
-                @self.router.get("/hello", response=SomeSchema)
-                async def hello(request):
-                    return SomeSchema(...)
+            @api_get("/hello", response=SomeSchema)
+            async def hello(request):
+                return SomeSchema(...)
 
         or
 
