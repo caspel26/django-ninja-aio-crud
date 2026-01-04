@@ -1,4 +1,4 @@
-from ninja_aio.factory.operations import ApiMethodFactory
+from ninja_aio.factory import ApiMethodFactory
 
 api_get = ApiMethodFactory.make("get")
 api_post = ApiMethodFactory.make("post")
