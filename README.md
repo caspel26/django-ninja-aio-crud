@@ -185,7 +185,7 @@ from ninja_aio.decorators import api_get
 @api.viewset(Book)
 class BookViewSet(APIViewSet):
     @api_get("/stats/")
-    async def stats(request):
+    async def stats(self, request):
         total = await Book.objects.acount()
         return {"total": total}
 ```
