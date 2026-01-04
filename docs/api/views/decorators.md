@@ -50,9 +50,8 @@ Attach decorators to CRUD operations without redefining views:
 ```python
 from ninja_aio.schemas.helpers import DecoratorsSchema
 
+@api.viewset(MyModel)
 class MyViewSet(APIViewSet):
-    api = api
-    model = MyModel
     extra_decorators = DecoratorsSchema(
         list=[require_auth, cache_page(30)],
         retrieve=[require_auth],
