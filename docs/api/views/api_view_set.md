@@ -218,6 +218,7 @@ Relations are declared via `M2MRelationSchema` objects (not tuples). Each schema
 - `get`: enable GET listing (bool)
 - `filters`: dict of `{param_name: (type, default)}` for relation-level filtering
 - `related_schema`: optional pre-built schema for the related model (auto-generated if the `model` is a `ModelSerializer`)
+- `append_slash`: bool to control trailing slash for the GET relation endpoint path. Defaults to `False` (no trailing slash) for backward compatibility. When `True`, the GET path ends with a trailing slash.
 
 If `path` is empty it falls back to the related model verbose name (lowercase plural).
 If `filters` is provided, a per-relation filters schema is auto-generated and exposed on the GET relation endpoint:
@@ -316,13 +317,13 @@ class MyViewSet(APIViewSet):
 
 ### Endpoint paths and operation naming
 
-- GET relation: `/{base}/{pk}/{rel_path}` (no trailing slash)
-- POST relation: `/{base}/{pk}/{rel_path}/` (trailing slash)
+- GET relation: `/{base}/{pk}/{rel_path}` by default (no trailing slash). You can enable a trailing slash per relation with `append_slash=True`, resulting in `/{base}/{pk}/{rel_path}/`.
+- POST relation: `/{base}/{pk}/{rel_path}/` (always with trailing slash).
 
 Path normalization rules:
 
 - Relation `path` is normalized internally; providing `path` with or without a leading slash produces the same final URL.
-  - Example: `path="tags"` or `path="/tags"` both yield `GET /{base}/{pk}/tags` and `POST /{base}/{pk}/tags/`.
+  - Example: `path="tags"` or `path="/tags"` both yield `GET /{base}/{pk}/tags` (or `GET /{base}/{pk}/tags/` when `append_slash=True`) and `POST /{base}/{pk}/tags/`.
 - If `path` is empty, it falls back to the related model verbose name.
 
 ### Request/Response and concurrency
@@ -365,6 +366,17 @@ class ArticleViewSet(APIViewSet):
         M2MRelationSchema(model=User, related_name="authors", path="co-authors", auth=[AdminAuth()])
     ]
     m2m_auth = [JWTAuth()]  # fallback for relations without custom auth
+```
+
+Example with trailing slash on GET relation:
+
+```python
+M2MRelationSchema(
+    model=Tag,
+    related_name="tags",
+    filters={"name": (str, "")},
+    append_slash=True,  # GET /{base}/{pk}/tags/
+)
 ```
 
 ## Custom Views
@@ -453,7 +465,7 @@ Note: prefix and tags are optional. If omitted, the base path is inferred from t
 @api.viewset(model=User)
 class ReadOnlyUserViewSet(APIViewSet):
     disable = ["create", "update", "delete"]
-````
+```
 
 ## Authentication Example
 
