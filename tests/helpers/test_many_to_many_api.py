@@ -17,6 +17,7 @@ class TestM2MViewSet(GenericAPIViewSet):
             model=models.TestModelSerializerReverseManyToMany,
             related_name=RELATED_NAME,
             filters={"name": (str, "")},
+            append_slash=True,
         )
     ]
 

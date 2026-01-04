@@ -338,7 +338,7 @@ class ManyToManyAPI:
         )
 
     def _get_api_path(self, rel_path: str, append_slash: bool = None) -> str:
-        append_slash = append_slash if append_slash is not None else False
+        append_slash = append_slash if append_slash is not None else True
         path = (
             f"{self.view_set.path_retrieve}{rel_path}/"
             if rel_path.startswith("/")
@@ -360,7 +360,7 @@ class ManyToManyAPI:
         append_slash: bool,
     ):
         @self.router.get(
-            self._get_api_path(rel_path, append_slash),
+            self._get_api_path(rel_path, append_slash=append_slash),
             response={
                 200: list[related_schema],
                 self.view_set.error_codes: GenericMessageSchema,
