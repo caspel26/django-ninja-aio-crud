@@ -337,6 +337,13 @@ class ManyToManyAPI:
             remove=remove,
         )
 
+    def _get_api_path(self, rel_path: str) -> str:
+        return (
+            f"{self.view_set.path_retrieve}{rel_path}/"
+            if rel_path.startswith("/")
+            else f"{self.view_set.path_retrieve}/{rel_path}/"
+        )
+
     def _register_get_relation_view(
         self,
         *,
@@ -348,7 +355,7 @@ class ManyToManyAPI:
         filters_schema,
     ):
         @self.router.get(
-            f"{self.view_set.path_retrieve}{rel_path}",
+            self._get_api_path(rel_path),
             response={
                 200: list[related_schema],
                 self.view_set.error_codes: GenericMessageSchema,
@@ -400,7 +407,7 @@ class ManyToManyAPI:
         summary = f"{action} {plural}"
 
         @self.router.post(
-            f"{self.view_set.path_retrieve}{rel_path}/",
+            self._get_api_path(rel_path),
             response={
                 200: M2MSchemaOut,
                 self.view_set.error_codes: GenericMessageSchema,
