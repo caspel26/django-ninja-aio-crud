@@ -1,5 +1,6 @@
 import asyncio
 from typing import (
+    Callable,
     Dict,
     List,
     Optional,
@@ -194,6 +195,7 @@ class ApiMethodFactory:
         url_name: Optional[str] = None,
         include_in_schema: bool = True,
         openapi_extra: Optional[Dict[str, Any]] = None,
+        decorators: Optional[List[Callable]] = None,  # es. [paginate(...)]
     ):
         """
         Returns a decorator that can be applied to an async or sync instance method.
@@ -211,6 +213,11 @@ class ApiMethodFactory:
 
                 clean_handler = self._build_handler(view_instance, func)
                 self._apply_metadata(clean_handler, func)
+
+                # Apply additional decorators if any
+                if decorators:
+                    for dec in reversed(decorators):
+                        clean_handler = dec(clean_handler)
 
                 route_adder = getattr(router, self.method_name)
                 route_adder(
@@ -259,6 +266,7 @@ class ApiMethodFactory:
             url_name: Optional[str] = None,
             include_in_schema: bool = True,
             openapi_extra: Optional[Dict[str, Any]] = None,
+            decorators: Optional[List[Callable]] = None,  # es. [paginate(...)]
         ):
             return cls(method_name).build_decorator(
                 path,
@@ -277,6 +285,7 @@ class ApiMethodFactory:
                 url_name=url_name,
                 include_in_schema=include_in_schema,
                 openapi_extra=openapi_extra,
+                decorators=decorators,
             )
 
         wrapper.__name__ = f"api_{method_name}"
