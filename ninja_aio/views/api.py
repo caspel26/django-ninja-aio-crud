@@ -5,6 +5,7 @@ from ninja.constants import NOT_SET
 from ninja.pagination import paginate, AsyncPaginationBase, PageNumberPagination
 from django.http import HttpRequest
 from django.db.models import Model, QuerySet
+from django.conf import settings
 from pydantic import create_model
 
 from ninja_aio.schemas.helpers import ModelQuerySetSchema, QuerySchema, DecoratorsSchema
@@ -66,7 +67,7 @@ class API:
     def _add_views(self):
         for name in dir(self.__class__):
             method = getattr(self.__class__, name)
-            if hasattr(method, '_api_register'):
+            if hasattr(method, "_api_register"):
                 method._api_register(self)
 
     def add_views_to_route(self):
@@ -260,10 +261,15 @@ class APIViewSet(API):
         self.router_tag = self.router_tag or self.model_verbose_name
         self.router_tags = self.router_tags or tags or [self.router_tag]
         self.router = Router(tags=self.router_tags)
-        self.path = "/"
+        self.append_slash = getattr(settings, "NINJA_AIO_APPEND_SLASH", True)
+        self.path = "/" if self.append_slash else ""
         self.get_path = ""
-        self.path_retrieve = f"{{{self.model_util.model_pk_name}}}/"
         self.get_path_retrieve = f"{{{self.model_util.model_pk_name}}}"
+        self.path_retrieve = (
+            f"{self.get_path_retrieve}/"
+            if self.append_slash
+            else self.get_path_retrieve
+        )
         self.api_route_path = (
             self.api_route_path
             or prefix

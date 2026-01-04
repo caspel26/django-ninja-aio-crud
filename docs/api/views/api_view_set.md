@@ -14,9 +14,15 @@
 
 Notes:
 
-- Retrieve path has no trailing slash; update/delete include a trailing slash.
+- Retrieve path typically includes a trailing slash by default (see settings below); update/delete include a trailing slash.
 - `{base}` auto-resolves from model verbose name plural (lowercase) unless `api_route_path` is provided.
 - Error responses may use a unified generic schema for codes: 400, 401, 404.
+
+### Settings: trailing slash behavior
+
+- NINJA_AIO_APPEND_SLASH (default: True)
+  - When True (default, for backward compatibility), retrieve and POST paths includes a trailing slash into CRUD: `/{base}/{pk}/`.
+  - When False, retrieve and post paths is generated without a trailing slash: `/{base}/{pk}`.
 
 ## Recommended: Decorator-based extra endpoints
 
@@ -212,6 +218,7 @@ Relations are declared via `M2MRelationSchema` objects (not tuples). Each schema
 - `get`: enable GET listing (bool)
 - `filters`: dict of `{param_name: (type, default)}` for relation-level filtering
 - `related_schema`: optional pre-built schema for the related model (auto-generated if the `model` is a `ModelSerializer`)
+- `append_slash`: bool to control trailing slash for the GET relation endpoint path. Defaults to `False` (no trailing slash) for backward compatibility. When `True`, the GET path ends with a trailing slash.
 
 If `path` is empty it falls back to the related model verbose name (lowercase plural).
 If `filters` is provided, a per-relation filters schema is auto-generated and exposed on the GET relation endpoint:
@@ -310,12 +317,14 @@ class MyViewSet(APIViewSet):
 
 ### Endpoint paths and operation naming
 
-- GET relation: `/{base}/{pk}/{rel_path}` (no trailing slash)
+- GET relation: `/{base}/{pk}/{rel_path}` by default (no trailing slash). You can enable a trailing slash per relation with `append_slash=True`, resulting in `/{base}/{pk}/{rel_path}/`.
+- POST relation: `/{base}/{pk}/{rel_path}/` (always with trailing slash).
 
-  - OperationId: `get_{base_model_name}_{rel_path}`
+Path normalization rules:
 
-- POST relation: `/{base}/{pk}/{rel_path}/` (trailing slash)
-  - OperationId: `manage_{base_model_name}_{rel_path}`
+- Relation `path` is normalized internally; providing `path` with or without a leading slash produces the same final URL.
+  - Example: `path="tags"` or `path="/tags"` both yield `GET /{base}/{pk}/tags` (or `GET /{base}/{pk}/tags/` when `append_slash=True`) and `POST /{base}/{pk}/tags/`.
+- If `path` is empty, it falls back to the related model verbose name.
 
 ### Request/Response and concurrency
 
@@ -359,6 +368,17 @@ class ArticleViewSet(APIViewSet):
     m2m_auth = [JWTAuth()]  # fallback for relations without custom auth
 ```
 
+Example with trailing slash on GET relation:
+
+```python
+M2MRelationSchema(
+    model=Tag,
+    related_name="tags",
+    filters={"name": (str, "")},
+    append_slash=True,  # GET /{base}/{pk}/tags/
+)
+```
+
 ## Custom Views
 
 Preferred (decorators): see the section above.
@@ -400,11 +420,11 @@ All CRUD and M2M endpoints may respond with `GenericMessageSchema` for error cod
 ## Minimal Usage
 
 === "Recommended"
-```python
-from ninja_aio import NinjaAIO
-from ninja_aio.views import APIViewSet
-from .models import User
-from ninja_aio.decorators import api_get
+    ````python
+    from ninja_aio import NinjaAIO
+    from ninja_aio.views import APIViewSet
+    from .models import User
+    from ninja_aio.decorators import api_get
 
     api = NinjaAIO(title="My API")
 
@@ -417,10 +437,10 @@ from ninja_aio.decorators import api_get
     ```
 
 === "Alternative implementation"
-```python
-from ninja_aio import NinjaAIO
-from ninja_aio.views import APIViewSet
-from .models import User
+    ```python
+    from ninja_aio import NinjaAIO
+    from ninja_aio.views import APIViewSet
+    from .models import User
 
     api = NinjaAIO(title="My API")
 

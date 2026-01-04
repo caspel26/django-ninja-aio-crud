@@ -17,6 +17,7 @@ class TestM2MViewSet(GenericAPIViewSet):
             model=models.TestModelSerializerReverseManyToMany,
             related_name=RELATED_NAME,
             filters={"name": (str, "")},
+            append_slash=True,
         )
     ]
 
@@ -52,19 +53,17 @@ class ManyToManyAPITestCase(TestCase):
             cls.related_objs.append(obj)
         cls.related_pks = [o.pk for o in cls.related_objs]
         cls.path_schema = cls.viewset.path_schema(**{cls.pk_att: cls.base_pk})
-        cls.manage_view = cls._get_related_views(manage_view=True)
-        cls.get_view = cls._get_related_views()
+        cls.get_view, cls.manage_view = cls._get_related_views()
 
     @classmethod
-    def _get_related_views(cls, manage_view: bool = False):
+    def _get_related_views(cls):
         path = (
-            f"{cls.viewset.path_retrieve}{cls.rel_util.verbose_name_path_resolver()}/"
-            if manage_view
-            else f"{cls.viewset.path_retrieve}{cls.rel_util.verbose_name_path_resolver()}"
+            f"{cls.viewset.path_retrieve}/{cls.rel_util.verbose_name_path_resolver()}/"
         )
-        return (
-            cls.viewset.m2m_api.router.path_operations.get(path).operations[0].view_func
-        )
+        get_view, manage_view = cls.viewset.m2m_api.router.path_operations.get(
+            path
+        ).operations
+        return get_view.view_func, manage_view.view_func
 
     def _manage_data(self, add=None, remove=None):
         action_schema = self.viewset.m2m_api.views_action_map[(True, True)][1]
@@ -91,7 +90,9 @@ class ManyToManyAPITestCase(TestCase):
             "test_model_serializers"
         ]
         filters = filters_schema(name="target")
-        content = await self.get_view(request=self.request.get(), pk=self.path_schema, filters=filters)
+        content = await self.get_view(
+            request=self.request.get(), pk=self.path_schema, filters=filters
+        )
         self.assertEqual(content["count"], 1)
         self.assertEqual(content["items"][0]["name"], "target")
 
