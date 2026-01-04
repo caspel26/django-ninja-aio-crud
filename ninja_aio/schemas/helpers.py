@@ -38,6 +38,8 @@ class M2MRelationSchema(BaseModel):
             Optional explicit schema to represent related objects in responses.
             If `model` is a ModelSerializerMeta, this is auto-derived via `model.generate_related_s()`.
             If `model` is a plain Django model, this must be provided.
+        append_slash (bool):
+            Whether to append a trailing slash to the generated GET endpoint path. Defaults to False for backward compatibility.
 
     Validation:
         - If `model` is not a ModelSerializerMeta, `related_schema` is required.
@@ -61,6 +63,7 @@ class M2MRelationSchema(BaseModel):
     auth: Optional[list] = None
     filters: Optional[dict[str, tuple]] = None
     related_schema: Optional[Type[Schema]] = None
+    append_slash: bool = False
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
