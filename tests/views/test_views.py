@@ -2,6 +2,7 @@ from ninja_aio import NinjaAIO
 from django.test import TestCase, tag
 from ninja_aio.decorators import api_get, api_post
 
+from ninja_aio.decorators.views import unique_view
 from tests.test_app import schema
 from tests.generics.request import Request
 from tests.generics.views import GenericAPIView
@@ -115,7 +116,11 @@ class APIViewDecoratorOperationsTestCase(TestCase):
                 async def ping(self, request):
                     return schema.SumSchemaOut(result=99).model_dump()
 
-                @api_post("/sum", response=schema.SumSchemaOut)
+                @api_post(
+                    "/sum",
+                    response=schema.SumSchemaOut,
+                    decorators=[unique_view("view-decorator-test-sum-view")],
+                )
                 async def sum_view(self, request, data: schema.SumSchemaIn):
                     return schema.SumSchemaOut(result=data.a + data.b).model_dump()
 
