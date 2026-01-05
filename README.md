@@ -39,6 +39,7 @@ Add to your project’s dependencies and ensure Django Ninja is installed.
 ## 🚀 Quick Start
 
 models.py
+
 ```python
 from django.db import models
 from ninja_aio.models import ModelSerializer
@@ -58,6 +59,7 @@ class Book(ModelSerializer):
 ```
 
 views.py
+
 ```python
 from ninja_aio import NinjaAIO
 from ninja_aio.views import APIViewSet
@@ -91,6 +93,7 @@ class BookViewSet(APIViewSet):
 ```
 
 Request:
+
 ```
 GET /book/?published=true&title=python
 ```
@@ -133,6 +136,7 @@ class ArticleViewSet(APIViewSet):
 ```
 
 Endpoints:
+
 - `GET /article/{pk}/tag?name=dev`
 - `POST /article/{pk}/tag/` body: `{"add":[1,2],"remove":[3]}`
 
@@ -167,6 +171,7 @@ class SecureBookViewSet(APIViewSet):
 ## 📑 Lifecycle Hooks (ModelSerializer)
 
 Available on every save/delete:
+
 - `on_create_before_save`
 - `on_create_after_save`
 - `before_save`
@@ -225,6 +230,7 @@ class BookViewSet(APIViewSet):
 ## 🛠 Project Structure & Docs
 
 Documentation (MkDocs + Material):
+
 ```
 docs/
   getting_started/
@@ -237,17 +243,19 @@ docs/
 ```
 
 Browse full reference:
+
 - APIViewSet: `docs/api/views/api_view_set.md`
 - APIView: `docs/api/views/api_view.md`
 - ModelSerializer: `docs/api/models/model_serializer.md`
 - Authentication: `docs/api/authentication.md`
-- Pagination: `docs/api/pagination.md`
+- Example repository: https://github.com/caspel26/ninja-aio-blog-example
 
 ---
 
 ## 🧪 Tests
 
 Use Django test runner + async ORM patterns. Example async pattern:
+
 ```python
 obj = await Book.objects.acreate(title="T1", published=True)
 count = await Book.objects.acount()
@@ -287,6 +295,7 @@ class ReadOnlyBookViewSet(APIViewSet):
 ## ⭐ Support
 
 Star the repo or donate:
+
 - [Buy me a coffee](https://buymeacoffee.com/caspel26)
 
 ---
@@ -299,10 +308,11 @@ MIT License. See [LICENSE](LICENSE).
 
 ## 🔗 Quick Links
 
-| Item | Link |
-|------|------|
-| PyPI | https://pypi.org/project/django-ninja-aio-crud/ |
-| Docs | https://django-ninja-aio.com
-| Issues | https://github.com/caspel26/django-ninja-aio-crud/issues |
+| Item    | Link                                                     |
+| ------- | -------------------------------------------------------- |
+| PyPI    | https://pypi.org/project/django-ninja-aio-crud/          |
+| Docs    | https://django-ninja-aio.com                             |
+| Issues  | https://github.com/caspel26/django-ninja-aio-crud/issues |
+| Example | https://github.com/caspel26/ninja-aio-blog-example       |
 
 ---

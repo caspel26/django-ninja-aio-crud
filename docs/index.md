@@ -33,55 +33,52 @@ Traditional Django REST development requires:
 **Django Ninja Aio CRUD** eliminates this complexity:
 
 === "Traditional Approach"
-    ```python
-    # schema.py
-    class UserSchemaOut(ModelSchema)
-        class Meta:
-            model = User
-            fields = ['id', 'username', 'email']
-    
+```python # schema.py
+class UserSchemaOut(ModelSchema)
+class Meta:
+model = User
+fields = ['id', 'username', 'email']
+
     class UserSchemaIn(ModelSchema):
         class Meta:
             model = User
             fields = ['username', 'email', 'password']
-    
+
     # views.py
     @api.get("/users", response={200: list[UserSchemaOut]})
     async def list_users(request):
         return [user async for user in User.objects.select_related().all()]
-    
+
     @api.post("/users/", response={201: UserSchemaOut})
     async def create_user(request, data: UserSchemaIn):
         user = await User.objects.select_related().acreate(**data.model_dump())
         return 201, user
 
-    
+
     # ... more views for retrieve, update, delete
     ```
 
 === "Django Ninja Aio CRUD"
-    ```python
-    # models.py
-    class User(ModelSerializer):
-        username = models.CharField(max_length=150)
-        email = models.EmailField()
-        password = models.CharField(max_length=128)
-        
+```python # models.py
+class User(ModelSerializer):
+username = models.CharField(max_length=150)
+email = models.EmailField()
+password = models.CharField(max_length=128)
+
         class ReadSerializer:
             fields = ["id", "username", "email"]
-        
+
         class CreateSerializer:
             fields = ["username", "email", "password"]
-        
+
         class UpdateSerializer:
             optionals = [("email", str)]
-    
+
     # views.py
+    @api.viewset(User)
     class UserViewSet(APIViewSet):
-        model = User
-        api = api
-    
-    UserViewSet().add_views_to_route()
+        pass
+
     # Done! List, Create, Retrieve, Update, Delete endpoints ready
     ```
 
@@ -213,19 +210,18 @@ from .models import Author, Category, Article, Tag
 api = NinjaAIO(title="Blog API", version="1.0.0")
 
 
+@api.viewset(Author)
 class AuthorViewSet(APIViewSet):
-    model = Author
-    api = api
+    pass
 
 
+@api.viewset(Category)
 class CategoryViewSet(APIViewSet):
-    model = Category
-    api = api
+    pass
 
 
+@api.viewset(Article)
 class ArticleViewSet(APIViewSet):
-    model = Article
-    api = api
     query_params = {
         "is_published": (bool, None),
         "category": (int, None),
@@ -242,16 +238,9 @@ class ArticleViewSet(APIViewSet):
         return queryset
 
 
+@api.viewset(Tag)
 class TagViewSet(APIViewSet):
-    model = Tag
-    api = api
-
-
-# Register all views
-AuthorViewSet().add_views_to_route()
-CategoryViewSet().add_views_to_route()
-ArticleViewSet().add_views_to_route()
-TagViewSet().add_views_to_route()
+    pass
 ```
 
 This creates a complete blog API with:
@@ -287,9 +276,9 @@ class User(ModelSerializer):
 Automatically generates complete CRUD endpoints:
 
 ```python
+@api.viewset(User)
 class UserViewSet(APIViewSet):
-    model = User
-    api = api
+    pass
     # Generates: List, Create, Retrieve, Update, Delete
 ```
 
@@ -298,17 +287,16 @@ class UserViewSet(APIViewSet):
 Extend with custom endpoints:
 
 ```python
-class UserViewSet(APIViewSet):
-    model = User
-    api = api
+from ninja_aio.decorators import api_post
 
-    def views(self):
-        @self.router.post("/{pk}/activate/")
-        async def activate(request, pk: int):
-            user = await User.objects.aget(pk=pk)
-            user.is_active = True
-            await user.asave()
-            return {"message": "User activated"}
+@api.viewset(User)
+class UserViewSet(APIViewSet):
+    @api_post("/{pk}/activate")
+    async def activate(self, request, pk: int):
+        user = await User.objects.aget(pk=pk)
+        user.is_active = True
+        await user.asave()
+        return {"message": "User activated"}
 ```
 
 ## 📄 License
@@ -327,6 +315,7 @@ If you find Django Ninja Aio CRUD useful, consider supporting the project:
 - **GitHub:** [https://github.com/caspel26/django-ninja-aio-crud](https://github.com/caspel26/django-ninja-aio-crud)
 - **PyPI:** [https://pypi.org/project/django-ninja-aio-crud/](https://pypi.org/project/django-ninja-aio-crud/)
 - **Django Ninja:** [https://django-ninja.dev/](https://django-ninja.dev/)
+- **Example repository:** https://github.com/caspel26/ninja-aio-blog-example
 
 ---
 
