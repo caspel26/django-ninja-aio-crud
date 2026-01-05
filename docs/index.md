@@ -36,9 +36,9 @@ Traditional Django REST development requires:
     ```python 
     # schema.py
     class UserSchemaOut(ModelSchema)
-    class Meta:
-    model = User
-    fields = ['id', 'username', 'email']
+        class Meta:
+        model = User
+        fields = ['id', 'username', 'email']
 
     class UserSchemaIn(ModelSchema):
         class Meta:
