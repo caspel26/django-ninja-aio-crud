@@ -33,11 +33,12 @@ Traditional Django REST development requires:
 **Django Ninja Aio CRUD** eliminates this complexity:
 
 === "Traditional Approach"
-```python # schema.py
-class UserSchemaOut(ModelSchema)
-class Meta:
-model = User
-fields = ['id', 'username', 'email']
+    ```python 
+    # schema.py
+    class UserSchemaOut(ModelSchema)
+    class Meta:
+    model = User
+    fields = ['id', 'username', 'email']
 
     class UserSchemaIn(ModelSchema):
         class Meta:
@@ -59,11 +60,12 @@ fields = ['id', 'username', 'email']
     ```
 
 === "Django Ninja Aio CRUD"
-```python # models.py
-class User(ModelSerializer):
-username = models.CharField(max_length=150)
-email = models.EmailField()
-password = models.CharField(max_length=128)
+    ```python 
+    # models.py
+    class User(ModelSerializer):
+        username = models.CharField(max_length=150)
+        email = models.EmailField()
+        password = models.CharField(max_length=128)
 
         class ReadSerializer:
             fields = ["id", "username", "email"]
