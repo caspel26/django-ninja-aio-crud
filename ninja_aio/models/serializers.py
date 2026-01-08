@@ -110,11 +110,14 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
             Fields to force exclude (safety).
         customs : list[tuple[str, type, Any]]
             Computed / synthetic output attributes.
+        optionals : list[tuple[str, type]]
+            Optional output fields.
         """
 
         fields: list[str] = []
-        excludes: list[str] = []
         customs: list[tuple[str, type, Any]] = []
+        optionals: list[tuple[str, type]] = []
+        excludes: list[str] = []
 
     class UpdateSerializer:
         """Configuration describing update (PATCH/PUT) schema.
@@ -209,7 +212,9 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
             case "Patch":
                 s_type = "update"
             case "Out":
-                fields, reverse_rels, excludes, customs = cls.get_schema_out_data()
+                fields, reverse_rels, excludes, customs, optionals = (
+                    cls.get_schema_out_data()
+                )
                 if not fields and not reverse_rels and not excludes and not customs:
                     return None
                 return create_schema(
@@ -217,7 +222,7 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
                     name=f"{cls._meta.model_name}SchemaOut",
                     depth=depth,
                     fields=fields,
-                    custom_fields=reverse_rels + customs,
+                    custom_fields=reverse_rels + customs + optionals,
                     exclude=excludes,
                 )
             case "Related":
@@ -451,6 +456,7 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
             reverse_rels,
             cls.get_excluded_fields("read"),
             cls.get_custom_fields("read") + rels,
+            cls.get_optional_fields("read"),
         )
 
     @classmethod
