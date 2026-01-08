@@ -16,6 +16,7 @@ from ninja_aio.types import S_TYPES, F_TYPES, SCHEMA_TYPES, ModelSerializerMeta
 from ninja_aio.schemas.helpers import (
     ModelQuerySetSchema,
     ModelQuerySetExtraSchema,
+    SerializerSchema,
 )
 from ninja_aio.helpers.query import QueryUtil
 
@@ -682,3 +683,45 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
         res = super().delete(*args, **kwargs)
         self.on_delete()
         return res
+
+
+class Serializer:
+    class Meta:
+        model: type[ModelSerializer] | models.Model = None
+        schema_in: SerializerSchema = None
+        schema_out: SerializerSchema = None
+        schema_update: SerializerSchema = None
+
+    def __init__(self):
+        self.model = self._validate_model()
+
+    @classmethod
+    def _get_meta_data(cls, attr_name: str) -> Any:
+        return getattr(cls.Meta, attr_name, None)
+
+    @classmethod
+    def _generate_schema(cls, schema_meta: SerializerSchema, name: str) -> Schema:
+        fields = schema_meta.fields or []
+        optionals = [
+            (field, field_type, None)
+            for field, field_type in (schema_meta.optionals or [])
+        ]
+        customs = schema_meta.customs or []
+        excludes = schema_meta.exclude or []
+        if not fields and not excludes and not customs and not optionals:
+            return None
+        return create_schema(
+            model=cls.model,
+            name=name,
+            fields=fields,
+            custom_fields=customs + optionals,
+            exclude=excludes,
+        )
+
+    def _validate_model(self):
+        model = self._get_meta_data("model")
+        if not model:
+            raise ValueError("Meta.model must be defined for Serializer.")
+        if not issubclass(model, (models.Model, ModelSerializerMeta)):
+            raise ValueError("Meta.model must be a Django model or ModelSerializer.")
+        return model

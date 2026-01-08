@@ -168,3 +168,10 @@ class DecoratorsSchema(Schema):
     create: Optional[List] = []
     update: Optional[List] = []
     delete: Optional[List] = []
+
+
+class SerializerSchema(Schema):
+    fields: Optional[List[str]] = None
+    optionals: Optional[List[tuple[str, type]]] = None
+    exclude: Optional[List[str]] = None
+    customs: Optional[List[tuple[str, type, any]]] = None 
