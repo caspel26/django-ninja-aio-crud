@@ -34,7 +34,7 @@ Traditional Django REST development requires:
 **Django Ninja Aio CRUD** eliminates this complexity:
 
 === "Traditional Approach"
-    ````python 
+    ```python 
     # schema.py
     class UserSchemaOut(ModelSchema)
         class Meta:
