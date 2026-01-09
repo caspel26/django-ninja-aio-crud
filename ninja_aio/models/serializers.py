@@ -1,6 +1,7 @@
 from typing import Any, ClassVar, List, Optional
 import warnings
 
+from django.conf import settings
 from ninja import Schema
 from ninja.orm import create_schema
 from django.db import models
@@ -214,7 +215,11 @@ class BaseSerializer:
             )
 
             # If explicit relation serializers are declared, require mapping presence.
-            if is_reverse and f not in relations_serializers:
+            if (
+                is_reverse
+                and f not in relations_serializers
+                and not getattr(settings, "NINJA_AIO_TESTING", False)
+            ):
                 warnings.warn(
                     f"{cls.__name__}: reverse relation '{f}' is listed in read fields but has no entry in relations_serializers; "
                     "it will be auto-resolved only for ModelSerializer relations, otherwise skipped.",
