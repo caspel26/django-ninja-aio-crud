@@ -11,6 +11,7 @@
 
 ## ✨ Key Features
 
+- 📦 Serializer (Meta-driven) — Define schemas for existing Django models without inheriting ModelSerializer
 - 🚀 **Fully Async** - Built for Django's async ORM
 - 🔄 **Automatic CRUD** - Generate complete REST APIs with minimal code
 - 📝 **ModelSerializer** - Define schemas directly on models
@@ -33,11 +34,12 @@ Traditional Django REST development requires:
 **Django Ninja Aio CRUD** eliminates this complexity:
 
 === "Traditional Approach"
-```python # schema.py
-class UserSchemaOut(ModelSchema)
-class Meta:
-model = User
-fields = ['id', 'username', 'email']
+    ````python 
+    # schema.py
+    class UserSchemaOut(ModelSchema)
+        class Meta:
+        model = User
+        fields = ['id', 'username', 'email']
 
     class UserSchemaIn(ModelSchema):
         class Meta:
@@ -59,11 +61,12 @@ fields = ['id', 'username', 'email']
     ```
 
 === "Django Ninja Aio CRUD"
-```python # models.py
-class User(ModelSerializer):
-username = models.CharField(max_length=150)
-email = models.EmailField()
-password = models.CharField(max_length=128)
+    ```python 
+    # models.py
+    class User(ModelSerializer):
+        username = models.CharField(max_length=150)
+        email = models.EmailField()
+        password = models.CharField(max_length=128)
 
         class ReadSerializer:
             fields = ["id", "username", "email"]
@@ -86,11 +89,14 @@ password = models.CharField(max_length=128)
 
 Explore detailed documentation for each component:
 
+#### Serializer (Meta-driven)
+
+- **[Serializer (Meta-driven)](api/models/serializers.md)** - Dynamic schemas for existing Django models without inheriting ModelSerializer
+
 #### Models
 
 - **[Model Serializer](api/models/model_serializer.md)** - Schema generation and serialization
 - **[Model Util](api/models/model_util.md)** - Async CRUD utilities
-- **[Serializer (Meta-driven)](api/models/serializers.md)** - Dynamic schemas for existing Django models without inheriting ModelSerializer
 
 #### Views
 
@@ -101,6 +107,35 @@ Explore detailed documentation for each component:
 
 - **[Authentication](api/authentication.md)** - JWT and custom auth
 - **[Pagination](api/pagination.md)** - Customize pagination behavior
+
+## Start with Serializer
+
+Use Meta-driven Serializer first if you already have Django models and want immediate CRUD without changing bases:
+
+```python
+from ninja_aio.models import serializers
+from . import models
+
+class BookSerializer(serializers.Serializer):
+    class Meta:
+        model = models.Book
+        schema_in = serializers.SchemaModelConfig(fields=["title", "published"])
+        schema_out = serializers.SchemaModelConfig(fields=["id", "title", "published"])
+        schema_update = serializers.SchemaModelConfig(optionals=[("title", str), ("published", bool)])
+````
+
+Attach to a ViewSet:
+
+```python
+from ninja_aio.views import APIViewSet
+from ninja_aio import NinjaAIO
+
+api = NinjaAIO()
+
+@api.viewset(models.Book)
+class BookViewSet(APIViewSet):
+    serializer_class = BookSerializer
+```
 
 ## Query optimization and schemas
 

@@ -13,6 +13,7 @@
 
 ## ✨ Features
 
+- Serializer (Meta-driven) first-class: dynamic schemas for existing Django models without inheriting ModelSerializer
 - Async CRUD ViewSets (create, list, retrieve, update, delete)
 - Automatic Pydantic schemas from `ModelSerializer` (read/create/update)
 - Dynamic query params (runtime schema via `pydantic.create_model`)
@@ -26,17 +27,35 @@
 
 ---
 
-## 📦 Installation
+## 🚀 Quick Start (Serializer)
 
-```bash
-pip install django-ninja-aio-crud
+If you already have Django models, start with the Meta-driven Serializer for instant CRUD without changing model base classes.
+
+```python
+from ninja_aio.models import serializers
+from ninja_aio.views import APIViewSet
+from ninja_aio import NinjaAIO
+from . import models
+
+class BookSerializer(serializers.Serializer):
+    class Meta:
+        model = models.Book
+        schema_in = serializers.SchemaModelConfig(fields=["title", "published"])
+        schema_out = serializers.SchemaModelConfig(fields=["id", "title", "published"])
+        schema_update = serializers.SchemaModelConfig(optionals=[("title", str), ("published", bool)])
+
+api = NinjaAIO()
+
+@api.viewset(models.Book)
+class BookViewSet(APIViewSet):
+    serializer_class = BookSerializer
 ```
 
-Add to your project’s dependencies and ensure Django Ninja is installed.
+Visit `/docs` → CRUD endpoints ready.
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick Start (ModelSerializer)
 
 models.py
 
@@ -229,29 +248,7 @@ class BookViewSet(APIViewSet):
 
 ## Meta-driven Serializer (for vanilla Django models)
 
-If you already have Django models and don't want to inherit from ModelSerializer, use the Meta-driven Serializer to generate dynamic schemas and integrate with APIViewSet.
-
-Example:
-
-```python
-from ninja_aio.models import serializers
-from . import models
-
-class BookSerializer(serializers.Serializer):
-    class Meta:
-        model = models.Book
-        schema_in = serializers.SchemaModelConfig(fields=["title", "published"])
-        schema_out = serializers.SchemaModelConfig(fields=["id", "title", "published"])
-        schema_update = serializers.SchemaModelConfig(optionals=[("title", str), ("published", bool)])
-
-@api.viewset(models.Book)
-class BookViewSet(APIViewSet):
-    serializer_class = BookSerializer
-```
-
-- Works without modifying existing models
-- Supports nested relations via relations_serializers
-- APIViewSet will auto-generate missing schemas from the serializer
+Moved above as the primary quick start.
 
 ---
 
