@@ -1,4 +1,4 @@
-from typing import List, Optional, Type
+from typing import Any, List, Optional, Type
 
 from ninja import Schema
 from ninja_aio.types import ModelSerializerMeta
@@ -174,4 +174,4 @@ class SerializerSchema(Schema):
     fields: Optional[List[str]] = None
     optionals: Optional[List[tuple[str, type]]] = None
     exclude: Optional[List[str]] = None
-    customs: Optional[List[tuple[str, type, any]]] = None 
+    customs: Optional[List[tuple[str, type, Any]]] = None 
