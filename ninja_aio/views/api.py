@@ -253,7 +253,7 @@ class APIViewSet(API):
         self.error_codes = ERROR_CODES
         self.model = model or self.model
         self.model_util = (
-            ModelUtil(self.model)
+            ModelUtil(self.model, serializer_class=self.serializer_class)
             if not isinstance(self.model, ModelSerializerMeta)
             else self.model.util
         )

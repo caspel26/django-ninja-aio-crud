@@ -360,6 +360,21 @@ class BaseSerializer:
         """Generate related (nested) schema."""
         return cls._generate_model_schema("Related")
 
+    @classmethod
+    async def queryset_request(cls, request: HttpRequest):
+        """
+        Override to return a request-scoped filtered queryset.
+
+        Parameters
+        ----------
+        request : HttpRequest
+
+        Returns
+        -------
+        QuerySet
+        """
+        raise NotImplementedError
+
 
 class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMeta):
     """
@@ -539,17 +554,6 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
 
     @classmethod
     async def queryset_request(cls, request: HttpRequest):
-        """
-        Override to return a request-scoped filtered queryset.
-
-        Parameters
-        ----------
-        request : HttpRequest
-
-        Returns
-        -------
-        QuerySet
-        """
         return cls.query_util.apply_queryset_optimizations(
             queryset=cls.objects.all(),
             scope=cls.query_util.SCOPES.QUERYSET_REQUEST,
@@ -697,3 +701,7 @@ class Serializer(BaseSerializer):
         if not schema:
             return []
         return getattr(schema, f_type, []) or []
+
+    @classmethod
+    async def queryset_request(cls, request: HttpRequest):
+        return cls._get_model()._default_manager.all()

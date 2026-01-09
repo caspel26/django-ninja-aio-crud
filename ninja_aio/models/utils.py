@@ -93,7 +93,9 @@ class ModelUtil:
     - Stateless wrapper; safe per-request instantiation.
     """
 
-    def __init__(self, model: type["ModelSerializer"] | models.Model):
+    def __init__(
+        self, model: type["ModelSerializer"] | models.Model, serializer_class=None
+    ):
         """
         Initialize with a Django model or ModelSerializer subclass.
 
@@ -102,7 +104,14 @@ class ModelUtil:
         model : Model | ModelSerializerMeta
             Target model class.
         """
+        from ninja_aio.models.serializers import Serializer
+
         self.model = model
+        self.serializer_class: Serializer = serializer_class
+        if serializer_class is not None and isinstance(model, ModelSerializerMeta):
+            raise ConfigError(
+                "ModelUtil cannot accept both model and serializer_class if the model is a ModelSerializer."
+            )
 
     @property
     def pk_field_type(self):
@@ -240,7 +249,11 @@ class ModelUtil:
             Optimized and filtered queryset.
         """
         # Start with base queryset
-        obj_qs = self.model.objects.all()
+        obj_qs = (
+            self.model.objects.all()
+            if self.serializer_class is None
+            else await self.serializer_class.queryset_request(request)
+        )
 
         # Apply query optimizations
         obj_qs = self._apply_query_optimizations(obj_qs, query_data, is_for_read)
