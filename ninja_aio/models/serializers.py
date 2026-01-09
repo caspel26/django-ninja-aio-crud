@@ -687,10 +687,11 @@ class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
 
 class Serializer:
     class Meta:
-        model: type[ModelSerializer] | models.Model = None
+        model: models.Model = None
         schema_in: SerializerSchema = None
         schema_out: SerializerSchema = None
         schema_update: SerializerSchema = None
+        relations_serializers: dict[str, "Serializer"] = {}
 
     def __init__(self):
         self.model = self._validate_model()
@@ -701,6 +702,26 @@ class Serializer:
     @classmethod
     def _get_meta_data(cls, attr_name: str) -> Any:
         return getattr(cls.Meta, attr_name, None)
+
+    @classmethod
+    def _get_model(cls) -> models.Model:
+        return cls._validate_model()
+
+    @classmethod
+    def _get_relations_serializers(cls) -> dict[str, "Serializer"]:
+        relations_serializers = cls._get_meta_data("relations_serializers")
+        return relations_serializers or {}
+
+    @classmethod
+    def _get_schema_meta(cls, schema_type: str) -> SerializerSchema:
+        match schema_type:
+            case "in":
+                return cls._get_meta_data("schema_in")
+            case "out":
+                return cls._get_meta_data("schema_out")
+            case "update":
+                return cls._get_meta_data("schema_update")
+        return None
 
     @classmethod
     def _generate_schema(cls, schema_meta: SerializerSchema, name: str) -> Schema:
@@ -714,7 +735,7 @@ class Serializer:
         if not fields and not excludes and not customs and not optionals:
             return None
         return create_schema(
-            model=cls._validate_model(),
+            model=cls._get_model(),
             name=name,
             fields=fields,
             custom_fields=customs + optionals,
@@ -726,8 +747,8 @@ class Serializer:
         model = cls._get_meta_data("model")
         if not model:
             raise ValueError("Meta.model must be defined for Serializer.")
-        if not issubclass(model, (models.Model, ModelSerializerMeta)):
-            raise ValueError("Meta.model must be a Django model or ModelSerializer.")
+        if not isinstance(model, models.Model):
+            raise ValueError("Meta.model must be a Django model")
         return model
 
     @classmethod
@@ -739,6 +760,201 @@ class Serializer:
         return cls._generate_schema(
             schema_meta, name=f"{model._meta.model_name}Schema{suffix}"
         )
+
+    @classmethod
+    def _get_fields(cls, s_type: type[S_TYPES], f_type: type[F_TYPES]):
+        """
+        Internal accessor for raw configuration lists.
+        """
+        schema = {
+            "create": cls._get_schema_meta("in"),
+            "update": cls._get_schema_meta("update"),
+            "read": cls._get_schema_meta("out"),
+        }.get(s_type)
+        if not schema:
+            return []
+        return getattr(schema, f_type, []) or []
+
+    @classmethod
+    def _build_schema_reverse_rel(cls, field_name: str, descriptor: Any):
+        """
+        Build a reverse relation schema component for 'Out' schema generation.
+        """
+        if isinstance(descriptor, ManyToManyDescriptor):
+            rel_model: models.Model = descriptor.field.related_model
+            if descriptor.reverse:  # reverse side of M2M
+                rel_model = descriptor.field.model
+            rel_type = "many"
+        elif isinstance(descriptor, ReverseManyToOneDescriptor):
+            rel_model = descriptor.field.model
+            rel_type = "many"
+        else:  # ReverseOneToOneDescriptor
+            rel_model = descriptor.related.related_model
+            rel_type = "one"
+
+        if not isinstance(rel_model, ModelSerializerMeta):
+            return None
+        if not rel_model.get_fields("read") and not rel_model.get_custom_fields("read"):
+            return None
+
+        rel_schema = (
+            rel_model.generate_related_s()
+            if rel_type == "one"
+            else list[rel_model.generate_related_s()]
+        )
+        return (field_name, rel_schema | None, None)
+
+    @classmethod
+    def get_schema_out_data(cls):
+        """
+        Collect components for 'Out' read schema generation.
+
+        Returns
+        -------
+        tuple
+            (fields, reverse_rel_descriptors, excludes, custom_fields_with_forward_relations)
+        """
+
+        fields: list[str] = []
+        reverse_rels: list[tuple] = []
+        rels: list[tuple] = []
+        relations_serializers = cls._get_relations_serializers()
+
+        for f in cls.get_fields("read"):
+            field_obj = getattr(cls, f)
+
+            # Reverse relations
+            if (
+                isinstance(
+                    field_obj,
+                    (
+                        ManyToManyDescriptor,
+                        ReverseManyToOneDescriptor,
+                        ReverseOneToOneDescriptor,
+                    ),
+                )
+                and f in relations_serializers
+            ):
+                rel_tuple = cls._build_schema_reverse_rel(f, field_obj)
+                if rel_tuple:
+                    reverse_rels.append(rel_tuple)
+                    continue
+
+            # Forward relations
+            elif (
+                isinstance(
+                    field_obj, (ForwardOneToOneDescriptor, ForwardManyToOneDescriptor)
+                )
+                and f in relations_serializers
+            ):
+                rel_tuple = cls._build_schema_forward_rel(f, field_obj)
+                if rel_tuple is True:
+                    fields.append(f)
+                elif rel_tuple:
+                    rels.append(rel_tuple)
+                # If rel_tuple is None -> skip
+                continue
+
+            else:
+                raise ValueError(
+                    f"Relation field '{f}' must have a corresponding Serializer in Meta.relations_serializers."
+                )
+
+            # Plain field
+            fields.append(f)
+
+        return (
+            fields,
+            reverse_rels,
+            cls.get_excluded_fields("read"),
+            cls.get_custom_fields("read") + rels,
+            cls.get_optional_fields("read"),
+        )
+
+    @classmethod
+    def get_custom_fields(cls, s_type: type[S_TYPES]) -> list[tuple[str, type, Any]]:
+        """
+        Normalize declared custom field specs into (name, py_type, default) triples.
+
+        Accepted tuple shapes:
+          (name, py_type, default) -> keeps provided default (callable or literal)
+          (name, py_type)          -> marks as required (default = Ellipsis)
+        Any other arity raises ValueError.
+
+        Parameters
+        ----------
+        s_type : str
+            "create" | "update" | "read"
+
+        Returns
+        -------
+        list[tuple[str, type, Any]]
+        """
+        raw_customs = cls._get_fields(s_type, "customs") or []
+        normalized: list[tuple[str, type, Any]] = []
+        for spec in raw_customs:
+            if not isinstance(spec, tuple):
+                raise ValueError(f"Custom field spec must be a tuple, got {type(spec)}")
+            match len(spec):
+                case 3:
+                    name, py_type, default = spec
+                case 2:
+                    name, py_type = spec
+                    default = ...
+                case _:
+                    raise ValueError(
+                        f"Custom field tuple must have length 2 or 3 (name, type[, default]); got {len(spec)}"
+                    )
+            normalized.append((name, py_type, default))
+        return normalized
+
+    @classmethod
+    def get_optional_fields(cls, s_type: type[S_TYPES]):
+        """
+        Return optional field specifications normalized to (name, type, None).
+
+        Parameters
+        ----------
+        s_type : str
+
+        Returns
+        -------
+        list[tuple[str, type, None]]
+        """
+        return [
+            (field, field_type, None)
+            for field, field_type in cls._get_fields(s_type, "optionals")
+        ]
+
+    @classmethod
+    def get_excluded_fields(cls, s_type: type[S_TYPES]):
+        """
+        Return excluded field names for a serializer type.
+
+        Parameters
+        ----------
+        s_type : str
+
+        Returns
+        -------
+        list[str]
+        """
+        return cls._get_fields(s_type, "excludes")
+
+    @classmethod
+    def get_fields(cls, s_type: type[S_TYPES]):
+        """
+        Return explicit declared fields for a serializer type.
+
+        Parameters
+        ----------
+        s_type : str
+
+        Returns
+        -------
+        list[str]
+        """
+        return cls._get_fields(s_type, "fields")
 
     @classmethod
     def generate_schema_in(cls) -> Schema:
