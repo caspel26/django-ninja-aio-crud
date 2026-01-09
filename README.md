@@ -227,6 +227,34 @@ class BookViewSet(APIViewSet):
 
 ---
 
+## Meta-driven Serializer (for vanilla Django models)
+
+If you already have Django models and don't want to inherit from ModelSerializer, use the Meta-driven Serializer to generate dynamic schemas and integrate with APIViewSet.
+
+Example:
+
+```python
+from ninja_aio.models import serializers
+from . import models
+
+class BookSerializer(serializers.Serializer):
+    class Meta:
+        model = models.Book
+        schema_in = serializers.SchemaModelConfig(fields=["title", "published"])
+        schema_out = serializers.SchemaModelConfig(fields=["id", "title", "published"])
+        schema_update = serializers.SchemaModelConfig(optionals=[("title", str), ("published", bool)])
+
+@api.viewset(models.Book)
+class BookViewSet(APIViewSet):
+    serializer_class = BookSerializer
+```
+
+- Works without modifying existing models
+- Supports nested relations via relations_serializers
+- APIViewSet will auto-generate missing schemas from the serializer
+
+---
+
 ## 🛠 Project Structure & Docs
 
 Documentation (MkDocs + Material):
