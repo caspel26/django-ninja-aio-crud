@@ -5,7 +5,7 @@ from django.utils import timezone
 
 from ninja_aio.models import ModelUtil
 from tests.generics.views import Tests
-from tests.test_app import schema, models, views
+from tests.test_app import schema, models, views, serializers
 from ninja_aio import NinjaAIO
 from ninja_aio.views import APIViewSet
 from ninja_aio.decorators import api_get, api_post
@@ -52,10 +52,14 @@ class BaseTests:
 
         @classmethod
         def setUpTestData(cls):
-            cls.relation_data = {
+            data = {
                 "name": f"test_name_{cls.relation_viewset.model._meta.model_name}",
                 "description": f"test_description_{cls.relation_viewset.model._meta.model_name}",
             }
+            if not hasattr(cls, "relation_data"):
+                cls.relation_data = data
+            else:
+                cls.relation_data = cls.relation_data | data
             super().setUpTestData()
 
     @tag("viewset_foreign_key")
@@ -528,6 +532,36 @@ class ApiViewSetModelReverseManyToManyTestCase(
             schema.TestModelSchemaIn,
             schema.TestModelSchemaPatch,
         )
+
+
+@tag("model_foreign_key_serializer_viewset")
+class ApiViewSetModelForeignKeySerializerTestCase(
+    BaseTests.ApiViewSetForeignKeyTestCaseBase
+):
+    namespace = "test_model_foreign_key_serializer_viewset"
+    model = models.TestModelForeignKey
+    viewset = views.TestModelForeignKeySerializerAPI()
+    relation_viewset = views.TestModelReverseForeignKeySerializerAPI()
+    relation_related_name = "test_model"
+
+    @property
+    def schemas(self):
+        return (
+            serializers.TestModelForeignKeySerializer.generate_read_s(),
+            serializers.TestModelForeignKeySerializer.generate_create_s(),
+            serializers.TestModelForeignKeySerializer.generate_update_s(),
+        )
+
+    @property
+    def payload_create(self):
+        payload = super().payload_create
+        payload.pop("test_model_serializer_id")
+        return payload | {f"{self.relation_related_name}_id": self.relation_pk}
+
+
+# ==========================================================
+#               VIEWSET DECORATOR TEST CASES
+# ==========================================================
 
 
 @tag("viewset_decorator_modelserializer")
