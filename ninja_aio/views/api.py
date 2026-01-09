@@ -18,6 +18,7 @@ from ninja_aio.schemas import (
 from ninja_aio.helpers.api import ManyToManyAPI
 from ninja_aio.types import ModelSerializerMeta, VIEW_TYPES
 from ninja_aio.decorators import unique_view, decorate_view
+from ninja_aio.models import serializers
 
 ERROR_CODES = frozenset({400, 401, 404})
 
@@ -221,6 +222,7 @@ class APIViewSet(API):
     """
 
     model: ModelSerializer | Model
+    serializer_class: serializers.Serializer | None = None
     schema_in: Schema | None = None
     schema_out: Schema | None = None
     schema_update: Schema | None = None
@@ -251,7 +253,7 @@ class APIViewSet(API):
         self.error_codes = ERROR_CODES
         self.model = model or self.model
         self.model_util = (
-            ModelUtil(self.model)
+            ModelUtil(self.model, serializer_class=self.serializer_class)
             if not isinstance(self.model, ModelSerializerMeta)
             else self.model.util
         )
@@ -355,15 +357,30 @@ class APIViewSet(API):
         Compute and return (schema_out, schema_in, schema_update).
 
         - If model is a ModelSerializer (ModelSerializerMeta), auto-generate read/create/update schemas.
-        - Otherwise, return the schemas already set on the viewset (may be None).
+        - Otherwise, use existing schemas or generate from serializer_class if provided.
         """
-        if not isinstance(self.model, ModelSerializerMeta):
-            return self.schema_out, self.schema_in, self.schema_update
-        return (
-            self.schema_out or self.model.generate_read_s(),
-            self.schema_in or self.model.generate_create_s(),
-            self.schema_update or self.model.generate_update_s(),
+        # ModelSerializer case: prefer explicitly set schemas, otherwise generate from the model
+        if isinstance(self.model, ModelSerializerMeta):
+            return (
+                self.schema_out or self.model.generate_read_s(),
+                self.schema_in or self.model.generate_create_s(),
+                self.schema_update or self.model.generate_update_s(),
+            )
+
+        # Non-ModelSerializer: start from provided schemas
+        schema_out, schema_in, schema_update = (
+            self.schema_out,
+            self.schema_in,
+            self.schema_update,
         )
+
+        # If a serializer_class is available, generate from it
+        if self.serializer_class:
+            schema_in = schema_in or self.serializer_class.generate_create_s()
+            schema_out = schema_out or self.serializer_class.generate_read_s()
+            schema_update = schema_update or self.serializer_class.generate_update_s()
+
+        return (schema_out, schema_in, schema_update)
 
     async def query_params_handler(
         self, queryset: QuerySet[ModelSerializer], filters: dict
