@@ -1,4 +1,4 @@
-from typing import Any, ClassVar
+from typing import Any, ClassVar, List, Optional
 
 from ninja import Schema
 from ninja.orm import create_schema
@@ -16,7 +16,6 @@ from ninja_aio.types import S_TYPES, F_TYPES, SCHEMA_TYPES, ModelSerializerMeta
 from ninja_aio.schemas.helpers import (
     ModelQuerySetSchema,
     ModelQuerySetExtraSchema,
-    SerializerSchema,
 )
 from ninja_aio.helpers.query import QueryUtil
 
@@ -633,6 +632,29 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
         return res
 
 
+class SchemaModelConfig(Schema):
+    """
+    SchemaModelConfig
+    -----------------
+    Configuration container for declarative schema definitions.
+    Attributes
+    ----------
+    fields : Optional[List[str]]
+        Explicit model fields to include.
+    optionals : Optional[List[tuple[str, type]]]
+        Optional model fields.
+    exclude : Optional[List[str]]
+        Model fields to exclude.
+    customs : Optional[List[tuple[str, type, Any]]]
+        Custom / synthetic fields.
+    """
+
+    fields: Optional[List[str]] = None
+    optionals: Optional[List[tuple[str, type]]] = None
+    exclude: Optional[List[str]] = None
+    customs: Optional[List[tuple[str, type, Any]]] = None
+
+
 class Serializer(BaseSerializer):
     """
     Serializer
@@ -645,9 +667,9 @@ class Serializer(BaseSerializer):
 
     class Meta:
         model: models.Model = None
-        schema_in: SerializerSchema = None
-        schema_out: SerializerSchema = None
-        schema_update: SerializerSchema = None
+        schema_in: SchemaModelConfig = None
+        schema_out: SchemaModelConfig = None
+        schema_update: SchemaModelConfig = None
         relations_serializers: dict[str, "Serializer"] = {}
 
     def __init__(self):
@@ -671,7 +693,7 @@ class Serializer(BaseSerializer):
         return relations_serializers or {}
 
     @classmethod
-    def _get_schema_meta(cls, schema_type: str) -> SerializerSchema:
+    def _get_schema_meta(cls, schema_type: str) -> SchemaModelConfig:
         match schema_type:
             case "in":
                 return cls._get_meta_data("schema_in")
