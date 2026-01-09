@@ -217,6 +217,7 @@ class BaseSerializer:
             # If explicit relation serializers are declared, require mapping presence.
             if (
                 is_reverse
+                and not isinstance(cls._get_model(), ModelSerializerMeta)
                 and f not in relations_serializers
                 and not getattr(settings, "NINJA_AIO_TESTING", False)
             ):
