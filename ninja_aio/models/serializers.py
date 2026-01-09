@@ -694,6 +694,9 @@ class Serializer:
 
     def __init__(self):
         self.model = self._validate_model()
+        self.schema_in = self.generate_schema_in()
+        self.schema_out = self.generate_schema_out()
+        self.schema_update = self.generate_schema_update()
 
     @classmethod
     def _get_meta_data(cls, attr_name: str) -> Any:
@@ -711,17 +714,49 @@ class Serializer:
         if not fields and not excludes and not customs and not optionals:
             return None
         return create_schema(
-            model=cls.model,
+            model=cls._validate_model(),
             name=name,
             fields=fields,
             custom_fields=customs + optionals,
             exclude=excludes,
         )
 
-    def _validate_model(self):
-        model = self._get_meta_data("model")
+    @classmethod
+    def _validate_model(cls):
+        model = cls._get_meta_data("model")
         if not model:
             raise ValueError("Meta.model must be defined for Serializer.")
         if not issubclass(model, (models.Model, ModelSerializerMeta)):
             raise ValueError("Meta.model must be a Django model or ModelSerializer.")
         return model
+
+    @classmethod
+    def _generate_from_meta(cls, meta_key: str, suffix: str) -> Schema:
+        schema_meta = cls._get_meta_data(meta_key)
+        if not schema_meta:
+            return None
+        model = cls._validate_model()
+        return cls._generate_schema(
+            schema_meta, name=f"{model._meta.model_name}Schema{suffix}"
+        )
+
+    @classmethod
+    def generate_schema_in(cls) -> Schema:
+        """
+        Generate input schema based on Meta.schema_in configuration.
+        """
+        return cls._generate_from_meta("schema_in", "In")
+
+    @classmethod
+    def generate_schema_out(cls) -> Schema:
+        """
+        Generate output schema based on Meta.schema_out configuration.
+        """
+        return cls._generate_from_meta("schema_out", "Out")
+
+    @classmethod
+    def generate_schema_update(cls) -> Schema:
+        """
+        Generate update schema based on Meta.schema_update configuration.
+        """
+        return cls._generate_from_meta("schema_update", "Update")
