@@ -199,9 +199,10 @@ class BaseSerializer:
         reverse_rels: list[tuple] = []
         rels: list[tuple] = []
         relations_serializers = cls._get_relations_serializers() or {}
+        model = cls._get_model()
 
         for f in cls.get_fields("read"):
-            field_obj = getattr(cls._get_model(), f)
+            field_obj = getattr(model, f)
             is_reverse = isinstance(
                 field_obj,
                 (
@@ -217,7 +218,7 @@ class BaseSerializer:
             # If explicit relation serializers are declared, require mapping presence.
             if (
                 is_reverse
-                and not isinstance(cls._get_model(), ModelSerializerMeta)
+                and not isinstance(model, ModelSerializerMeta)
                 and f not in relations_serializers
                 and not getattr(settings, "NINJA_AIO_TESTING", False)
             ):
@@ -682,7 +683,7 @@ class Serializer(BaseSerializer):
         relations_serializers: dict[str, "Serializer"] = {}
 
     def __init__(self):
-        self.model = self._validate_model()
+        self.model = self._get_model()
         self.schema_in = self.generate_create_s()
         self.schema_out = self.generate_read_s()
         self.schema_update = self.generate_update_s()
