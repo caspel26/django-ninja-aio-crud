@@ -383,6 +383,36 @@ class BaseSerializer:
         """
         raise NotImplementedError
 
+    def after_save(self):
+        """
+        Sync hook executed after any save (create or update).
+        """
+        pass
+
+    def before_save(self):
+        """
+        Sync hook executed before any save (create or update).
+        """
+        pass
+
+    def on_create_after_save(self):
+        """
+        Sync hook executed only after initial creation save.
+        """
+        pass
+
+    def on_create_before_save(self):
+        """
+        Sync hook executed only before initial creation save.
+        """
+        pass
+
+    def on_delete(self):
+        """
+        Sync hook executed after delete.
+        """
+        pass
+
 
 class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMeta):
     """
@@ -584,36 +614,6 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
         """
         pass
 
-    def after_save(self):
-        """
-        Sync hook executed after any save (create or update).
-        """
-        pass
-
-    def before_save(self):
-        """
-        Sync hook executed before any save (create or update).
-        """
-        pass
-
-    def on_create_after_save(self):
-        """
-        Sync hook executed only after initial creation save.
-        """
-        pass
-
-    def on_create_before_save(self):
-        """
-        Sync hook executed only before initial creation save.
-        """
-        pass
-
-    def on_delete(self):
-        """
-        Sync hook executed after delete.
-        """
-        pass
-
     def save(self, *args, **kwargs):
         """
         Override save lifecycle to inject create/update hooks.
@@ -676,9 +676,9 @@ class Serializer(BaseSerializer):
 
     class Meta:
         model: models.Model = None
-        schema_in: SchemaModelConfig = None
-        schema_out: SchemaModelConfig = None
-        schema_update: SchemaModelConfig = None
+        schema_in: Optional[SchemaModelConfig] = None
+        schema_out: Optional[SchemaModelConfig] = None
+        schema_update: Optional[SchemaModelConfig] = None
         relations_serializers: dict[str, "Serializer"] = {}
 
     def __init__(self):
@@ -702,7 +702,7 @@ class Serializer(BaseSerializer):
         return relations_serializers or {}
 
     @classmethod
-    def _get_schema_meta(cls, schema_type: str) -> SchemaModelConfig:
+    def _get_schema_meta(cls, schema_type: str) -> SchemaModelConfig | None:
         match schema_type:
             case "in":
                 return cls._get_meta_data("schema_in")
@@ -710,7 +710,8 @@ class Serializer(BaseSerializer):
                 return cls._get_meta_data("schema_out")
             case "update":
                 return cls._get_meta_data("schema_update")
-        return None
+            case _:
+                return None
 
     @classmethod
     def _validate_model(cls):
@@ -733,6 +734,71 @@ class Serializer(BaseSerializer):
             return []
         return getattr(schema, f_type, []) or []
 
+    def _before_save_actions(self, creation: bool = False):
+        if creation:
+            self.on_create_before_save()
+        self.before_save()
+
+    def _after_save_actions(self, creation: bool = False):
+        if creation:
+            self.on_create_after_save()
+        self.after_save()
+
     @classmethod
     async def queryset_request(cls, request: HttpRequest):
         return cls._get_model()._default_manager.all()
+
+    async def save_model(self, instance: models.Model) -> models.Model:
+        """
+        Async helper to save a model instance with lifecycle hooks.
+
+        Parameters
+        ----------
+        instance : models.Model
+            The model instance to save.
+        """
+        creation = instance._state.adding
+        self._before_save_actions(creation=creation)
+        await instance.asave()
+        self._after_save_actions(creation=creation)
+        return instance
+
+    async def create(self, payload: dict[str, Any]) -> models.Model:
+        """
+        Create a new model instance from the provided payload.
+
+        Parameters
+        ----------
+        payload : dict
+            Input data.
+
+        Returns
+        -------
+        models.Model
+            Created model instance.
+        """
+        model = self._get_model()
+        instance: models.Model = model(**payload)
+        return await self.save_model(instance)
+
+    async def update(
+        self, instance: models.Model, payload: dict[str, Any]
+    ) -> models.Model:
+        """
+        Update an existing model instance with the provided payload.
+
+        Parameters
+        ----------
+        instance : models.Model
+            The model instance to update.
+        payload : dict
+            Input data.
+
+        Returns
+        -------
+        models.Model
+            Updated model instance.
+        """
+        for attr, value in payload.items():
+            setattr(instance, attr, value)
+        return await self.save_model(instance)
