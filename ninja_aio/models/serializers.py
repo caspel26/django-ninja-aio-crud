@@ -749,7 +749,7 @@ class Serializer(BaseSerializer):
     async def queryset_request(cls, request: HttpRequest):
         return cls._get_model()._default_manager.all()
 
-    async def save_model(self, instance: models.Model) -> models.Model:
+    async def save(self, instance: models.Model) -> models.Model:
         """
         Async helper to save a model instance with lifecycle hooks.
 
@@ -764,7 +764,7 @@ class Serializer(BaseSerializer):
         self._after_save_actions(creation=creation)
         return instance
 
-    async def create_model(self, payload: dict[str, Any]) -> models.Model:
+    async def create(self, payload: dict[str, Any]) -> models.Model:
         """
         Create a new model instance from the provided payload.
 
@@ -781,7 +781,7 @@ class Serializer(BaseSerializer):
         instance: models.Model = self.model(**payload)
         return await self.save_model(instance)
 
-    async def update_model(
+    async def update(
         self, instance: models.Model, payload: dict[str, Any]
     ) -> models.Model:
         """
