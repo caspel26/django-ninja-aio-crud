@@ -22,6 +22,7 @@ from ninja_aio.exceptions import SerializeError, NotFoundError
 from ninja_aio.models.serializers import ModelSerializer
 from ninja_aio.types import ModelSerializerMeta
 from ninja_aio.schemas.helpers import (
+    ModelQuerySetSchema,
     QuerySchema,
     ObjectQuerySchema,
     ObjectsQuerySchema,
@@ -112,6 +113,18 @@ class ModelUtil:
             raise ConfigError(
                 "ModelUtil cannot accept both model and serializer_class if the model is a ModelSerializer."
             )
+        self.serializer: Serializer = serializer_class() if serializer_class else None
+
+    @property
+    def with_serializer(self) -> bool:
+        """
+        Indicates if a serializer_class is associated.
+
+        Returns
+        -------
+        bool
+        """
+        return self.serializer_class is not None
 
     @property
     def pk_field_type(self):
@@ -445,6 +458,23 @@ class ModelUtil:
 
         return queryset
 
+    def _get_read_optimizations(self) -> ModelQuerySetSchema:
+        """
+        Retrieve read optimizations from model or serializer class.
+
+        Returns
+        -------
+        ModelQuerySetSchema
+            Read optimization configuration.
+        """
+        if isinstance(self.model, ModelSerializerMeta):
+            return getattr(self.model.QuerySet, "read", ModelQuerySetSchema())
+        if self.with_serializer:
+            return getattr(
+                self.serializer_class.QuerySet, "read", ModelQuerySetSchema()
+            )
+        return ModelQuerySetSchema()
+
     def get_reverse_relations(self) -> list[str]:
         """
         Discover reverse relation names for safe prefetching.
@@ -454,7 +484,9 @@ class ModelUtil:
         list[str]
             Relation attribute names.
         """
-        reverse_rels = []
+        reverse_rels = self._get_read_optimizations().prefetch_related.copy()
+        if reverse_rels:
+            return reverse_rels
         for f in self.serializable_fields:
             field_obj = getattr(self.model, f)
             if isinstance(field_obj, ManyToManyDescriptor):
@@ -476,7 +508,9 @@ class ModelUtil:
         list[str]
             Relation attribute names.
         """
-        select_rels = []
+        select_rels = self._get_read_optimizations().select_related.copy()
+        if select_rels:
+            return select_rels
         for f in self.serializable_fields:
             field_obj = getattr(self.model, f)
             if isinstance(field_obj, ForwardManyToOneDescriptor):
@@ -615,7 +649,8 @@ class ModelUtil:
         """
         payload = data.model_dump(mode="json")
 
-        is_serializer = isinstance(self.model, ModelSerializerMeta)
+        is_serializer = isinstance(self.model, ModelSerializerMeta) or self.with_serializer
+        serializer = self.serializer if self.with_serializer else self.model
 
         # Collect custom and optional fields (only if ModelSerializerMeta)
         customs: dict[str, Any] = {}
@@ -624,10 +659,10 @@ class ModelUtil:
             customs = {
                 k: v
                 for k, v in payload.items()
-                if self.model.is_custom(k) and k not in self.model_fields
+                if serializer.is_custom(k) and k not in self.model_fields
             }
             optionals = [
-                k for k, v in payload.items() if self.model.is_optional(k) and v is None
+                k for k, v in payload.items() if serializer.is_optional(k) and v is None
             ]
 
         skip_keys = set()
@@ -636,8 +671,8 @@ class ModelUtil:
             skip_keys = {
                 k
                 for k, v in payload.items()
-                if (self.model.is_custom(k) and k not in self.model_fields)
-                or (self.model.is_optional(k) and v is None)
+                if (serializer.is_custom(k) and k not in self.model_fields)
+                or (serializer.is_optional(k) and v is None)
             }
 
         # Process payload fields
@@ -674,10 +709,19 @@ class ModelUtil:
             Serialized created object.
         """
         payload, customs = await self.parse_input_data(request, data)
-        pk = (await self.model.objects.acreate(**payload)).pk
+        pk = (
+            (await self.model.objects.acreate(**payload)).pk
+            if not self.with_serializer
+            else (await self.serializer.create(payload)).pk
+        )
         obj = await self.get_object(request, pk)
         if isinstance(self.model, ModelSerializerMeta):
             await asyncio.gather(obj.custom_actions(customs), obj.post_create())
+        if self.with_serializer:
+            await asyncio.gather(
+                self.serializer.custom_actions(customs, obj),
+                self.serializer.post_create(obj),
+            )
         return await self.read_s(obj_schema, request, obj)
 
     async def _read_s(
@@ -871,7 +915,11 @@ class ModelUtil:
                 setattr(obj, k, v)
         if isinstance(self.model, ModelSerializerMeta):
             await obj.custom_actions(customs)
-        await obj.asave()
+        if self.with_serializer:
+            await self.serializer.custom_actions(customs, obj)
+            await self.serializer.save(obj)
+        else:
+            await obj.asave()
         updated_object = await self.get_object(request, pk)
         return await self.read_s(obj_schema, request, updated_object)
 

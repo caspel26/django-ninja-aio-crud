@@ -17,14 +17,35 @@ ModelUtil acts as a bridge between Django Ninja schemas and Django ORM, handling
 ```python
 from ninja_aio.models import ModelUtil
 
-util = ModelUtil(model)
+util = ModelUtil(model, serializer_class=None)
 ```
 
 **Parameters:**
 
 - `model` (`type[ModelSerializer] | models.Model`): Django model or ModelSerializer subclass
+- `serializer_class` (`Serializer | None`): Optional Serializer class for plain Django models
 
 ## Properties
+
+### `with_serializer`
+
+Indicates if a serializer_class is associated.
+
+```python
+util = ModelUtil(User, serializer_class=UserSerializer)
+print(util.with_serializer)  # True
+```
+
+### `pk_field_type`
+
+Returns the Python type corresponding to the model's primary key field.
+
+```python
+util = ModelUtil(User)
+print(util.pk_field_type)  # <class 'int'>
+```
+
+Uses the Django field's internal type and `ninja.orm.fields.TYPES` mapping. Raises `ConfigError` if the internal type is not registered.
 
 ### `model_pk_name`
 
@@ -45,7 +66,7 @@ print(util.model_fields)
 # ["id", "username", "email", "created_at", "is_active"]
 ```
 
-### `schema_out_fields`
+### `serializable_fields`
 
 Returns serializable fields (ReadSerializer fields or all model fields).
 
@@ -59,8 +80,17 @@ class User(ModelSerializer):
         fields = ["id", "username", "email"]
 
 util = ModelUtil(User)
-print(util.schema_out_fields)
+print(util.serializable_fields)
 # ["id", "username", "email"]  (password excluded)
+```
+
+### `model_name`
+
+Returns the Django internal model name.
+
+```python
+util = ModelUtil(User)
+print(util.model_name)  # "user"
 ```
 
 ### `serializer_meta`
@@ -147,9 +177,19 @@ qs = await ModelUtil(Book).get_objects(
         select_related=["author"],
         prefetch_related=["tags"],
     ),
+    with_qs_request=True,  # Apply queryset_request hook
     is_for_read=True,  # union with auto-discovered relations
 )
 ```
+
+**Parameters:**
+
+- `request` (`HttpRequest`): Current HTTP request
+- `query_data` (`ObjectsQuerySchema | None`): Query configuration (filters, select_related, prefetch_related)
+- `with_qs_request` (`bool`): Apply queryset_request hook if available (default: True)
+- `is_for_read` (`bool`): Merge with read-specific optimizations (default: False)
+
+**Returns:** Optimized `QuerySet`
 
 ### `get_object`
 
@@ -163,6 +203,7 @@ obj = await ModelUtil(Book).get_object(
     request,
     pk=42,
     query_data=ObjectQuerySchema(select_related=["author"]),
+    with_qs_request=True,
     is_for_read=True,
 )
 
@@ -173,10 +214,20 @@ obj = await ModelUtil(Book).get_object(
 )
 ```
 
-Errors:
+**Parameters:**
 
-- ValueError if neither pk nor getters provided.
-- NotFoundError if no match.
+- `request` (`HttpRequest`): Current HTTP request
+- `pk` (`int | str | None`): Primary key value (optional if getters provided)
+- `query_data` (`ObjectQuerySchema | QuerySchema | None`): Query configuration
+- `with_qs_request` (`bool`): Apply queryset_request hook if available (default: True)
+- `is_for_read` (`bool`): Merge with read-specific optimizations (default: False)
+
+**Returns:** Model instance
+
+**Errors:**
+
+- `ValueError` if neither pk nor getters provided
+- `NotFoundError` if no match found
 
 ### `read_s` and `list_read_s`
 
@@ -208,10 +259,27 @@ items = await ModelUtil(Book).list_read_s(
 )
 ```
 
-Behavior:
+**Parameters (read_s):**
 
-- When is_for_read=True, select_related and prefetch_related are merged with model-discovered relations.
-- Passing instances skips fetching; passing query_data fetches automatically.
+- `schema` (`Schema`): Output schema for serialization
+- `request` (`HttpRequest`): Current HTTP request
+- `instance` (`Model | None`): Model instance to serialize (optional)
+- `query_data` (`ObjectQuerySchema | QuerySchema | None`): Query configuration for fetching (optional)
+- `is_for_read` (`bool`): Merge with read-specific optimizations (default: False)
+
+**Parameters (list_read_s):**
+
+- `schema` (`Schema`): Output schema for serialization
+- `request` (`HttpRequest`): Current HTTP request
+- `instances` (`QuerySet | list[Model] | None`): Instances to serialize (optional)
+- `query_data` (`ObjectsQuerySchema | None`): Query configuration for fetching (optional)
+- `is_for_read` (`bool`): Merge with read-specific optimizations (default: False)
+
+**Behavior:**
+
+- When `is_for_read=True`, select_related and prefetch_related are merged with model-discovered relations
+- Passing `instance`/`instances` skips fetching; passing `query_data` fetches automatically
+- Either `instance`/`instances` OR `query_data` must be provided, not both
 
 ### `get_reverse_relations()`
 

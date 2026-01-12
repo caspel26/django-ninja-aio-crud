@@ -1,4 +1,4 @@
-from typing import Any, ClassVar, List, Optional
+from typing import Any, List, Optional
 import warnings
 
 from django.conf import settings
@@ -19,7 +19,6 @@ from ninja_aio.schemas.helpers import (
     ModelQuerySetSchema,
     ModelQuerySetExtraSchema,
 )
-from ninja_aio.helpers.query import QueryUtil
 
 
 class BaseSerializer:
@@ -35,6 +34,28 @@ class BaseSerializer:
     - _get_model(): return the Django model class associated with the serializer
     - _get_relations_serializers(): optional mapping of relation field -> serializer (may be empty)
     """
+
+    class QuerySet:
+        """
+        Configuration container describing how to build query schemas for a model.
+        Purpose
+        -------
+        Describes which fields and extras are available when querying for model
+        instances. A factory/metaclass can read this configuration to generate
+        Pydantic / Ninja query schemas.
+        Attributes
+        ----------
+        read : ModelQuerySetSchema
+            Schema configuration for read operations.
+        queryset_request : ModelQuerySetSchema
+            Schema configuration for queryset_request hook.
+        extras : list[ModelQuerySetExtraSchema]
+            Additional computed / synthetic query parameters.
+        """
+
+        read = ModelQuerySetSchema()
+        queryset_request = ModelQuerySetSchema()
+        extras: list[ModelQuerySetExtraSchema] = []
 
     @classmethod
     def _get_fields(cls, s_type: type[S_TYPES], f_type: type[F_TYPES]):
@@ -199,9 +220,10 @@ class BaseSerializer:
         reverse_rels: list[tuple] = []
         rels: list[tuple] = []
         relations_serializers = cls._get_relations_serializers() or {}
+        model = cls._get_model()
 
         for f in cls.get_fields("read"):
-            field_obj = getattr(cls._get_model(), f)
+            field_obj = getattr(model, f)
             is_reverse = isinstance(
                 field_obj,
                 (
@@ -217,7 +239,7 @@ class BaseSerializer:
             # If explicit relation serializers are declared, require mapping presence.
             if (
                 is_reverse
-                and not isinstance(cls._get_model(), ModelSerializerMeta)
+                and not isinstance(model, ModelSerializerMeta)
                 and f not in relations_serializers
                 and not getattr(settings, "NINJA_AIO_TESTING", False)
             ):
@@ -393,41 +415,17 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
     lifecycle hooks and query utilities.
     """
 
-    util: ClassVar
-    query_util: ClassVar[QueryUtil]
-
-    class Meta:
-        abstract = True
-
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         from ninja_aio.models.utils import ModelUtil
+        from ninja_aio.helpers.query import QueryUtil
 
         # Bind a ModelUtil instance to the subclass for convenient access
         cls.util = ModelUtil(cls)
         cls.query_util = QueryUtil(cls)
 
-    class QuerySet:
-        """
-        Configuration container describing how to build query schemas for a model.
-        Purpose
-        -------
-        Describes which fields and extras are available when querying for model
-        instances. A factory/metaclass can read this configuration to generate
-        Pydantic / Ninja query schemas.
-        Attributes
-        ----------
-        read : ModelQuerySetSchema
-            Schema configuration for read operations.
-        queryset_request : ModelQuerySetSchema
-            Schema configuration for queryset_request hook.
-        extras : list[ModelQuerySetExtraSchema]
-            Additional computed / synthetic query parameters.
-        """
-
-        read = ModelQuerySetSchema()
-        queryset_request = ModelQuerySetSchema()
-        extras: list[ModelQuerySetExtraSchema] = []
+    class Meta:
+        abstract = True
 
     class CreateSerializer:
         """Configuration container describing how to build a create (input) schema for a model.
@@ -674,19 +672,25 @@ class Serializer(BaseSerializer):
     schema components during read schema generation.
     """
 
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        from ninja_aio.models.utils import ModelUtil
+        from ninja_aio.helpers.query import QueryUtil
+
+        cls.model = cls._get_model()
+        cls.schema_in = cls.generate_create_s()
+        cls.schema_out = cls.generate_read_s()
+        cls.schema_update = cls.generate_update_s()
+        cls.schema_related = cls.generate_related_s()
+        cls.util = ModelUtil(cls._get_model(), serializer_class=cls)
+        cls.query_util = QueryUtil(cls)
+
     class Meta:
         model: models.Model = None
-        schema_in: SchemaModelConfig = None
-        schema_out: SchemaModelConfig = None
-        schema_update: SchemaModelConfig = None
+        schema_in: Optional[SchemaModelConfig] = None
+        schema_out: Optional[SchemaModelConfig] = None
+        schema_update: Optional[SchemaModelConfig] = None
         relations_serializers: dict[str, "Serializer"] = {}
-
-    def __init__(self):
-        self.model = self._validate_model()
-        self.schema_in = self.generate_create_s()
-        self.schema_out = self.generate_read_s()
-        self.schema_update = self.generate_update_s()
-        self.schema_related = self.generate_related_s()
 
     @classmethod
     def _get_meta_data(cls, attr_name: str) -> Any:
@@ -702,7 +706,7 @@ class Serializer(BaseSerializer):
         return relations_serializers or {}
 
     @classmethod
-    def _get_schema_meta(cls, schema_type: str) -> SchemaModelConfig:
+    def _get_schema_meta(cls, schema_type: str) -> SchemaModelConfig | None:
         match schema_type:
             case "in":
                 return cls._get_meta_data("schema_in")
@@ -710,7 +714,8 @@ class Serializer(BaseSerializer):
                 return cls._get_meta_data("schema_out")
             case "update":
                 return cls._get_meta_data("schema_update")
-        return None
+            case _:
+                return None
 
     @classmethod
     def _validate_model(cls):
@@ -733,6 +738,151 @@ class Serializer(BaseSerializer):
             return []
         return getattr(schema, f_type, []) or []
 
+
     @classmethod
     async def queryset_request(cls, request: HttpRequest):
-        return cls._get_model()._default_manager.all()
+        return cls.query_util.apply_queryset_optimizations(
+            queryset=cls.model._default_manager.all(),
+            scope=cls.query_util.SCOPES.QUERYSET_REQUEST,
+        )
+
+    async def post_create(self, instance: models.Model) -> None:
+        """
+        Async hook executed after first persistence (create path).
+        """
+        pass
+
+    async def custom_actions(self, payload: dict[str, Any], instance: models.Model):
+        """
+        Async hook for reacting to provided custom (synthetic) fields.
+
+        Parameters
+        ----------
+        payload : dict
+            Custom field name/value pairs.
+        """
+        pass
+
+    async def save(self, instance: models.Model) -> models.Model:
+        """
+        Async helper to save a model instance with lifecycle hooks.
+
+        Parameters
+        ----------
+        instance : models.Model
+            The model instance to save.
+        """
+        creation = instance._state.adding
+        if creation:
+            self.on_create_before_save(instance)
+        self.before_save(instance)
+        await instance.asave()
+        if creation:
+            self.on_create_after_save(instance)
+        self.after_save(instance)
+        return instance
+
+    async def create(self, payload: dict[str, Any]) -> models.Model:
+        """
+        Create a new model instance from the provided payload.
+
+        Parameters
+        ----------
+        payload : dict
+            Input data.
+
+        Returns
+        -------
+        models.Model
+            Created model instance.
+        """
+        instance: models.Model = self.model(**payload)
+        return await self.save(instance)
+
+    async def update(
+        self, instance: models.Model, payload: dict[str, Any]
+    ) -> models.Model:
+        """
+        Update an existing model instance with the provided payload.
+
+        Parameters
+        ----------
+        instance : models.Model
+            The model instance to update.
+        payload : dict
+            Input data.
+
+        Returns
+        -------
+        models.Model
+            Updated model instance.
+        """
+        for attr, value in payload.items():
+            setattr(instance, attr, value)
+        return await self.save(instance)
+
+    async def model_dump(self, instance: models.Model) -> dict[str, Any]:
+        """
+        Serialize a model instance to a dictionary using the Out schema.
+
+        Parameters
+        ----------
+        instance : models.Model
+            The model instance to serialize.
+
+        Returns
+        -------
+        dict
+            Serialized data.
+        """
+        return await self.model_util.read_s(schema=self.schema_out, instance=instance)
+
+    async def models_dump(
+        self, instances: models.QuerySet[models.Model]
+    ) -> list[dict[str, Any]]:
+        """
+        Serialize a list of model instances to a list of dictionaries using the Out schema.
+
+        Parameters
+        ----------
+        instances : list[models.Model]
+            The list of model instances to serialize.
+
+        Returns
+        -------
+        list[dict]
+            List of serialized data.
+        """
+        return await self.model_util.list_read_s(
+            schema=self.schema_out, instances=instances
+        )
+
+    def after_save(self, instance: models.Model):
+        """
+        Sync hook executed after any save (create or update).
+        """
+        pass
+
+    def before_save(self, instance: models.Model):
+        """
+        Sync hook executed before any save (create or update).
+        """
+        pass
+
+    def on_create_after_save(self, instance: models.Model):
+        """
+        Sync hook executed only after initial creation save.
+        """
+        pass
+
+    def on_create_before_save(self, instance: models.Model):
+        """
+        Sync hook executed only before initial creation save.
+        """
+        pass
+
+    def on_delete(self, instance: models.Model):
+        """
+        Sync hook executed after delete.
+        """
+        pass
