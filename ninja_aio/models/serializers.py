@@ -445,11 +445,11 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
     lifecycle hooks and query utilities.
     """
 
-    from ninja_aio.models.utils import ModelUtil
-    from ninja_aio.helpers.query import QueryUtil
+    # from ninja_aio.models.utils import ModelUtil
+    # from ninja_aio.helpers.query import QueryUtil
 
-    util: ClassVar[ModelUtil]
-    query_util: ClassVar[QueryUtil]
+    # util: ClassVar[ModelUtil]
+    # query_util: ClassVar[QueryUtil]
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -678,11 +678,11 @@ class Serializer(BaseSerializer):
     schema components during read schema generation.
     """
 
-    from ninja_aio.models.utils import ModelUtil
-    from ninja_aio.helpers.query import QueryUtil
+    # from ninja_aio.models.utils import ModelUtil
+    # from ninja_aio.helpers.query import QueryUtil
 
-    util: ClassVar[ModelUtil]
-    query_util: ClassVar[QueryUtil]
+    # util: ClassVar[ModelUtil]
+    # query_util: ClassVar[QueryUtil]
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -814,7 +814,7 @@ class Serializer(BaseSerializer):
             Created model instance.
         """
         instance: models.Model = self.model(**payload)
-        return await self.save_model(instance)
+        return await self.save(instance)
 
     async def update(
         self, instance: models.Model, payload: dict[str, Any]
@@ -836,7 +836,7 @@ class Serializer(BaseSerializer):
         """
         for attr, value in payload.items():
             setattr(instance, attr, value)
-        return await self.save_model(instance)
+        return await self.save(instance)
 
     async def model_dump(self, instance: models.Model) -> dict[str, Any]:
         """
