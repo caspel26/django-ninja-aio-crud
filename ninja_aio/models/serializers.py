@@ -683,11 +683,14 @@ class Serializer(BaseSerializer):
         relations_serializers: dict[str, "Serializer"] = {}
 
     def __init__(self):
+        from ninja_aio.models.utils import ModelUtil
+
         self.model = self._get_model()
         self.schema_in = self.generate_create_s()
         self.schema_out = self.generate_read_s()
         self.schema_update = self.generate_update_s()
         self.schema_related = self.generate_related_s()
+        self.model_util = ModelUtil(self.model, serializer_class=self)
 
     @classmethod
     def _get_meta_data(cls, attr_name: str) -> Any:
@@ -802,3 +805,39 @@ class Serializer(BaseSerializer):
         for attr, value in payload.items():
             setattr(instance, attr, value)
         return await self.save_model(instance)
+
+    async def model_dump(self, instance: models.Model) -> dict[str, Any]:
+        """
+        Serialize a model instance to a dictionary using the Out schema.
+
+        Parameters
+        ----------
+        instance : models.Model
+            The model instance to serialize.
+
+        Returns
+        -------
+        dict
+            Serialized data.
+        """
+        return await self.model_util.read_s(schema=self.schema_out, instance=instance)
+
+    async def models_dump(
+        self, instances: models.QuerySet[models.Model]
+    ) -> list[dict[str, Any]]:
+        """
+        Serialize a list of model instances to a list of dictionaries using the Out schema.
+
+        Parameters
+        ----------
+        instances : list[models.Model]
+            The list of model instances to serialize.
+
+        Returns
+        -------
+        list[dict]
+            List of serialized data.
+        """
+        return await self.model_util.list_read_s(
+            schema=self.schema_out, instances=instances
+        )
