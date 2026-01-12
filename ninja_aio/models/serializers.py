@@ -749,13 +749,6 @@ class Serializer(BaseSerializer):
         "update": "update",
         "read": "out",
     }
-    # Schema cache configuration mapping
-    _SCHEMA_CONFIG = {
-        "schema_in": ("_schema_in_cache", "generate_create_s"),
-        "schema_out": ("_schema_out_cache", "generate_read_s"),
-        "schema_update": ("_schema_update_cache", "generate_update_s"),
-        "schema_related": ("_schema_related_cache", "generate_related_s"),
-    }
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -763,34 +756,9 @@ class Serializer(BaseSerializer):
         from ninja_aio.helpers.query import QueryUtil
 
         cls.model = cls._get_model()
-        # Initialize schema cache to None - will be lazily generated on first access
-        cls._schema_in_cache = None
-        cls._schema_out_cache = None
-        cls._schema_update_cache = None
-        cls._schema_related_cache = None
         cls.util = ModelUtil(cls.model, serializer_class=cls)
         cls.query_util = QueryUtil(cls)
-
-    def __class_getitem__(cls, _item):
-        """Allow generic type hints like Serializer[Model]."""
-        return cls
-
-    @classmethod
-    def __getattr__(cls, name: str):
-        """
-        Lazy schema generation on attribute access.
-
-        This allows forward references and circular dependencies in relations_serializers
-        by deferring schema generation until first access.
-        """
-        if name in cls._SCHEMA_CONFIG:
-            cache_attr, generator_method = cls._SCHEMA_CONFIG[name]
-            cached_value = getattr(cls, cache_attr, None)
-            if cached_value is None:
-                cached_value = getattr(cls, generator_method)()
-                setattr(cls, cache_attr, cached_value)
-            return cached_value
-        raise AttributeError(f"type object '{cls.__name__}' has no attribute '{name}'")
+        cls._meta = cls.Meta
 
     class Meta:
         model: models.Model = None

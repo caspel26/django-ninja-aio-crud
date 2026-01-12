@@ -254,6 +254,9 @@ class APIViewSet(API):
         self.api = api or self.api
         self.error_codes = ERROR_CODES
         self.model = model or self.model
+        self.serializer = (
+            None if self.serializer_class is None else self.serializer_class()
+        )
         self.model_util = (
             ModelUtil(self.model, serializer_class=self.serializer_class)
             if not isinstance(self.model, ModelSerializerMeta)
