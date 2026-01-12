@@ -741,14 +741,14 @@ class Serializer(BaseSerializer):
     def _before_save_actions(self, instance: models.Model):
         creation = instance._state.adding
         if creation:
-            self.on_create_before_save()
-        self.before_save()
+            self.on_create_before_save(instance)
+        self.before_save(instance)
 
     def _after_save_actions(self, instance: models.Model):
         creation = instance._state.adding
         if creation:
-            self.on_create_after_save()
-        self.after_save()
+            self.on_create_after_save(instance)
+        self.after_save(instance)
 
     @classmethod
     async def queryset_request(cls, request: HttpRequest):
