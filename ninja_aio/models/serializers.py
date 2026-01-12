@@ -752,6 +752,23 @@ class Serializer(BaseSerializer):
     async def queryset_request(cls, request: HttpRequest):
         return cls._get_model()._default_manager.all()
 
+    async def post_create(self, instance: models.Model) -> None:
+        """
+        Async hook executed after first persistence (create path).
+        """
+        pass
+
+    async def custom_actions(self, payload: dict[str, Any], instance: models.Model):
+        """
+        Async hook for reacting to provided custom (synthetic) fields.
+
+        Parameters
+        ----------
+        payload : dict
+            Custom field name/value pairs.
+        """
+        pass
+
     async def save(self, instance: models.Model) -> models.Model:
         """
         Async helper to save a model instance with lifecycle hooks.
