@@ -241,6 +241,8 @@ class APIViewSet(API):
     m2m_relations: list[M2MRelationSchema] = []
     m2m_auth: list | None = NOT_SET
     extra_decorators: DecoratorsSchema = DecoratorsSchema()
+    model_verbose_name: str = ""
+    model_verbose_name_plural: str = ""
 
     def __init__(
         self,
@@ -260,7 +262,13 @@ class APIViewSet(API):
         self.schema_out, self.schema_in, self.schema_update = self.get_schemas()
         self.path_schema = self._generate_path_schema()
         self.filters_schema = self._generate_filters_schema()
-        self.model_verbose_name = self.model._meta.verbose_name.capitalize()
+        self.model_verbose_name = (
+            self.model._meta.verbose_name.capitalize() or self.model_verbose_name
+        )
+        self.model_verbose_name_plural = (
+            self.model._meta.verbose_name_plural.capitalize()
+            or self.model_verbose_name_plural
+        )
         self.router_tag = self.router_tag or self.model_verbose_name
         self.router_tags = self.router_tags or tags or [self.router_tag]
         self.router = Router(tags=self.router_tags)
@@ -400,7 +408,7 @@ class APIViewSet(API):
         @self.router.post(
             self.path,
             auth=self.post_view_auth(),
-            summary=f"Create {self.model._meta.verbose_name.capitalize()}",
+            summary=f"Create {self.model_verbose_name}",
             description=self.create_docs,
             response={201: self.schema_out, self.error_codes: GenericMessageSchema},
         )
@@ -418,7 +426,7 @@ class APIViewSet(API):
         @self.router.get(
             self.get_path,
             auth=self.get_view_auth(),
-            summary=f"List {self.model._meta.verbose_name_plural.capitalize()}",
+            summary=f"List {self.model_verbose_name_plural}",
             description=self.list_docs,
             response={
                 200: List[self.schema_out],
@@ -453,7 +461,7 @@ class APIViewSet(API):
         @self.router.get(
             self.get_path_retrieve,
             auth=self.get_view_auth(),
-            summary=f"Retrieve {self.model._meta.verbose_name.capitalize()}",
+            summary=f"Retrieve {self.model_verbose_name}",
             description=self.retrieve_docs,
             response={200: self.schema_out, self.error_codes: GenericMessageSchema},
         )
@@ -478,7 +486,7 @@ class APIViewSet(API):
         @self.router.patch(
             self.path_retrieve,
             auth=self.patch_view_auth(),
-            summary=f"Update {self.model._meta.verbose_name.capitalize()}",
+            summary=f"Update {self.model_verbose_name}",
             description=self.update_docs,
             response={200: self.schema_out, self.error_codes: GenericMessageSchema},
         )
@@ -502,7 +510,7 @@ class APIViewSet(API):
         @self.router.delete(
             self.path_retrieve,
             auth=self.delete_view_auth(),
-            summary=f"Delete {self.model._meta.verbose_name.capitalize()}",
+            summary=f"Delete {self.model_verbose_name}",
             description=self.delete_docs,
             response={204: None, self.error_codes: GenericMessageSchema},
         )
