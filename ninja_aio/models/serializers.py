@@ -1,4 +1,4 @@
-from typing import Any, ClassVar, List, Optional
+from typing import Any, List, Optional
 import warnings
 
 from django.conf import settings
