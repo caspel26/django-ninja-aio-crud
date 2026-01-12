@@ -405,36 +405,6 @@ class BaseSerializer:
         """
         raise NotImplementedError
 
-    def after_save(self):
-        """
-        Sync hook executed after any save (create or update).
-        """
-        pass
-
-    def before_save(self):
-        """
-        Sync hook executed before any save (create or update).
-        """
-        pass
-
-    def on_create_after_save(self):
-        """
-        Sync hook executed only after initial creation save.
-        """
-        pass
-
-    def on_create_before_save(self):
-        """
-        Sync hook executed only before initial creation save.
-        """
-        pass
-
-    def on_delete(self):
-        """
-        Sync hook executed after delete.
-        """
-        pass
-
 
 class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMeta):
     """
@@ -612,6 +582,36 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
         """
         pass
 
+    def after_save(self):
+        """
+        Sync hook executed after any save (create or update).
+        """
+        pass
+
+    def before_save(self):
+        """
+        Sync hook executed before any save (create or update).
+        """
+        pass
+
+    def on_create_after_save(self):
+        """
+        Sync hook executed only after initial creation save.
+        """
+        pass
+
+    def on_create_before_save(self):
+        """
+        Sync hook executed only before initial creation save.
+        """
+        pass
+
+    def on_delete(self):
+        """
+        Sync hook executed after delete.
+        """
+        pass
+
     def save(self, *args, **kwargs):
         """
         Override save lifecycle to inject create/update hooks.
@@ -738,12 +738,14 @@ class Serializer(BaseSerializer):
             return []
         return getattr(schema, f_type, []) or []
 
-    def _before_save_actions(self, creation: bool = False):
+    def _before_save_actions(self, instance: models.Model):
+        creation = instance._state.adding
         if creation:
             self.on_create_before_save()
         self.before_save()
 
-    def _after_save_actions(self, creation: bool = False):
+    def _after_save_actions(self, instance: models.Model):
+        creation = instance._state.adding
         if creation:
             self.on_create_after_save()
         self.after_save()
@@ -781,10 +783,9 @@ class Serializer(BaseSerializer):
         instance : models.Model
             The model instance to save.
         """
-        creation = instance._state.adding
-        self._before_save_actions(creation=creation)
+        self._before_save_actions(instance=instance)
         await instance.asave()
-        self._after_save_actions(creation=creation)
+        self._after_save_actions(instance=instance)
         return instance
 
     async def create(self, payload: dict[str, Any]) -> models.Model:
@@ -861,3 +862,33 @@ class Serializer(BaseSerializer):
         return await self.model_util.list_read_s(
             schema=self.schema_out, instances=instances
         )
+
+    def after_save(self, instance: models.Model):
+        """
+        Sync hook executed after any save (create or update).
+        """
+        pass
+
+    def before_save(self, instance: models.Model):
+        """
+        Sync hook executed before any save (create or update).
+        """
+        pass
+
+    def on_create_after_save(self, instance: models.Model):
+        """
+        Sync hook executed only after initial creation save.
+        """
+        pass
+
+    def on_create_before_save(self, instance: models.Model):
+        """
+        Sync hook executed only before initial creation save.
+        """
+        pass
+
+    def on_delete(self, instance: models.Model):
+        """
+        Sync hook executed after delete.
+        """
+        pass
