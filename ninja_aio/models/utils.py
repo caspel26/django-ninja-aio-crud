@@ -649,7 +649,8 @@ class ModelUtil:
         """
         payload = data.model_dump(mode="json")
 
-        is_serializer = isinstance(self.model, ModelSerializerMeta)
+        is_serializer = isinstance(self.model, ModelSerializerMeta) or self.with_serializer
+        serializer = self.serializer if self.with_serializer else self.model
 
         # Collect custom and optional fields (only if ModelSerializerMeta)
         customs: dict[str, Any] = {}
@@ -658,10 +659,10 @@ class ModelUtil:
             customs = {
                 k: v
                 for k, v in payload.items()
-                if self.model.is_custom(k) and k not in self.model_fields
+                if serializer.is_custom(k) and k not in self.model_fields
             }
             optionals = [
-                k for k, v in payload.items() if self.model.is_optional(k) and v is None
+                k for k, v in payload.items() if serializer.is_optional(k) and v is None
             ]
 
         skip_keys = set()
@@ -670,8 +671,8 @@ class ModelUtil:
             skip_keys = {
                 k
                 for k, v in payload.items()
-                if (self.model.is_custom(k) and k not in self.model_fields)
-                or (self.model.is_optional(k) and v is None)
+                if (serializer.is_custom(k) and k not in self.model_fields)
+                or (serializer.is_optional(k) and v is None)
             }
 
         # Process payload fields
