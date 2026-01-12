@@ -445,8 +445,11 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
     lifecycle hooks and query utilities.
     """
 
-    util: ClassVar
-    query_util: ClassVar
+    from ninja_aio.models.utils import ModelUtil
+    from ninja_aio.helpers.query import QueryUtil
+
+    util: ClassVar[ModelUtil]
+    query_util: ClassVar[QueryUtil]
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -675,8 +678,11 @@ class Serializer(BaseSerializer):
     schema components during read schema generation.
     """
 
-    util: ClassVar
-    query_util: ClassVar
+    from ninja_aio.models.utils import ModelUtil
+    from ninja_aio.helpers.query import QueryUtil
+
+    util: ClassVar[ModelUtil]
+    query_util: ClassVar[QueryUtil]
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -756,7 +762,10 @@ class Serializer(BaseSerializer):
 
     @classmethod
     async def queryset_request(cls, request: HttpRequest):
-        return cls.model._default_manager.all()
+        return cls.query_util.apply_queryset_optimizations(
+            queryset=cls.model._default_manager.all(),
+            scope=cls.query_util.SCOPES.QUERYSET_REQUEST,
+        )
 
     async def post_create(self, instance: models.Model) -> None:
         """
