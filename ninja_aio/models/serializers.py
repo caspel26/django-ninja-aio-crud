@@ -855,7 +855,7 @@ class Serializer(BaseSerializer):
         self.after_save(instance)
         return instance
 
-    async def create(self, request, payload: dict[str, Any]) -> models.Model:
+    async def create(self, payload: dict[str, Any]) -> models.Model:
         """
         Create a new model instance from the provided payload.
 
@@ -869,12 +869,11 @@ class Serializer(BaseSerializer):
         models.Model
             Created model instance.
         """
-        payload, _ = await self.util.parse_input_data(request, payload)
         instance: models.Model = self.model(**payload)
         return await self.save(instance)
 
     async def update(
-        self, request, instance: models.Model, payload: dict[str, Any]
+        self, instance: models.Model, payload: dict[str, Any]
     ) -> models.Model:
         """
         Update an existing model instance with the provided payload.
@@ -891,7 +890,6 @@ class Serializer(BaseSerializer):
         models.Model
             Updated model instance.
         """
-        payload, _ = await self.util.parse_input_data(request, payload)
         for attr, value in payload.items():
             setattr(instance, attr, value)
         return await self.save(instance)
