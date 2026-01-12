@@ -1,0 +1,3355 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Async CRUD utilities for Django Ninja with auth, filtering, pagination.">
+      
+      
+      
+        <link rel="canonical" href="https://django-ninja-aio.com/2.6.1/release_notes/">
+      
+      
+        <link rel="prev" href="../contributing/">
+      
+      
+      
+      <link rel="icon" href="../images/favicon.ico">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.22">
+    
+    
+      
+        <title>Release Notes - Django Ninja Aio CRUD</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.84d31ad4.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+  
+
+
+  
+  
+
+<script id="__analytics">function __md_analytics(){function e(){dataLayer.push(arguments)}window.dataLayer=window.dataLayer||[],e("js",new Date),e("config",""),document.addEventListener("DOMContentLoaded",(function(){document.forms.search&&document.forms.search.query.addEventListener("blur",(function(){this.value&&e("event","search",{search_term:this.value})}));document$.subscribe((function(){var t=document.forms.feedback;if(void 0!==t)for(var a of t.querySelectorAll("[type=submit]"))a.addEventListener("click",(function(a){a.preventDefault();var n=document.location.pathname,d=this.getAttribute("data-md-value");e("event","feedback",{page:n,data:d}),t.firstElementChild.disabled=!0;var r=t.querySelector(".md-feedback__note [data-md-value='"+d+"']");r&&(r.hidden=!1)})),t.hidden=!1})),location$.subscribe((function(t){e("config","",{page_path:t.pathname})}))}));var t=document.createElement("script");t.async=!0,t.src="https://www.googletagmanager.com/gtag/js?id=",document.getElementById("__analytics").insertAdjacentElement("afterEnd",t)}</script>
+  
+    <script>"undefined"!=typeof __md_analytics&&__md_analytics()</script>
+  
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="deep-purple">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#release-notes" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Django Ninja Aio CRUD" class="md-header__button md-logo" aria-label="Django Ninja Aio CRUD" data-md-component="logo">
+      
+  <img src="../images/logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Django Ninja Aio CRUD
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Release Notes
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme)" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="deep-purple"  aria-label="Auto"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Auto" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.3 16-.7-2h-3.2l-.7 2H7.8L11 7h2l3.2 9zM20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12zm-9.15 3.96h2.3L12 9z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="deep-purple"  aria-label="Dark"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Dark" for="__palette_2" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="deep-purple"  aria-label="Light"  type="radio" name="__palette" id="__palette_2">
+    
+      <label class="md-header__button md-icon" title="Light" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/caspel26/django-ninja-aio-crud" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    caspel26/django-ninja-aio-crud
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../getting_started/installation/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../tutorial/model/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Tutorial
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../api/views/api_view/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  API Reference
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../auth/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Authentication
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../contributing/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Release Notes
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Django Ninja Aio CRUD" class="md-nav__button md-logo" aria-label="Django Ninja Aio CRUD" data-md-component="logo">
+      
+  <img src="../images/logo.png" alt="logo">
+
+    </a>
+    Django Ninja Aio CRUD
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/caspel26/django-ninja-aio-crud" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    caspel26/django-ninja-aio-crud
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Home
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Getting Started
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Getting Started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting_started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Installation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting_started/quick_start/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Quick Start
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Tutorial
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Tutorial
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorial/model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Step 1: Define Your Model
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorial/crud/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Step 2: Create CRUD Views
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorial/authentication/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Step 3: Add Authentication
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorial/filtering/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Step 4: Add Filtering & Pagination
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    API Reference
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            API Reference
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_1" id="__nav_4_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Views
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_1">
+            <span class="md-nav__icon md-icon"></span>
+            Views
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/views/api_view/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    APIView
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/views/api_view_set/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    APIViewSet
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/views/decorators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Decorators
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/views/mixins/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Mixins
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_2" id="__nav_4_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Models
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_2">
+            <span class="md-nav__icon md-icon"></span>
+            Models
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/models/model_serializer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    ModelSerializer
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/models/model_util/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    ModelUtil
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/models/serializers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Serializer (Meta-driven)
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/authentication/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Authentication
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/pagination/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Pagination
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Authentication
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Authentication
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../auth/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    JWT & AsyncJwtBearer
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Contributing
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    Release Notes
+    
+  </span>
+  
+
+      </a>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="release-notes">Release Notes<a class="headerlink" href="#release-notes" title="Permanent link">&para;</a></h1>
+<div style='width:100%;overflow-x:auto;'><table style='width:100%;min-width:900px;border-collapse:collapse;table-layout:auto;font-size:.8rem;'><thead style='background:transparent;'><tr><th style='text-align:left;padding:.75rem 1rem;border-bottom:2px solid #ccc;width:15%;font-size:.85rem;'>Version</th><th style='text-align:left;padding:.75rem 1rem;border-bottom:2px solid #ccc;width:15%;font-size:.85rem;'>Date</th><th style='text-align:left;padding:.75rem 1rem;border-bottom:2px solid #ccc;width:70%;font-size:.85rem;'>Summary</th></tr></thead><tbody><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v2.6.1/'><strong>v2.6.1</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v2.5.0...v2.6.1'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2026-01-12</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><img alt='notes' src='https://img.shields.io/badge/notes-available-blue?style=flat' style='margin-right:6px;vertical-align:middle;height:20px;' /><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><h1>Release Notes</h1>
+<h2>[v2.6.1] - 2026-01-12</h2>
+<hr />
+<h2>✨ Added</h2>
+<ul>
+<li><strong>String Reference Support for Relations</strong>:</li>
+<li><code>relations_serializers</code> now accepts string references (e.g., <code>"ArticleSerializer"</code>) in addition to class references</li>
+<li>Enables forward references and circular dependencies between serializers</li>
+<li>
+<p>Lazy resolution of serializer references when schemas are generated</p>
+</li>
+<li>
+<p><strong>New Internal Methods</strong>:</p>
+</li>
+<li><code>BaseSerializer._resolve_serializer_reference()</code> - Resolves string or class serializer references</li>
+<li><code>BaseSerializer._resolve_relation_schema()</code> - Centralized relation schema resolution logic</li>
+</ul>
+<hr />
+<h2>🛠 Changed</h2>
+<ul>
+<li><strong>Schema Generation Lifecycle</strong>:</li>
+<li>Removed eager schema generation from <code>Serializer.__init_subclass__()</code></li>
+<li>Schemas are now generated on-demand via explicit calls to <code>generate_*()</code> methods</li>
+<li>Removed cached schema properties (<code>.schema_in</code>, <code>.schema_out</code>, <code>.schema_update</code>, <code>.schema_related</code>)</li>
+<li>
+<p><strong>Breaking</strong>: Must use <code>generate_create_s()</code>, <code>generate_read_s()</code>, etc. instead of accessing properties</p>
+</li>
+<li>
+<p><strong>Internal Refactoring</strong>:</p>
+</li>
+<li>Replaced <code>match/case</code> with <code>if/elif</code> statements in <code>_generate_model_schema()</code> for better readability</li>
+<li>Added configuration mapping dictionaries (<code>_SERIALIZER_CONFIG_MAP</code>) to simplify lookups</li>
+<li>Consolidated duplicate schema resolution logic in relation handling methods</li>
+<li>
+<p>Improved code organization with clearer comments and structure</p>
+</li>
+<li>
+<p><strong>APIViewSet Integration</strong>:</p>
+</li>
+<li>Added <code>serializer</code> instance property initialized from <code>serializer_class()</code></li>
+<li>Better integration with on-demand schema generation</li>
+</ul>
+<hr />
+<h2>📝 Documentation</h2>
+<ul>
+<li><strong>Updated Serializer Documentation</strong>:</li>
+<li>Added "String References for Forward/Circular Dependencies" section with examples</li>
+<li>Updated "Schema Generation" section to clarify on-demand generation</li>
+<li>Removed outdated references to eager schema generation</li>
+<li>Updated comparison table: "Auto-binding" → "Schema generation"</li>
+<li>
+<p>Enhanced configuration section with bold formatting and clearer descriptions</p>
+</li>
+<li>
+<p><strong>Key Documentation Changes</strong>:</p>
+</li>
+<li>Emphasized that <code>generate_*()</code> methods must be called explicitly</li>
+<li>Documented string reference requirements (same module, lazy resolution)</li>
+<li>Added circular dependency example with <code>AuthorSerializer</code> ↔ <code>ArticleSerializer</code></li>
+</ul>
+<hr />
+<h2>⚠ Breaking Changes &amp; Migration Notes</h2>
+<h3>Removed Schema Properties</h3>
+<p>Schema properties have been removed from <code>Serializer</code> class. You must now explicitly call generation methods:</p>
+<p>```python</p>
+<h1>Before (v2.5.0) - NO LONGER WORKS</h1>
+<p>ArticleSerializer.schema_in       # ❌ AttributeError
+ArticleSerializer.schema_out      # ❌ AttributeError
+ArticleSerializer.schema_update   # ❌ AttributeError
+ArticleSerializer.schema_related  # ❌ AttributeError</p>
+<h1>After (v2.6.0) - Explicit generation required</h1>
+<p>ArticleSerializer.generate_create_s()   # ✅ Returns create schema
+ArticleSerializer.generate_read_s()     # ✅ Returns read schema
+ArticleSerializer.generate_update_s()   # ✅ Returns update schema
+ArticleSerializer.generate_related_s()  # ✅ Returns related schema
+```</p>
+<p><strong>Note</strong>: This change typically doesn't affect user code since these methods are called internally by <code>APIViewSet</code>. Only relevant if you're calling these methods directly.</p>
+<hr />
+<h2>🔍 Migration Guide</h2>
+<h3>1. Update Schema Access in Custom Code</h3>
+<p>If you're directly accessing schema properties, update to use generation methods:</p>
+<p>```python</p>
+<h1>Before (v2.5.0)</h1>
+<p>class ArticleViewSet(APIViewSet):
+    def get_schemas(self):
+        return {
+            "in": self.serializer_class.schema_in,      # ❌ No longer works
+            "out": self.serializer_class.schema_out,    # ❌ No longer works
+        }</p>
+<h1>After (v2.6.0)</h1>
+<p>class ArticleViewSet(APIViewSet):
+    def get_schemas(self):
+        return {
+            "in": self.serializer_class.generate_create_s(),   # ✅ Explicit generation
+            "out": self.serializer_class.generate_read_s(),    # ✅ Explicit generation
+        }
+```</p>
+<h3>2. Use String References for Circular Dependencies</h3>
+<p>Take advantage of string references to simplify circular dependencies:</p>
+<p>```python</p>
+<h1>Before (v2.5.0) - Workarounds needed for circular refs</h1>
+<p>class AuthorSerializer(serializers.Serializer):
+    class Meta:
+        model = models.Author
+        schema_out = serializers.SchemaModelConfig(
+            fields=["id", "name", "articles"]
+        )
+        # Had to carefully order class definitions or use late binding</p>
+<h1>After (v2.6.0) - String references make it easy</h1>
+<p>class AuthorSerializer(serializers.Serializer):
+    class Meta:
+        model = models.Author
+        schema_out = serializers.SchemaModelConfig(
+            fields=["id", "name", "articles"]
+        )
+        relations_serializers = {
+            "articles": "ArticleSerializer",  # ✅ Forward reference
+        }</p>
+<p>class ArticleSerializer(serializers.Serializer):
+    class Meta:
+        model = models.Article
+        schema_out = serializers.SchemaModelConfig(
+            fields=["id", "title", "author"]
+        )
+        relations_serializers = {
+            "author": "AuthorSerializer",  # ✅ Circular reference works!
+        }
+```</p>
+<p><strong>String Reference Requirements:</strong>
+- Must be the exact class name as a string
+- Serializer must be defined in the same module
+- Resolution happens lazily when <code>generate_*()</code> is called
+- Both forward and circular references are supported</p>
+<h3>3. Schema Generation Best Practices</h3>
+<p><strong>In APIViewSet</strong> (no changes needed):
+```python</p>
+<h1>APIViewSet handles schema generation automatically</h1>
+<p>@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    serializer_class = ArticleSerializer
+    # No changes needed - works automatically
+```</p>
+<p><strong>In Custom Code</strong> (call generate methods):
+```python</p>
+<h1>Explicit schema generation when needed</h1>
+<p>from ninja import Router</p>
+<p>router = Router()</p>
+<p>@router.post("/articles/", response=ArticleSerializer.generate_read_s())
+async def create_article(request, payload: ArticleSerializer.generate_create_s()):
+    serializer = ArticleSerializer()
+    instance = await serializer.create(payload.model_dump())
+    return await serializer.model_dump(instance)
+```</p>
+<p><strong>Caching Schemas</strong> (if needed for performance):
+```python</p>
+<h1>Cache schemas at module level if generating repeatedly</h1>
+<p>ARTICLE_CREATE_SCHEMA = ArticleSerializer.generate_create_s()
+ARTICLE_READ_SCHEMA = ArticleSerializer.generate_read_s()</p>
+<p>@router.post("/articles/", response=ARTICLE_READ_SCHEMA)
+async def create_article(payload: ARTICLE_CREATE_SCHEMA):
+    # Use cached schemas
+    pass
+```</p>
+<h3>4. Complete Migration Example</h3>
+<p>Here's a complete before/after example:</p>
+<p>```python</p>
+<h1>Before (v2.5.0)</h1>
+<p>from ninja_aio.models import serializers
+from ninja_aio import NinjaAIO
+from ninja_aio.views import APIViewSet</p>
+<p>class AuthorSerializer(serializers.Serializer):
+    class Meta:
+        model = models.Author
+        schema_out = serializers.SchemaModelConfig(
+            fields=["id", "name"]
+        )</p>
+<p>class ArticleSerializer(serializers.Serializer):
+    class Meta:
+        model = models.Article
+        schema_out = serializers.SchemaModelConfig(
+            fields=["id", "title", "author"]
+        )
+        relations_serializers = {
+            "author": AuthorSerializer,  # Required class ordering
+        }</p>
+<h1>Access schemas (no longer works)</h1>
+<p>create_schema = ArticleSerializer.schema_in      # ❌
+read_schema = ArticleSerializer.schema_out       # ❌</p>
+<h1>After (v2.6.0)</h1>
+<p>from ninja_aio.models import serializers
+from ninja_aio import NinjaAIO
+from ninja_aio.views import APIViewSet</p>
+<p>class AuthorSerializer(serializers.Serializer):
+    class Meta:
+        model = models.Author
+        schema_out = serializers.SchemaModelConfig(
+            fields=["id", "name", "articles"]
+        )
+        relations_serializers = {
+            "articles": "ArticleSerializer",  # ✅ String reference
+        }</p>
+<p>class ArticleSerializer(serializers.Serializer):
+    class Meta:
+        model = models.Article
+        schema_out = serializers.SchemaModelConfig(
+            fields=["id", "title", "author"]
+        )
+        relations_serializers = {
+            "author": "AuthorSerializer",  # ✅ Circular reference!
+        }</p>
+<h1>Explicit schema generation</h1>
+<p>create_schema = ArticleSerializer.generate_create_s()  # ✅
+read_schema = ArticleSerializer.generate_read_s()      # ✅</p>
+<h1>Using with APIViewSet (no changes needed)</h1>
+<p>api = NinjaAIO()</p>
+<p>@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    serializer_class = ArticleSerializer
+    # Automatically works with on-demand generation
+```</p>
+<hr />
+<h2>🐛 Bug Fixes</h2>
+<ul>
+<li>Fixed lazy resolution issues with forward and circular serializer references</li>
+<li>Improved error messages when string references cannot be resolved</li>
+<li>Corrected <code>model_dump()</code> and <code>models_dump()</code> to use explicit schema generation</li>
+<li>Fixed potential issues with <code>model_util</code> vs <code>util</code> attribute naming</li>
+</ul>
+<hr />
+<h2>🚀 Performance Improvements</h2>
+<ul>
+<li><strong>Reduced Initialization Overhead</strong>: Schemas only generated when actually needed</li>
+<li><strong>Memory Efficiency</strong>: Unused schemas are never created</li>
+<li><strong>Lazy Resolution</strong>: String references resolved on-demand, reducing startup time</li>
+<li><strong>Faster Imports</strong>: Removed eager schema generation from module import time</li>
+</ul>
+<hr />
+<h2>📊 Code Quality Improvements</h2>
+<ul>
+<li><strong>Reduced Code Duplication</strong>:</li>
+<li>Extracted common relation resolution logic into <code>_resolve_relation_schema()</code></li>
+<li>Consolidated duplicate code in <code>_build_schema_reverse_rel()</code> and <code>_build_schema_forward_rel()</code></li>
+<li>
+<p>Reduced relation handling code by ~40 lines</p>
+</li>
+<li>
+<p><strong>Improved Maintainability</strong>:</p>
+</li>
+<li>Replaced <code>match/case</code> with clearer <code>if/elif</code> statements</li>
+<li>Added configuration mapping dictionaries for cleaner lookups</li>
+<li>Better code organization with descriptive comments</li>
+<li>
+<p>Consistent use of <code>any()</code> for empty checks</p>
+</li>
+<li>
+<p><strong>Better Readability</strong>:</p>
+</li>
+<li>Flattened nesting in <code>_generate_model_schema()</code></li>
+<li>Clearer separation between special cases and standard logic</li>
+<li>Improved docstrings and parameter descriptions</li>
+<li>More descriptive variable names</li>
+</ul>
+<hr />
+<h2>🙏 Acknowledgments</h2>
+<p>This release focuses on:
+- Architectural improvements for forward/circular dependency support
+- Cleaner, more maintainable internal code structure
+- On-demand resource generation for better performance
+- Enhanced developer experience with string references</p>
+<hr />
+<h2>📝 Notes</h2>
+<ul>
+<li>
+<p><strong>Schema Generation</strong>: While properties were removed, <code>APIViewSet</code> automatically calls <code>generate_*()</code> methods, so most applications won't need code changes</p>
+</li>
+<li>
+<p><strong>Performance</strong>: On-demand generation typically improves startup time. If you need schemas multiple times, consider caching them at module level</p>
+</li>
+<li>
+<p><strong>String References</strong>: Only resolve within the same module. For cross-module references, use direct class imports</p>
+</li>
+<li>
+<p><strong>Backward Compatibility</strong>: Code using <code>APIViewSet</code> continues to work without changes. Direct schema property access will raise <code>AttributeError</code></p>
+</li>
+<li>
+<p><strong>Internal Refactoring</strong>: This release includes significant internal refactoring for code quality without changing public APIs (except removal of schema properties)</p>
+</li>
+</ul>
+<hr />
+<h2>🔗 Links</h2>
+<ul>
+<li><a href="https://caspel26.github.io/django-ninja-aio-crud/">Documentation</a></li>
+<li><a href="https://github.com/caspel26/django-ninja-aio-crud">GitHub Repository</a></li>
+<li><a href="https://github.com/caspel26/django-ninja-aio-crud/issues">Issue Tracker</a></li>
+<li><a href="https://github.com/caspel26/django-ninja-aio-crud/releases/tag/v2.5.0">v2.5.0 Release Notes</a></li>
+</ul>
+<hr />
+<h2>📦 Upgrade Checklist</h2>
+<p>Use this checklist when upgrading from v2.5.0 to v2.6.0:</p>
+<ul>
+<li>[ ] Search codebase for <code>.schema_in</code>, <code>.schema_out</code>, <code>.schema_update</code>, <code>.schema_related</code> property access</li>
+<li>[ ] Replace with <code>generate_create_s()</code>, <code>generate_read_s()</code>, <code>generate_update_s()</code>, <code>generate_related_s()</code> calls</li>
+<li>[ ] Update any circular serializer references to use string references</li>
+<li>[ ] Review custom <code>create()</code> and <code>update()</code> method implementations (if any)</li>
+<li>[ ] Test all CRUD endpoints to ensure proper functionality</li>
+<li>[ ] Update any schema caching logic to use explicit generation</li>
+<li>[ ] Review and update API documentation if it references old property access</li>
+</ul>
+<hr /></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v2.5.0/'><strong>v2.5.0</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v2.4.0...v2.5.0'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2026-01-12</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><img alt='notes' src='https://img.shields.io/badge/notes-available-blue?style=flat' style='margin-right:6px;vertical-align:middle;height:20px;' /><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><h1>Release Notes</h1>
+<h2>[v2.5.0] - 2026-01-12</h2>
+<hr />
+<h2>✨ Added</h2>
+<ul>
+<li><strong>APIViewSet Enhancements</strong>:</li>
+<li><code>model_verbose_name</code> and <code>model_verbose_name_plural</code> attributes for display name customization</li>
+<li>
+<p>Automatic transaction wrapping on create, update, and delete operations</p>
+</li>
+<li>
+<p><strong>ModelUtil Query Methods</strong>:</p>
+</li>
+<li>New properties:<ul>
+<li><code>with_serializer</code> - Check if serializer_class is attached</li>
+<li><code>pk_field_type</code> - Python type corresponding to the primary key field</li>
+<li><code>model_name</code> - Django internal model name</li>
+</ul>
+</li>
+</ul>
+<hr />
+<h2>🛠 Changed</h2>
+<ul>
+<li><strong>APIViewSet</strong>:</li>
+<li>CRUD views now automatically decorated with <code>@aatomic</code> for transactional integrity</li>
+<li>
+<p>Enhanced <code>get_schemas()</code> method for unified schema generation from both ModelSerializer and Serializer</p>
+</li>
+<li>
+<p><strong>ModelUtil</strong>:</p>
+</li>
+<li>
+<p>Query optimization merging logic improved to respect both model and serializer configurations</p>
+</li>
+<li>
+<p><strong>Serializer Lifecycle Hooks</strong>:</p>
+</li>
+<li>All Serializer hooks now consistently receive <code>instance</code> parameter</li>
+<li>Inline execution of before/after save hooks integrated with <code>@aatomic</code> decorator</li>
+<li>Hook signatures standardized: <code>custom_actions(payload, instance)</code>, <code>post_create(instance)</code>, <code>before_save(instance)</code>, etc.</li>
+</ul>
+<hr />
+<h2>📝 Documentation</h2>
+<ul>
+<li><strong>New Documentation Pages</strong>:</li>
+<li>Transaction Management section in APIViewSet docs</li>
+<li>Extra Decorators section with examples and configuration</li>
+<li>Enhanced ModelUtil properties documentation</li>
+<li>
+<p>Query method parameter documentation with detailed examples</p>
+</li>
+<li>
+<p><strong>Enhanced Content</strong>:</p>
+</li>
+<li>APIViewSet Core Attributes table updated with new fields</li>
+<li>Serializer lifecycle hooks section with complete signature examples</li>
+<li>ModelUtil method signatures with all parameters documented</li>
+<li>CRUD operation flows documented for Serializer pattern</li>
+</ul>
+<hr />
+<h2>⚠ Breaking Changes &amp; Migration Notes</h2>
+<h3>Transaction Behavior (New Default)</h3>
+<p>Create, update, and delete operations are now automatically wrapped in database transactions:</p>
+<p>```python</p>
+<h1>Automatic transaction wrapping (new in v2.5.0)</h1>
+<p>@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    pass  # create/update/delete wrapped in @aatomic
+```</p>
+<p><strong>Migration</strong>: If you were manually managing transactions in lifecycle hooks, you may encounter nested transaction issues. Remove manual transaction management:</p>
+<p>```python</p>
+<h1>Before (v2.4.0)</h1>
+<p>async def post_create(self, instance):
+    async with transaction.atomic():  # Remove this
+        await AuditLog.objects.acreate(...)</p>
+<h1>After (v2.5.0)</h1>
+<p>async def post_create(self, instance):
+    # Transaction already managed by @aatomic
+    await AuditLog.objects.acreate(...)
+```</p>
+<h3>Serializer Hook Signatures</h3>
+<p>Added Serializer hooks signatures, they are standardized to always receive <code>instance</code>:</p>
+<p>```python</p>
+<h1>v2.5.0 - Standardized (always receive instance)</h1>
+<p>class MySerializer(Serializer):
+    async def custom_actions(self, payload, instance):
+        # instance parameter required
+        pass</p>
+<pre><code>async def post_create(self, instance):
+    # instance parameter required
+    pass
+
+def before_save(self, instance):
+    # instance parameter required
+    pass
+
+def after_save(self, instance):
+    # instance parameter required
+    pass
+
+def on_delete(self, instance):
+    # instance parameter required
+    pass
+</code></pre>
+<p>```</p>
+<hr />
+<h2>🔍 Migration Guide</h2>
+<h3>1. Updating Serializer Lifecycle Hooks</h3>
+<p>If you're using Serializer (Meta-driven pattern), update hook signatures to receive <code>instance</code> parameter:</p>
+<p>```python
+from ninja_aio.models import serializers
+from asgiref.sync import sync_to_async</p>
+<p>class ArticleSerializer(serializers.Serializer):
+    class Meta:
+        model = Article
+        schema_in = serializers.SchemaModelConfig(
+            fields=["title", "content", "author"],
+            customs=[("send_notification", bool, True)]
+        )
+        schema_out = serializers.SchemaModelConfig(
+            fields=["id", "title", "content", "author", "created_at"]
+        )</p>
+<pre><code># Async hooks - receive instance parameter
+async def custom_actions(self, payload, instance):
+    """Execute custom logic after field assignment."""
+    if payload.get("send_notification"):
+        # Access instance fields
+        await send_email(
+            instance.author.email,
+            f"Article created: {instance.title}"
+        )
+
+async def post_create(self, instance):
+    """Hook after first save (creation only)."""
+    await AuditLog.objects.acreate(
+        action="article_created",
+        article_id=instance.id,
+        user_id=instance.author_id
+    )
+
+# Sync hooks - also receive instance parameter
+def before_save(self, instance):
+    """Modify instance before save."""
+    from django.utils.text import slugify
+    if not instance.slug:
+        instance.slug = slugify(instance.title)
+
+def after_save(self, instance):
+    """Execute logic after save."""
+    # Clear cache
+    from django.core.cache import cache
+    cache.delete(f"article:{instance.id}")
+
+def on_create_before_save(self, instance):
+    """Before save, creation only."""
+    instance.view_count = 0
+
+def on_create_after_save(self, instance):
+    """After save, creation only."""
+    # Log creation
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"Article {instance.id} created")
+
+def on_delete(self, instance):
+    """After deletion."""
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"Article {instance.id} deleted")
+</code></pre>
+<p>```</p>
+<p><strong>Key Points:</strong>
+- All hooks receive <code>instance</code> as a parameter
+- Async hooks: <code>custom_actions(payload, instance)</code>, <code>post_create(instance)</code>
+- Sync hooks: <code>before_save(instance)</code>, <code>after_save(instance)</code>, <code>on_delete(instance)</code>
+- Creation-specific hooks: <code>on_create_before_save(instance)</code>, <code>on_create_after_save(instance)</code></p>
+<h3>2. Configuring QuerySet Optimization</h3>
+<p>Add QuerySet configuration to your Serializer or ModelSerializer for automatic query optimization:</p>
+<p>```python
+from ninja_aio.models import serializers
+from ninja_aio.schemas.helpers import ModelQuerySetSchema, ModelQuerySetExtraSchema</p>
+<p>class ArticleSerializer(serializers.Serializer):
+    class Meta:
+        model = Article
+        schema_out = serializers.SchemaModelConfig(
+            fields=["id", "title", "content", "author", "category", "tags"]
+        )
+        relations_serializers = {
+            "author": AuthorSerializer,
+            "category": CategorySerializer,
+            "tags": TagSerializer,
+        }</p>
+<pre><code>class QuerySet:
+    # Applied to list and retrieve operations
+    read = ModelQuerySetSchema(
+        select_related=["author", "category"],
+        prefetch_related=["tags"],
+    )
+
+    # Applied when queryset_request hook is called
+    queryset_request = ModelQuerySetSchema(
+        select_related=["author__profile"],
+        prefetch_related=["comments", "comments__author"],
+    )
+
+    # Named scopes for specific use cases
+    extras = [
+        ModelQuerySetExtraSchema(
+            scope="detail_view",
+            select_related=["author", "author__profile", "category"],
+            prefetch_related=["tags", "comments", "comments__author"],
+        ),
+        ModelQuerySetExtraSchema(
+            scope="list_view",
+            select_related=["author", "category"],
+            prefetch_related=["tags"],
+        ),
+    ]
+
+@classmethod
+async def queryset_request(cls, request):
+    """
+    Optional: Customize queryset based on request.
+    Automatically enhanced with QuerySet.queryset_request optimizations.
+    """
+    qs = cls._meta.model.objects.all()
+
+    # Filter based on user permissions
+    if not request.user.is_staff:
+        qs = qs.filter(is_published=True)
+
+    # Add request-specific filters
+    if request.GET.get("featured"):
+        qs = qs.filter(is_featured=True)
+
+    return qs
+</code></pre>
+<p>```</p>
+<p><strong>For ModelSerializer:</strong></p>
+<p>```python
+from ninja_aio.models import ModelSerializer
+from ninja_aio.schemas.helpers import ModelQuerySetSchema
+from django.db import models</p>
+<p>class Article(ModelSerializer):
+    title = models.CharField(max_length=200)
+    content = models.TextField()
+    author = models.ForeignKey(User, on_delete=models.CASCADE)
+    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True)
+    tags = models.ManyToManyField(Tag, related_name="articles")</p>
+<pre><code>class ReadSerializer:
+    fields = ["id", "title", "content", "author", "category", "tags"]
+
+class QuerySet:
+    read = ModelQuerySetSchema(
+        select_related=["author", "category"],
+        prefetch_related=["tags"],
+    )
+    queryset_request = ModelQuerySetSchema(
+        select_related=["author__profile"],
+        prefetch_related=["comments"],
+    )
+
+@classmethod
+async def queryset_request(cls, request):
+    """Optimize queries for this model."""
+    return cls.objects.select_related("author", "category")
+</code></pre>
+<p>```</p>
+<p><strong>How QuerySet Configuration Works:</strong></p>
+<ol>
+<li><strong><code>read</code></strong>: Applied automatically to list and retrieve operations when <code>is_for_read=True</code></li>
+<li><strong><code>queryset_request</code></strong>: Applied when <code>with_qs_request=True</code> (default) in <code>get_objects()</code> or <code>get_object()</code></li>
+<li><strong><code>extras</code></strong>: Named scopes accessible via <code>QueryUtil.SCOPES</code> for custom scenarios</li>
+<li><strong>Merging</strong>: Optimizations from multiple sources are merged (no duplicates)</li>
+</ol>
+<p><strong>Benefits:</strong>
+- Eliminates N+1 queries automatically
+- Centralizes query optimization configuration
+- Works with both ModelSerializer and Serializer patterns
+- Optimizations apply to all CRUD operations</p>
+<h3>3. Customizing Model Display Names</h3>
+<p>Override verbose names without modifying models:</p>
+<p><code>python
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    model_verbose_name = "Blog Post"
+    model_verbose_name_plural = "Blog Posts"
+    # OpenAPI will use "Blog Post" instead of "Article"</code></p>
+<hr />
+<h2>🐛 Bug Fixes</h2>
+<ul>
+<li>Fixed query optimization merging when both model and serializer provide hints</li>
+<li>Corrected <code>read_s()</code> behavior when both <code>instance</code> and <code>query_data</code> provided (now raises clear error)</li>
+<li>Improved error messages for missing primary key in <code>get_object()</code></li>
+<li>Fixed duplicate route registration with <code>@unique_view</code> decorator</li>
+</ul>
+<hr />
+<h2>🚀 Performance Improvements</h2>
+<ul>
+<li>Transaction management with <code>@aatomic</code> reduces database round-trips</li>
+<li>Query optimization merging eliminates redundant select_related/prefetch_related</li>
+<li><code>with_qs_request</code> parameter allows skipping hook when not needed</li>
+</ul>
+<hr />
+<h2>🙏 Acknowledgments</h2>
+<p>This release focuses on:
+- Enhanced transaction safety
+- Flexible query control
+- Per-operation customization
+- Comprehensive documentation</p>
+<hr />
+<h2>📝 Notes</h2>
+<ul>
+<li>
+<p><strong>Backward Compatibility</strong>: All v2.4.0 code continues to work. New parameters have sensible defaults.</p>
+</li>
+<li>
+<p><strong>Transaction Overhead</strong>: The <code>@aatomic</code> decorator adds minimal overhead. If you need non-transactional operations, override the view methods directly.</p>
+</li>
+<li>
+<p><strong>Query Parameters</strong>: <code>with_qs_request</code> defaults to <code>True</code> to maintain v2.4.0 behavior. Set to <code>False</code> to skip the queryset_request hook.</p>
+</li>
+<li>
+<p><strong>Serializer Hooks</strong>: If migrating from v2.4.0 Serializer usage, ensure all hooks accept the <code>instance</code> parameter.</p>
+</li>
+</ul>
+<hr />
+<h2>🔗 Links</h2>
+<ul>
+<li><a href="https://caspel26.github.io/django-ninja-aio-crud/">Documentation</a></li>
+<li><a href="https://github.com/caspel26/django-ninja-aio-crud">GitHub Repository</a></li>
+<li><a href="https://github.com/caspel26/django-ninja-aio-crud/issues">Issue Tracker</a></li>
+<li><a href="https://github.com/caspel26/django-ninja-aio-crud/releases/tag/v2.4.0">v2.4.0 Release Notes</a></li>
+</ul>
+<hr /></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v2.4.0/'><strong>v2.4.0</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v2.3.2...v2.4.0'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2026-01-09</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><img alt='notes' src='https://img.shields.io/badge/notes-available-blue?style=flat' style='margin-right:6px;vertical-align:middle;height:20px;' /><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><h1>Release Notes</h1>
+<h2>[v2.4.0] - 2026-01-09</h2>
+<hr />
+<h2>✨ Added</h2>
+<ul>
+<li>Serializer (Meta-driven):</li>
+<li>New Serializer for vanilla Django models configured via nested Meta (no ModelSerializer inheritance).</li>
+<li>Dynamic schema generation helpers: generate_read_s, generate_create_s, generate_update_s, generate_related_s.</li>
+<li>Relation handling via relations_serializers for forward and reverse relations.</li>
+<li>APIViewSet:</li>
+<li>serializer_class to auto-generate missing schemas for non-ModelSerializer models and drive queryset_request.</li>
+<li>ModelUtil:</li>
+<li>Accepts serializer_class to build querysets using Serializer.queryset_request when provided.</li>
+<li>Docs/README:</li>
+<li>New docs page: api/models/serializers.md with usage and examples.</li>
+<li>README sections/examples for Meta-driven Serializer.</li>
+<li>MkDocs nav entry for Serializer.</li>
+<li>Tests:</li>
+<li>Serializer tests (forward and reverse relations).</li>
+<li>Viewset tests using serializer_class-backed endpoints.</li>
+</ul>
+<hr />
+<h2>🛠 Changed</h2>
+<ul>
+<li>Package layout:</li>
+<li>ninja_aio/models/<strong>init</strong>.py now exports ModelUtil and ModelSerializer.</li>
+<li>models.py refactored to models/utils.py; ModelSerializer moved to models/serializers.py.</li>
+<li>API internals:</li>
+<li>APIViewSet.compute_schema generates schemas from serializer_class for vanilla models; retains model-backed generation for ModelSerializer.</li>
+<li>ModelUtil.get_queryset_request uses serializer_class when provided.</li>
+<li>Docs:</li>
+<li>Index formatting tweaks; added links and examples for Serializer docs.</li>
+</ul>
+<hr />
+<h2>📝 Documentation</h2>
+<ul>
+<li>Serializer (Meta-driven):</li>
+<li>Configure via Meta: model, schema_in, schema_out, schema_update, relations_serializers.</li>
+<li>Examples for FK and reverse relations; customs and optionals.</li>
+<li>APIViewSet:</li>
+<li>Using serializer_class to auto-generate schemas and plug into queryset_request.</li>
+<li>README:</li>
+<li>Quick example attaching Serializer to APIViewSet.</li>
+<li>MkDocs:</li>
+<li>Added nav entry under Models: Serializer (Meta-driven).</li>
+</ul>
+<hr />
+<h2>⚠ Notes / Potential Impact</h2>
+<ul>
+<li>Relation serializers:</li>
+<li>Reverse relations on vanilla models need relations_serializers entries to include nested schemas; otherwise skipped unless the related model is a ModelSerializer.</li>
+<li>A UserWarning is emitted when a reverse relation is listed without a mapping; suppressed in tests via NINJA_AIO_TESTING=True.</li>
+<li>Refactor:</li>
+<li>Imports may need updates due to ModelUtil relocation and new serializers module.</li>
+</ul>
+<hr />
+<h2>🔍 Migration / Action</h2>
+<ol>
+<li>Define a Meta-driven Serializer for existing Django models and attach it to APIViewSet via serializer_class.</li>
+<li>Provide relations_serializers for reverse relations to include nested schemas on read.</li>
+<li>Update imports:</li>
+<li>from ninja_aio.models import ModelUtil, ModelSerializer</li>
+<li>from ninja_aio.models.serializers import Serializer, SchemaModelConfig</li>
+<li>If relying on queryset_request with vanilla models, implement Serializer.queryset_request; APIViewSet and ModelUtil will use it automatically.</li>
+</ol></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v2.3.2/'><strong>v2.3.2</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v2.3.1...v2.3.2'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2026-01-08</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><img alt='notes' src='https://img.shields.io/badge/notes-available-blue?style=flat' style='margin-right:6px;vertical-align:middle;height:20px;' /><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><h2>[v2.3.2] - 2026-01-08</h2>
+<hr />
+<h2>✨ Added</h2>
+<ul>
+<li>Support Url pydantic field serialization</li>
+<li>Support for django ninja until 1.6</li>
+</ul>
+<hr /></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v2.3.1/'><strong>v2.3.1</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v2.3.0...v2.3.1'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2026-01-07</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><img alt='notes' src='https://img.shields.io/badge/notes-available-blue?style=flat' style='margin-right:6px;vertical-align:middle;height:20px;' /><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><h2>[v2.3.1] - 2026-01-07</h2>
+<hr />
+<h2>✨ Added</h2>
+<ul>
+<li>CI/Docs Deployment:</li>
+<li>GitHub workflow updated to recognize and manage version "2.3" for docs deploy/delete.</li>
+<li>Documentation/README:</li>
+<li>Added link to the external example repository: https://github.com/caspel26/ninja-aio-blog-example.</li>
+</ul>
+<hr />
+<h2>🛠 Changed</h2>
+<ul>
+<li>README/Docs:</li>
+<li>Switched examples to decorator-first style with <code>@api.viewset(Model)</code> and in-class method decorators (e.g., <code>@api_post</code>).</li>
+<li>Removed explicit <code>api = api</code> and <code>model = ...</code> from examples where <code>@api.viewset(...)</code> is used; emphasized automatic registration.</li>
+<li>Cleaned and reformatted examples and quick links table; clarified usage in the index page and decorators page.</li>
+<li>Packaging:</li>
+<li>Python version spec adjusted from <code>&gt;=3.10, &lt;=3.14</code> to <code>&gt;=3.10, &lt;3.15</code> in pyproject metadata.</li>
+</ul>
+<hr />
+<h2>🗑 Removed</h2>
+<ul>
+<li>In-repo example apps:</li>
+<li>Deleted <code>examples/ex_1</code> and <code>examples/ex_2</code> (models, views, urls, and auth). Examples are now hosted in the external repository linked in the README.</li>
+</ul>
+<hr />
+<h2>📝 Documentation</h2>
+<ul>
+<li>Index and README updated to prefer <code>@api.viewset(Model)</code> and decorator-based custom endpoints.</li>
+<li>Decorators page (<code>docs/api/views/decorators.md</code>) revised to reflect decorator-first usage.</li>
+<li>Added references to the external example repository for complete, runnable samples.</li>
+</ul>
+<hr /></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v2.3.0/'><strong>v2.3.0</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v2.2.0...v2.3.0'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2026-01-04</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><img alt='notes' src='https://img.shields.io/badge/notes-available-blue?style=flat' style='margin-right:6px;vertical-align:middle;height:20px;' /><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><h1>Release Notes</h1>
+<h2>[v2.3.0] - 2026-01-04</h2>
+<hr />
+<h2>✨ Added</h2>
+<ul>
+<li>Decorators:</li>
+<li>New operation decorators for class methods: <code>api_get</code>, <code>api_post</code>, <code>api_put</code>, <code>api_patch</code>, <code>api_delete</code>, <code>api_options</code>, <code>api_head</code> (import from <code>ninja_aio.decorators</code>).</li>
+<li>Utilities: <code>decorate_view</code>, <code>aatomic</code>, <code>unique_view</code> (now under <code>ninja_aio.decorators</code>).</li>
+<li>Factory-backed decorators ensure clean OpenAPI signatures (exclude <code>self</code>) and support extra decorators like pagination.</li>
+<li>Views:</li>
+<li>APIView/APIViewSet auto-register decorated methods via lazy binding; no manual <code>add_views_to_route()</code> when using <code>@api.view</code> / <code>@api.viewset</code>.</li>
+<li>APIViewSet supports global trailing slash setting via <code>settings.NINJA_AIO_APPEND_SLASH</code> (default True).</li>
+<li>M2M:</li>
+<li><code>M2MRelationSchema.append_slash</code> to control trailing slash on the GET relation route.</li>
+<li>Relation path normalization for consistent URLs whether <code>path</code> includes leading slash or not.</li>
+<li>Tests/Examples:</li>
+<li>Added decorator-based examples and tests for custom endpoints on views and viewsets.</li>
+</ul>
+<hr />
+<h2>🛠 Changed</h2>
+<ul>
+<li>README/Docs:</li>
+<li>Prefer <code>@api.viewset(Model)</code> with decorator-based endpoints; legacy <code>views()</code> remains supported.</li>
+<li>Clarified trailing slash behavior for CRUD retrieve paths and M2M relations.</li>
+<li>Decorator-first examples across APIView and APIViewSet pages; cleaner OpenAPI notes.</li>
+<li>API internals:</li>
+<li>Base API class now binds decorator-registered methods via <code>_add_views()</code>; APIView/APIViewSet call <code>super()._add_views()</code> before legacy <code>views()</code>.</li>
+<li>APIViewSet path generation respects <code>NINJA_AIO_APPEND_SLASH</code> for retrieve path (<code>/{pk}/</code> vs <code>/{pk}</code>).</li>
+<li>Exceptions/Helpers:</li>
+<li>Added docstrings for clearer behavior in exceptions, query helpers, and schemas.</li>
+</ul>
+<hr />
+<h2>📝 Documentation</h2>
+<ul>
+<li>APIView/APIViewSet:</li>
+<li>Decorator-first usage with examples; automatic lazy registration; signature preservation.</li>
+<li>Decorators:</li>
+<li>Using operation decorators with extra decorators (e.g., <code>paginate(PageNumberPagination)</code>, <code>unique_view(name)</code>).</li>
+<li>ViewSet relations:</li>
+<li>Per-relation <code>append_slash</code>; path normalization rules; trailing slash settings.</li>
+<li>README:</li>
+<li>Simplified setup: <code>@api.viewset(Model)</code> and decorator-based custom endpoints.</li>
+</ul>
+<hr />
+<h2>⚠ Notes / Potential Impact</h2>
+<ul>
+<li>Trailing slash:</li>
+<li>Global <code>NINJA_AIO_APPEND_SLASH</code> defaults to True. Disable to remove trailing slash from retrieve paths.</li>
+<li>M2M GET relation endpoints default to no trailing slash; enable per relation with <code>append_slash=True</code>.</li>
+<li>Registration:</li>
+<li>When using <code>@api.view</code> / <code>@api.viewset</code>, endpoints defined via decorators are mounted automatically; avoid redundant manual registration.</li>
+<li>OpenAPI:</li>
+<li>Decorator-backed handlers exclude <code>self</code> and preserve type hints for cleaner specs.</li>
+</ul>
+<hr />
+<h2>🔍 Migration / Action</h2>
+<ol>
+<li>Adopt decorators for extra endpoints:</li>
+<li>APIView: annotate the class with <code>@api.view(...)</code>, then decorate methods with <code>@api_get("/path", ...)</code>.</li>
+<li>APIViewSet: annotate with <code>@api.viewset(Model, ...)</code>, then use <code>@api_get("/path", ...)</code>, <code>@api_post(...)</code>, etc.</li>
+<li>Trailing slash configuration:</li>
+<li>Set <code>NINJA_AIO_APPEND_SLASH=False</code> in Django settings to drop trailing slash on retrieve paths globally.</li>
+<li>For M2M GET relations, use <code>M2MRelationSchema(append_slash=True/False)</code> to control trailing slash.</li>
+<li>Legacy support:</li>
+<li><code>views()</code> continues to work; prefer decorators for clearer code and better OpenAPI.</li>
+<li>Docs/examples:</li>
+<li>Update references to new decorator modules and follow decorator-first examples.</li>
+</ol></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v2.2.0/'><strong>v2.2.0</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v2.1.0...v2.2.0'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2026-01-03</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><img alt='notes' src='https://img.shields.io/badge/notes-available-blue?style=flat' style='margin-right:6px;vertical-align:middle;height:20px;' /><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><h1>Release Notes</h1>
+<h2>[2.2.0] - 2026-01-03</h2>
+<hr />
+<h2>✨ Added</h2>
+<ul>
+<li>API:</li>
+<li>Decorators: <code>NinjaAIO.view(prefix, tags)</code> and <code>NinjaAIO.viewset(model, prefix, tags)</code> for automatic registration.</li>
+<li>Base API class: shared attributes for APIView and APIViewSet (api, router_tags, api_route_path).</li>
+<li>Views:</li>
+<li>APIView: supports constructor args <code>(api, prefix, tags)</code> with <code>router_tags</code> and standardized <code>error_codes</code>.</li>
+<li>APIViewSet: constructor <code>(api, model, prefix, tags)</code>; infers base path from model when not provided; <code>router_tags</code> support.</li>
+<li>Auth:</li>
+<li>JwtKeys type expands to include <code>jwk.OctKey</code> (HMAC).</li>
+<li><code>validate_key</code> accepts <code>jwk.OctKey</code>.</li>
+<li><code>encode_jwt</code>/<code>decode_jwt</code> type hints generalized to <code>JwtKeys</code>.</li>
+<li>Tests:</li>
+<li>Added decorator-based tests for APIView and APIViewSet (ModelSerializer and plain Django model).</li>
+<li>Updated ManyToMany tests to construct viewset with <code>api</code> argument.</li>
+<li>Docs:</li>
+<li>APIView and APIViewSet docs: “Recommended” decorator-based examples.</li>
+<li>Mixins doc moved to <code>docs/api/views/mixins.md</code>.</li>
+<li>Index updated with modern ModelSchema-based examples and async ORM usage.</li>
+</ul>
+<hr />
+<h2>🛠 Changed</h2>
+<ul>
+<li>Version:</li>
+<li>Bumped to 2.2.0 in <code>ninja_aio/__init__.py</code>.</li>
+<li>Error codes:</li>
+<li>Standardized to {400, 401, 404}; removed 428 references in code and docs.</li>
+<li>Docs:</li>
+<li><code>docs/api/authentication.md</code>: use list-based auth <code>[JWTAuth(), APIKeyAuth()]</code> instead of bitwise OR.</li>
+<li><code>docs/api/views/api_view.md</code> and <code>api_view_set.md</code>: emphasize decorator usage; cleaner examples; notes updated.</li>
+<li>MkDocs nav: Mixins path updated to <code>api/views/mixins.md</code>.</li>
+<li>API internals:</li>
+<li>APIView/APIViewSet refactored to share base attributes, constructor supports <code>api</code>, <code>prefix</code>, and <code>tags</code>.</li>
+<li>Docs workflow:</li>
+<li><code>mike set-default --push latest</code> when MAKE_LATEST is true.</li>
+<li>Packaging:</li>
+<li>Python requirement set to <code>&gt;=3.10, &lt;=3.14</code> in <code>pyproject.toml</code>.</li>
+</ul>
+<hr />
+<h2>📝 Documentation</h2>
+<ul>
+<li>Updated:</li>
+<li>Authentication: list-based auth configuration and clarified behavior.</li>
+<li>APIView/APIViewSet: decorator-first usage, async compatibility, and standard error codes.</li>
+<li>Index: ModelSchema In/Out patterns with async ORM examples.</li>
+<li>Moved:</li>
+<li>Mixins doc to <code>api/views/mixins.md</code>; MkDocs navigation adjusted.</li>
+</ul>
+<hr />
+<h2>⚠ Notes / Potential Impact</h2>
+<ul>
+<li>Error handling:</li>
+<li>428 code removed; rely on {400, 401, 404}.</li>
+<li>Auth configuration:</li>
+<li>Use lists for multiple auth methods; bitwise OR in docs deprecated.</li>
+<li>Docs deployment:</li>
+<li>Default alias set to “latest” on deploy when MAKE_LATEST=true.</li>
+<li>Python compatibility:</li>
+<li>Upper bound set to 3.14.</li>
+</ul>
+<hr />
+<h2>🔍 Migration / Action</h2>
+<ol>
+<li>Adopt decorators:</li>
+<li>APIView: <code>@api.view(prefix="/path", tags=[...])</code></li>
+<li>APIViewSet: <code>@api.viewset(model=MyModel, prefix="/path", tags=[...])</code></li>
+<li>Update auth configuration:</li>
+<li>HMAC keys supported via <code>jwk.OctKey</code> where applicable.</li>
+<li>Error codes:</li>
+<li>Remove references/handlers for 428; standardize to {400, 401, 404}.</li>
+<li>Docs links:</li>
+<li>Update references to Mixins at <code>api/views/mixins.md</code>.</li>
+<li>Runtime:</li>
+<li>Ensure Python version is &lt;= 3.14 per <code>pyproject.toml</code>.</li>
+</ol></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v2.1.0/'><strong>v2.1.0</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v2.0.0...v2.1.0'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2026-01-02</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><img alt='notes' src='https://img.shields.io/badge/notes-available-blue?style=flat' style='margin-right:6px;vertical-align:middle;height:20px;' /><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><h1>Release Notes</h1>
+<h2>[2.1.0] - 2026-01-01</h2>
+<hr />
+<h2>✨ Added</h2>
+<ul>
+<li>Views:</li>
+<li>ReadOnlyViewSet: list and retrieve-only endpoints.</li>
+<li>WriteOnlyViewSet: create, update, and delete-only endpoints.</li>
+<li>Exported via <code>ninja_aio.views.__init__</code> for cleaner imports.</li>
+<li>Mixins:</li>
+<li>New filtering mixins under <code>ninja_aio/views/mixins.py</code>: IcontainsFilterViewSetMixin, BooleanFilterViewSetMixin, NumericFilterViewSetMixin, DateFilterViewSetMixin, and specialized Greater/Less variants.</li>
+<li>Auth docs:</li>
+<li>New <code>docs/auth.md</code> with JWT helpers and <code>AsyncJwtBearer</code> usage and configuration.</li>
+<li>Tests:</li>
+<li>Extended test model with <code>age</code>, <code>active</code>, and <code>active_from</code> fields.</li>
+<li>Added viewset tests for mixins (icontains, boolean, numeric, date comparisons).</li>
+<li>Added auth tests for JWT encode/decode and AsyncJwtBearer claim validation.</li>
+<li>Docs navigation:</li>
+<li>Added Mixins page and JWT &amp; AsyncJwtBearer page to MkDocs nav.</li>
+<li>MkDocs <code>mike</code> config sets <code>default: latest</code>.</li>
+</ul>
+<hr />
+<h2>🛠 Changed</h2>
+<ul>
+<li>Docs workflow (<code>.github/workflows/docs.yml</code>):</li>
+<li>Safer deletion: requires explicit <code>delete_version</code> choice and <code>delete_confirm</code>, protects <code>latest</code>, <code>stable</code>, and current default.</li>
+<li><code>make_latest</code> default set to false.</li>
+<li>Coverage workflow:</li>
+<li>Bump <code>codecov/codecov-action</code> from v5.5.1 to v5.5.2.</li>
+<li>API helpers:</li>
+<li>Use <code>decorate_view</code> to compose <code>unique_view</code> and <code>paginate</code> for related GET endpoints.</li>
+<li>APIViewSet (imports and behavior):</li>
+<li>Module reorganized to <code>ninja_aio/views/api.py</code> with updated internal imports.</li>
+<li><code>get_schemas</code>: generates schemas only if missing when model is a <code>ModelSerializerMeta</code>, else returns explicitly set schemas.</li>
+<li>Hook docs clarified to allow sync or async handlers for query params.</li>
+<li>Auth:</li>
+<li><code>encode_jwt</code>: header now includes <code>kid</code> only when present (conditional merge).</li>
+<li>Docs:</li>
+<li><code>docs/api/views/api_view_set.md</code> updated to document ReadOnlyViewSet and WriteOnlyViewSet.</li>
+<li><code>docs/mixins.md</code> aligned with implemented mixins and examples.</li>
+</ul>
+<hr />
+<h2>📝 Documentation</h2>
+<ul>
+<li>New:</li>
+<li>JWT &amp; AsyncJwtBearer guide with examples for settings and direct JWK usage.</li>
+<li>Updated:</li>
+<li>Mixins reference to match implemented classes and recommended query param types.</li>
+<li>APIViewSet docs extended with ReadOnly/WriteOnly usage.</li>
+</ul>
+<hr />
+<h2>⚠ Notes / Potential Impact</h2>
+<ul>
+<li>Docs deployment:</li>
+<li>Deletion requires explicit confirmation and cannot remove protected aliases or current default.</li>
+<li>Mixins:</li>
+<li>Date filters expect values that implement <code>isoformat</code>; prefer Pydantic <code>date</code>/<code>datetime</code> in query params.</li>
+</ul>
+<hr />
+<h2>🔍 Migration / Action</h2>
+<ol>
+<li>Update imports:</li>
+<li><code>from ninja_aio.views import APIViewSet, ReadOnlyViewSet, WriteOnlyViewSet</code></li>
+<li><code>from ninja_aio.views import mixins</code> for filter mixins.</li>
+<li>For related list endpoints using custom decorators, consider adopting <code>decorate_view</code> for consistent composition.</li>
+<li>If using JWT:</li>
+<li>Optionally set <code>JWT_PRIVATE_KEY</code>, <code>JWT_PUBLIC_KEY</code>, <code>JWT_ISSUER</code>, <code>JWT_AUDIENCE</code> in Django settings.</li>
+<li>Validate claims via <code>AsyncJwtBearer.claims</code> registry and verify allowed algorithms.</li>
+<li>Review docs workflow inputs before deleting versions; use <code>delete_confirm: true</code>.</li>
+</ol></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v2.0.0/'><strong>v2.0.0</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v2.0.0-rc1...v2.0.0'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-12-16</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><img alt='notes' src='https://img.shields.io/badge/notes-available-blue?style=flat' style='margin-right:6px;vertical-align:middle;height:20px;' /><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><h1>Release Notes</h1>
+<h2>[2.0.0] - 2025-12-16</h2>
+<hr />
+<h2>✨ Added</h2>
+<ul>
+<li>QueryUtil and query scopes:</li>
+<li>New <code>QueryUtil</code> with <code>SCOPES</code> (READ, QUERYSET_REQUEST, plus extras) and <code>apply_queryset_optimizations</code>.</li>
+<li><code>ModelSerializer.query_util</code> bound per model via <code>__init_subclass__</code>.</li>
+<li><code>ModelSerializer.QuerySet</code> supports <code>read</code>, <code>queryset_request</code>, <code>extras</code>.</li>
+<li>Query schemas:</li>
+<li><code>QuerySchema</code>, <code>ObjectQuerySchema</code>, <code>ObjectsQuerySchema</code>, <code>ModelQuerySetSchema</code>, <code>ModelQuerySetExtraSchema</code>, <code>QueryUtilBaseScopesSchema</code>.</li>
+<li>ModelUtil:</li>
+<li><code>get_objects(...)</code>: optimized queryset fetching with filters and select/prefetch hints.</li>
+<li><code>get_object(...)</code>: single-object retrieval by pk or getters with optimizations.</li>
+<li><code>read_s(...)</code> and <code>list_read_s(...)</code>: serialize instances or auto-fetch via query schemas.</li>
+<li>Relation discovery helpers: <code>get_select_relateds()</code>, <code>get_reverse_relations()</code>.</li>
+<li>PK type resolution: <code>pk_field_type</code> with helpful error for unknown field types.</li>
+<li>ManyToManyAPI:</li>
+<li>GET related endpoints return <code>{items: [...], count: N}</code>.</li>
+<li>Relation filter handlers accept sync or async functions.</li>
+<li>Related items use <code>ModelUtil.list_read_s</code> for serialization.</li>
+<li>Per-relation single-object resolution handler for POST: <code>&lt;related_name&gt;_query_handler(...)</code>.</li>
+<li>Schemas modularization:</li>
+<li>New modules: <code>ninja_aio/schemas/api.py</code>, <code>ninja_aio/schemas/generics.py</code>, and exported names under <code>ninja_aio/schemas/__init__.py</code>.</li>
+<li>Decorators:</li>
+<li><code>decorate_view</code> utility to compose multiple decorators (sync/async), skipping <code>None</code>.</li>
+<li><code>APIViewSet.extra_decorators</code> via <code>DecoratorsSchema</code> for per-operation decoration.</li>
+<li>Renderer:</li>
+<li>ORJSON renderer option via <code>settings.NINJA_AIO_ORJSON_RENDERER_OPTION</code> (bitmask, supports <code>|</code>).</li>
+</ul>
+<hr />
+<h2>🛠 Changed</h2>
+<ul>
+<li>APIViewSet:</li>
+<li>List uses <code>ModelUtil.get_objects</code> and <code>list_read_s</code> with read optimizations; filter hooks retained.</li>
+<li>Retrieve uses <code>read_s</code> with <code>QuerySchema(getters={"pk": ...})</code>.</li>
+<li>Path PK schema type inferred from model PK via <code>ModelUtil.pk_field_type</code>.</li>
+<li>Default read query data comes from <code>ModelSerializer.QuerySet.read</code> via <code>query_util</code>.</li>
+<li>Built-ins and custom decorators composed with <code>decorate_view</code> (e.g., <code>paginate</code>, <code>unique_view</code>, extras).</li>
+<li>ModelSerializer:</li>
+<li>Binds <code>util = ModelUtil(cls)</code> and <code>query_util = QueryUtil(cls)</code> to subclasses.</li>
+<li><code>queryset_request</code> applies configured optimizations from <code>QuerySet.queryset_request</code>.</li>
+<li>ModelUtil internals:</li>
+<li>Unified <code>_apply_query_optimizations</code> merges explicit select/prefetch with auto-discovered relations when <code>is_for_read=True</code>.</li>
+<li>Serialization paths standardized through internal helpers; <code>read_s</code>/<code>list_read_s</code> accept <code>schema</code> first.</li>
+<li>Auth:</li>
+<li><code>AsyncJwtBearer.verify_token</code> simplifies error handling; drops explicit <code>AuthError</code>.</li>
+<li>Imports:</li>
+<li><code>ManyToManyAPI</code> consumed from <code>ninja_aio/helpers/api.py</code>.</li>
+<li>Runtime requirements:</li>
+<li>Upper bounds added: <code>django-ninja &lt;=1.5.1</code>, <code>joserfc &lt;=1.4.1</code>, <code>orjson &lt;=3.11.5</code>.</li>
+<li>Docs and site:</li>
+<li>MkDocs/mike integration for versioned docs; new workflow <code>docs.yml</code>.</li>
+</ul>
+<hr />
+<h2>🔴 Breaking Changes</h2>
+<ul>
+<li>Path PK schema type:</li>
+<li>PK type is inferred from the model PK. Code relying on <code>int | str</code> in path schemas may need adjustments.</li>
+<li>ManyToMany GET response shape:</li>
+<li>Response changed from a plain list to <code>{items: [...], count: N}</code>. Clients must adapt parsing.</li>
+<li>Import paths:</li>
+<li>Schema helpers moved under <code>ninja_aio/schemas/helpers.py</code> and re-exported by <code>ninja_aio/schemas/__init__.py</code>.</li>
+<li><code>ManyToManyAPI</code> import is now <code>from ninja_aio.helpers.api import ManyToManyAPI</code>.</li>
+<li>ModelUtil read API:</li>
+<li><code>read_s</code> and <code>list_read_s</code> signatures accept <code>schema</code> first and support <code>instance</code> or <code>query_data</code>. Code passing <code>(request, obj, schema)</code> must switch to <code>(schema, request, instance=obj)</code>.</li>
+</ul>
+<hr />
+<h2>📝 Documentation</h2>
+<ul>
+<li>Updated:</li>
+<li>ModelUtil reference: QuerySet config, QueryUtil, query schemas, <code>get_objects</code>, <code>get_object</code>, <code>read_s</code>, <code>list_read_s</code>.</li>
+<li>APIViewSet: list/retrieve flow, PK type inference, M2M GET envelope, async/sync filter handlers, operation decorators.</li>
+<li>Tutorial (model): QuerySet config and <code>query_util</code> examples; fetch/serialize using query schemas.</li>
+<li>Index: overview of query optimizations and schemas.</li>
+<li>ORJSON renderer: configuration guide.</li>
+</ul>
+<hr />
+<h2>⚠ Notes / Potential Impact</h2>
+<p>| Area                | Observation                                                       | Impact                                                                |
+| ------------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Query optimizations | <code>is_for_read=True</code> merges explicit and auto-discovered relations. | More joins/prefetches; re-check performance for heavy endpoints.      |
+| Requirements caps   | Upper bounds added for core deps.                                 | Ensure compatible versions in your environment.                       |
+| Decorator order     | <code>decorate_view</code> applies standard Python stacking order.           | Verify nesting with <code>paginate</code>, <code>unique_view</code>, and custom decorators. |</p>
+<hr />
+<h2>🔍 Migration / Action</h2>
+<ol>
+<li>Update imports:</li>
+<li><code>from ninja_aio.schemas.helpers import QuerySchema, ObjectQuerySchema, ObjectsQuerySchema, ModelQuerySetSchema, ModelQuerySetExtraSchema</code></li>
+<li><code>from ninja_aio.helpers.api import ManyToManyAPI</code></li>
+<li>Adjust M2M GET consumers to handle <code>{items, count}</code>.</li>
+<li>Update <code>read_s</code>/<code>list_read_s</code> calls to new parameter order.</li>
+<li>Verify path PK handling in custom routes that relied on a generic PK type.</li>
+<li>Review <code>QuerySet.read</code> / <code>QuerySet.queryset_request</code> for desired select/prefetch behavior.</li>
+<li>Optionally configure ORJSON via <code>NINJA_AIO_ORJSON_RENDERER_OPTION</code>.</li>
+</ol></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v2.0.0-rc1/'><strong>v2.0.0-rc1</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v2.0.0-rc2...v2.0.0-rc1'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-12-07</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><img alt='notes' src='https://img.shields.io/badge/notes-available-blue?style=flat' style='margin-right:6px;vertical-align:middle;height:20px;' /><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><h1>Release Notes</h1>
+<h2>[2.0.0-rc1] - 2025-12-07</h2>
+<hr />
+<h2>✨ Added</h2>
+<ul>
+<li>QueryUtil and query scopes:</li>
+<li>New <code>QueryUtil</code> with <code>SCOPES</code> (READ, QUERYSET_REQUEST, plus extras) and <code>apply_queryset_optimizations</code>.</li>
+<li><code>ModelSerializer.query_util</code> bound per model via <code>__init_subclass__</code>.</li>
+<li><code>ModelSerializer.QuerySet</code> supports <code>read</code>, <code>queryset_request</code>, <code>extras</code>.</li>
+<li>Query schemas:</li>
+<li><code>QuerySchema</code>, <code>ObjectQuerySchema</code>, <code>ObjectsQuerySchema</code>, <code>ModelQuerySetSchema</code>, <code>ModelQuerySetExtraSchema</code>, <code>QueryUtilBaseScopesSchema</code>.</li>
+<li>ModelUtil:</li>
+<li><code>get_objects(...)</code>: optimized queryset fetching with filters and select/prefetch hints.</li>
+<li><code>get_object(...)</code>: single-object retrieval by pk or getters with optimizations.</li>
+<li><code>read_s(...)</code> and <code>list_read_s(...)</code>: serialize instances or auto-fetch via query schemas.</li>
+<li>Relation discovery helpers: <code>get_select_relateds()</code>, <code>get_reverse_relations()</code>.</li>
+<li>PK type resolution: <code>pk_field_type</code> with helpful error for unknown field types.</li>
+<li>ManyToManyAPI:</li>
+<li>GET related endpoints return <code>{items: [...], count: N}</code>.</li>
+<li>Relation filter handlers accept sync or async functions.</li>
+<li>Related items use <code>ModelUtil.list_read_s</code> for serialization.</li>
+<li>Schemas modularization:</li>
+<li>New modules: <code>ninja_aio/schemas/api.py</code>, <code>ninja_aio/schemas/generics.py</code>, and exported names under <code>ninja_aio/schemas/__init__.py</code>.</li>
+<li>Decorators:</li>
+<li>Minor hardening and docs for <code>aatomic</code> and <code>unique_view</code>.</li>
+</ul>
+<hr />
+<h2>🛠 Changed</h2>
+<ul>
+<li>APIViewSet:</li>
+<li>List view uses <code>ModelUtil.get_objects</code> and <code>list_read_s</code> with read optimizations; filter hooks retained.</li>
+<li>Retrieve view uses <code>read_s</code> with <code>QuerySchema(getters={"pk": ...})</code>.</li>
+<li>Path PK schema type inferred from model PK via <code>ModelUtil.pk_field_type</code>.</li>
+<li>Default read query data comes from <code>ModelSerializer.QuerySet.read</code> via <code>query_util</code>.</li>
+<li>ModelSerializer:</li>
+<li>Binds <code>util = ModelUtil(cls)</code> and <code>query_util = QueryUtil(cls)</code> to subclasses.</li>
+<li><code>queryset_request</code> applies configured optimizations from <code>QuerySet.queryset_request</code>.</li>
+<li>ModelUtil internals:</li>
+<li>Unified <code>_apply_query_optimizations</code> merges explicit select/prefetch with auto-discovered relations when <code>is_for_read=True</code>.</li>
+<li>Serialization paths standardized through internal bump helpers.</li>
+<li>Auth:</li>
+<li><code>AsyncJwtBearer.verify_token</code> simplifies error handling; drops explicit <code>AuthError</code>.</li>
+<li>Imports:</li>
+<li><code>ManyToManyAPI</code> consumed from <code>ninja_aio/helpers/api.py</code>.</li>
+<li>Runtime requirements:</li>
+<li>Pinned upper bounds for <code>django-ninja</code>, <code>joserfc</code>, <code>orjson</code>.</li>
+</ul>
+<hr />
+<h2>📝 Documentation</h2>
+<ul>
+<li>Updated:</li>
+<li>ModelUtil reference: QuerySet config, QueryUtil, query schemas, <code>get_objects</code>, <code>get_object</code>, <code>read_s</code>, <code>list_read_s</code>.</li>
+<li>APIViewSet: list/retrieve flow, PK type inference, M2M GET envelope, async/sync filter handlers.</li>
+<li>Tutorial (model): QuerySet config and <code>query_util</code> examples; fetch/serialize using query schemas.</li>
+<li>Index: overview of query optimizations and schemas.</li>
+</ul>
+<hr />
+<h2>🔴 Breaking Changes</h2>
+<ul>
+<li>Path PK schema type:</li>
+<li>PK type is now inferred from the model PK. Code relying on <code>int | str</code> in path schemas may need adjustments.</li>
+<li>ManyToMany GET response shape:</li>
+<li>Response changed from a plain list to an envelope <code>{items: [...], count: N}</code>. Clients must adapt parsing.</li>
+<li>Import paths:</li>
+<li>Schema helpers moved under <code>ninja_aio/schemas/helpers.py</code> and re-exported by <code>ninja_aio/schemas/__init__.py</code>.</li>
+<li><code>ManyToManyAPI</code> import is now <code>from ninja_aio.helpers.api import ManyToManyAPI</code>.</li>
+<li>ModelUtil read API:</li>
+<li><code>read_s</code> and <code>list_read_s</code> signatures accept <code>schema</code> first and support <code>instance</code> or <code>query_data</code>. Code passing <code>(request, obj, schema)</code> must switch to <code>(schema, request, instance=obj)</code>.</li>
+</ul>
+<hr />
+<h2>⚠ Notes / Potential Impact</h2>
+<p>| Area | Observation | Impact |
+| ---- | ----------- | ------ |
+| Query optimizations | <code>is_for_read=True</code> merges explicit and auto-discovered relations. | More joins/prefetches; re-check performance for heavy endpoints. |
+| Requirements caps | Upper bounds added for core deps. | Ensure compatible versions in your environment. |</p>
+<hr />
+<h2>🔍 Migration / Action</h2>
+<ol>
+<li>Update imports:</li>
+<li><code>from ninja_aio.schemas.helpers import QuerySchema, ObjectQuerySchema, ObjectsQuerySchema, ModelQuerySetSchema, ModelQuerySetExtraSchema</code></li>
+<li><code>from ninja_aio.helpers.api import ManyToManyAPI</code></li>
+<li>Adjust M2M GET consumers to handle <code>{items, count}</code>.</li>
+<li>Update <code>read_s</code>/<code>list_read_s</code> calls to new parameter order.</li>
+<li>Verify path PK handling in custom routes that relied on a generic PK type.</li>
+<li>Review <code>QuerySet.read</code> / <code>QuerySet.queryset_request</code> for desired select/prefetch behavior.</li>
+</ol>
+<hr />
+<h2>✅ Suggested Follow-Ups</h2>
+<ul>
+<li>Add perf checks around list/retrieve with merged relations.</li>
+<li>Expand tests for:</li>
+<li>PK type inference in path schemas.</li>
+<li>Sync vs async relation filter handlers.</li>
+<li>QueryUtil extras scopes resolution and application.</li>
+</ul>
+<hr /></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v2.0.0-rc2/'><strong>v2.0.0-rc2</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v2.0.0-rc3...v2.0.0-rc2'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-12-12</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><img alt='notes' src='https://img.shields.io/badge/notes-available-blue?style=flat' style='margin-right:6px;vertical-align:middle;height:20px;' /><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><h1>Release Notes</h1>
+<h2>[2.0.0-rc2] - 2025-12-12</h2>
+<hr />
+<h2>✨ Added</h2>
+<ul>
+<li>support for django-ninja 1.5.1</li>
+<li>support for orjson 3.11.5</li>
+</ul></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v2.0.0-rc3/'><strong>v2.0.0-rc3</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v2.0.0-rc4...v2.0.0-rc3'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-12-12</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><img alt='notes' src='https://img.shields.io/badge/notes-available-blue?style=flat' style='margin-right:6px;vertical-align:middle;height:20px;' /><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><h1>Release Notes</h1>
+<h2>[2.0.0-rc3] - 2025-12-12</h2>
+<hr />
+<h2>✨ Added</h2>
+<ul>
+<li>ManyToManyAPI:</li>
+<li>New per-relation POST object resolution handler: <code>&lt;related_name&gt;_query_handler(self, request, pk, instance)</code> returning a queryset, resolved via <code>.afirst()</code>.</li>
+<li>Endpoint registration details documented: GET without trailing slash, POST with trailing slash; operationId conventions (<code>get_{base}_{rel}</code>, <code>manage_{base}_{rel}</code>).</li>
+</ul>
+<hr />
+<h2>🛠 Changed</h2>
+<ul>
+<li>ManyToManyAPI:</li>
+<li>Split handlers: GET uses <code>&lt;related_name&gt;_query_params_handler(self, queryset, filters_dict)</code>; POST uses <code>&lt;related_name&gt;_query_handler(...)</code> for per-PK validation.</li>
+<li>Manage view uses <code>_collect_m2m(...)</code> with additional context (<code>related_name</code>, <code>instance</code>) and falls back to <code>ModelUtil.get_objects(...)</code> when query handler is absent.</li>
+<li>Improved docs and docstrings for concurrency, error semantics, and request/response payloads.</li>
+<li>Docs:</li>
+<li>Refined M2M section: clarified handlers, paths, operationIds, request bodies, and concurrency.</li>
+<li>Minor wording and formatting improvements; standardized examples.</li>
+<li>Version:</li>
+<li>Bump to <code>2.0.0-rc3</code>.</li>
+</ul>
+<hr />
+<h2>📝 Documentation</h2>
+<ul>
+<li>APIViewSet M2M docs updated:</li>
+<li>Clarified GET filters vs POST per-PK resolution.</li>
+<li>Documented response semantics and per-PK success/error messages.</li>
+<li>Added an example showcasing both handlers.</li>
+</ul>
+<hr />
+<h2>🔴 Breaking Changes</h2>
+<ul>
+<li>Handler naming:</li>
+<li>GET filters must use <code>&lt;related_name&gt;_query_params_handler</code>; POST add/remove resolution must use <code>&lt;related_name&gt;_query_handler</code>. Existing single-handler implementations should be split accordingly.</li>
+<li>Endpoint paths:</li>
+<li>GET relation: <code>/{base}/{pk}/{rel_path}</code> (no trailing slash).</li>
+<li>POST relation: <code>/{base}/{pk}/{rel_path}/</code> (trailing slash).</li>
+</ul>
+<hr />
+<h2>⚠ Notes / Potential Impact</h2>
+<p>| Area | Observation | Impact |
+| ---- | ----------- | ------ |
+| Validation | POST uses per-PK resolution handler when present; fallback uses <code>ModelUtil.get_objects</code>. | Tighten access control and scoping per relation. |
+| Concurrency | <code>aadd</code> and <code>aremove</code> run concurrently via <code>asyncio.gather</code>. | Faster bulk mutations; ensure thread-safety of custom logic. |</p>
+<hr />
+<h2>🔍 Migration / Action</h2>
+<ol>
+<li>Implement per-relation handlers:</li>
+<li>GET filters: <code>def|async def &lt;rel&gt;_query_params_handler(self, qs, filters: dict) -&gt; qs</code>.</li>
+<li>POST resolution: <code>async def &lt;rel&gt;_query_handler(self, request, pk, instance) -&gt; queryset</code>.</li>
+<li>Verify clients and OpenAPI consumers against the documented endpoint paths and operationIds.</li>
+<li>Ensure manage responses are consumed as documented (<code>results</code>, <code>errors</code> with <code>count</code> and <code>details</code>).</li>
+</ol>
+<hr />
+<h2>✅ Suggested Follow-Ups</h2>
+<ul>
+<li>Add tests for:</li>
+<li>Presence/absence of <code>&lt;related_name&gt;_query_handler</code> fallback behavior.</li>
+<li>Sync vs async GET filter handlers.</li>
+<li>Per-PK error and success detail aggregation.</li>
+</ul></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v2.0.0-rc4/'><strong>v2.0.0-rc4</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v2.0.0-rc5...v2.0.0-rc4'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-12-12</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><img alt='notes' src='https://img.shields.io/badge/notes-available-blue?style=flat' style='margin-right:6px;vertical-align:middle;height:20px;' /><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><h1>Release Notes</h1>
+<h2>[2.0.0-rc4] - 2025-12-12</h2>
+<hr />
+<h2>✨ Added</h2>
+<ul>
+<li>possibility to override router tag in APIViewSet</li>
+</ul>
+<hr /></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v2.0.0-rc5/'><strong>v2.0.0-rc5</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v2.0.0-rc6...v2.0.0-rc5'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-12-12</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><img alt='notes' src='https://img.shields.io/badge/notes-available-blue?style=flat' style='margin-right:6px;vertical-align:middle;height:20px;' /><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><h1>Release Notes</h1>
+<h2>[2.0.0-rc5] - 2025-12-12</h2>
+<hr />
+<h2>🛠 Changed</h2>
+<ul>
+<li>fix: update log messages to use 'pk' instead of 'id' for consistency in ManyToManyAPI</li>
+</ul>
+<hr /></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v2.0.0-rc6/'><strong>v2.0.0-rc6</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v2.0.0-rc7...v2.0.0-rc6'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-12-12</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><img alt='notes' src='https://img.shields.io/badge/notes-available-blue?style=flat' style='margin-right:6px;vertical-align:middle;height:20px;' /><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><h1>Release Notes</h1>
+<h2>[2.0.0-rc6] - 2025-12-12</h2>
+<hr />
+<h2>✨ Added</h2>
+<ul>
+<li>ORJSONRenderer:</li>
+<li>Configurable orjson option via Django settings: <code>NINJA_AIO_ORJSON_RENDERER_OPTION</code>.</li>
+<li>New <code>dumps</code> classmethod applying the configured option to all JSON responses.</li>
+</ul>
+<hr />
+<h2>🛠 Changed</h2>
+<ul>
+<li>Version bump:</li>
+<li><code>__version__</code> updated from <code>2.0.0-rc5</code> to <code>2.0.0-rc6</code>.</li>
+<li>Rendering internals:</li>
+<li><code>render</code> now calls <code>self.dumps(...)</code> instead of <code>orjson.dumps(...)</code> directly.</li>
+</ul>
+<hr />
+<h2>📝 Documentation</h2>
+<ul>
+<li>Mention <code>NINJA_AIO_ORJSON_RENDERER_OPTION</code> in setup/config docs with example values (e.g., <code>orjson.OPT_NAIVE_UTC</code>, <code>orjson.OPT_SERIALIZE_DATACLASS</code>).</li>
+</ul>
+<hr />
+<h2>🔍 Migration / Action</h2>
+<ol>
+<li>If you need specific JSON encoding behavior, set in Django settings:</li>
+<li><code>NINJA_AIO_ORJSON_RENDERER_OPTION = orjson.OPT_NAIVE_UTC | orjson.OPT_SERIALIZE_NUMPY</code> (example).</li>
+<li>No code changes required for consumers; behavior is backward compatible when the setting is absent.</li>
+</ol>
+<hr />
+<h2>⚠ Notes / Potential Impact</h2>
+<p>| Area | Observation | Impact |
+| ---- | ----------- | ------ |
+| JSON options | Renderer honors global orjson options. | Unified behavior across endpoints; verify compatibility with clients. |</p>
+<hr /></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v2.0.0-rc7/'><strong>v2.0.0-rc7</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v1.0.5...v2.0.0-rc7'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-12-16</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><img alt='notes' src='https://img.shields.io/badge/notes-available-blue?style=flat' style='margin-right:6px;vertical-align:middle;height:20px;' /><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><h1>Release Notes</h1>
+<h2>[2.0.0-rc7] - 2025-12-16</h2>
+<hr />
+<h2>✨ Added</h2>
+<ul>
+<li>Decorators:</li>
+<li><code>decorate_view</code>: compose multiple decorators (sync/async), preserves normal stacking order, skips <code>None</code>.</li>
+<li><code>APIViewSet.extra_decorators</code>: declarative per-operation decorators.</li>
+<li><code>DecoratorsSchema</code> in <code>ninja_aio.schemas.helpers</code> to configure per-op decorators.</li>
+</ul>
+<hr />
+<h2>🛠 Changed</h2>
+<ul>
+<li>APIViewSet:</li>
+<li><code>create</code>, <code>list</code>, <code>retrieve</code>, <code>update</code>, <code>delete</code> compose built-ins (<code>unique_view</code>, <code>paginate</code>) and user-provided extras via <code>decorate_view</code> for consistent ordering.</li>
+</ul>
+<hr />
+<h2>📝 Documentation</h2>
+<ul>
+<li>New:</li>
+<li><code>docs/api/views/decorators.md</code>: <code>decorate_view</code> usage, conditional decoration, and <code>extra_decorators</code> with <code>DecoratorsSchema</code>.</li>
+<li><code>docs/api/renderers/orjson_renderer.md</code>: how to configure ORJSON options in <code>settings.py</code>.</li>
+</ul>
+<hr />
+<h2>⚠ Notes / Potential Impact</h2>
+<ul>
+<li>Decorator order:</li>
+<li><code>decorate_view</code> applies decorators in standard Python stacking semantics. If you relied on a specific nesting between <code>paginate</code>, <code>unique_view</code>, and custom decorators, verify behavior.</li>
+</ul>
+<hr />
+<h2>🔍 Migration / Action</h2>
+<ol>
+<li>Optionally move per-operation decorators to <code>APIViewSet.extra_decorators = DecoratorsSchema(...)</code>.</li>
+<li>If desired, configure ORJSON behavior via <code>NINJA_AIO_ORJSON_RENDERER_OPTION</code> in <code>settings.py</code>.</li>
+</ol></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v1.0.5/'><strong>v1.0.5</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v1.0.4...v1.0.5'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-12-07</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><img alt='notes' src='https://img.shields.io/badge/notes-available-blue?style=flat' style='margin-right:6px;vertical-align:middle;height:20px;' /><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><h2>[1.0.5] - 2025-12-07</h2>
+<h2>🛠 Changed</h2>
+<ul>
+<li>limited support up to django ninja 1.4.5</li>
+</ul></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v1.0.4/'><strong>v1.0.4</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v1.0.3...v1.0.4'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-11-03</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><img alt='notes' src='https://img.shields.io/badge/notes-available-blue?style=flat' style='margin-right:6px;vertical-align:middle;height:20px;' /><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><h2>[1.0.4] - 2025-11-03</h2>
+<hr />
+<h2>✨ Added</h2>
+<ul>
+<li><code>ModelUtil._rewrite_nested_foreign_keys</code>: reintroduced helper to rename nested FK keys from <code>&lt;field&gt;</code> to <code>&lt;field&gt;_id</code> inside nested dicts (currently invoked conditionally in <code>parse_output_data</code>).</li>
+</ul>
+<hr />
+<h2>🛠 Changed</h2>
+<ul>
+<li><code>ModelUtil._extract_field_obj</code> converted to async; now uses <code>agetattr</code> for safer async attribute access.</li>
+<li><code>ModelUtil.parse_output_data</code>:</li>
+<li>Awaits the new async <code>_extract_field_obj</code>.</li>
+<li>Fetches related instance first, then (conditionally) calls <code>_rewrite_nested_foreign_keys</code> when the outer field is a <code>ForeignKey</code>.</li>
+</ul>
+<hr />
+<h2>📝 Documentation</h2>
+<ul>
+<li>Table in <code>docs/api/models/model_serializer.md</code> (CreateSerializer attributes) reformatted:</li>
+<li>Condensed multiline description for <code>customs</code> into a single line with semicolons.</li>
+<li>Adjusted column widths / alignment for cleaner diff footprint.</li>
+</ul>
+<hr />
+<h2>⚠ Note / Potential Issue</h2>
+<p>| Area | Observation | Impact |
+| ---- | ----------- | ------ |
+| <code>parse_output_data</code> | Result of <code>_rewrite_nested_foreign_keys</code> is assigned to local <code>v</code> but not reattached to <code>payload</code> (final output still sets <code>payload[k] = rel_instance</code>). | FK key rewriting may be a no-op for consumers; behavior might not match intent. |</p>
+<hr />
+<h2>🔍 Migration / Action</h2>
+<ol>
+<li>If you relied on the absence of FK key rewriting (1.0.3), verify whether the restored helper actually affects payloads (it likely does not yet).</li>
+<li>If rewriting is desired, ensure the transformed dict (or additional metadata) is surfaced in the serialized output or adjust logic accordingly.</li>
+</ol>
+<hr />
+<h2>✅ Suggested Follow-Ups</h2>
+<ul>
+<li>Add a test asserting expected presence (or absence) of <code>&lt;field&gt;_id</code> keys in nested output.</li>
+<li>Decide whether payload should expose both the related object and rewritten key map, or deprecate the helper again if not needed.</li>
+</ul>
+<hr /></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v1.0.3/'><strong>v1.0.3</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v1.0.2...v1.0.3'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-11-03</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><img alt='notes' src='https://img.shields.io/badge/notes-available-blue?style=flat' style='margin-right:6px;vertical-align:middle;height:20px;' /><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><h2>[1.0.3] - 2025-11-03</h2>
+<hr />
+<h2>✨ Added</h2>
+<ul>
+<li><code>M2MRelationSchema</code>: New optional field <code>related_schema</code> documented (auto-generated when using a <code>ModelSerializer</code>).</li>
+</ul>
+<hr />
+<h2>🛠 Changed</h2>
+<ul>
+<li>Documentation tables (CRUD, Core Attributes, Auth, M2M Endpoints, Hooks) reformatted for alignment &amp; readability.</li>
+<li>Extra blank lines inserted to improve Markdown rendering clarity.</li>
+<li><code>ModelUtil.parse_output_data</code>: simplified nested relation handling (direct instance assignment).</li>
+</ul>
+<hr />
+<h2>🗑 Removed</h2>
+<ul>
+<li><code>ModelUtil._rewrite_nested_foreign_keys</code> helper.</li>
+<li>Foreign key nested dict rewriting logic (<code>&lt;field&gt;</code> → <code>&lt;field&gt;_id</code>) during output serialization.</li>
+</ul>
+<hr />
+<h2>📄 Documentation</h2>
+<ul>
+<li>Added warning block describing support for plain Django <code>Model</code> in <code>M2MRelationSchema.model</code> and mandatory <code>related_schema</code> when used.</li>
+<li>Added <code>related_schema</code> bullet to M2M relation capabilities list.</li>
+<li>Ensured file ends with a trailing newline.</li>
+</ul>
+<hr />
+<h2>⚠ Breaking Change</h2>
+<p>| Change | Impact |
+| ------ | ------ |
+| Removal of FK key rewriting in nested outputs | Clients expecting <code>&lt;nested_fk&gt;_id</code> keys must adjust parsing logic |</p>
+<hr />
+<h2>🔍 Migration Notes</h2>
+<ol>
+<li>If consumers relied on <code>&lt;nested_fk&gt;_id</code> keys, add a post-serialization adapter to inject them, or reintroduce prior logic.</li>
+<li>When declaring M2M relations with plain Django models, always provide <code>related_schema</code>; omission now results in validation errors.</li>
+</ol>
+<hr />
+<h2>📌 Highlights</h2>
+<ul>
+<li>Cleaner docs + explicit M2M plain model guidance.</li>
+<li>Leaner serialization path (less mutation, clearer intent).</li>
+</ul>
+<hr />
+<h2>🧪 Suggested Follow‑Ups</h2>
+<ul>
+<li>Add regression test ensuring nested FK dicts are no longer rewritten.</li>
+<li>Consider exposing an optional flag to restore legacy FK key rewriting if demand appears.</li>
+</ul></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v1.0.2/'><strong>v1.0.2</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v1.0.1...v1.0.2'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-11-01</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><img alt='notes' src='https://img.shields.io/badge/notes-available-blue?style=flat' style='margin-right:6px;vertical-align:middle;height:20px;' /><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><h2>[1.0.2] - 2025-11-01</h2>
+<hr />
+<h2>✨ Added</h2>
+<ul>
+<li>SonarCloud Quality Gate badge (README + docs index).</li>
+<li>Custom domain support (docs/CNAME).</li>
+<li>Release Notes page with dynamic macros (<code>docs/release_notes.md</code> + <code>mkdocs-macros-plugin</code>).</li>
+<li>Release automation script (<code>main.py</code>) generating tables, full changelog, and cards.</li>
+<li>ManyToManyAPI helper (<code>ninja_aio/helpers/api.py</code>) with dynamic GET / ADD / REMOVE endpoints, filter schemas, concurrent operations, and query handler support.</li>
+<li>Helpers package export (<code>helpers/__init__.py</code>).</li>
+<li>Extended schema support in <code>M2MRelationSchema</code> (auto <code>related_schema</code> via validator).</li>
+<li>Refactored M2M integration in <code>APIViewSet</code> (now uses <code>ManyToManyAPI</code>).</li>
+<li>New test suites: decorators, exceptions/API, renderer/parser, many-to-many API.</li>
+<li>Centralized literal for “not found” (<code>tests/generics/literals.py</code>).</li>
+</ul>
+<hr />
+<h2>🛠 Changed</h2>
+<ul>
+<li><code>NotFoundError</code>: error key now uses underscored verbose name.</li>
+<li><code>ORJSONRenderer</code>: replaced nested mutation with recursive <code>transform</code>.</li>
+<li><code>ModelUtil</code> / <code>ModelSerializer</code>: added comprehensive docstrings, normalized custom field tuples, improved FK and nested output handling.</li>
+<li>Removed inline M2M view logic from <code>APIViewSet</code>.</li>
+<li>Enriched model serializer docs (tables, normalization, error cases).</li>
+<li><code>M2MRelationSchema</code>: validation for related schema generation.</li>
+</ul>
+<hr />
+<h2>🧾 Documentation</h2>
+<ul>
+<li>Major rewrite of <code>docs/api/models/model_serializer.md</code>: normalization workflow, error cases, best practices, expanded examples.</li>
+<li>Added Release Notes navigation in <code>mkdocs.yml</code>.</li>
+<li>Inline internal-use warning for <code>ManyToManyAPI</code>.</li>
+<li>Improved readability (spacing, tables, JSON formatting).</li>
+</ul>
+<hr />
+<h2>✅ Tests</h2>
+<ul>
+<li>Coverage for:</li>
+<li>ORJSON transformations (bytes→base64, IP→string).</li>
+<li><code>unique_view</code> name suffix logic.</li>
+<li>Exception parsing and API defaults.</li>
+<li>M2M add/remove flows + duplicate/error handling.</li>
+<li>Updated NotFoundError key format.</li>
+<li>Reused shared literal for 404 assertions.</li>
+</ul>
+<hr />
+<h2>📦 Tooling</h2>
+<ul>
+<li>Added <code>mkdocs-macros-plugin</code>.</li>
+<li>Automated release visualization (HTML tables, cards).</li>
+<li>Cleaner MkDocs theme (font configuration).</li>
+</ul>
+<hr />
+<h2>⚠ Impact</h2>
+<p>| Change | Potential Effect |
+| ------ | ---------------- |
+| Underscored error keys | Clients parsing old keys must adjust |
+| Extracted M2M logic | Custom subclasses relying on internals must migrate |
+| 2‑tuple customs now required | Missing values trigger validation errors |</p>
+<hr />
+<h2>🔍 Upgrade Notes</h2>
+<ol>
+<li>Update error handling for new 404 key shape.</li>
+<li>Migrate any manual M2M endpoint wiring to <code>ManyToManyAPI</code>.</li>
+<li>Review custom field tuples—add defaults if optional behavior desired.</li>
+</ol>
+<hr />
+<h2>🧪 Follow‑Ups</h2>
+<ul>
+<li>Tag release (<code>git tag -a vX.Y.Z -m "Release vX.Y.Z" &amp;&amp; git push --tags</code>).</li>
+<li>Optionally add top-level <code>CHANGELOG.md</code>.</li>
+<li>Decide on public stability of <code>ManyToManyAPI</code> (remove warning when ready).</li>
+</ul>
+<hr />
+<h2>📌 Release Template</h2>
+<p>```markdown</p>
+<h2>vX.Y.Z (YYYY-MM-DD)</h2>
+<p>Highlights:
+- ...</p>
+<p>Full release table: /release_notes/</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v1.0.1/'><strong>v1.0.1</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v1.0.0...v1.0.1'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-10-30</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><img alt='notes' src='https://img.shields.io/badge/notes-available-blue?style=flat' style='margin-right:6px;vertical-align:middle;height:20px;' /><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><h2><a href="https://github.com/caspel26/django-ninja-aio-crud/compare/v1.0.0...v1.0.1">1.0.1</a> - 2025-10-30</h2>
+<h3>Added</h3>
+<ul>
+<li>Docs: New dev dependencies file <code>requirements.dev.txt</code>.</li>
+<li>MkDocs: Additional plugins (<code>mkdocstrings</code>, <code>section-index</code>, <code>autorefs</code>) and extended <code>markdown_extensions</code>.</li>
+<li>Theme extras: social links, analytics stub, version metadata.</li>
+<li>CSS: Logo sizing rules in <code>docs/extra.css</code>.</li>
+</ul>
+<h3>Changed</h3>
+<ul>
+<li>README: Reduced length, modernized intro, added concise feature + quick start sections.</li>
+<li>Pagination docs: Reformatted tables, spacing, clarified examples.</li>
+<li>Contributing docs: Expanded with setup, PR guidelines, issue template hints.</li>
+<li>Tutorial (CRUD &amp; Filtering): Table formatting, spacing normalization, improved examples.</li>
+<li>Favicon path moved <code>docs/img/favicon.ico</code> → <code>docs/images/favicon.ico</code>; logo updated.</li>
+<li>Index docs: Documentation URL switched to custom domain.</li>
+<li>MkDocs config:</li>
+<li><code>site_url</code> updated to <code>https://django-ninja-aio.com/</code>.</li>
+<li>Added logo/favicon references and rich navigation features.</li>
+<li>Expanded palette + features (search, code copy/select, tooltips, etc.).</li>
+<li>PyProject metadata: Documentation URL updated to new domain.</li>
+<li>Pagination imports switched to <code>from ninja.pagination</code> instead of local alias in examples.</li>
+<li>Refactor: <code>_m2m_views</code> now takes a single <code>M2MRelationSchema</code> and is invoked in a loop (improves clarity).</li>
+<li>Minor docstring spacing added before CRUD endpoint decorators.</li>
+<li>M2M registration: Logic unchanged functionally but simplified iteration pattern.</li>
+</ul>
+<h3>Removed</h3>
+<ul>
+<li>Legacy automatic loop inside <code>_m2m_views</code> (replaced by external loop in <code>_add_views</code>).</li>
+<li>Redundant long README sections (old serializer deep examples, extended auth/pagination prose).</li>
+</ul>
+<h3>Internal</h3>
+<ul>
+<li><code>_add_views</code> now iterates <code>self.m2m_relations</code> and calls <code>_m2m_views(relation)</code> for each.</li>
+<li>Consistent path/auth resolution maintained; no schema changes to public API.</li>
+<li>Added <code>use_directory_urls: true</code> explicitly in <code>mkdocs.yml</code>.</li>
+</ul>
+<h3>Impact</h3>
+<ul>
+<li>No breaking API changes.</li>
+<li>Documentation structure improved; search indexing benefits from new plugins.</li>
+<li>M2M internals slightly cleaner; external behavior stable.</li>
+</ul>
+<h3>Migration Notes</h3>
+<p>No action required for existing users.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v1.0.0/'><strong>v1.0.0</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.11.4...v1.0.0'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-10-28</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><img alt='notes' src='https://img.shields.io/badge/notes-available-blue?style=flat' style='margin-right:6px;vertical-align:middle;height:20px;' /><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><h2><a href="https://github.com/caspel26/django-ninja-aio-crud/compare/v0.11.4...v1.0.0">1.0.0</a> - 2025-10-28</h2>
+<h3>Added</h3>
+<ul>
+<li>Per‑relation M2M configuration via <code>M2MRelationSchema</code> (replaces tuples).</li>
+<li>Per‑relation flags: <code>add</code>, <code>remove</code>, <code>get</code>.</li>
+<li>Per‑relation <code>filters</code> with dynamic schema generation and hook <code>&lt;related_name&gt;_query_params_handler</code>.</li>
+<li>Method <code>_generate_m2m_filters_schemas</code> to build all M2M filter schemas.</li>
+<li>Query param injection for M2M GET: <code>filters: Query[filters_schema] = None</code>.</li>
+<li>Extended docstrings for <code>APIViewSet</code> and internal helper methods.</li>
+<li>Overridable hooks documented in docs (<code>query_params_handler</code>, per‑relation handlers).</li>
+<li>Changelog: version bump to <code>__version__ = "1.0.0"</code>.</li>
+</ul>
+<h3>Changed</h3>
+<ul>
+<li><code>api_view_set.md</code> rewritten: tuple-based M2M section replaced with <code>M2MRelationSchema</code> docs, new sections for filters, hooks, examples.</li>
+<li>CRUD table wording (schema_out formatting, notes clarified).</li>
+<li>Auth resolution notes now include M2M fallback logic.</li>
+<li>Internal view registration: per-relation flags extracted (<code>m2m_add/remove/get</code> replaced by schema attributes).</li>
+<li>Error message spacing adjusted in <code>_check_m2m_objs</code>.</li>
+<li>Refactored internal function docs (more concise, purpose-focused).</li>
+<li>Dynamic filter/path schemas built through unified <code>_generate_schema</code>.</li>
+</ul>
+<h3>Removed</h3>
+<ul>
+<li>Class attributes: <code>m2m_add</code>, <code>m2m_remove</code>, <code>m2m_get</code>.</li>
+<li>Tuple-based <code>m2m_relations</code> formats.</li>
+<li>Legacy verbose examples inside <code>views()</code> docstring.</li>
+<li>Redundant <code>m2m_auth</code> entry in auth table (moved to core attributes table).</li>
+</ul>
+<h3>Internal</h3>
+<ul>
+<li>Added per-method docstrings (<code>create_view</code>, <code>list_view</code>, <code>retrieve_view</code>, <code>update_view</code>, <code>delete_view</code>, <code>_m2m_views</code>, <code>_add_views</code>, etc.).</li>
+<li><code>_crud_views</code> now described as a mapping.</li>
+<li>Added storage of <code>self.m2m_filters_schemas</code> during init.</li>
+<li>GET M2M handler applies optional per-relation filter hook if present.</li>
+<li>Manage M2M handler chooses input schema dynamically (<code>M2MSchemaIn</code> / <code>M2MAddSchemaIn</code> / <code>M2MRemoveSchemaIn</code>).</li>
+</ul>
+<h3>Migration Notes</h3>
+<p>Old:
+<code>python
+m2m_relations = [
+    (Tag, "tags"),
+    (Category, "categories", "article-categories"),
+    (Author, "authors", "co-authors", [AdminAuth()])
+]
+m2m_add = True
+m2m_remove = True
+m2m_get = True</code></p>
+<p>New:
+```python
+from ninja_aio.schemas import M2MRelationSchema</p>
+<p>m2m_relations = [
+    M2MRelationSchema(model=Tag, related_name="tags"),
+    M2MRelationSchema(model=Category, related_name="categories", path="article-categories"),
+    M2MRelationSchema(model=Author, related_name="authors", path="co-authors", auth=[AdminAuth()])
+]</p>
+<h1>Disable ops per relation if needed:</h1>
+<h1>M2MRelationSchema(model=Tag, related_name="tags", add=False, remove=False, get=True)</h1>
+<p>```</p>
+<p>Per‑relation filters:
+```python
+M2MRelationSchema(
+    model=Tag,
+    related_name="tags",
+    filters={"name": (str, "")}
+)</p>
+<p>async def tags_query_params_handler(self, queryset, filters):
+    if filters.get("name"):
+        queryset = queryset.filter(name__icontains=filters["name"])
+    return queryset
+```</p>
+<h3>Breaking Changes</h3>
+<ul>
+<li><code>m2m_relations</code> must use <code>M2MRelationSchema</code> (no tuples).</li>
+<li>Removed <code>m2m_add</code>, <code>m2m_remove</code>, <code>m2m_get</code> (use per-relation flags).</li>
+<li>Any code unpacking relation tuples must be updated to attribute access.</li>
+</ul>
+<h3>Summary</h3>
+<p>Release focuses on granular M2M configuration, per‑relation filtering, cleaner internals, and clearer documentation for extensibility.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.11.4/'><strong>v0.11.4</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.11.3...v0.11.4'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-10-28</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><img alt='notes' src='https://img.shields.io/badge/notes-available-blue?style=flat' style='margin-right:6px;vertical-align:middle;height:20px;' /><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><h2><a href="https://github.com/caspel26/django-ninja-aio-crud/compare/v0.11.3...v0.11.4">0.11.4</a> - 2025-10-28</h2>
+<h3>Changed</h3>
+<ul>
+<li>Documentation heading renamed from <code># API ViewSet</code> to <code># APIViewSet</code>.</li>
+<li>Docs rewritten: long examples replaced with concise endpoint table and structured attribute sections.</li>
+<li>Core attributes table expanded (added <code>pagination_class</code>, <code>query_params</code>, <code>disable</code>, endpoint doc strings).</li>
+<li>Clarified authentication resolution; explicit mention of <code>m2m_auth</code>.</li>
+</ul>
+<h3>Added</h3>
+<ul>
+<li>Per-relation M2M configuration: support for 3- and 4-element tuples in <code>m2m_relations</code>.</li>
+<li>3 elements: <code>(model, related_name, custom_path)</code></li>
+<li>4 elements: <code>(model, related_name, custom_path, per_relation_auth)</code></li>
+<li>Per-relation auth override (local <code>m2m_auth</code> inside <code>_m2m_views</code> loop).</li>
+<li>Documentation of M2M path/auth resolution rules.</li>
+</ul>
+<h3>Removed</h3>
+<ul>
+<li>Global <code>m2m_path</code> attribute (replaced by per-relation path tuple element).</li>
+<li>Old <code>m2m_relations</code> signature <code>list[tuple[ModelSerializer | Model, str]]</code>.</li>
+</ul>
+<h3>Internal Implementation</h3>
+<ul>
+<li>M2M loop updated: <code>for m2m_data in self.m2m_relations:</code> with dynamic tuple length parsing.</li>
+<li>Path resolution:
+  <code>python
+  rel_path = rel_util.verbose_name_path_resolver() if not m2m_path else m2m_path</code></li>
+<li>Auth passed to decorators as <code>auth=m2m_auth</code> instead of <code>auth=self.m2m_auth</code>.</li>
+<li>Continued use of <code>@unique_view(...)</code> for stable handler naming.</li>
+</ul>
+<h3>Migration Notes</h3>
+<p>```python</p>
+<h1>Before</h1>
+<p>m2m_relations = [(Tag, "tags")]
+m2m_path = "custom-tags"  # no longer supported</p>
+<h1>After</h1>
+<p>m2m_relations = [
+    (Tag, "tags"),                                 # auto path + fallback auth
+    (Category, "categories", "custom-categories"), # custom path
+    (Author, "authors", "article-authors", [AdminAuth()])  # custom path + custom auth
+]
+<code>``
+- Remove any</code>m2m_path` usage.
+- 2-element tuples remain valid (no breaking change).</p>
+<h3>Summary</h3>
+<p>Improved flexibility and granularity for M2M relation configuration and streamlined documentation.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.11.3/'><strong>v0.11.3</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.11.1...v0.11.3'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-10-28</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><img alt='notes' src='https://img.shields.io/badge/notes-available-blue?style=flat' style='margin-right:6px;vertical-align:middle;height:20px;' /><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><h2>[0.11.3] - 2025-10-28</h2>
+<h3>Added</h3>
+<ul>
+<li><strong>M2M Path Customization</strong>: Added <code>m2m_path</code> attribute to <code>APIViewSet</code> for custom many-to-many relationship endpoint paths</li>
+<li>Default: empty string (uses auto-generated path from model verbose name)</li>
+<li>Allows overriding the default path resolution for M2M endpoints</li>
+</ul>
+<h3>Changed</h3>
+<h4>APIViewSet Class Attributes</h4>
+<ul>
+<li><strong>m2m_relations type annotation</strong>: Changed from <code>tuple[ModelSerializer | Model, str]</code> to <code>list[tuple[ModelSerializer | Model, str]]</code></li>
+<li>More flexible and mutable data structure</li>
+<li>Allows dynamic modification of M2M relations at runtime</li>
+</ul>
+<h4>Code Quality &amp; Formatting</h4>
+<ul>
+<li><strong>Consistent blank lines</strong>: Added blank lines after function returns for better code readability</li>
+<li>Applied to: <code>create_view()</code>, <code>list_view()</code>, <code>retrieve_view()</code>, <code>update_view()</code>, <code>delete_view()</code></li>
+<li><strong>Removed extra blank line</strong>: Cleaned up unnecessary blank line in <code>delete_view()</code> method</li>
+<li><strong>M2M views refactoring</strong>: Improved code structure for many-to-many relationship views</li>
+<li>Applied <code>@unique_view</code> decorator to M2M endpoints (<code>get_related</code>, <code>manage_related</code>)</li>
+<li>Removed manual <code>__name__</code> assignment in favor of decorator pattern</li>
+<li>Better separation of concerns between GET and POST operations</li>
+<li>Moved conditional M2M add/remove logic outside of the GET endpoint block</li>
+</ul>
+<h4>M2M Endpoint Generation</h4>
+<ul>
+<li><strong>Dynamic path resolution</strong>: M2M endpoints now respect custom <code>m2m_path</code> attribute
+  ```python
+  rel_path = (
+      rel_util.verbose_name_path_resolver()
+      if not self.m2m_path
+      else self.m2m_path
+  )</li>
+</ul></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.11.1/'><strong>v0.11.1</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.11.0...v0.11.1'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-10-28</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><img alt='notes' src='https://img.shields.io/badge/notes-available-blue?style=flat' style='margin-right:6px;vertical-align:middle;height:20px;' /><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><h2>[0.11.1] - 2025-10-28</h2>
+<h3>Fixed</h3>
+<ul>
+<li>Fixed typo in module name: renamed <code>decoratos.py</code> to <code>decorators.py</code></li>
+<li>Updated import statement in <code>views.py</code> to use correct <code>decorators</code> module name</li>
+</ul>
+<h3>Changed</h3>
+<h4>Documentation</h4>
+<ul>
+<li><strong>Homepage Examples</strong> - Updated traditional approach comparison</li>
+<li>Changed from Django REST Framework serializers to Django Ninja ModelSchema</li>
+<li>Simplified example from <code>UserSerializer</code> to <code>UserSchemaOut</code></li>
+<li>Simplified example from <code>UserCreateSerializer</code> to <code>UserSchemaIn</code></li>
+<li>Updated view examples to use Django Ninja's <code>@api.get()</code> and <code>@api.post()</code> decorators</li>
+<li>Replaced class-based views (<code>UserListView</code>, <code>UserCreateView</code>) with function-based views</li>
+<li>Removed <code>sync_to_async</code> wrapper calls in favor of native async Django ORM operations</li>
+<li>Simplified user creation with direct <code>acreate()</code> usage</li>
+<li>Updated response format to use tuple-based status code returns <code>(201, user)</code></li>
+<li>Made code examples more concise and modern</li>
+</ul>
+<h3>Technical Details</h3>
+<h4>Module Renaming</h4>
+<p>```python</p>
+<h1>Before (v0.11.0)</h1>
+<p>from .decoratos import unique_view</p>
+<h1>After (v0.11.1)</h1>
+<p>from .decorators import unique_view</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.11.0/'><strong>v0.11.0</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.10.3...v0.11.0'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-10-26</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><img alt='notes' src='https://img.shields.io/badge/notes-available-blue?style=flat' style='margin-right:6px;vertical-align:middle;height:20px;' /><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><h2>[0.11.0] - 2025-10-26</h2>
+<h3>Added</h3>
+<h4>Documentation</h4>
+<ul>
+<li>Complete documentation website with MkDocs Material theme</li>
+<li>Custom domain configuration (ninja-aio.dev) via CNAME</li>
+<li><strong>Getting Started Guide</strong></li>
+<li>Installation instructions</li>
+<li>Quick start tutorial with screenshots</li>
+<li>Auto-generated Swagger UI examples</li>
+<li><strong>Tutorial Series</strong> (4 comprehensive steps)</li>
+<li>Step 1: Define Your Model - Complete guide to ModelSerializer with relationships, custom fields, and lifecycle hooks</li>
+<li>Step 2: Create CRUD Views - APIViewSet usage, custom endpoints, query parameters, and error handling</li>
+<li>Step 3: Add Authentication - JWT setup with RSA keys, role-based access control, and ownership validation</li>
+<li>Step 4: Add Filtering &amp; Pagination - Advanced filtering, full-text search, ordering, and performance optimization</li>
+<li><strong>API Reference Documentation</strong></li>
+<li>Authentication guide (965 lines) covering AsyncJwtBearer, JWT validation, RBAC, and integrations</li>
+<li>ModelSerializer reference (806 lines) with schema generation and relationship handling</li>
+<li>ModelUtil reference (1,066 lines) detailing CRUD operations and data transformations</li>
+<li>APIView documentation for custom endpoints</li>
+<li>APIViewSet documentation (327 lines) for complete CRUD operations</li>
+<li>Pagination guide (750 lines) with custom pagination examples</li>
+<li>Contributing guidelines</li>
+<li>Logo and branding assets</li>
+<li>Extra CSS styling for code blocks</li>
+</ul>
+<h4>Core Features</h4>
+<ul>
+<li><strong>NotFoundError Exception</strong></li>
+<li>New exception class for 404 errors with model-aware error messages</li>
+<li>Automatically includes model verbose name in error response</li>
+<li>Status code 404 with structured error format</li>
+</ul>
+<h4>Utilities</h4>
+<ul>
+<li><strong>Decorators Module</strong> (<code>ninja_aio/decoratos.py</code>)</li>
+<li><code>aatomic</code> decorator for asynchronous atomic transactions</li>
+<li><code>AsyncAtomicContextManager</code> for async transaction context management</li>
+<li><code>unique_view</code> decorator for generating unique view names based on model metadata</li>
+<li>Support for both singular and plural model naming conventions</li>
+</ul>
+<h4>Examples</h4>
+<ul>
+<li><strong>Example 1</strong> (<code>examples/ex_1/</code>)</li>
+<li>Basic User model without relationships</li>
+<li>Simple ViewSet implementation</li>
+<li>Basic URL configuration</li>
+<li><strong>Example 2</strong> (<code>examples/ex_2/</code>)</li>
+<li>User and Customer models with ForeignKey relationship</li>
+<li>JWT authentication setup with RSA keys</li>
+<li>Complete auth configuration with mandatory claims</li>
+<li>Related field serialization examples</li>
+</ul>
+<h4>Development Tools</h4>
+<ul>
+<li>MkDocs configuration (<code>mkdocs.yml</code>)</li>
+<li>Material theme with deep purple color scheme</li>
+<li>Dark/light mode support with auto-detection</li>
+<li>Navigation tabs and integrated TOC</li>
+<li>Code highlighting with Pygments</li>
+<li>Admonitions and superfences support</li>
+<li>Documentation requirements file</li>
+<li>Custom CSS for documentation styling</li>
+</ul>
+<h3>Changed</h3>
+<h4>Core Models</h4>
+<ul>
+<li><strong>ModelSerializer</strong></li>
+<li>Enhanced docstring (113 lines) with comprehensive API documentation</li>
+<li>Detailed explanation of schema generation and relationship handling</li>
+<li>Examples for CreateSerializer, ReadSerializer, and UpdateSerializer</li>
+<li>Documented sync and async lifecycle hooks</li>
+<li><strong>ModelUtil</strong></li>
+<li>Enhanced docstring (79 lines) documenting all CRUD operations</li>
+<li>Detailed method documentation for <code>parse_input_data</code>, <code>parse_output_data</code>, and CRUD methods</li>
+<li>Performance notes and error handling documentation</li>
+<li>Updated to use <code>NotFoundError</code> instead of generic <code>SerializeError</code> for 404 cases</li>
+</ul>
+<h4>Views</h4>
+<ul>
+<li><strong>APIViewSet</strong></li>
+<li>Applied <code>@unique_view</code> decorator to all generated CRUD methods (create, list, retrieve, update, delete)</li>
+<li>Removed manual <code>__name__</code> assignment in favor of decorator-based approach</li>
+<li>Cleaner method definitions without post-definition name mutations</li>
+<li><strong>APIView</strong></li>
+<li>Added comprehensive docstring explaining base class functionality</li>
+</ul>
+<h4>Authentication</h4>
+<ul>
+<li><strong>AsyncJwtBearer</strong></li>
+<li>Enhanced docstring (71 lines) with detailed attribute and method documentation</li>
+<li>Security considerations and best practices</li>
+<li>Integration examples with Auth0, Keycloak, and Firebase</li>
+</ul>
+<h4>Project Structure</h4>
+<ul>
+<li>Reorganized documentation structure with clear separation of concerns</li>
+</ul>
+<h3>Fixed</h3>
+<ul>
+<li>Consistent error handling using <code>NotFoundError</code> for object not found scenarios</li>
+<li>Proper async context management for database transactions</li>
+</ul>
+<h3>Documentation Improvements</h3>
+<h4>Tutorial Content</h4>
+<ul>
+<li>4,435 total lines of tutorial content</li>
+<li>120+ code examples across all tutorials</li>
+<li>50+ API usage examples with curl commands</li>
+<li>Comprehensive error handling examples</li>
+<li>Performance optimization tips and best practices</li>
+</ul>
+<h4>API Reference</h4>
+<ul>
+<li>3,994 total lines of API reference documentation</li>
+<li>Complete method signatures with parameter descriptions</li>
+<li>Return type documentation</li>
+<li>Error handling specifications</li>
+<li>Integration examples</li>
+</ul>
+<h4>Visual Assets</h4>
+<ul>
+<li>Swagger UI screenshots for all CRUD operations</li>
+<li>Logo and branding images</li>
+<li>Diagram examples (where applicable)</li>
+</ul>
+<h3>Notes</h3>
+<h4>Breaking Changes</h4>
+<p>None - This is a documentation and enhancement release</p>
+<h4>Migration Required</h4>
+<p>None - All changes are backward compatible</p>
+<h4>Known Issues</h4>
+<p>None reported</p>
+<h2>Links</h2>
+<ul>
+<li><strong>Documentation</strong>: https://caspel26.github.io/django-ninja-aio-crud/</li>
+</ul></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.10.3/'><strong>v0.10.3</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.10.2...v0.10.3'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-09-23</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><img alt='notes' src='https://img.shields.io/badge/notes-available-blue?style=flat' style='margin-right:6px;vertical-align:middle;height:20px;' /><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><h2>[0.10.3] - 2025-09-23</h2>
+<h3>🔧 Changed</h3>
+<ul>
+<li><strong>ModelUtil Refactoring</strong>: Extracted model field handling logic into separate property</li>
+<li>Added <code>model_fields</code> property to encapsulate <code>[field.name for field in self.model._meta.get_fields()]</code></li>
+<li>Updated <code>serializable_fields</code> property to use new <code>model_fields</code> property for non-ModelSerializerMeta models</li>
+</ul>
+<h3>🛠️ Fixed</h3>
+<ul>
+<li><strong>Custom Field Filtering</strong>: Enhanced custom field detection logic to prevent conflicts with actual model fields</li>
+<li>Custom fields are now filtered to exclude fields that exist in the actual Django model</li>
+<li>Added <code>k not in self.model_fields</code> condition to both custom field dictionary comprehension and iteration logic</li>
+<li>Prevents custom serializer fields from overriding or conflicting with real model fields</li>
+</ul>
+<h3>📈 Improvements</h3>
+<ul>
+<li><strong>Code Organization</strong>: Better separation of concerns with dedicated <code>model_fields</code> property</li>
+<li><strong>Field Conflict Prevention</strong>: More robust handling of custom vs model field distinction</li>
+<li><strong>Code Readability</strong>: Improved maintainability by reducing code duplication in field name extraction</li>
+</ul>
+<h3>🔄 Technical Details</h3>
+<ul>
+<li>The <code>customs</code> dictionary now only includes truly custom fields that don't exist on the model</li>
+<li>Custom field processing in the main loop now respects model field boundaries</li>
+<li>Better encapsulation of model introspection logic</li>
+</ul></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.10.2/'><strong>v0.10.2</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.10.1...v0.10.2'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-09-18</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><img alt='notes' src='https://img.shields.io/badge/notes-available-blue?style=flat' style='margin-right:6px;vertical-align:middle;height:20px;' /><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><h2>[0.10.2] - 2025-09-18</h2>
+<h3>✨ Added</h3>
+<ul>
+<li><strong>Pagination Support for M2M Relations</strong>: Added <code>@paginate(self.pagination_class)</code> decorator to M2M <code>get_related</code> endpoints for better performance with large datasets</li>
+</ul>
+<h3>🔧 Changed</h3>
+<ul>
+<li><strong>Code Quality Improvements</strong>:</li>
+<li>Cleaned up response schema formatting in M2M GET endpoints (removed unnecessary line breaks)</li>
+<li>Fixed spacing inconsistency in <code>self.error_codes</code> assignment</li>
+<li>Improved variable initialization readability in M2M management function</li>
+<li>
+<p>Added proper line spacing for better code organization</p>
+</li>
+<li>
+<p><strong>Dynamic M2M Endpoint Documentation</strong>: </p>
+</li>
+<li>Enhanced summary and description generation for M2M endpoints based on available operations</li>
+<li>Summary now dynamically shows "Add", "Remove", or "Add or Remove" based on configuration</li>
+<li>
+<p>More intuitive endpoint descriptions that reflect actual capabilities</p>
+</li>
+<li>
+<p><strong>Function Naming Convention</strong>:</p>
+</li>
+<li>Renamed <code>add_and_remove_related</code> to <code>manage_related</code> for better semantic clarity</li>
+<li>
+<p>Updated function name assignment to <code>manage_{model_name}_{relation_path}</code> pattern</p>
+</li>
+<li>
+<p><strong>Schema Selection Logic</strong>: Refactored conditional schema assignment using ternary operators for better readability</p>
+</li>
+</ul>
+<h3>🛠️ Technical Improvements</h3>
+<ul>
+<li><strong>Variable Declaration</strong>: Simplified tuple unpacking for M2M operation variables</li>
+<li><strong>Code Formatting</strong>: Improved consistency in code spacing and line breaks</li>
+<li><strong>Function Organization</strong>: Better separation of logic blocks with appropriate whitespace</li>
+</ul>
+<h3>📈 Performance</h3>
+<ul>
+<li>M2M related object listing now supports pagination, reducing memory usage and improving response times for large relationship sets</li>
+</ul></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.10.1/'><strong>v0.10.1</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.10.0...v0.10.1'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-09-18</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><img alt='notes' src='https://img.shields.io/badge/notes-available-blue?style=flat' style='margin-right:6px;vertical-align:middle;height:20px;' /><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><h2>[0.10.1] - 2025-09-18</h2>
+<h3>✨ Added</h3>
+<ul>
+<li><strong>Pagination Support for M2M Relations</strong>: Added <code>@paginate(self.pagination_class)</code> decorator to M2M <code>get_related</code> endpoints for better performance with large datasets</li>
+</ul>
+<h3>🔧 Changed</h3>
+<ul>
+<li><strong>Code Quality Improvements</strong>:</li>
+<li>Cleaned up response schema formatting in M2M GET endpoints (removed unnecessary line breaks)</li>
+<li>Fixed spacing inconsistency in <code>self.error_codes</code> assignment</li>
+<li>Improved variable initialization readability in M2M management function</li>
+<li>
+<p>Added proper line spacing for better code organization</p>
+</li>
+<li>
+<p><strong>Dynamic M2M Endpoint Documentation</strong>: </p>
+</li>
+<li>Enhanced summary and description generation for M2M endpoints based on available operations</li>
+<li>Summary now dynamically shows "Add", "Remove", or "Add or Remove" based on configuration</li>
+<li>
+<p>More intuitive endpoint descriptions that reflect actual capabilities</p>
+</li>
+<li>
+<p><strong>Function Naming Convention</strong>:</p>
+</li>
+<li>Renamed <code>add_and_remove_related</code> to <code>manage_related</code> for better semantic clarity</li>
+<li>
+<p>Updated function name assignment to <code>manage_{model_name}_{relation_path}</code> pattern</p>
+</li>
+<li>
+<p><strong>Schema Selection Logic</strong>: Refactored conditional schema assignment using ternary operators for better readability</p>
+</li>
+</ul>
+<h3>🛠️ Technical Improvements</h3>
+<ul>
+<li><strong>Variable Declaration</strong>: Simplified tuple unpacking for M2M operation variables</li>
+<li><strong>Code Formatting</strong>: Improved consistency in code spacing and line breaks</li>
+<li><strong>Function Organization</strong>: Better separation of logic blocks with appropriate whitespace</li>
+</ul>
+<h3>📈 Performance</h3>
+<ul>
+<li>M2M related object listing now supports pagination, reducing memory usage and improving response times for large relationship sets</li>
+</ul></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.10.0/'><strong>v0.10.0</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/0.9.2...v0.10.0'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-09-15</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><img alt='notes' src='https://img.shields.io/badge/notes-available-blue?style=flat' style='margin-right:6px;vertical-align:middle;height:20px;' /><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><h2>[0.10.0] - 2025-09-15</h2>
+<h3>🚀 Added</h3>
+<ul>
+<li><strong>Many-to-Many Relations Support</strong>: Complete M2M relationship management system</li>
+<li>Added <code>M2MDetailSchema</code>, <code>M2MSchemaOut</code>, <code>M2MSchemaIn</code>, <code>M2MAddSchemaIn</code>, <code>M2MRemoveSchemaIn</code> schemas</li>
+<li>New <code>m2m_relations</code> configuration for defining M2M relationships to manage</li>
+<li><code>m2m_add</code>, <code>m2m_remove</code>, <code>m2m_get</code> boolean flags to control M2M operations</li>
+<li><code>m2m_auth</code> parameter for M2M-specific authentication</li>
+<li>Auto-generated M2M endpoints for getting, adding, and removing related objects</li>
+<li><strong>Enhanced ModelUtil</strong>: Added return type annotations for better IDE support</li>
+<li><strong>Async Support</strong>: Added <code>asyncio</code> import for concurrent M2M operations</li>
+</ul>
+<h3>🔧 Changed</h3>
+<ul>
+<li><strong>BREAKING</strong>: Enhanced JWT authentication error handling in <code>AsyncJwtBearer</code></li>
+<li>Now returns <code>False</code> instead of raising <code>AuthError</code> for invalid tokens</li>
+<li>Added proper exception handling for <code>JoseError</code> during claims validation</li>
+<li>Improved authentication flow with better error recovery</li>
+<li><strong>ModelUtil.get_object()</strong>: Enhanced to return QuerySet when no primary key is provided</li>
+<li><strong>APIViewSet Documentation</strong>: Updated class docstring with M2M configuration options</li>
+</ul>
+<h3>🛠️ Fixed</h3>
+<ul>
+<li><strong>JWT Error Handling</strong>: More graceful handling of JWT decode and validation errors</li>
+<li><strong>Import Organization</strong>: Added missing <code>errors</code> import from <code>joserfc</code></li>
+</ul>
+<h3>📚 Technical Details</h3>
+<ul>
+<li>Added <code>_check_m2m_objs()</code> helper method for M2M object validation</li>
+<li>Added <code>_m2m_views()</code> method for automatic M2M endpoint generation</li>
+<li>M2M operations use <code>asyncio.gather()</code> for concurrent add/remove operations</li>
+<li>Dynamic function naming for M2M endpoints to avoid conflicts</li>
+<li>Comprehensive error reporting for M2M operations with detailed success/failure counts</li>
+</ul>
+<h3>🔄 Migration Notes</h3>
+<ul>
+<li>Update JWT error handling if you were catching <code>AuthError</code> exceptions</li>
+<li>Configure <code>m2m_relations</code> if you want to use the new M2M management features</li>
+<li>Review authentication flows as JWT validation now returns <code>False</code> instead of raising errors</li>
+</ul></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/0.9.2/'><strong>0.9.2</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.9.1...0.9.2'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-08-25</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.9.1/'><strong>v0.9.1</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.9.0...v0.9.1'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-08-25</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.9.0/'><strong>v0.9.0</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.8.4...v0.9.0'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-07-18</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.8.4/'><strong>v0.8.4</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.8.3...v0.8.4'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-06-20</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.8.3/'><strong>v0.8.3</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.8.2...v0.8.3'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-06-18</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.8.2/'><strong>v0.8.2</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.8.1...v0.8.2'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-06-18</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.8.1/'><strong>v0.8.1</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.8.0...v0.8.1'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-06-18</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.8.0/'><strong>v0.8.0</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.7.8...v0.8.0'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-05-15</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.7.8/'><strong>v0.7.8</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.7.7...v0.7.8'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-03-21</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.7.7/'><strong>v0.7.7</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.7.6...v0.7.7'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-03-05</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.7.6/'><strong>v0.7.6</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.7.5...v0.7.6'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-02-24</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.7.5/'><strong>v0.7.5</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.7.4...v0.7.5'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-02-22</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.7.4/'><strong>v0.7.4</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.7.3...v0.7.4'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-02-20</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.7.3/'><strong>v0.7.3</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.7.2...v0.7.3'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-02-19</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.7.2/'><strong>v0.7.2</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.7.1...v0.7.2'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-01-30</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.7.1/'><strong>v0.7.1</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.7.0...v0.7.1'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-01-29</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.7.0/'><strong>v0.7.0</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.6.4...v0.7.0'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-01-29</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.6.4/'><strong>v0.6.4</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.6.3...v0.6.4'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-01-22</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.6.3/'><strong>v0.6.3</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.6.2...v0.6.3'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-01-22</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.6.2/'><strong>v0.6.2</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.6.1...v0.6.2'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-01-19</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.6.1/'><strong>v0.6.1</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.6.0...v0.6.1'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-01-13</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.6.0/'><strong>v0.6.0</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.5.0...v0.6.0'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-01-12</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.5.0/'><strong>v0.5.0</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.4.0...v0.5.0'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-01-09</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.4.0/'><strong>v0.4.0</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.3.1...v0.4.0'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-01-08</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.3.1/'><strong>v0.3.1</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.3.0...v0.3.1'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2024-11-07</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.3.0/'><strong>v0.3.0</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.2.2...v0.3.0'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2024-10-10</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.2.2/'><strong>v0.2.2</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.2.1...v0.2.2'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2024-10-03</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.2.1/'><strong>v0.2.1</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.2.0...v0.2.1'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2024-10-02</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.2.0/'><strong>v0.2.0</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.1.4...v0.2.0'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2024-10-01</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.1.4/'><strong>v0.1.4</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.1.3...v0.1.4'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2024-09-29</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.1.3/'><strong>v0.1.3</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.1.2...v0.1.3'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2024-09-28</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.1.2/'><strong>v0.1.2</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v0.1.1...v0.1.2'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2024-09-26</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v0.1.1/'><strong>v0.1.1</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/tree/v0.1.1'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2024-09-26</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr></tbody></table></div>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../contributing/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Contributing">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Contributing
+              </div>
+            </div>
+          </a>
+        
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+    <a href="https://github.com/caspel26/django-ninja-aio-crud" target="_blank" rel="noopener" title="GitHub" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+    
+    
+    
+    
+    <a href="https://pypi.org/project/django-ninja-aio-crud/" target="_blank" rel="noopener" title="PyPI" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.8 200.5c-7.7-30.9-22.3-54.2-53.4-54.2h-40.1v47.4c0 36.8-31.2 67.8-66.8 67.8H172.7c-29.2 0-53.4 25-53.4 54.3v101.8c0 29 25.2 46 53.4 54.3 33.8 9.9 66.3 11.7 106.8 0 26.9-7.8 53.4-23.5 53.4-54.3v-40.7H226.2v-13.6h160.2c31.1 0 42.6-21.7 53.4-54.2 11.2-33.5 10.7-65.7 0-108.6M286.2 444.7a20.4 20.4 0 1 1 0-40.7 20.4 20.4 0 1 1 0 40.7M167.8 248.1h106.8c29.7 0 53.4-24.5 53.4-54.3V91.9c0-29-24.4-50.7-53.4-55.6-35.8-5.9-74.7-5.6-106.8.1-45.2 8-53.4 24.7-53.4 55.6v40.7h106.9v13.6h-147c-31.1 0-58.3 18.7-66.8 54.2-9.8 40.7-10.2 66.1 0 108.6 7.6 31.6 25.7 54.2 56.8 54.2H101v-48.8c0-35.3 30.5-66.4 66.8-66.4m-6.6-183.4a20.4 20.4 0 1 1 0 40.8 20.4 20.4 0 1 1 0-40.8"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      <script id="__config" type="application/json">{"base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.top", "navigation.footer", "navigation.sections", "navigation.indexes", "header.autohide", "toc.follow", "toc.integrate", "content.code.copy", "content.code.select", "content.code.annotate", "content.tabs.link", "content.tooltips", "content.footnote.tooltips", "search.suggest", "search.highlight", "search.share"], "search": "../assets/javascripts/workers/search.973d3a69.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"default": "latest", "provider": "mike", "repo": "caspel26/django-ninja-aio-crud"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.f55a23d4.min.js"></script>
+      
+    
+  </body>
+</html>
