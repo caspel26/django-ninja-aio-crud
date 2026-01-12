@@ -1,5 +1,6 @@
 from typing import Any, List, Optional
 import warnings
+import sys
 
 from django.conf import settings
 from ninja import Schema
@@ -68,9 +69,90 @@ class BaseSerializer:
         raise NotImplementedError
 
     @classmethod
+    def _resolve_serializer_reference(cls, serializer_ref: str | type) -> type:
+        """
+        Resolve a serializer reference that may be a string or a class.
+
+        This method performs lazy resolution, meaning it will attempt to resolve
+        string references only when called, allowing for forward references and
+        circular dependencies between serializers in the same module.
+
+        Parameters
+        ----------
+        serializer_ref : str | type
+            Either a string reference to a serializer class name in the same module,
+            or an actual serializer class.
+
+        Returns
+        -------
+        type
+            The resolved serializer class.
+
+        Raises
+        ------
+        ValueError
+            If the string reference cannot be resolved.
+        """
+        # If it's already a class, return it directly
+        if not isinstance(serializer_ref, str):
+            return serializer_ref
+
+        # Get the module where the current serializer class is defined
+        module = sys.modules.get(cls.__module__)
+
+        if module is None:
+            raise ValueError(
+                f"Cannot resolve serializer reference '{serializer_ref}': "
+                f"module '{cls.__module__}' not found in sys.modules."
+            )
+
+        # Try to get the serializer class from the module
+        serializer_class = getattr(module, serializer_ref, None)
+
+        if serializer_class is None:
+            raise ValueError(
+                f"Cannot resolve serializer reference '{serializer_ref}' in module '{cls.__module__}'. "
+                f"Make sure the serializer class '{serializer_ref}' is defined in the same module as {cls.__name__}."
+            )
+
+        return serializer_class
+
+    @classmethod
     def _get_relations_serializers(cls) -> dict[str, "Serializer"]:
         # Optional in subclasses. Default to no explicit relation serializers.
         return {}
+
+    @classmethod
+    def _resolve_relation_schema(cls, field_name: str, rel_model: models.Model):
+        """
+        Resolve and generate schema for a related model.
+
+        Parameters
+        ----------
+        field_name : str
+            Name of the relation field.
+        rel_model : models.Model
+            The related model class.
+
+        Returns
+        -------
+        Schema | None
+            Generated schema or None if cannot be resolved.
+        """
+        # Check if related model is a ModelSerializer with readable fields
+        if isinstance(rel_model, ModelSerializerMeta):
+            if rel_model.get_fields("read") or rel_model.get_custom_fields("read"):
+                return rel_model.generate_related_s()
+            return None
+
+        # Fall back to explicit serializer mapping
+        rel_serializers = cls._get_relations_serializers() or {}
+        serializer_ref = rel_serializers.get(field_name)
+        if serializer_ref:
+            serializer = cls._resolve_serializer_reference(serializer_ref)
+            return serializer.generate_related_s()
+
+        return None
 
     @classmethod
     def _is_special_field(
@@ -160,18 +242,7 @@ class BaseSerializer:
             rel_model = descriptor.related.related_model
             many = False
 
-        schema = None
-        if isinstance(rel_model, ModelSerializerMeta):
-            # Auto-include if related model exposes readable data
-            if rel_model.get_fields("read") or rel_model.get_custom_fields("read"):
-                schema = rel_model.generate_related_s()
-        else:
-            # Use explicit serializer when provided by subclasses
-            rel_serializers = cls._get_relations_serializers() or {}
-            serializer = rel_serializers.get(field_name)
-            if serializer:
-                schema = serializer.generate_related_s()
-
+        schema = cls._resolve_relation_schema(field_name, rel_model)
         if not schema:
             return None
 
@@ -187,21 +258,14 @@ class BaseSerializer:
         """
         rel_model = descriptor.field.related_model
 
-        schema = None
+        # Special case: ModelSerializer with no readable fields should be skipped entirely
         if isinstance(rel_model, ModelSerializerMeta):
-            # Prefer auto-inclusion when the related model is a ModelSerializer
-            if rel_model.get_fields("read") or rel_model.get_custom_fields("read"):
-                schema = rel_model.generate_related_s()
-            else:
-                # Explicit ModelSerializer with no readable fields -> skip entirely
+            if not (
+                rel_model.get_fields("read") or rel_model.get_custom_fields("read")
+            ):
                 return None
-        else:
-            # Fall back to an explicitly provided serializer mapping
-            rel_serializers = cls._get_relations_serializers() or {}
-            serializer = rel_serializers.get(field_name)
-            if serializer:
-                schema = serializer.generate_related_s()
 
+        schema = cls._resolve_relation_schema(field_name, rel_model)
         if not schema:
             # Could not build a schema: treat as a plain field (serialize as-is)
             return True
@@ -289,52 +353,55 @@ class BaseSerializer:
         Handles In/Patch/Out/Related.
         """
         model = cls._get_model()
-        match schema_type:
-            case "In":
-                s_type = "create"
-            case "Patch":
-                s_type = "update"
-            case "Out":
-                fields, reverse_rels, excludes, customs, optionals = (
-                    cls.get_schema_out_data()
-                )
-                if not fields and not reverse_rels and not excludes and not customs:
-                    return None
-                return create_schema(
-                    model=model,
-                    name=f"{model._meta.model_name}SchemaOut",
-                    depth=depth,
-                    fields=fields,
-                    custom_fields=reverse_rels + customs + optionals,
-                    exclude=excludes,
-                )
-            case "Related":
-                # Related schema includes only non-relational declared fields + customs
-                fields, customs = cls.get_related_schema_data()
-                if not fields and not customs:
-                    return None
-                return create_schema(
-                    model=model,
-                    name=f"{model._meta.model_name}SchemaRelated",
-                    fields=fields,
-                    custom_fields=customs,
-                )
+
+        # Handle special schema types with custom logic
+        if schema_type == "Out":
+            fields, reverse_rels, excludes, customs, optionals = (
+                cls.get_schema_out_data()
+            )
+            if not any([fields, reverse_rels, excludes, customs]):
+                return None
+            return create_schema(
+                model=model,
+                name=f"{model._meta.model_name}SchemaOut",
+                depth=depth,
+                fields=fields,
+                custom_fields=reverse_rels + customs + optionals,
+                exclude=excludes,
+            )
+
+        if schema_type == "Related":
+            fields, customs = cls.get_related_schema_data()
+            if not fields and not customs:
+                return None
+            return create_schema(
+                model=model,
+                name=f"{model._meta.model_name}SchemaRelated",
+                fields=fields,
+                custom_fields=customs,
+            )
+
+        # Handle standard In/Patch schema types
+        s_type = "create" if schema_type == "In" else "update"
         fields = cls.get_fields(s_type)
         optionals = cls.get_optional_fields(s_type)
         customs = cls.get_custom_fields(s_type) + optionals
         excludes = cls.get_excluded_fields(s_type)
+
+        # If no explicit fields but have optionals, use optional field names as fields
         if not fields and not excludes:
             fields = [f[0] for f in optionals]
-        return (
-            create_schema(
-                model=model,
-                name=f"{model._meta.model_name}Schema{schema_type}",
-                fields=fields,
-                custom_fields=customs,
-                exclude=excludes,
-            )
-            if fields or customs or excludes
-            else None
+
+        # Only create schema if we have something to include
+        if not any([fields, customs, excludes]):
+            return None
+
+        return create_schema(
+            model=model,
+            name=f"{model._meta.model_name}Schema{schema_type}",
+            fields=fields,
+            custom_fields=customs,
+            exclude=excludes,
         )
 
     @classmethod
@@ -493,6 +560,13 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
         optionals: list[tuple[str, type]] = []
         excludes: list[str] = []
 
+    # Serializer type to configuration class mapping
+    _SERIALIZER_CONFIG_MAP = {
+        "create": "CreateSerializer",
+        "update": "UpdateSerializer",
+        "read": "ReadSerializer",
+    }
+
     @classmethod
     def _get_fields(cls, s_type: type[S_TYPES], f_type: type[F_TYPES]):
         """
@@ -510,14 +584,11 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
         list
             Raw configuration list or empty list.
         """
-        match s_type:
-            case "create":
-                fields = getattr(cls.CreateSerializer, f_type, [])
-            case "update":
-                fields = getattr(cls.UpdateSerializer, f_type, [])
-            case "read":
-                fields = getattr(cls.ReadSerializer, f_type, [])
-        return fields
+        config_class_name = cls._SERIALIZER_CONFIG_MAP.get(s_type)
+        if not config_class_name:
+            return []
+        config_class = getattr(cls, config_class_name)
+        return getattr(config_class, f_type, [])
 
     @classmethod
     def _get_model(cls) -> "ModelSerializer":
@@ -672,18 +743,54 @@ class Serializer(BaseSerializer):
     schema components during read schema generation.
     """
 
+    # Serializer type to Meta schema attribute mapping
+    _SCHEMA_META_MAP = {
+        "create": "in",
+        "update": "update",
+        "read": "out",
+    }
+    # Schema cache configuration mapping
+    _SCHEMA_CONFIG = {
+        "schema_in": ("_schema_in_cache", "generate_create_s"),
+        "schema_out": ("_schema_out_cache", "generate_read_s"),
+        "schema_update": ("_schema_update_cache", "generate_update_s"),
+        "schema_related": ("_schema_related_cache", "generate_related_s"),
+    }
+
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         from ninja_aio.models.utils import ModelUtil
         from ninja_aio.helpers.query import QueryUtil
 
         cls.model = cls._get_model()
-        cls.schema_in = cls.generate_create_s()
-        cls.schema_out = cls.generate_read_s()
-        cls.schema_update = cls.generate_update_s()
-        cls.schema_related = cls.generate_related_s()
-        cls.util = ModelUtil(cls._get_model(), serializer_class=cls)
+        # Initialize schema cache to None - will be lazily generated on first access
+        cls._schema_in_cache = None
+        cls._schema_out_cache = None
+        cls._schema_update_cache = None
+        cls._schema_related_cache = None
+        cls.util = ModelUtil(cls.model, serializer_class=cls)
         cls.query_util = QueryUtil(cls)
+
+    def __class_getitem__(cls, _item):
+        """Allow generic type hints like Serializer[Model]."""
+        return cls
+
+    @classmethod
+    def __getattr__(cls, name: str):
+        """
+        Lazy schema generation on attribute access.
+
+        This allows forward references and circular dependencies in relations_serializers
+        by deferring schema generation until first access.
+        """
+        if name in cls._SCHEMA_CONFIG:
+            cache_attr, generator_method = cls._SCHEMA_CONFIG[name]
+            cached_value = getattr(cls, cache_attr, None)
+            if cached_value is None:
+                cached_value = getattr(cls, generator_method)()
+                setattr(cls, cache_attr, cached_value)
+            return cached_value
+        raise AttributeError(f"type object '{cls.__name__}' has no attribute '{name}'")
 
     class Meta:
         model: models.Model = None
@@ -729,15 +836,13 @@ class Serializer(BaseSerializer):
     @classmethod
     def _get_fields(cls, s_type: type[S_TYPES], f_type: type[F_TYPES]):
         """Internal accessor for raw configuration lists from Meta schemas."""
-        schema = {
-            "create": cls._get_schema_meta("in"),
-            "update": cls._get_schema_meta("update"),
-            "read": cls._get_schema_meta("out"),
-        }.get(s_type)
+        schema_key = cls._SCHEMA_META_MAP.get(s_type)
+        if not schema_key:
+            return []
+        schema = cls._get_schema_meta(schema_key)
         if not schema:
             return []
         return getattr(schema, f_type, []) or []
-
 
     @classmethod
     async def queryset_request(cls, request: HttpRequest):
