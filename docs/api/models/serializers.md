@@ -12,21 +12,22 @@ It mirrors the behavior of ModelSerializer but reads configuration from a nested
 
 While both `ModelSerializer` and `Serializer` provide schema generation and CRUD operations, there are important differences:
 
-| Feature                  | ModelSerializer                     | Serializer                         |
-| ------------------------ | ----------------------------------- | ---------------------------------- |
-| Model class              | Custom base class                   | Plain Django model                 |
-| Configuration            | Nested classes (CreateSerializer)   | Meta class (schema_in/out/update)  |
-| Lifecycle hooks          | Instance methods (uses `self`)      | Receives `instance` parameter      |
-| Schema generation        | On-demand via generate_*() methods  | On-demand via generate_*() methods |
-| Usage                    | Inherit from ModelSerializer        | Separate serializer class          |
-| Query optimization       | QuerySet nested class               | QuerySet nested class (inherited)  |
-| Relation serializers     | Auto-resolved                       | Explicit via relations_serializers |
+| Feature                  | ModelSerializer                     | Serializer                                    |
+| ------------------------ | ----------------------------------- | --------------------------------------------- |
+| Model class              | Custom base class                   | Plain Django model                            |
+| Configuration            | Nested classes (CreateSerializer)   | Meta class (schema_in/out/update)             |
+| Lifecycle hooks          | Instance methods (uses `self`)      | Receives `instance` parameter                 |
+| Schema generation        | On-demand via generate_*() methods  | On-demand via generate_*() methods            |
+| Usage                    | Inherit from ModelSerializer        | Separate serializer class                     |
+| Query optimization       | QuerySet nested class               | QuerySet nested class (inherited)             |
+| Relation serializers     | Auto-resolved                       | Explicit via relations_serializers (supports string refs) |
 
 ## Key points
 
 - Works with any Django model (no inheritance required).
 - Generates read/create/update/related schemas on demand via ninja.orm.create_schema.
 - Supports explicit relation serializers for forward and reverse relations.
+- **Supports string references in `relations_serializers` for forward/circular dependencies**.
 - Plays nicely with APIViewSet to auto-wire schemas and queryset handling.
 
 ## Configuration
@@ -37,7 +38,7 @@ Define a Serializer subclass with a nested Meta:
 - **schema_in**: SchemaModelConfig for create inputs
 - **schema_out**: SchemaModelConfig for read outputs
 - **schema_update**: SchemaModelConfig for patch/update inputs
-- **relations_serializers**: Mapping of relation field name -> Serializer class **or string reference**
+- **relations_serializers**: Mapping of relation field name -> Serializer class **or string reference** (for forward/circular dependencies)
 
 SchemaModelConfig fields:
 
