@@ -22,6 +22,7 @@ from ninja_aio.exceptions import SerializeError, NotFoundError
 from ninja_aio.models.serializers import ModelSerializer
 from ninja_aio.types import ModelSerializerMeta
 from ninja_aio.schemas.helpers import (
+    ModelQuerySetSchema,
     QuerySchema,
     ObjectQuerySchema,
     ObjectsQuerySchema,
@@ -445,6 +446,23 @@ class ModelUtil:
 
         return queryset
 
+    def _get_read_optimizations(self) -> ModelQuerySetSchema:
+        """
+        Retrieve read optimizations from model or serializer class.
+
+        Returns
+        -------
+        ModelQuerySetSchema
+            Read optimization configuration.
+        """
+        if isinstance(self.model, ModelSerializerMeta):
+            return getattr(self.model.QuerySet, "read", ModelQuerySetSchema())
+        if self.serializer_class is not None:
+            return getattr(
+                self.serializer_class.QuerySet, "read", ModelQuerySetSchema()
+            )
+        return ModelQuerySetSchema()
+
     def get_reverse_relations(self) -> list[str]:
         """
         Discover reverse relation names for safe prefetching.
@@ -454,7 +472,9 @@ class ModelUtil:
         list[str]
             Relation attribute names.
         """
-        reverse_rels = []
+        reverse_rels = self._get_read_optimizations().prefetch_related
+        if reverse_rels:
+            return reverse_rels
         for f in self.serializable_fields:
             field_obj = getattr(self.model, f)
             if isinstance(field_obj, ManyToManyDescriptor):
@@ -476,7 +496,9 @@ class ModelUtil:
         list[str]
             Relation attribute names.
         """
-        select_rels = []
+        select_rels = self._get_read_optimizations().select_related
+        if select_rels:
+            return select_rels
         for f in self.serializable_fields:
             field_obj = getattr(self.model, f)
             if isinstance(field_obj, ForwardManyToOneDescriptor):
