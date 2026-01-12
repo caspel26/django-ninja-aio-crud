@@ -263,11 +263,12 @@ class APIViewSet(API):
         self.path_schema = self._generate_path_schema()
         self.filters_schema = self._generate_filters_schema()
         self.model_verbose_name = (
-            self.model._meta.verbose_name.capitalize() or self.model_verbose_name
+            self.model_verbose_name or
+            self.model._meta.verbose_name.capitalize()
         )
         self.model_verbose_name_plural = (
+            self.model_verbose_name_plural or
             self.model._meta.verbose_name_plural.capitalize()
-            or self.model_verbose_name_plural
         )
         self.router_tag = self.router_tag or self.model_verbose_name
         self.router_tags = self.router_tags or tags or [self.router_tag]
