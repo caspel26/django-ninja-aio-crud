@@ -113,6 +113,18 @@ class ModelUtil:
             raise ConfigError(
                 "ModelUtil cannot accept both model and serializer_class if the model is a ModelSerializer."
             )
+        self.serializer: Serializer = serializer_class() if serializer_class else None
+
+    @property
+    def with_serializer(self) -> bool:
+        """
+        Indicates if a serializer_class is associated.
+
+        Returns
+        -------
+        bool
+        """
+        return self.serializer_class is not None
 
     @property
     def pk_field_type(self):
@@ -696,10 +708,19 @@ class ModelUtil:
             Serialized created object.
         """
         payload, customs = await self.parse_input_data(request, data)
-        pk = (await self.model.objects.acreate(**payload)).pk
+        pk = (
+            (await self.model.objects.acreate(**payload)).pk
+            if not self.with_serializer
+            else (await self.serializer.create(payload)).pk
+        )
         obj = await self.get_object(request, pk)
         if isinstance(self.model, ModelSerializerMeta):
             await asyncio.gather(obj.custom_actions(customs), obj.post_create())
+        if self.with_serializer:
+            await asyncio.gather(
+                self.serializer.custom_actions(customs, obj),
+                self.serializer.post_create(obj),
+            )
         return await self.read_s(obj_schema, request, obj)
 
     async def _read_s(
@@ -893,7 +914,11 @@ class ModelUtil:
                 setattr(obj, k, v)
         if isinstance(self.model, ModelSerializerMeta):
             await obj.custom_actions(customs)
-        await obj.asave()
+        if self.with_serializer:
+            await self.serializer.custom_actions(customs, obj)
+            await self.serializer.save(obj)
+        else:
+            await obj.asave()
         updated_object = await self.get_object(request, pk)
         return await self.read_s(obj_schema, request, updated_object)
 
