@@ -1,4 +1,4 @@
-from ninja_aio.types import ModelSerializerMeta
+from ninja_aio.models.serializers import Serializer, ModelSerializer
 from ninja_aio.schemas.helpers import (
     ModelQuerySetSchema,
     QueryUtilBaseScopesSchema,
@@ -52,7 +52,7 @@ class QueryUtil:
 
     SCOPES: QueryUtilBaseScopesSchema
 
-    def __init__(self, model: ModelSerializerMeta):
+    def __init__(self, model: ModelSerializer | Serializer):
         """Initialize QueryUtil, resolving base and extra scope configurations for a model."""
         self.model = model
         self._configuration = getattr(self.model, "QuerySet", None)

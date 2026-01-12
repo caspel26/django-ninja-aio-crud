@@ -19,7 +19,6 @@ from ninja_aio.schemas.helpers import (
     ModelQuerySetSchema,
     ModelQuerySetExtraSchema,
 )
-from ninja_aio.helpers.query import QueryUtil
 
 
 class BaseSerializer:
@@ -35,6 +34,28 @@ class BaseSerializer:
     - _get_model(): return the Django model class associated with the serializer
     - _get_relations_serializers(): optional mapping of relation field -> serializer (may be empty)
     """
+
+    class QuerySet:
+        """
+        Configuration container describing how to build query schemas for a model.
+        Purpose
+        -------
+        Describes which fields and extras are available when querying for model
+        instances. A factory/metaclass can read this configuration to generate
+        Pydantic / Ninja query schemas.
+        Attributes
+        ----------
+        read : ModelQuerySetSchema
+            Schema configuration for read operations.
+        queryset_request : ModelQuerySetSchema
+            Schema configuration for queryset_request hook.
+        extras : list[ModelQuerySetExtraSchema]
+            Additional computed / synthetic query parameters.
+        """
+
+        read = ModelQuerySetSchema()
+        queryset_request = ModelQuerySetSchema()
+        extras: list[ModelQuerySetExtraSchema] = []
 
     @classmethod
     def _get_fields(cls, s_type: type[S_TYPES], f_type: type[F_TYPES]):
@@ -425,40 +446,19 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
     """
 
     util: ClassVar
-    query_util: ClassVar[QueryUtil]
-
-    class Meta:
-        abstract = True
+    query_util: ClassVar
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         from ninja_aio.models.utils import ModelUtil
+        from ninja_aio.helpers.query import QueryUtil
 
         # Bind a ModelUtil instance to the subclass for convenient access
         cls.util = ModelUtil(cls)
         cls.query_util = QueryUtil(cls)
 
-    class QuerySet:
-        """
-        Configuration container describing how to build query schemas for a model.
-        Purpose
-        -------
-        Describes which fields and extras are available when querying for model
-        instances. A factory/metaclass can read this configuration to generate
-        Pydantic / Ninja query schemas.
-        Attributes
-        ----------
-        read : ModelQuerySetSchema
-            Schema configuration for read operations.
-        queryset_request : ModelQuerySetSchema
-            Schema configuration for queryset_request hook.
-        extras : list[ModelQuerySetExtraSchema]
-            Additional computed / synthetic query parameters.
-        """
-
-        read = ModelQuerySetSchema()
-        queryset_request = ModelQuerySetSchema()
-        extras: list[ModelQuerySetExtraSchema] = []
+    class Meta:
+        abstract = True
 
     class CreateSerializer:
         """Configuration container describing how to build a create (input) schema for a model.
@@ -675,22 +675,28 @@ class Serializer(BaseSerializer):
     schema components during read schema generation.
     """
 
+    util: ClassVar
+    query_util: ClassVar
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        from ninja_aio.models.utils import ModelUtil
+        from ninja_aio.helpers.query import QueryUtil
+
+        cls.model = cls._get_model()
+        cls.schema_in = cls.generate_create_s()
+        cls.schema_out = cls.generate_read_s()
+        cls.schema_update = cls.generate_update_s()
+        cls.schema_related = cls.generate_related_s()
+        cls.util = ModelUtil(cls._get_model(), serializer_class=cls)
+        cls.query_util = QueryUtil(cls)
+
     class Meta:
         model: models.Model = None
         schema_in: Optional[SchemaModelConfig] = None
         schema_out: Optional[SchemaModelConfig] = None
         schema_update: Optional[SchemaModelConfig] = None
         relations_serializers: dict[str, "Serializer"] = {}
-
-    def __init__(self):
-        from ninja_aio.models.utils import ModelUtil
-
-        self.model = self._get_model()
-        self.schema_in = self.generate_create_s()
-        self.schema_out = self.generate_read_s()
-        self.schema_update = self.generate_update_s()
-        self.schema_related = self.generate_related_s()
-        self.model_util = ModelUtil(self.model, serializer_class=self)
 
     @classmethod
     def _get_meta_data(cls, attr_name: str) -> Any:
@@ -750,7 +756,7 @@ class Serializer(BaseSerializer):
 
     @classmethod
     async def queryset_request(cls, request: HttpRequest):
-        return cls._get_model()._default_manager.all()
+        return cls.model._default_manager.all()
 
     async def post_create(self, instance: models.Model) -> None:
         """
