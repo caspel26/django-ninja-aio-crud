@@ -469,7 +469,7 @@ class ModelUtil:
         """
         if isinstance(self.model, ModelSerializerMeta):
             return getattr(self.model.QuerySet, "read", ModelQuerySetSchema())
-        if self.serializer_class is not None:
+        if self.with_serializer:
             return getattr(
                 self.serializer_class.QuerySet, "read", ModelQuerySetSchema()
             )
@@ -484,7 +484,7 @@ class ModelUtil:
         list[str]
             Relation attribute names.
         """
-        reverse_rels = self._get_read_optimizations().prefetch_related
+        reverse_rels = self._get_read_optimizations().prefetch_related.copy()
         if reverse_rels:
             return reverse_rels
         for f in self.serializable_fields:
