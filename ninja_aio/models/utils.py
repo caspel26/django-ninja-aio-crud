@@ -508,7 +508,7 @@ class ModelUtil:
         list[str]
             Relation attribute names.
         """
-        select_rels = self._get_read_optimizations().select_related
+        select_rels = self._get_read_optimizations().select_related.copy()
         if select_rels:
             return select_rels
         for f in self.serializable_fields:
