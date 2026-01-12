@@ -445,12 +445,6 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
     lifecycle hooks and query utilities.
     """
 
-    # from ninja_aio.models.utils import ModelUtil
-    # from ninja_aio.helpers.query import QueryUtil
-
-    # util: ClassVar[ModelUtil]
-    # query_util: ClassVar[QueryUtil]
-
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         from ninja_aio.models.utils import ModelUtil
@@ -677,12 +671,6 @@ class Serializer(BaseSerializer):
     Supports optional relations_serializers mapping to explicitly include related
     schema components during read schema generation.
     """
-
-    # from ninja_aio.models.utils import ModelUtil
-    # from ninja_aio.helpers.query import QueryUtil
-
-    # util: ClassVar[ModelUtil]
-    # query_util: ClassVar[QueryUtil]
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
