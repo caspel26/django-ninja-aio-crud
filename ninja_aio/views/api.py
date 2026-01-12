@@ -17,7 +17,7 @@ from ninja_aio.schemas import (
 )
 from ninja_aio.helpers.api import ManyToManyAPI
 from ninja_aio.types import ModelSerializerMeta, VIEW_TYPES
-from ninja_aio.decorators import unique_view, decorate_view
+from ninja_aio.decorators import unique_view, decorate_view, aatomic
 from ninja_aio.models import serializers
 
 ERROR_CODES = frozenset({400, 401, 404})
@@ -263,12 +263,11 @@ class APIViewSet(API):
         self.path_schema = self._generate_path_schema()
         self.filters_schema = self._generate_filters_schema()
         self.model_verbose_name = (
-            self.model_verbose_name or
-            self.model._meta.verbose_name.capitalize()
+            self.model_verbose_name or self.model._meta.verbose_name.capitalize()
         )
         self.model_verbose_name_plural = (
-            self.model_verbose_name_plural or
-            self.model._meta.verbose_name_plural.capitalize()
+            self.model_verbose_name_plural
+            or self.model._meta.verbose_name_plural.capitalize()
         )
         self.router_tag = self.router_tag or self.model_verbose_name
         self.router_tags = self.router_tags or tags or [self.router_tag]
@@ -413,7 +412,7 @@ class APIViewSet(API):
             description=self.create_docs,
             response={201: self.schema_out, self.error_codes: GenericMessageSchema},
         )
-        @decorate_view(unique_view(self), *self.extra_decorators.create)
+        @decorate_view(aatomic, unique_view(self), *self.extra_decorators.create)
         async def create(request: HttpRequest, data: self.schema_in):  # type: ignore
             return 201, await self.model_util.create_s(request, data, self.schema_out)
 
@@ -491,7 +490,7 @@ class APIViewSet(API):
             description=self.update_docs,
             response={200: self.schema_out, self.error_codes: GenericMessageSchema},
         )
-        @decorate_view(unique_view(self), *self.extra_decorators.update)
+        @decorate_view(aatomic, unique_view(self), *self.extra_decorators.update)
         async def update(
             request: HttpRequest,
             data: self.schema_update,  # type: ignore
@@ -515,7 +514,7 @@ class APIViewSet(API):
             description=self.delete_docs,
             response={204: None, self.error_codes: GenericMessageSchema},
         )
-        @decorate_view(unique_view(self), *self.extra_decorators.delete)
+        @decorate_view(aatomic, unique_view(self), *self.extra_decorators.delete)
         async def delete(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
             return 204, await self.model_util.delete_s(request, self._get_pk(pk))
 
