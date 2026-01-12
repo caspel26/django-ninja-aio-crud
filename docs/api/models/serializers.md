@@ -17,7 +17,7 @@ While both `ModelSerializer` and `Serializer` provide schema generation and CRUD
 | Model class              | Custom base class                   | Plain Django model                 |
 | Configuration            | Nested classes (CreateSerializer)   | Meta class (schema_in/out/update)  |
 | Lifecycle hooks          | Instance methods (uses `self`)      | Receives `instance` parameter      |
-| Auto-binding             | Automatic via metaclass             | Manual via `__init_subclass__`     |
+| Schema generation        | On-demand via generate_*() methods  | On-demand via generate_*() methods |
 | Usage                    | Inherit from ModelSerializer        | Separate serializer class          |
 | Query optimization       | QuerySet nested class               | QuerySet nested class (inherited)  |
 | Relation serializers     | Auto-resolved                       | Explicit via relations_serializers |
@@ -33,18 +33,32 @@ While both `ModelSerializer` and `Serializer` provide schema generation and CRUD
 
 Define a Serializer subclass with a nested Meta:
 
-- model: Django model class.
-- schema_in: SchemaModelConfig for create inputs.
-- schema_out: SchemaModelConfig for read outputs.
-- schema_update: SchemaModelConfig for patch/update inputs.
-- relations_serializers: mapping of relation field name -> Serializer to include nested schemas for relations.
+- **model**: Django model class
+- **schema_in**: SchemaModelConfig for create inputs
+- **schema_out**: SchemaModelConfig for read outputs
+- **schema_update**: SchemaModelConfig for patch/update inputs
+- **relations_serializers**: Mapping of relation field name -> Serializer class **or string reference**
 
 SchemaModelConfig fields:
 
-- fields: list[str]
-- optionals: list[tuple[str, type]]
-- exclude: list[str]
-- customs: list[tuple[str, type, Any]]
+- **fields**: `list[str]` - Model field names to include
+- **optionals**: `list[tuple[str, type]]` - Optional fields with their types
+- **exclude**: `list[str]` - Fields to exclude from schema
+- **customs**: `list[tuple[str, type, Any]]` - Custom/computed fields
+
+### Schema Generation
+
+Generate schemas explicitly using these methods:
+
+```python
+# Explicitly generate schemas when needed
+ArticleSerializer.generate_create_s()  # Returns create (In) schema
+ArticleSerializer.generate_read_s()    # Returns read (Out) schema
+ArticleSerializer.generate_update_s()  # Returns update (Patch) schema
+ArticleSerializer.generate_related_s() # Returns related (nested) schema
+```
+
+Schemas support **forward references and circular dependencies** via string references in `relations_serializers`.
 
 ## Example: simple FK
 
@@ -64,16 +78,6 @@ class ArticleSerializer(serializers.Serializer):
         schema_update = serializers.SchemaModelConfig(
             optionals=[("title", str), ("content", str)]
         )
-```
-
-Schemas are auto-generated in `__init_subclass__` and available as class attributes:
-
-```python
-# Schemas are automatically generated
-ArticleSerializer.generate_read_s()    # Returns read schema
-ArticleSerializer.generate_create_s()  # Returns create schema
-ArticleSerializer.generate_update_s()  # Returns update schema
-ArticleSerializer.generate_related_s() # Returns related schema
 ```
 
 ## Lifecycle Hooks
@@ -148,6 +152,37 @@ class AuthorSerializer(serializers.Serializer):
             "articles": ArticleSerializer,  # include nested article schema
         }
 ```
+
+## String References for Forward/Circular Dependencies
+
+You can use string references in `relations_serializers` to handle forward references and circular dependencies:
+
+```python
+class AuthorSerializer(serializers.Serializer):
+    class Meta:
+        model = models.Author
+        schema_out = serializers.SchemaModelConfig(
+            fields=["id", "name", "articles"]
+        )
+        relations_serializers = {
+            "articles": "ArticleSerializer",  # String reference - resolved lazily
+        }
+
+class ArticleSerializer(serializers.Serializer):
+    class Meta:
+        model = models.Article
+        schema_out = serializers.SchemaModelConfig(
+            fields=["id", "title", "author"]
+        )
+        relations_serializers = {
+            "author": "AuthorSerializer",  # Circular reference works!
+        }
+```
+
+**String Reference Requirements:**
+- String must be the class name of a serializer in the same module
+- References are resolved lazily when schemas are generated
+- Both forward and circular references are supported
 
 Notes:
 
