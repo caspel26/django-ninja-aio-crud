@@ -778,8 +778,7 @@ class Serializer(BaseSerializer):
         models.Model
             Created model instance.
         """
-        model = self._get_model()
-        instance: models.Model = model(**payload)
+        instance: models.Model = self.model(**payload)
         return await self.save_model(instance)
 
     async def update_model(
