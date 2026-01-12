@@ -94,24 +94,28 @@ class ArticleViewSet(APIViewSet):
 
 ## Core Attributes
 
-| Attribute          | Type                          | Default                                            | Description                                                             |
-| ------------------ | ----------------------------- | -------------------------------------------------- | ----------------------------------------------------------------------- |
-| `model`            | `ModelSerializer \| Model`    | —                                                  | Target model (required)                                                 |
-| `api`              | `NinjaAPI`                    | —                                                  | API instance (required)                                                 |
-| `schema_in`        | `Schema \| None`              | `None` (auto)                                      | Create input schema override                                            |
-| `schema_out`       | `Schema \| None`              | `None` (auto)                                      | Read/output schema override                                             |
-| `schema_update`    | `Schema \| None`              | `None` (auto)                                      | Update input schema override                                            |
-| `pagination_class` | `type[AsyncPaginationBase]`   | `PageNumberPagination`                             | Pagination strategy                                                     |
-| `query_params`     | `dict[str, tuple[type, ...]]` | `{}`                                               | List endpoint filters definition                                        |
-| `disable`          | `list[type[VIEW_TYPES]]`      | `[]`                                               | Disable CRUD views (`create`,`list`,`retrieve`,`update`,`delete`,`all`) |
-| `api_route_path`   | `str`                         | `""`                                               | Base route segment                                                      |
-| `list_docs`        | `str`                         | `"List all objects."`                              | List endpoint description                                               |
-| `create_docs`      | `str`                         | `"Create a new object."`                           | Create endpoint description                                             |
-| `retrieve_docs`    | `str`                         | `"Retrieve a specific object by its primary key."` | Retrieve endpoint description                                           |
-| `update_docs`      | `str`                         | `"Update an object by its primary key."`           | Update endpoint description                                             |
-| `delete_docs`      | `str`                         | `"Delete an object by its primary key."`           | Delete endpoint description                                             |
-| `m2m_relations`    | `list[M2MRelationSchema]`     | `[]`                                               | M2M relation configs                                                    |
-| `m2m_auth`         | `list \| None`                | `NOT_SET`                                          | Default auth for all M2M endpoints (overridden per relation if set)     |
+| Attribute                   | Type                          | Default                                            | Description                                                             |
+| --------------------------- | ----------------------------- | -------------------------------------------------- | ----------------------------------------------------------------------- |
+| `model`                     | `ModelSerializer \| Model`    | —                                                  | Target model (required)                                                 |
+| `api`                       | `NinjaAPI`                    | —                                                  | API instance (required)                                                 |
+| `serializer_class`          | `Serializer \| None`          | `None`                                             | Serializer class for plain models (alternative to ModelSerializer)      |
+| `schema_in`                 | `Schema \| None`              | `None` (auto)                                      | Create input schema override                                            |
+| `schema_out`                | `Schema \| None`              | `None` (auto)                                      | Read/output schema override                                             |
+| `schema_update`             | `Schema \| None`              | `None` (auto)                                      | Update input schema override                                            |
+| `pagination_class`          | `type[AsyncPaginationBase]`   | `PageNumberPagination`                             | Pagination strategy                                                     |
+| `query_params`              | `dict[str, tuple[type, ...]]` | `{}`                                               | List endpoint filters definition                                        |
+| `disable`                   | `list[type[VIEW_TYPES]]`      | `[]`                                               | Disable CRUD views (`create`,`list`,`retrieve`,`update`,`delete`,`all`) |
+| `api_route_path`            | `str`                         | `""`                                               | Base route segment                                                      |
+| `list_docs`                 | `str`                         | `"List all objects."`                              | List endpoint description                                               |
+| `create_docs`               | `str`                         | `"Create a new object."`                           | Create endpoint description                                             |
+| `retrieve_docs`             | `str`                         | `"Retrieve a specific object by its primary key."` | Retrieve endpoint description                                           |
+| `update_docs`               | `str`                         | `"Update an object by its primary key."`           | Update endpoint description                                             |
+| `delete_docs`               | `str`                         | `"Delete an object by its primary key."`           | Delete endpoint description                                             |
+| `m2m_relations`             | `list[M2MRelationSchema]`     | `[]`                                               | M2M relation configs                                                    |
+| `m2m_auth`                  | `list \| None`                | `NOT_SET`                                          | Default auth for all M2M endpoints (overridden per relation if set)     |
+| `extra_decorators`          | `DecoratorsSchema`            | `DecoratorsSchema()`                               | Custom decorators for CRUD operations                                   |
+| `model_verbose_name`        | `str`                         | `""`                                               | Override model verbose name for display                                 |
+| `model_verbose_name_plural` | `str`                         | `""`                                               | Override model verbose name plural for display                          |
 
 ## Authentication Attributes
 
@@ -129,6 +133,18 @@ Resolution rules:
 - `None` makes the endpoint public (no authentication).
 - M2M endpoints use relation-level auth (`m2m_data.auth`) or fall back to `m2m_auth`.
 
+## Transaction Management
+
+Create, update, and delete operations are automatically wrapped in atomic transactions using the `@aatomic` decorator. This ensures that database operations are rolled back on exceptions:
+
+```python
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    pass  # create/update/delete automatically transactional
+```
+
+The transaction behavior is applied by default. Custom decorators can be added via `extra_decorators` attribute.
+
 ## Automatic Schema Generation
 
 If `model` is a subclass of `ModelSerializerMeta`:
@@ -137,7 +153,27 @@ If `model` is a subclass of `ModelSerializerMeta`:
 - `schema_in` from `CreateSerializer`
 - `schema_update` from `UpdateSerializer`
 
-Otherwise provide them manually.
+For plain Django models, you can provide a `serializer_class` (Serializer) instead:
+
+```python
+from ninja_aio.models import serializers
+
+class ArticleSerializer(serializers.Serializer):
+    class Meta:
+        model = models.Article
+        schema_in = serializers.SchemaModelConfig(
+            fields=["title", "content", "author"]
+        )
+        schema_out = serializers.SchemaModelConfig(
+            fields=["id", "title", "content", "author"]
+        )
+
+@api.viewset(model=models.Article)
+class ArticleViewSet(APIViewSet):
+    serializer_class = ArticleSerializer
+```
+
+Otherwise provide schemas manually via `schema_in`, `schema_out`, and `schema_update` attributes.
 
 ## List Filtering
 
@@ -396,6 +432,37 @@ def views(self):
 ## Dynamic View Naming
 
 All generated handlers are decorated with `@unique_view(...)` to ensure stable unique function names (prevents collisions and ensures consistent OpenAPI schema generation). Relation endpoints use explicit names like `get_<model>_<rel_path>` and `manage_<model>_<rel_path>`.
+
+## Extra Decorators
+
+Apply custom decorators to specific CRUD operations via the `extra_decorators` attribute:
+
+```python
+from ninja_aio.schemas.helpers import DecoratorsSchema
+from functools import wraps
+
+def log_operation(func):
+    @wraps(func)
+    async def wrapper(*args, **kwargs):
+        print(f"Calling {func.__name__}")
+        return await func(*args, **kwargs)
+    return wrapper
+
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    extra_decorators = DecoratorsSchema(
+        create=[log_operation],
+        update=[log_operation],
+        delete=[log_operation],
+    )
+```
+
+Available decorator fields:
+- `create`: Decorators for create endpoint
+- `list`: Decorators for list endpoint
+- `retrieve`: Decorators for retrieve endpoint
+- `update`: Decorators for update endpoint
+- `delete`: Decorators for delete endpoint
 
 ## Overridable Hooks
 
