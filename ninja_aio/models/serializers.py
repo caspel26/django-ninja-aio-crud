@@ -855,7 +855,7 @@ class Serializer(BaseSerializer):
         self.after_save(instance)
         return instance
 
-    async def create(self, payload: dict[str, Any]) -> models.Model:
+    async def create(self, request, payload: dict[str, Any]) -> models.Model:
         """
         Create a new model instance from the provided payload.
 
@@ -869,11 +869,12 @@ class Serializer(BaseSerializer):
         models.Model
             Created model instance.
         """
+        payload, _ = await self.util.parse_input_data(request, payload)
         instance: models.Model = self.model(**payload)
         return await self.save(instance)
 
     async def update(
-        self, instance: models.Model, payload: dict[str, Any]
+        self, request, instance: models.Model, payload: dict[str, Any]
     ) -> models.Model:
         """
         Update an existing model instance with the provided payload.
@@ -890,6 +891,7 @@ class Serializer(BaseSerializer):
         models.Model
             Updated model instance.
         """
+        payload, _ = await self.util.parse_input_data(request, payload)
         for attr, value in payload.items():
             setattr(instance, attr, value)
         return await self.save(instance)
@@ -908,7 +910,7 @@ class Serializer(BaseSerializer):
         dict
             Serialized data.
         """
-        return await self.model_util.read_s(schema=self.schema_out, instance=instance)
+        return await self.util.read_s(schema=self.generate_read_s(), instance=instance)
 
     async def models_dump(
         self, instances: models.QuerySet[models.Model]
@@ -926,8 +928,8 @@ class Serializer(BaseSerializer):
         list[dict]
             List of serialized data.
         """
-        return await self.model_util.list_read_s(
-            schema=self.schema_out, instances=instances
+        return await self.util.list_read_s(
+            schema=self.generate_read_s(), instances=instances
         )
 
     def after_save(self, instance: models.Model):
