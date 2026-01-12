@@ -738,17 +738,6 @@ class Serializer(BaseSerializer):
             return []
         return getattr(schema, f_type, []) or []
 
-    def _before_save_actions(self, instance: models.Model):
-        creation = instance._state.adding
-        if creation:
-            self.on_create_before_save(instance)
-        self.before_save(instance)
-
-    def _after_save_actions(self, instance: models.Model):
-        creation = instance._state.adding
-        if creation:
-            self.on_create_after_save(instance)
-        self.after_save(instance)
 
     @classmethod
     async def queryset_request(cls, request: HttpRequest):
@@ -783,9 +772,14 @@ class Serializer(BaseSerializer):
         instance : models.Model
             The model instance to save.
         """
-        self._before_save_actions(instance=instance)
+        creation = instance._state.adding
+        if creation:
+            self.on_create_before_save(instance)
+        self.before_save(instance)
         await instance.asave()
-        self._after_save_actions(instance=instance)
+        if creation:
+            self.on_create_after_save(instance)
+        self.after_save(instance)
         return instance
 
     async def create(self, payload: dict[str, Any]) -> models.Model:
