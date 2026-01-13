@@ -20,7 +20,7 @@ While both `ModelSerializer` and `Serializer` provide schema generation and CRUD
 | Schema generation        | On-demand via generate_*() methods  | On-demand via generate_*() methods            |
 | Usage                    | Inherit from ModelSerializer        | Separate serializer class                     |
 | Query optimization       | QuerySet nested class               | QuerySet nested class (inherited)             |
-| Relation serializers     | Auto-resolved                       | Explicit via relations_serializers (supports string refs) |
+| Relation serializers     | Auto-resolved                       | Explicit via relations_serializers (supports string refs & Union) |
 
 ## Key points
 
@@ -28,6 +28,7 @@ While both `ModelSerializer` and `Serializer` provide schema generation and CRUD
 - Generates read/create/update/related schemas on demand via ninja.orm.create_schema.
 - Supports explicit relation serializers for forward and reverse relations.
 - **Supports string references in `relations_serializers` for forward/circular dependencies**.
+- **Supports Union types for polymorphic relations** (e.g., generic foreign keys, content types).
 - Plays nicely with APIViewSet to auto-wire schemas and queryset handling.
 
 ## Configuration
@@ -38,7 +39,7 @@ Define a Serializer subclass with a nested Meta:
 - **schema_in**: SchemaModelConfig for create inputs
 - **schema_out**: SchemaModelConfig for read outputs
 - **schema_update**: SchemaModelConfig for patch/update inputs
-- **relations_serializers**: Mapping of relation field name -> Serializer class **or string reference** (for forward/circular dependencies)
+- **relations_serializers**: Mapping of relation field name -> Serializer class, **string reference**, or **Union of serializers** (supports forward/circular dependencies and polymorphic relations)
 
 SchemaModelConfig fields:
 
@@ -236,12 +237,135 @@ class UserSerializer(serializers.Serializer):
         }
 ```
 
+## Union Types for Polymorphic Relations
+
+You can use `Union` types in `relations_serializers` to handle polymorphic relationships where a field can reference multiple possible serializer types. This is particularly useful for generic foreign keys, content types, or any scenario where a relation can point to different model types.
+
+```python
+from typing import Union
+from ninja_aio.models import serializers
+from . import models
+
+class VideoSerializer(serializers.Serializer):
+    class Meta:
+        model = models.Video
+        schema_out = serializers.SchemaModelConfig(
+            fields=["id", "title", "duration", "url"]
+        )
+
+class ImageSerializer(serializers.Serializer):
+    class Meta:
+        model = models.Image
+        schema_out = serializers.SchemaModelConfig(
+            fields=["id", "title", "width", "height", "url"]
+        )
+
+class CommentSerializer(serializers.Serializer):
+    class Meta:
+        model = models.Comment
+        schema_out = serializers.SchemaModelConfig(
+            fields=["id", "text", "content_object"]
+        )
+        relations_serializers = {
+            # content_object can be a Video or Image
+            "content_object": Union[VideoSerializer, ImageSerializer],
+        }
+```
+
+**Union Type Formats:**
+
+1. **Direct class references:**
+   ```python
+   relations_serializers = {
+       "field": Union[SerializerA, SerializerB],
+   }
+   ```
+
+2. **String references:**
+   ```python
+   relations_serializers = {
+       "field": Union["SerializerA", "SerializerB"],
+   }
+   ```
+
+3. **Mixed class and string references:**
+   ```python
+   relations_serializers = {
+       "field": Union[SerializerA, "SerializerB"],
+   }
+   ```
+
+4. **Absolute import paths:**
+   ```python
+   relations_serializers = {
+       "field": Union["myapp.serializers.SerializerA", SerializerB],
+   }
+   ```
+
+**Use Cases for Union Types:**
+
+- **Polymorphic relations:** Generic foreign keys or Django ContentType relations
+- **Flexible APIs:** Different response formats for the same field based on runtime type
+- **Gradual migrations:** Transitioning between different serializer implementations
+- **Multi-tenant systems:** Different serialization requirements per tenant
+
+**Complete Polymorphic Example:**
+
+```python
+from typing import Union
+from django.contrib.contenttypes.fields import GenericForeignKey
+from ninja_aio.models import serializers
+
+# Models
+class Comment(models.Model):
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey('content_type', 'object_id')
+    text = models.TextField()
+
+# Serializers for different content types
+class BlogPostSerializer(serializers.Serializer):
+    class Meta:
+        model = models.BlogPost
+        schema_out = serializers.SchemaModelConfig(
+            fields=["id", "title", "body", "published_at"]
+        )
+
+class ProductSerializer(serializers.Serializer):
+    class Meta:
+        model = models.Product
+        schema_out = serializers.SchemaModelConfig(
+            fields=["id", "name", "price", "stock"]
+        )
+
+class EventSerializer(serializers.Serializer):
+    class Meta:
+        model = models.Event
+        schema_out = serializers.SchemaModelConfig(
+            fields=["id", "name", "date", "location"]
+        )
+
+# Comment serializer with Union support
+class CommentSerializer(serializers.Serializer):
+    class Meta:
+        model = Comment
+        schema_out = serializers.SchemaModelConfig(
+            fields=["id", "text", "created_at", "content_object"]
+        )
+        relations_serializers = {
+            # Comments can be on blog posts, products, or events
+            "content_object": Union[BlogPostSerializer, ProductSerializer, EventSerializer],
+        }
+```
+
 Notes:
 
 - Forward relations are included as plain fields unless a related ModelSerializer/Serializer is declared.
 - Reverse relations require an entry in relations_serializers when using vanilla Django models.
 - When the related model is a ModelSerializer, related schemas can be auto-resolved.
 - Absolute import paths are useful for cross-module references and avoiding circular import issues at module load time.
+- Union types are resolved lazily, so forward and circular references work seamlessly.
+- The schema generator will create a union of all possible schemas from the serializers in the Union.
 
 ## Using with APIViewSet
 

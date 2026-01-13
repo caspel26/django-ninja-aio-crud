@@ -1,4 +1,6 @@
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Union, get_args, get_origin, ForwardRef
+from functools import reduce
+from operator import or_
 import warnings
 import sys
 
@@ -69,21 +71,14 @@ class BaseSerializer:
         raise NotImplementedError
 
     @classmethod
-    def _resolve_serializer_reference(cls, serializer_ref: str | type) -> type:
+    def _resolve_string_reference(cls, string_ref: str) -> type:
         """
-        Resolve a serializer reference that may be a string or a class.
-
-        This method performs lazy resolution, meaning it will attempt to resolve
-        string references only when called, allowing for forward references and
-        circular dependencies between serializers in the same module.
+        Resolve a string serializer reference to an actual class.
 
         Parameters
         ----------
-        serializer_ref : str | type
-            Either a string reference to a serializer class. This can be:
-            - A class name in the same module (e.g., "UserSerializer")
-            - An absolute import path (e.g., "myapp.serializers.UserSerializer")
-            Or an actual serializer class.
+        string_ref : str
+            String reference (local class name or absolute import path).
 
         Returns
         -------
@@ -95,20 +90,15 @@ class BaseSerializer:
         ValueError
             If the string reference cannot be resolved.
         """
-        # If it's already a class, return it directly
-        if not isinstance(serializer_ref, str):
-            return serializer_ref
-
         # Check if it's an absolute import path (contains dots)
-        if "." in serializer_ref:
+        if "." in string_ref:
             # Absolute import path: "myapp.serializers.UserSerializer"
-            module_path, class_name = serializer_ref.rsplit(".", 1)
+            module_path, class_name = string_ref.rsplit(".", 1)
 
             try:
-                # Try to import the module
+                # Try to get or import the module
                 module = sys.modules.get(module_path)
                 if module is None:
-                    # Module not yet imported, try to import it
                     import importlib
                     module = importlib.import_module(module_path)
 
@@ -117,14 +107,14 @@ class BaseSerializer:
 
                 if serializer_class is None:
                     raise ValueError(
-                        f"Cannot resolve serializer reference '{serializer_ref}': "
+                        f"Cannot resolve serializer reference '{string_ref}': "
                         f"class '{class_name}' not found in module '{module_path}'."
                     )
 
                 return serializer_class
             except ImportError as e:
                 raise ValueError(
-                    f"Cannot resolve serializer reference '{serializer_ref}': "
+                    f"Cannot resolve serializer reference '{string_ref}': "
                     f"failed to import module '{module_path}': {e}"
                 )
 
@@ -133,25 +123,118 @@ class BaseSerializer:
 
         if module is None:
             raise ValueError(
-                f"Cannot resolve serializer reference '{serializer_ref}': "
+                f"Cannot resolve serializer reference '{string_ref}': "
                 f"module '{cls.__module__}' not found in sys.modules."
             )
 
-        # Try to get the serializer class from the module
-        serializer_class = getattr(module, serializer_ref, None)
+        serializer_class = getattr(module, string_ref, None)
 
         if serializer_class is None:
             raise ValueError(
-                f"Cannot resolve serializer reference '{serializer_ref}' in module '{cls.__module__}'. "
-                f"Make sure the serializer class '{serializer_ref}' is defined in the same module as {cls.__name__}."
+                f"Cannot resolve serializer reference '{string_ref}' in module '{cls.__module__}'. "
+                f"Make sure the serializer class '{string_ref}' is defined in the same module as {cls.__name__}."
             )
 
         return serializer_class
 
     @classmethod
+    def _resolve_serializer_reference(cls, serializer_ref: str | type | Any) -> type | Any:
+        """
+        Resolve a serializer reference that may be a string, a class, or a Union of serializers.
+
+        This method performs lazy resolution, meaning it will attempt to resolve
+        string references only when called, allowing for forward references and
+        circular dependencies between serializers in the same module.
+
+        Parameters
+        ----------
+        serializer_ref : str | type | Union
+            Either a string reference to a serializer class, an actual serializer class,
+            or a Union of serializer references. String references can be:
+            - A class name in the same module (e.g., "UserSerializer")
+            - An absolute import path (e.g., "myapp.serializers.UserSerializer")
+
+        Returns
+        -------
+        type | Union
+            The resolved serializer class or Union of serializer classes.
+
+        Raises
+        ------
+        ValueError
+            If the string reference cannot be resolved.
+
+        Examples
+        --------
+        >>> # Single reference
+        >>> cls._resolve_serializer_reference("UserSerializer")
+        >>> cls._resolve_serializer_reference(UserSerializer)
+        >>>
+        >>> # Union reference
+        >>> from typing import Union
+        >>> cls._resolve_serializer_reference(Union[UserSerializer, AdminSerializer])
+        >>> cls._resolve_serializer_reference(Union["UserSerializer", "AdminSerializer"])
+        """
+        # Handle Union types
+        origin = get_origin(serializer_ref)
+        if origin is Union:
+            resolved_types = tuple(
+                cls._resolve_serializer_reference(arg)
+                for arg in get_args(serializer_ref)
+            )
+            # Optimize single-type unions
+            if len(resolved_types) == 1:
+                return resolved_types[0]
+            # Create Union using reduce with or operator
+            return reduce(or_, resolved_types)
+
+        # Handle ForwardRef (created when using Union["StringType"])
+        if isinstance(serializer_ref, ForwardRef):
+            return cls._resolve_serializer_reference(serializer_ref.__forward_arg__)
+
+        # Handle string references
+        if isinstance(serializer_ref, str):
+            return cls._resolve_string_reference(serializer_ref)
+
+        # Already a class, return as-is
+        return serializer_ref
+
+    @classmethod
     def _get_relations_serializers(cls) -> dict[str, "Serializer"]:
         # Optional in subclasses. Default to no explicit relation serializers.
         return {}
+
+    @classmethod
+    def _generate_union_schema(cls, resolved_union: Any) -> Any:
+        """
+        Generate a Union schema from multiple resolved serializers.
+
+        Parameters
+        ----------
+        resolved_union : Union
+            A Union type containing resolved serializer classes.
+
+        Returns
+        -------
+        Schema | Union[Schema, ...] | None
+            Union of generated schemas or None if all schemas are None.
+        """
+        # Generate schemas for each serializer in the Union
+        schemas = tuple(
+            serializer_type.generate_related_s()
+            for serializer_type in get_args(resolved_union)
+            if serializer_type.generate_related_s() is not None
+        )
+
+        if not schemas:
+            return None
+
+        # Optimize single-schema unions
+        if len(schemas) == 1:
+            return schemas[0]
+
+        # Create Union of schemas using reduce with or operator
+        return reduce(or_, schemas)
 
     @classmethod
     def _resolve_relation_schema(cls, field_name: str, rel_model: models.Model):
@@ -167,23 +250,30 @@ class BaseSerializer:
 
         Returns
         -------
-        Schema | None
-            Generated schema or None if cannot be resolved.
+        Schema | Union[Schema, ...] | None
+            Generated schema, Union of schemas, or None if cannot be resolved.
         """
-        # Check if related model is a ModelSerializer with readable fields
+        # Auto-resolve ModelSerializer with readable fields
         if isinstance(rel_model, ModelSerializerMeta):
             if rel_model.get_fields("read") or rel_model.get_custom_fields("read"):
                 return rel_model.generate_related_s()
             return None
 
-        # Fall back to explicit serializer mapping
+        # Resolve from explicit serializer mapping
         rel_serializers = cls._get_relations_serializers() or {}
         serializer_ref = rel_serializers.get(field_name)
-        if serializer_ref:
-            serializer = cls._resolve_serializer_reference(serializer_ref)
-            return serializer.generate_related_s()
 
-        return None
+        if not serializer_ref:
+            return None
+
+        resolved = cls._resolve_serializer_reference(serializer_ref)
+
+        # Handle Union of serializers
+        if get_origin(resolved) is Union:
+            return cls._generate_union_schema(resolved)
+
+        # Handle single serializer
+        return resolved.generate_related_s()
 
     @classmethod
     def _is_special_field(

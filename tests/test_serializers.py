@@ -1,4 +1,5 @@
 import warnings
+from typing import Union
 from django.test import TestCase, tag
 
 from tests.test_app.models import TestModelForeignKey, TestModelReverseForeignKey
@@ -26,6 +27,37 @@ class TestModelReverseForeignKeySerializer(serializers.Serializer):
         relations_serializers = {
             "test_model_foreign_keys": TestModelForeignKeySerializer,
         }
+
+
+# Test serializers for Union tests - defined at module level so they can be resolved
+class AltSerializer(serializers.Serializer):
+    class Meta:
+        model = TestModelForeignKey
+        schema_out = serializers.SchemaModelConfig(
+            fields=["id", "name"]
+        )
+
+
+class AltStringSerializer(serializers.Serializer):
+    class Meta:
+        model = TestModelForeignKey
+        schema_out = serializers.SchemaModelConfig(
+            fields=["id", "description"]
+        )
+
+
+class MixedAltSerializer(serializers.Serializer):
+    class Meta:
+        model = TestModelForeignKey
+        schema_out = serializers.SchemaModelConfig(
+            fields=["id", "name", "description"]
+        )
+
+
+class LocalTestSerializer(serializers.Serializer):
+    class Meta:
+        model = TestModelForeignKey
+        schema_out = serializers.SchemaModelConfig(fields=["id"])
 
 
 @tag("serializers")
@@ -104,3 +136,156 @@ class SerializersTestCase(TestCase):
         # Also ensure base fields present
         for f in ["id", "name", "description"]:
             self.assertIn(f, schema_out_rfk.model_fields)
+
+
+@tag("serializers", "union")
+class UnionSerializerTestCase(TestCase):
+    """Test cases for Union serializer references support."""
+
+    def setUp(self):
+        warnings.simplefilter("ignore", UserWarning)
+
+    def test_union_with_direct_class_references(self):
+        """Test Union with direct class references."""
+
+        class UnionTestSerializer(serializers.Serializer):
+            class Meta:
+                model = TestModelReverseForeignKey
+                schema_out = serializers.SchemaModelConfig(
+                    fields=["id", "name", "test_model_foreign_keys"]
+                )
+                relations_serializers = {
+                    "test_model_foreign_keys": Union[TestModelForeignKeySerializer, AltSerializer],
+                }
+
+        # Should resolve without errors
+        schema = UnionTestSerializer.generate_read_s()
+        self.assertIsNotNone(schema)
+        self.assertIn("test_model_foreign_keys", schema.model_fields)
+
+    def test_union_with_string_references(self):
+        """Test Union with string references."""
+
+        class UnionStringTestSerializer(serializers.Serializer):
+            class Meta:
+                model = TestModelReverseForeignKey
+                schema_out = serializers.SchemaModelConfig(
+                    fields=["id", "name", "test_model_foreign_keys"]
+                )
+                relations_serializers = {
+                    "test_model_foreign_keys": Union["TestModelForeignKeySerializer", "AltStringSerializer"],
+                }
+
+        # Should resolve without errors
+        schema = UnionStringTestSerializer.generate_read_s()
+        self.assertIsNotNone(schema)
+        self.assertIn("test_model_foreign_keys", schema.model_fields)
+
+    def test_union_with_mixed_references(self):
+        """Test Union with mixed class and string references."""
+
+        class UnionMixedTestSerializer(serializers.Serializer):
+            class Meta:
+                model = TestModelReverseForeignKey
+                schema_out = serializers.SchemaModelConfig(
+                    fields=["id", "name", "test_model_foreign_keys"]
+                )
+                relations_serializers = {
+                    "test_model_foreign_keys": Union[MixedAltSerializer, "TestModelForeignKeySerializer"],
+                }
+
+        # Should resolve without errors
+        schema = UnionMixedTestSerializer.generate_read_s()
+        self.assertIsNotNone(schema)
+        self.assertIn("test_model_foreign_keys", schema.model_fields)
+
+    def test_union_with_absolute_import_path(self):
+        """Test Union with absolute import path string references."""
+
+        class UnionAbsolutePathSerializer(serializers.Serializer):
+            class Meta:
+                model = TestModelReverseForeignKey
+                schema_out = serializers.SchemaModelConfig(
+                    fields=["id", "name", "test_model_foreign_keys"]
+                )
+                relations_serializers = {
+                    "test_model_foreign_keys": Union[
+                        "tests.test_serializers.TestModelForeignKeySerializer",
+                        TestModelForeignKeySerializer,
+                    ],
+                }
+
+        # Should resolve without errors
+        schema = UnionAbsolutePathSerializer.generate_read_s()
+        self.assertIsNotNone(schema)
+        self.assertIn("test_model_foreign_keys", schema.model_fields)
+
+    def test_resolve_serializer_reference_with_union(self):
+        """Test _resolve_serializer_reference directly with Union types."""
+        from typing import get_args, get_origin
+
+        # Test with Union of DIFFERENT classes (Union of same type gets optimized away by Python)
+        union_ref = Union[TestModelForeignKeySerializer, AltSerializer]
+        resolved = TestModelForeignKeySerializer._resolve_serializer_reference(union_ref)
+
+        # Check that it returns a Union (using reduce with or_ creates a union-like structure)
+        # The resolved type should be a union of the two serializers
+        self.assertEqual(get_origin(resolved), Union)
+        resolved_args = get_args(resolved)
+        self.assertEqual(len(resolved_args), 2)
+        # Should contain both serializer classes
+        self.assertIn(TestModelForeignKeySerializer, resolved_args)
+        self.assertIn(AltSerializer, resolved_args)
+
+    def test_resolve_serializer_reference_with_string_union(self):
+        """Test _resolve_serializer_reference with Union of strings."""
+        from typing import get_args, get_origin
+
+        # Test with Union of string references
+        union_ref = Union["TestModelForeignKeySerializer", "LocalTestSerializer"]
+        resolved = LocalTestSerializer._resolve_serializer_reference(union_ref)
+
+        # Check that it returns a Union
+        self.assertEqual(get_origin(resolved), Union)
+        resolved_types = get_args(resolved)
+        self.assertEqual(len(resolved_types), 2)
+
+        # Verify that both serializers are resolved correctly
+        self.assertIn(TestModelForeignKeySerializer, resolved_types)
+        self.assertIn(LocalTestSerializer, resolved_types)
+
+    def test_single_serializer_still_works(self):
+        """Ensure single serializer references still work as before."""
+
+        class SingleRefSerializer(serializers.Serializer):
+            class Meta:
+                model = TestModelReverseForeignKey
+                schema_out = serializers.SchemaModelConfig(
+                    fields=["id", "name", "test_model_foreign_keys"]
+                )
+                relations_serializers = {
+                    "test_model_foreign_keys": TestModelForeignKeySerializer,
+                }
+
+        # Should work exactly as before
+        schema = SingleRefSerializer.generate_read_s()
+        self.assertIsNotNone(schema)
+        self.assertIn("test_model_foreign_keys", schema.model_fields)
+
+    def test_single_string_serializer_still_works(self):
+        """Ensure single string serializer references still work as before."""
+
+        class SingleStringRefSerializer(serializers.Serializer):
+            class Meta:
+                model = TestModelReverseForeignKey
+                schema_out = serializers.SchemaModelConfig(
+                    fields=["id", "name", "test_model_foreign_keys"]
+                )
+                relations_serializers = {
+                    "test_model_foreign_keys": "TestModelForeignKeySerializer",
+                }
+
+        # Should work exactly as before
+        schema = SingleStringRefSerializer.generate_read_s()
+        self.assertIsNotNone(schema)
+        self.assertIn("test_model_foreign_keys", schema.model_fields)
