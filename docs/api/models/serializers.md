@@ -202,11 +202,46 @@ class ArticleSerializer(serializers.Serializer):
 - References are resolved lazily when schemas are generated
 - Both forward and circular references are supported
 
+**Example: Cross-Module References with Absolute Paths**
+
+```python
+# myapp/serializers.py
+from ninja_aio.models import serializers
+from . import models
+
+class ArticleSerializer(serializers.Serializer):
+    class Meta:
+        model = models.Article
+        schema_out = serializers.SchemaModelConfig(
+            fields=["id", "title", "author"]
+        )
+        relations_serializers = {
+            # Reference a serializer from another module
+            "author": "users.serializers.UserSerializer",
+        }
+
+# users/serializers.py
+from ninja_aio.models import serializers
+from . import models
+
+class UserSerializer(serializers.Serializer):
+    class Meta:
+        model = models.User
+        schema_out = serializers.SchemaModelConfig(
+            fields=["id", "username", "email", "articles"]
+        )
+        relations_serializers = {
+            # Reference back to the article serializer
+            "articles": "myapp.serializers.ArticleSerializer",
+        }
+```
+
 Notes:
 
 - Forward relations are included as plain fields unless a related ModelSerializer/Serializer is declared.
 - Reverse relations require an entry in relations_serializers when using vanilla Django models.
 - When the related model is a ModelSerializer, related schemas can be auto-resolved.
+- Absolute import paths are useful for cross-module references and avoiding circular import issues at module load time.
 
 ## Using with APIViewSet
 
