@@ -80,8 +80,10 @@ class BaseSerializer:
         Parameters
         ----------
         serializer_ref : str | type
-            Either a string reference to a serializer class name in the same module,
-            or an actual serializer class.
+            Either a string reference to a serializer class. This can be:
+            - A class name in the same module (e.g., "UserSerializer")
+            - An absolute import path (e.g., "myapp.serializers.UserSerializer")
+            Or an actual serializer class.
 
         Returns
         -------
@@ -97,7 +99,36 @@ class BaseSerializer:
         if not isinstance(serializer_ref, str):
             return serializer_ref
 
-        # Get the module where the current serializer class is defined
+        # Check if it's an absolute import path (contains dots)
+        if "." in serializer_ref:
+            # Absolute import path: "myapp.serializers.UserSerializer"
+            module_path, class_name = serializer_ref.rsplit(".", 1)
+
+            try:
+                # Try to import the module
+                module = sys.modules.get(module_path)
+                if module is None:
+                    # Module not yet imported, try to import it
+                    import importlib
+                    module = importlib.import_module(module_path)
+
+                # Get the serializer class from the module
+                serializer_class = getattr(module, class_name, None)
+
+                if serializer_class is None:
+                    raise ValueError(
+                        f"Cannot resolve serializer reference '{serializer_ref}': "
+                        f"class '{class_name}' not found in module '{module_path}'."
+                    )
+
+                return serializer_class
+            except ImportError as e:
+                raise ValueError(
+                    f"Cannot resolve serializer reference '{serializer_ref}': "
+                    f"failed to import module '{module_path}': {e}"
+                )
+
+        # Local reference: simple class name in the same module
         module = sys.modules.get(cls.__module__)
 
         if module is None:
