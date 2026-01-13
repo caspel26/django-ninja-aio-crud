@@ -180,8 +180,25 @@ class ArticleSerializer(serializers.Serializer):
         }
 ```
 
+**String Reference Formats:**
+
+1. **Class name in the same module:**
+   ```python
+   relations_serializers = {
+       "articles": "ArticleSerializer",  # Resolved in current module
+   }
+   ```
+
+2. **Absolute import path:**
+   ```python
+   relations_serializers = {
+       "articles": "myapp.serializers.ArticleSerializer",  # Full import path
+   }
+   ```
+
 **String Reference Requirements:**
-- String must be the class name of a serializer in the same module
+- String can be the class name of a serializer in the same module, or an absolute import path
+- Absolute paths use dot notation: `"package.module.ClassName"`
 - References are resolved lazily when schemas are generated
 - Both forward and circular references are supported
 
