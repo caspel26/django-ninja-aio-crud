@@ -1,6 +1,4 @@
 from typing import Any, List, Optional, Union, get_args, get_origin, ForwardRef
-from functools import reduce
-from operator import or_
 import warnings
 import sys
 
@@ -185,8 +183,8 @@ class BaseSerializer:
             # Optimize single-type unions
             if len(resolved_types) == 1:
                 return resolved_types[0]
-            # Create Union using reduce with or operator
-            return reduce(or_, resolved_types)
+            # Create Union using indexing syntax for Python 3.10+ compatibility
+            return Union[resolved_types]
 
         # Handle ForwardRef (created when using Union["StringType"])
         if isinstance(serializer_ref, ForwardRef):
@@ -233,8 +231,8 @@ class BaseSerializer:
         if len(schemas) == 1:
             return schemas[0]
 
-        # Create Union of schemas using reduce with or operator
-        return reduce(or_, schemas)
+        # Create Union of schemas using indexing syntax for Python 3.10+ compatibility
+        return Union[schemas]
 
     @classmethod
     def _resolve_relation_schema(cls, field_name: str, rel_model: models.Model):
