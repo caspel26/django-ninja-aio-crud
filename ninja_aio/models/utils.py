@@ -245,7 +245,9 @@ class ModelUtil:
         """
         return self.model_verbose_name_plural.replace(" ", "")
 
-    def _get_serializable_field_names(self, fields_type: Literal["read", "detail"]) -> list[str]:
+    def _get_serializable_field_names(
+        self, fields_type: Literal["read", "detail"]
+    ) -> list[str]:
         """
         Get serializable field names for the model.
 
@@ -257,7 +259,7 @@ class ModelUtil:
         if isinstance(self.model, ModelSerializerMeta):
             return self.model.get_fields(fields_type)
         if self.with_serializer:
-            return self.serializer_class.get_fields(fields_type)       
+            return self.serializer_class.get_fields(fields_type)
         return self.model_fields
 
     async def _get_base_queryset(
@@ -485,7 +487,9 @@ class ModelUtil:
 
         return queryset
 
-    def _get_read_optimizations(self) -> ModelQuerySetSchema:
+    def _get_read_optimizations(
+        self, is_for: Literal["read", "detail"] = "read"
+    ) -> ModelQuerySetSchema:
         """
         Retrieve read optimizations from model or serializer class.
 
@@ -495,10 +499,10 @@ class ModelUtil:
             Read optimization configuration.
         """
         if isinstance(self.model, ModelSerializerMeta):
-            return getattr(self.model.QuerySet, "read", ModelQuerySetSchema())
+            return getattr(self.model.QuerySet, is_for, ModelQuerySetSchema())
         if self.with_serializer:
             return getattr(
-                self.serializer_class.QuerySet, "read", ModelQuerySetSchema()
+                self.serializer_class.QuerySet, is_for, ModelQuerySetSchema()
             )
         return ModelQuerySetSchema()
 
@@ -518,7 +522,7 @@ class ModelUtil:
         list[str]
             Relation attribute names.
         """
-        reverse_rels = self._get_read_optimizations().prefetch_related.copy()
+        reverse_rels = self._get_read_optimizations(is_for).prefetch_related.copy()
         if reverse_rels:
             return reverse_rels
         serializable_fields = self._get_serializable_field_names(is_for)
@@ -550,7 +554,7 @@ class ModelUtil:
         list[str]
             Relation attribute names.
         """
-        select_rels = self._get_read_optimizations().select_related.copy()
+        select_rels = self._get_read_optimizations(is_for).select_related.copy()
         if select_rels:
             return select_rels
         serializable_fields = self._get_serializable_field_names(is_for)
@@ -624,9 +628,7 @@ class ModelUtil:
     ):
         """Handle different query modes (filters vs getters)."""
         if hasattr(query_data, "filters") and query_data.filters:
-            return await self._serialize_queryset(
-                request, query_data, schema, is_for
-            )
+            return await self._serialize_queryset(request, query_data, schema, is_for)
 
         if hasattr(query_data, "getters") and query_data.getters:
             return await self._serialize_single_object(
@@ -645,9 +647,7 @@ class ModelUtil:
         is_for: Literal["read", "detail"] | None = None,
     ):
         """Serialize a queryset of objects."""
-        objs = await self.get_objects(
-            request, query_data=query_data, is_for=is_for
-        )
+        objs = await self.get_objects(request, query_data=query_data, is_for=is_for)
         return [await self._bump_object_from_schema(obj, schema) async for obj in objs]
 
     async def _serialize_single_object(
@@ -658,9 +658,7 @@ class ModelUtil:
         is_for: Literal["read", "detail"] | None = None,
     ):
         """Serialize a single object."""
-        obj = await self.get_object(
-            request, query_data=query_data, is_for=is_for
-        )
+        obj = await self.get_object(request, query_data=query_data, is_for=is_for)
         return await self._bump_object_from_schema(obj, obj_schema)
 
     async def parse_input_data(self, request: HttpRequest, data: Schema):
@@ -692,7 +690,9 @@ class ModelUtil:
         """
         payload = data.model_dump(mode="json")
 
-        is_serializer = isinstance(self.model, ModelSerializerMeta) or self.with_serializer
+        is_serializer = (
+            isinstance(self.model, ModelSerializerMeta) or self.with_serializer
+        )
         serializer = self.serializer if self.with_serializer else self.model
 
         # Collect custom and optional fields (only if ModelSerializerMeta)
