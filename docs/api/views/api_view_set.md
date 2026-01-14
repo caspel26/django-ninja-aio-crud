@@ -254,6 +254,7 @@ Relations are declared via `M2MRelationSchema` objects (not tuples). Each schema
 - `get`: enable GET listing (bool)
 - `filters`: dict of `{param_name: (type, default)}` for relation-level filtering
 - `related_schema`: optional pre-built schema for the related model (auto-generated if the `model` is a `ModelSerializer`)
+- `serializer_class`: optional `Serializer` class for plain Django models. When provided, `related_schema` is auto-generated from the serializer. Cannot be used when `model` is a `ModelSerializer`.
 - `append_slash`: bool to control trailing slash for the GET relation endpoint path. Defaults to `False` (no trailing slash) for backward compatibility. When `True`, the GET path ends with a trailing slash.
 
 If `path` is empty it falls back to the related model verbose name (lowercase plural).
@@ -285,20 +286,42 @@ async def tags_query_params_handler(self, queryset, filters_dict):
 
 Warning: Model support
 
-- You can supply a standard Django `Model` (not a `ModelSerializer`) in `M2MRelationSchema.model`. When doing so you must provide `related_schema` manually:
+- You can supply a standard Django `Model` (not a `ModelSerializer`) in `M2MRelationSchema.model`. When doing so you must provide either `related_schema` manually or `serializer_class`:
 
-```python
-M2MRelationSchema(
-    model=Tag,                # plain django.db.models.Model
-    related_name="tags",
-    related_schema=TagOut,    # a Pydantic/Ninja Schema you define
-    add=True,
-    remove=True,
-    get=True,
-)
-```
+=== "With related_schema"
+    ```python
+    M2MRelationSchema(
+        model=Tag,                # plain django.db.models.Model
+        related_name="tags",
+        related_schema=TagOut,    # a Pydantic/Ninja Schema you define
+        add=True,
+        remove=True,
+        get=True,
+    )
+    ```
+
+=== "With serializer_class"
+    ```python
+    from ninja_aio.models import serializers
+
+    class TagSerializer(serializers.Serializer):
+        class Meta:
+            model = Tag
+            schema_out = serializers.SchemaModelConfig(fields=["id", "name"])
+
+    M2MRelationSchema(
+        model=Tag,                        # plain django.db.models.Model
+        related_name="tags",
+        serializer_class=TagSerializer,   # auto-generates related_schema
+        add=True,
+        remove=True,
+        get=True,
+    )
+    ```
 
 For `ModelSerializer` models, `related_schema` can be inferred automatically (via internal helpers).
+
+Note: You cannot use `serializer_class` when `model` is already a `ModelSerializer` - this will raise a `ValueError`.
 
 Example with filters:
 

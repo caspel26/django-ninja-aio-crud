@@ -15,7 +15,7 @@ from django.db.models.fields.related_descriptors import (
     ForwardOneToOneDescriptor,
 )
 
-from ninja_aio.types import S_TYPES, F_TYPES, SCHEMA_TYPES, ModelSerializerMeta
+from ninja_aio.types import S_TYPES, F_TYPES, SCHEMA_TYPES, ModelSerializerMeta, SerializerMeta
 from ninja_aio.schemas.helpers import (
     ModelQuerySetSchema,
     ModelQuerySetExtraSchema,
@@ -852,7 +852,7 @@ class SchemaModelConfig(Schema):
     customs: Optional[List[tuple[str, type, Any]]] = None
 
 
-class Serializer(BaseSerializer):
+class Serializer(BaseSerializer, metaclass=SerializerMeta):
     """
     Serializer
     ----------

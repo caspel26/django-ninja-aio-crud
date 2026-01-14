@@ -472,7 +472,7 @@ class ManyToManyAPI:
         model = relation.model
         related_name = relation.related_name
         m2m_auth = relation.auth or self.default_auth
-        rel_util = ModelUtil(model)
+        rel_util = ModelUtil(model, serializer_class=relation.serializer_class)
         rel_path = relation.path or rel_util.verbose_name_path_resolver()
         related_schema = relation.related_schema
         m2m_add, m2m_remove, m2m_get = relation.add, relation.remove, relation.get
