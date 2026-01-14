@@ -20,6 +20,7 @@ on:
           - "2.6"
           - "2.6.1"
           - "2.7.0"
+          - "2.8"
       make_latest:
         description: 'Set as "latest" and default?'
         type: boolean
@@ -43,6 +44,7 @@ on:
           - "2.6"
           - "2.6.1"
           - "2.7.0"
+          - "2.8"
       delete_confirm:
         description: 'Confirm deletion of the selected version'
         type: boolean
