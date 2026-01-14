@@ -1,6 +1,6 @@
 import asyncio
 import base64
-from typing import Any
+from typing import Any, Literal
 
 from ninja import Schema
 from ninja.orm import fields
@@ -167,9 +167,19 @@ class ModelUtil:
         list[str]
             Explicit read fields if ModelSerializerMeta, otherwise all model fields.
         """
-        if isinstance(self.model, ModelSerializerMeta):
-            return self.model.get_fields("read")
-        return self.model_fields
+        return self._get_serializable_field_names("read")
+
+    @property
+    def serializable_detail_fields(self):
+        """
+        List of fields considered serializable for detail operations.
+
+        Returns
+        -------
+        list[str]
+            Explicit detail fields if ModelSerializerMeta, otherwise all model fields.
+        """
+        return self._get_serializable_field_names("detail")
 
     @property
     def model_fields(self):
@@ -235,12 +245,29 @@ class ModelUtil:
         """
         return self.model_verbose_name_plural.replace(" ", "")
 
+    def _get_serializable_field_names(
+        self, fields_type: Literal["read", "detail"]
+    ) -> list[str]:
+        """
+        Get serializable field names for the model.
+
+        Returns
+        -------
+        list[str]
+            List of serializable field names.
+        """
+        if isinstance(self.model, ModelSerializerMeta):
+            return self.model.get_fields(fields_type)
+        if self.with_serializer:
+            return self.serializer_class.get_fields(fields_type)
+        return self.model_fields
+
     async def _get_base_queryset(
         self,
         request: HttpRequest,
         query_data: QuerySchema,
         with_qs_request: bool,
-        is_for_read: bool,
+        is_for: Literal["read", "detail"] | None = None,
     ) -> models.QuerySet[type["ModelSerializer"] | models.Model]:
         """
         Build base queryset with optimizations and filters.
@@ -253,8 +280,9 @@ class ModelUtil:
             Query configuration with filters and optimizations.
         with_qs_request : bool
             Whether to apply queryset_request hook.
-        is_for_read : bool
-            Whether this is a read operation.
+        is_for : Literal["read", "detail"] | None
+            Purpose of the query, determines which serializable fields to use.
+            If None, only query_data optimizations are applied.
 
         Returns
         -------
@@ -269,7 +297,7 @@ class ModelUtil:
         )
 
         # Apply query optimizations
-        obj_qs = self._apply_query_optimizations(obj_qs, query_data, is_for_read)
+        obj_qs = self._apply_query_optimizations(obj_qs, query_data, is_for)
 
         # Apply queryset_request hook if available
         if isinstance(self.model, ModelSerializerMeta) and with_qs_request:
@@ -286,7 +314,7 @@ class ModelUtil:
         request: HttpRequest,
         query_data: ObjectsQuerySchema = None,
         with_qs_request=True,
-        is_for_read: bool = False,
+        is_for: Literal["read", "detail"] | None = None,
     ) -> models.QuerySet[type["ModelSerializer"] | models.Model]:
         """
         Retrieve a queryset with optimized database queries.
@@ -305,9 +333,9 @@ class ModelUtil:
         with_qs_request : bool, optional
             Whether to apply the model's queryset_request hook if available.
             Defaults to True.
-        is_for_read : bool, optional
-            Flag indicating if the query is for read operations, which may affect
-            query optimization strategies. Defaults to False.
+        is_for : Literal["read", "detail"] | None, optional
+            Purpose of the query, determines which serializable fields to use.
+            If None, only query_data optimizations are applied.
 
         Returns
         -------
@@ -323,7 +351,7 @@ class ModelUtil:
             query_data = ObjectsQuerySchema()
 
         return await self._get_base_queryset(
-            request, query_data, with_qs_request, is_for_read
+            request, query_data, with_qs_request, is_for
         )
 
     async def get_object(
@@ -332,7 +360,7 @@ class ModelUtil:
         pk: int | str = None,
         query_data: ObjectQuerySchema = None,
         with_qs_request=True,
-        is_for_read: bool = False,
+        is_for: Literal["read", "detail"] | None = None,
     ) -> type["ModelSerializer"] | models.Model:
         """
         Retrieve a single object with optimized database queries.
@@ -353,9 +381,9 @@ class ModelUtil:
         with_qs_request : bool, optional
             Whether to apply the model's queryset_request hook if available.
             Defaults to True.
-        is_for_read : bool, optional
-            Flag indicating if the query is for read operations, which may affect
-            query optimization strategies. Defaults to False.
+        is_for : Literal["read", "detail"] | None, optional
+            Purpose of the query, determines which serializable fields to use.
+            If None, only query_data optimizations are applied.
 
         Returns
         -------
@@ -385,7 +413,7 @@ class ModelUtil:
         # Build lookup query and get optimized queryset
         get_q = self._build_lookup_query(pk, query_data.getters)
         obj_qs = await self._get_base_queryset(
-            request, query_data, with_qs_request, is_for_read
+            request, query_data, with_qs_request, is_for
         )
 
         # Perform lookup
@@ -421,7 +449,7 @@ class ModelUtil:
         self,
         queryset: models.QuerySet,
         query_data: QuerySchema,
-        is_for_read: bool,
+        is_for: Literal["read", "detail"] | None = None,
     ) -> models.QuerySet:
         """
         Apply select_related and prefetch_related optimizations to queryset.
@@ -432,8 +460,9 @@ class ModelUtil:
             Base queryset to optimize.
         query_data : ModelQuerySchema
             Query configuration with select_related/prefetch_related lists.
-        is_for_read : bool
-            Whether to include model-level relation discovery.
+        is_for : Literal["read", "detail"] | None
+            Purpose of the query, determines which serializable fields to use.
+            If None, only query_data optimizations are applied.
 
         Returns
         -------
@@ -441,13 +470,13 @@ class ModelUtil:
             Optimized queryset.
         """
         select_related = (
-            query_data.select_related + self.get_select_relateds()
-            if is_for_read
+            query_data.select_related + self.get_select_relateds(is_for)
+            if is_for
             else query_data.select_related
         )
         prefetch_related = (
-            query_data.prefetch_related + self.get_reverse_relations()
-            if is_for_read
+            query_data.prefetch_related + self.get_reverse_relations(is_for)
+            if is_for
             else query_data.prefetch_related
         )
 
@@ -458,9 +487,13 @@ class ModelUtil:
 
         return queryset
 
-    def _get_read_optimizations(self) -> ModelQuerySetSchema:
+    def _get_read_optimizations(
+        self, is_for: Literal["read", "detail"] = "read"
+    ) -> ModelQuerySetSchema:
         """
         Retrieve read optimizations from model or serializer class.
+
+        When is_for="detail" and no detail config exists, falls back to read config.
 
         Returns
         -------
@@ -468,26 +501,38 @@ class ModelUtil:
             Read optimization configuration.
         """
         if isinstance(self.model, ModelSerializerMeta):
-            return getattr(self.model.QuerySet, "read", ModelQuerySetSchema())
+            result = getattr(self.model.QuerySet, is_for, None)
+            if result is None and is_for == "detail":
+                result = getattr(self.model.QuerySet, "read", None)
+            return result or ModelQuerySetSchema()
         if self.with_serializer:
-            return getattr(
-                self.serializer_class.QuerySet, "read", ModelQuerySetSchema()
-            )
+            result = getattr(self.serializer_class.QuerySet, is_for, None)
+            if result is None and is_for == "detail":
+                result = getattr(self.serializer_class.QuerySet, "read", None)
+            return result or ModelQuerySetSchema()
         return ModelQuerySetSchema()
 
-    def get_reverse_relations(self) -> list[str]:
+    def get_reverse_relations(
+        self, is_for: Literal["read", "detail"] = "read"
+    ) -> list[str]:
         """
         Discover reverse relation names for safe prefetching.
+
+        Parameters
+        ----------
+        is_for : Literal["read", "detail"]
+            Purpose of the query, determines which serializable fields to use.
 
         Returns
         -------
         list[str]
             Relation attribute names.
         """
-        reverse_rels = self._get_read_optimizations().prefetch_related.copy()
+        reverse_rels = self._get_read_optimizations(is_for).prefetch_related.copy()
         if reverse_rels:
             return reverse_rels
-        for f in self.serializable_fields:
+        serializable_fields = self._get_serializable_field_names(is_for)
+        for f in serializable_fields:
             field_obj = getattr(self.model, f)
             if isinstance(field_obj, ManyToManyDescriptor):
                 reverse_rels.append(f)
@@ -499,19 +544,27 @@ class ModelUtil:
                 reverse_rels.append(field_obj.related.name)
         return reverse_rels
 
-    def get_select_relateds(self) -> list[str]:
+    def get_select_relateds(
+        self, is_for: Literal["read", "detail"] = "read"
+    ) -> list[str]:
         """
         Discover forward relation names for safe select_related.
+
+        Parameters
+        ----------
+        is_for : Literal["read", "detail"]
+            Purpose of the query, determines which serializable fields to use.
 
         Returns
         -------
         list[str]
             Relation attribute names.
         """
-        select_rels = self._get_read_optimizations().select_related.copy()
+        select_rels = self._get_read_optimizations(is_for).select_related.copy()
         if select_rels:
             return select_rels
-        for f in self.serializable_fields:
+        serializable_fields = self._get_serializable_field_names(is_for)
+        for f in serializable_fields:
             field_obj = getattr(self.model, f)
             if isinstance(field_obj, ForwardManyToOneDescriptor):
                 select_rels.append(f)
@@ -577,17 +630,15 @@ class ModelUtil:
         request: HttpRequest,
         query_data: QuerySchema,
         schema: Schema,
-        is_for_read: bool,
+        is_for: Literal["read", "detail"] | None = None,
     ):
         """Handle different query modes (filters vs getters)."""
         if hasattr(query_data, "filters") and query_data.filters:
-            return await self._serialize_queryset(
-                request, query_data, schema, is_for_read
-            )
+            return await self._serialize_queryset(request, query_data, schema, is_for)
 
         if hasattr(query_data, "getters") and query_data.getters:
             return await self._serialize_single_object(
-                request, query_data, schema, is_for_read
+                request, query_data, schema, is_for
             )
 
         raise SerializeError(
@@ -599,12 +650,10 @@ class ModelUtil:
         request: HttpRequest,
         query_data: QuerySchema,
         schema: Schema,
-        is_for_read: bool,
+        is_for: Literal["read", "detail"] | None = None,
     ):
         """Serialize a queryset of objects."""
-        objs = await self.get_objects(
-            request, query_data=query_data, is_for_read=is_for_read
-        )
+        objs = await self.get_objects(request, query_data=query_data, is_for=is_for)
         return [await self._bump_object_from_schema(obj, schema) async for obj in objs]
 
     async def _serialize_single_object(
@@ -612,12 +661,10 @@ class ModelUtil:
         request: HttpRequest,
         query_data: QuerySchema,
         obj_schema: Schema,
-        is_for_read: bool,
+        is_for: Literal["read", "detail"] | None = None,
     ):
         """Serialize a single object."""
-        obj = await self.get_object(
-            request, query_data=query_data, is_for_read=is_for_read
-        )
+        obj = await self.get_object(request, query_data=query_data, is_for=is_for)
         return await self._bump_object_from_schema(obj, obj_schema)
 
     async def parse_input_data(self, request: HttpRequest, data: Schema):
@@ -649,7 +696,9 @@ class ModelUtil:
         """
         payload = data.model_dump(mode="json")
 
-        is_serializer = isinstance(self.model, ModelSerializerMeta) or self.with_serializer
+        is_serializer = (
+            isinstance(self.model, ModelSerializerMeta) or self.with_serializer
+        )
         serializer = self.serializer if self.with_serializer else self.model
 
         # Collect custom and optional fields (only if ModelSerializerMeta)
@@ -732,7 +781,7 @@ class ModelUtil:
         | type["ModelSerializer"]
         | models.Model = None,
         query_data: QuerySchema = None,
-        is_for_read: bool = False,
+        is_for: Literal["read", "detail"] | None = None,
     ):
         """
         Internal serialization method handling both single instances and querysets.
@@ -747,8 +796,8 @@ class ModelUtil:
             Instance(s) to serialize. If None, fetches based on query_data.
         query_data : QuerySchema, optional
             Query parameters for fetching objects when instance is None.
-        is_for_read : bool, optional
-            Whether to apply read-specific query optimizations.
+        is_for : Literal["read", "detail"] | None, optional
+            Purpose of the query, determines which serializable fields to use.
 
         Returns
         -------
@@ -772,7 +821,7 @@ class ModelUtil:
             return await self._bump_object_from_schema(instance, schema)
 
         self._validate_read_params(request, query_data)
-        return await self._handle_query_mode(request, query_data, schema, is_for_read)
+        return await self._handle_query_mode(request, query_data, schema, is_for)
 
     async def read_s(
         self,
@@ -780,7 +829,7 @@ class ModelUtil:
         request: HttpRequest = None,
         instance: type["ModelSerializer"] = None,
         query_data: ObjectQuerySchema = None,
-        is_for_read: bool = False,
+        is_for: Literal["read", "detail"] | None = None,
     ) -> dict:
         """
         Serialize a single model instance or fetch and serialize using query parameters.
@@ -799,8 +848,9 @@ class ModelUtil:
         query_data : ObjectQuerySchema, optional
             Query parameters with getters for single object lookup.
             Required when instance is None.
-        is_for_read : bool, optional
-            Whether to apply read-specific query optimizations. Defaults to False.
+        is_for : Literal["read", "detail"] | None, optional
+            Purpose of the query, determines which serializable fields to use.
+            Defaults to None.
 
         Returns
         -------
@@ -820,14 +870,14 @@ class ModelUtil:
         -----
         - Uses Pydantic's from_orm() with mode="json" for serialization
         - When instance is provided, request and query_data are ignored
-        - Query optimizations applied when is_for_read=True
+        - Query optimizations applied when is_for is specified
         """
         return await self._read_s(
             schema,
             request,
             instance,
             query_data,
-            is_for_read,
+            is_for,
         )
 
     async def list_read_s(
@@ -836,7 +886,7 @@ class ModelUtil:
         request: HttpRequest = None,
         instances: models.QuerySet[type["ModelSerializer"] | models.Model] = None,
         query_data: ObjectsQuerySchema = None,
-        is_for_read: bool = False,
+        is_for: Literal["read", "detail"] | None = None,
     ) -> list[dict]:
         """
         Serialize multiple model instances or fetch and serialize using query parameters.
@@ -855,8 +905,9 @@ class ModelUtil:
         query_data : ObjectsQuerySchema, optional
             Query parameters with filters for multiple object lookup.
             Required when instances is None.
-        is_for_read : bool, optional
-            Whether to apply read-specific query optimizations. Defaults to False.
+        is_for : Literal["read", "detail"] | None, optional
+            Purpose of the query, determines which serializable fields to use.
+            Defaults to None.
 
         Returns
         -------
@@ -874,7 +925,7 @@ class ModelUtil:
         -----
         - Uses Pydantic's from_orm() with mode="json" for serialization
         - When instances is provided, request and query_data are ignored
-        - Query optimizations applied when is_for_read=True
+        - Query optimizations applied when is_for is specified
         - Processes queryset asynchronously for efficiency
         """
         return await self._read_s(
@@ -882,7 +933,7 @@ class ModelUtil:
             request,
             instances,
             query_data,
-            is_for_read,
+            is_for,
         )
 
     async def update_s(

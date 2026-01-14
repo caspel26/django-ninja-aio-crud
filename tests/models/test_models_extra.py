@@ -2,7 +2,7 @@ from django.test import TestCase, tag
 from ninja_aio.models import ModelUtil, ModelSerializer
 from ninja_aio.exceptions import SerializeError
 from tests.test_app import models as app_models
-from ninja_aio.schemas.helpers import QuerySchema
+from ninja_aio.schemas.helpers import QuerySchema, ModelQuerySetSchema
 from django.db import models
 import base64
 from unittest import mock
@@ -178,7 +178,7 @@ class ModelUtilReadSQuerysetErrorTestCase(TestCase):
                 request=None,
                 obj=None,
                 query_data=QuerySchema(),
-                is_for_read=True,
+                is_for="read",
             )
 
 
@@ -247,7 +247,7 @@ class ModelUtilApplyQueryOptimizationsTestCase(TestCase):
             ) as m_pref,
         ):
             _ = self.util_fk._apply_query_optimizations(
-                qs, query_data, is_for_read=True
+                qs, query_data, is_for="read"
             )
             sel_args = m_sel.call_args[0][1:]
             self.assertEqual(sel_args[0], "custom_sel")
@@ -265,7 +265,7 @@ class ModelUtilApplyQueryOptimizationsTestCase(TestCase):
             autospec=True,
         ) as m_sel:
             _ = self.util_fk._apply_query_optimizations(
-                qs, query_data, is_for_read=False
+                qs, query_data, is_for=None
             )
             sel_args = m_sel.call_args[0][1:]
             self.assertEqual(sel_args, ("only_custom",))
@@ -288,7 +288,7 @@ class ModelUtilApplyQueryOptimizationsTestCase(TestCase):
             ) as m_sel,
         ):
             _ = self.util_rev._apply_query_optimizations(
-                qs, query_data, is_for_read=True
+                qs, query_data, is_for="read"
             )
             pref_args = m_pref.call_args[0][1:]
             self.assertEqual(pref_args[0], "custom_prefetch")
@@ -307,7 +307,165 @@ class ModelUtilApplyQueryOptimizationsTestCase(TestCase):
             autospec=True,
         ) as m_pref:
             _ = self.util_rev._apply_query_optimizations(
-                qs, query_data, is_for_read=False
+                qs, query_data, is_for=None
             )
             pref_args = m_pref.call_args[0][1:]
             self.assertEqual(pref_args, ("only_custom_prefetch",))
+
+
+class DetailFieldsModelSerializer(ModelSerializer):
+    """Test model with different read vs detail fields including a relation."""
+
+    name = models.CharField(max_length=50)
+    description = models.TextField(max_length=255)
+    extra_info = models.TextField(blank=True, default="")
+    related = models.ForeignKey(
+        app_models.TestModelSerializerReverseForeignKey,
+        on_delete=models.CASCADE,
+        related_name="detail_fields_relations",
+        null=True,
+        blank=True,
+    )
+
+    class ReadSerializer:
+        # Read only includes basic fields, no relations
+        fields = ["id", "name"]
+
+    class DetailSerializer:
+        # Detail includes the relation
+        fields = ["id", "name", "description", "extra_info", "related"]
+
+    class Meta:
+        app_label = app_models.TestModelSerializer._meta.app_label
+
+
+@tag("model_util_is_for_detail", "model_util")
+class ModelUtilIsForDetailTestCase(TestCase):
+    """Tests for is_for='detail' parameter in ModelUtil methods."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.util = ModelUtil(DetailFieldsModelSerializer)
+
+    def test_serializable_fields_returns_read_fields(self):
+        """serializable_fields property returns read fields."""
+        self.assertEqual(
+            self.util.serializable_fields,
+            ["id", "name"],
+        )
+
+    def test_serializable_detail_fields_returns_detail_fields(self):
+        """serializable_detail_fields property returns detail fields."""
+        self.assertEqual(
+            self.util.serializable_detail_fields,
+            ["id", "name", "description", "extra_info", "related"],
+        )
+
+    def test_get_select_relateds_read_no_relations(self):
+        """get_select_relateds with is_for='read' returns no FK relations."""
+        # Read fields don't include 'related', so no select_related
+        rels = self.util.get_select_relateds(is_for="read")
+        self.assertNotIn("related", rels)
+
+    def test_get_select_relateds_detail_includes_relation(self):
+        """get_select_relateds with is_for='detail' returns FK relation."""
+        # Detail fields include 'related', so select_related should include it
+        rels = self.util.get_select_relateds(is_for="detail")
+        self.assertIn("related", rels)
+
+    def test_apply_query_optimizations_read_vs_detail(self):
+        """_apply_query_optimizations uses correct fields based on is_for."""
+        qs = DetailFieldsModelSerializer.objects.all()
+        query_data = QuerySchema(select_related=[], prefetch_related=[])
+
+        with mock.patch(
+            "django.db.models.query.QuerySet.select_related",
+            side_effect=lambda self, *args: self,
+            autospec=True,
+        ) as m_sel:
+            # is_for="read" should NOT include 'related'
+            _ = self.util._apply_query_optimizations(qs, query_data, is_for="read")
+            if m_sel.called:
+                sel_args = m_sel.call_args[0][1:]
+                self.assertNotIn("related", sel_args)
+
+        with mock.patch(
+            "django.db.models.query.QuerySet.select_related",
+            side_effect=lambda self, *args: self,
+            autospec=True,
+        ) as m_sel:
+            # is_for="detail" should include 'related'
+            _ = self.util._apply_query_optimizations(qs, query_data, is_for="detail")
+            sel_args = m_sel.call_args[0][1:]
+            self.assertIn("related", sel_args)
+
+    def test_get_serializable_field_names_read(self):
+        """_get_serializable_field_names returns correct fields for read."""
+        fields = self.util._get_serializable_field_names("read")
+        self.assertEqual(fields, ["id", "name"])
+
+    def test_get_serializable_field_names_detail(self):
+        """_get_serializable_field_names returns correct fields for detail."""
+        fields = self.util._get_serializable_field_names("detail")
+        self.assertEqual(fields, ["id", "name", "description", "extra_info", "related"])
+
+
+class ReadOnlyQuerySetModelSerializer(ModelSerializer):
+    """Test model with QuerySet.read but no QuerySet.detail."""
+
+    name = models.CharField(max_length=50)
+    related = models.ForeignKey(
+        app_models.TestModelSerializerReverseForeignKey,
+        on_delete=models.CASCADE,
+        related_name="read_only_qs_relations",
+        null=True,
+        blank=True,
+    )
+
+    class ReadSerializer:
+        fields = ["id", "name", "related"]
+
+    class QuerySet:
+        read = ModelQuerySetSchema(
+            select_related=["related"],
+            prefetch_related=[],
+        )
+        # No detail config - should fall back to read
+
+    class Meta:
+        app_label = app_models.TestModelSerializer._meta.app_label
+
+
+@tag("model_util_optimization_fallback", "model_util")
+class ModelUtilOptimizationFallbackTestCase(TestCase):
+    """Tests for _get_read_optimizations fallback behavior."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.util = ModelUtil(ReadOnlyQuerySetModelSerializer)
+
+    def test_get_read_optimizations_read(self):
+        """_get_read_optimizations returns read config for is_for='read'."""
+        config = self.util._get_read_optimizations("read")
+        self.assertEqual(config.select_related, ["related"])
+
+    def test_get_read_optimizations_detail_falls_back_to_read(self):
+        """_get_read_optimizations falls back to read config when detail not defined."""
+        config = self.util._get_read_optimizations("detail")
+        # Should fall back to read config
+        self.assertEqual(config.select_related, ["related"])
+
+    def test_apply_query_optimizations_detail_uses_read_fallback(self):
+        """_apply_query_optimizations with is_for='detail' uses read config as fallback."""
+        qs = ReadOnlyQuerySetModelSerializer.objects.all()
+        query_data = QuerySchema(select_related=[], prefetch_related=[])
+
+        with mock.patch(
+            "django.db.models.query.QuerySet.select_related",
+            side_effect=lambda self, *args: self,
+            autospec=True,
+        ) as m_sel:
+            _ = self.util._apply_query_optimizations(qs, query_data, is_for="detail")
+            sel_args = m_sel.call_args[0][1:]
+            # Should include 'related' from read config fallback
+            self.assertIn("related", sel_args)

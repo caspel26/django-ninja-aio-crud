@@ -475,11 +475,18 @@ class ArticleSerializer(serializers.Serializer):
         schema_out = serializers.SchemaModelConfig(
             fields=["id", "title", "content", "author", "category"]
         )
+        schema_detail = serializers.SchemaModelConfig(
+            fields=["id", "title", "content", "author", "category", "tags", "comments"]
+        )
 
     class QuerySet:
         read = ModelQuerySetSchema(
             select_related=["author", "category"],
             prefetch_related=["tags"],
+        )
+        detail = ModelQuerySetSchema(
+            select_related=["author", "category", "author__profile"],
+            prefetch_related=["tags", "comments", "comments__author"],
         )
         queryset_request = ModelQuerySetSchema(
             select_related=[],
@@ -494,7 +501,12 @@ class ArticleSerializer(serializers.Serializer):
         ]
 ```
 
-The QuerySet configuration is used by ModelUtil to automatically optimize database queries during read operations.
+The QuerySet configuration is used by ModelUtil to automatically optimize database queries:
+
+- **read**: Applied to list operations (`is_for="read"`)
+- **detail**: Applied to retrieve/detail operations (`is_for="detail"`). Falls back to `read` if not defined.
+- **queryset_request**: Applied inside the `queryset_request` hook
+- **extras**: Named configurations available via `QueryUtil.SCOPES`
 
 ## Complete Example
 

@@ -796,9 +796,11 @@ class DetailSchemaFallbackTestCase(TestCase):
         # The decorator returns the instance, not the class
         cls.viewset = NoDetailViewSet
 
-    def test_fallback_to_schema_out_when_no_detail(self):
-        """Test that _get_retrieve_schema falls back to schema_out when no detail."""
-        # TestModelSerializer has no DetailSerializer defined
-        self.assertIsNone(self.viewset.schema_detail)
+    def test_detail_schema_falls_back_to_read_schema(self):
+        """Test that schema_detail falls back to read schema when no detail config."""
+        # TestModelSerializer has no DetailSerializer defined, but schema_detail
+        # now falls back to the read schema instead of being None
+        self.assertIsNotNone(self.viewset.schema_detail)
         retrieve_schema = self.viewset._get_retrieve_schema()
-        self.assertEqual(retrieve_schema, self.viewset.schema_out)
+        # The retrieve schema should be the detail schema (which is the fallback)
+        self.assertEqual(retrieve_schema, self.viewset.schema_detail)
