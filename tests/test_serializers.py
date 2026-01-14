@@ -326,8 +326,8 @@ class DetailSerializerTestCase(TestCase):
         self.assertIn("description", schema_detail.model_fields)
         self.assertIn("test_model", schema_detail.model_fields)
 
-    def test_generate_detail_schema_returns_none_when_not_configured(self):
-        """Test generate_detail_s() returns None when no detail config exists."""
+    def test_generate_detail_schema_falls_back_to_read_when_not_configured(self):
+        """Test generate_detail_s() falls back to read schema when no detail config."""
 
         class NoDetailSerializer(serializers.Serializer):
             class Meta:
@@ -336,9 +336,15 @@ class DetailSerializerTestCase(TestCase):
                     fields=["id", "name"]
                 )
 
-        # Detail schema should be None when not configured
+        # Detail schema should fall back to read schema when not configured
         schema_detail = NoDetailSerializer.generate_detail_s()
-        self.assertIsNone(schema_detail)
+        schema_out = NoDetailSerializer.generate_read_s()
+        self.assertIsNotNone(schema_detail)
+        # Both should have the same fields since detail falls back to read
+        self.assertEqual(
+            set(schema_detail.model_fields.keys()),
+            set(schema_out.model_fields.keys()),
+        )
 
     def test_detail_schema_with_relations(self):
         """Test detail schema includes relation serializers."""
