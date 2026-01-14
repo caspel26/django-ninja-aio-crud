@@ -230,7 +230,7 @@ class Tests:
 
         def test_get_schemas(self):
             schemas = self.viewset.get_schemas()
-            self.assertEqual(len(schemas), 3)
+            self.assertEqual(len(schemas), 4)
             self.assertEqual(schemas, self.schemas)
 
         async def test_create(self):
