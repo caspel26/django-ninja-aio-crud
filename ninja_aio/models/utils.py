@@ -493,17 +493,23 @@ class ModelUtil:
         """
         Retrieve read optimizations from model or serializer class.
 
+        When is_for="detail" and no detail config exists, falls back to read config.
+
         Returns
         -------
         ModelQuerySetSchema
             Read optimization configuration.
         """
         if isinstance(self.model, ModelSerializerMeta):
-            return getattr(self.model.QuerySet, is_for, ModelQuerySetSchema())
+            result = getattr(self.model.QuerySet, is_for, None)
+            if result is None and is_for == "detail":
+                result = getattr(self.model.QuerySet, "read", None)
+            return result or ModelQuerySetSchema()
         if self.with_serializer:
-            return getattr(
-                self.serializer_class.QuerySet, is_for, ModelQuerySetSchema()
-            )
+            result = getattr(self.serializer_class.QuerySet, is_for, None)
+            if result is None and is_for == "detail":
+                result = getattr(self.serializer_class.QuerySet, "read", None)
+            return result or ModelQuerySetSchema()
         return ModelQuerySetSchema()
 
     def get_reverse_relations(

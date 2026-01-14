@@ -2,7 +2,7 @@ from django.test import TestCase, tag
 from ninja_aio.models import ModelUtil, ModelSerializer
 from ninja_aio.exceptions import SerializeError
 from tests.test_app import models as app_models
-from ninja_aio.schemas.helpers import QuerySchema
+from ninja_aio.schemas.helpers import QuerySchema, ModelQuerySetSchema
 from django.db import models
 import base64
 from unittest import mock
@@ -408,3 +408,64 @@ class ModelUtilIsForDetailTestCase(TestCase):
         """_get_serializable_field_names returns correct fields for detail."""
         fields = self.util._get_serializable_field_names("detail")
         self.assertEqual(fields, ["id", "name", "description", "extra_info", "related"])
+
+
+class ReadOnlyQuerySetModelSerializer(ModelSerializer):
+    """Test model with QuerySet.read but no QuerySet.detail."""
+
+    name = models.CharField(max_length=50)
+    related = models.ForeignKey(
+        app_models.TestModelSerializerReverseForeignKey,
+        on_delete=models.CASCADE,
+        related_name="read_only_qs_relations",
+        null=True,
+        blank=True,
+    )
+
+    class ReadSerializer:
+        fields = ["id", "name", "related"]
+
+    class QuerySet:
+        read = ModelQuerySetSchema(
+            select_related=["related"],
+            prefetch_related=[],
+        )
+        # No detail config - should fall back to read
+
+    class Meta:
+        app_label = app_models.TestModelSerializer._meta.app_label
+
+
+@tag("model_util_optimization_fallback", "model_util")
+class ModelUtilOptimizationFallbackTestCase(TestCase):
+    """Tests for _get_read_optimizations fallback behavior."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.util = ModelUtil(ReadOnlyQuerySetModelSerializer)
+
+    def test_get_read_optimizations_read(self):
+        """_get_read_optimizations returns read config for is_for='read'."""
+        config = self.util._get_read_optimizations("read")
+        self.assertEqual(config.select_related, ["related"])
+
+    def test_get_read_optimizations_detail_falls_back_to_read(self):
+        """_get_read_optimizations falls back to read config when detail not defined."""
+        config = self.util._get_read_optimizations("detail")
+        # Should fall back to read config
+        self.assertEqual(config.select_related, ["related"])
+
+    def test_apply_query_optimizations_detail_uses_read_fallback(self):
+        """_apply_query_optimizations with is_for='detail' uses read config as fallback."""
+        qs = ReadOnlyQuerySetModelSerializer.objects.all()
+        query_data = QuerySchema(select_related=[], prefetch_related=[])
+
+        with mock.patch(
+            "django.db.models.query.QuerySet.select_related",
+            side_effect=lambda self, *args: self,
+            autospec=True,
+        ) as m_sel:
+            _ = self.util._apply_query_optimizations(qs, query_data, is_for="detail")
+            sel_args = m_sel.call_args[0][1:]
+            # Should include 'related' from read config fallback
+            self.assertIn("related", sel_args)
