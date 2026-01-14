@@ -1,4 +1,4 @@
-from typing import Any, List, Optional, Union, get_args, get_origin, ForwardRef
+from typing import Any, List, Literal, Optional, Union, get_args, get_origin, ForwardRef
 import warnings
 import sys
 
@@ -15,7 +15,13 @@ from django.db.models.fields.related_descriptors import (
     ForwardOneToOneDescriptor,
 )
 
-from ninja_aio.types import S_TYPES, F_TYPES, SCHEMA_TYPES, ModelSerializerMeta, SerializerMeta
+from ninja_aio.types import (
+    S_TYPES,
+    F_TYPES,
+    SCHEMA_TYPES,
+    ModelSerializerMeta,
+    SerializerMeta,
+)
 from ninja_aio.schemas.helpers import (
     ModelQuerySetSchema,
     ModelQuerySetExtraSchema,
@@ -98,6 +104,7 @@ class BaseSerializer:
                 module = sys.modules.get(module_path)
                 if module is None:
                     import importlib
+
                     module = importlib.import_module(module_path)
 
                 # Get the serializer class from the module
@@ -136,7 +143,9 @@ class BaseSerializer:
         return serializer_class
 
     @classmethod
-    def _resolve_serializer_reference(cls, serializer_ref: str | type | Any) -> type | Any:
+    def _resolve_serializer_reference(
+        cls, serializer_ref: str | type | Any
+    ) -> type | Any:
         """
         Resolve a serializer reference that may be a string, a class, or a Union of serializers.
 
@@ -217,11 +226,11 @@ class BaseSerializer:
         Schema | Union[Schema, ...] | None
             Union of generated schemas or None if all schemas are None.
         """
-        # Generate schemas for each serializer in the Union
+        # Generate schemas for each serializer in the Union (single call per serializer)
         schemas = tuple(
-            serializer_type.generate_related_s()
+            schema
             for serializer_type in get_args(resolved_union)
-            if serializer_type.generate_related_s() is not None
+            if (schema := serializer_type.generate_related_s()) is not None
         )
 
         if not schemas:
@@ -393,19 +402,26 @@ class BaseSerializer:
         return (field_name, schema | None, None)
 
     @classmethod
-    def get_schema_out_data(cls):
+    def get_schema_out_data(cls, type: Literal["Out", "Detail"] = "Out"):
         """
         Collect components for 'Out' read schema generation.
         Returns (fields, reverse_rel_descriptors, excludes, custom_fields_with_forward_relations, optionals).
         Enforces relation serializers only when provided by subclass via _get_relations_serializers.
         """
+        if type not in ("Out", "Detail"):
+            raise ValueError(
+                "get_schema_out_data only supports 'Out' or 'Detail' types"
+            )
+
         fields: list[str] = []
         reverse_rels: list[tuple] = []
         rels: list[tuple] = []
         relations_serializers = cls._get_relations_serializers() or {}
         model = cls._get_model()
 
-        for f in cls.get_fields("read"):
+        fields_type = "read" if type == "Out" else "detail"
+
+        for f in cls.get_fields(fields_type):
             field_obj = getattr(model, f)
             is_reverse = isinstance(
                 field_obj,
@@ -456,9 +472,9 @@ class BaseSerializer:
         return (
             fields,
             reverse_rels,
-            cls.get_excluded_fields("read"),
-            cls.get_custom_fields("read") + rels,
-            cls.get_optional_fields("read"),
+            cls.get_excluded_fields(fields_type),
+            cls.get_custom_fields(fields_type) + rels,
+            cls.get_optional_fields(fields_type),
         )
 
     @classmethod
@@ -474,15 +490,16 @@ class BaseSerializer:
         model = cls._get_model()
 
         # Handle special schema types with custom logic
-        if schema_type == "Out":
+        if schema_type == "Out" or schema_type == "Detail":
             fields, reverse_rels, excludes, customs, optionals = (
-                cls.get_schema_out_data()
+                cls.get_schema_out_data(schema_type)
             )
             if not any([fields, reverse_rels, excludes, customs]):
                 return None
+            schema_name = "SchemaOut" if schema_type == "Out" else "DetailSchemaOut"
             return create_schema(
                 model=model,
-                name=f"{model._meta.model_name}SchemaOut",
+                name=f"{model._meta.model_name}{schema_name}",
                 depth=depth,
                 fields=fields,
                 custom_fields=reverse_rels + customs + optionals,
@@ -560,6 +577,11 @@ class BaseSerializer:
     def generate_read_s(cls, depth: int = 1) -> Schema:
         """Generate read (Out) schema."""
         return cls._generate_model_schema("Out", depth)
+
+    @classmethod
+    def generate_detail_s(cls, depth: int = 1) -> Schema:
+        """Generate detail (single object Out) schema."""
+        return cls._generate_model_schema("Detail", depth)
 
     @classmethod
     def generate_create_s(cls) -> Schema:
@@ -659,6 +681,26 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
         optionals: list[tuple[str, type]] = []
         excludes: list[str] = []
 
+    class DetailSerializer:
+        """Configuration describing detail (single object) read schema.
+
+        Attributes
+        ----------
+        fields : list[str]
+            Explicit model fields to include.
+        excludes : list[str]
+            Fields to force exclude (safety).
+        customs : list[tuple[str, type, Any]]
+            Computed / synthetic output attributes.
+        optionals : list[tuple[str, type]]
+            Optional output fields.
+        """
+
+        fields: list[str] = []
+        customs: list[tuple[str, type, Any]] = []
+        optionals: list[tuple[str, type]] = []
+        excludes: list[str] = []
+
     class UpdateSerializer:
         """Configuration describing update (PATCH/PUT) schema.
 
@@ -684,6 +726,7 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
         "create": "CreateSerializer",
         "update": "UpdateSerializer",
         "read": "ReadSerializer",
+        "detail": "DetailSerializer",
     }
 
     @classmethod
@@ -867,6 +910,7 @@ class Serializer(BaseSerializer, metaclass=SerializerMeta):
         "create": "in",
         "update": "update",
         "read": "out",
+        "detail": "detail",
     }
 
     def __init_subclass__(cls, **kwargs):
@@ -884,6 +928,7 @@ class Serializer(BaseSerializer, metaclass=SerializerMeta):
         schema_in: Optional[SchemaModelConfig] = None
         schema_out: Optional[SchemaModelConfig] = None
         schema_update: Optional[SchemaModelConfig] = None
+        schema_detail: Optional[SchemaModelConfig] = None
         relations_serializers: dict[str, "Serializer"] = {}
 
     @classmethod
@@ -908,6 +953,8 @@ class Serializer(BaseSerializer, metaclass=SerializerMeta):
                 return cls._get_meta_data("schema_out")
             case "update":
                 return cls._get_meta_data("schema_update")
+            case "detail":
+                return cls._get_meta_data("schema_detail")
             case _:
                 return None
 
@@ -1027,7 +1074,12 @@ class Serializer(BaseSerializer, metaclass=SerializerMeta):
         dict
             Serialized data.
         """
-        return await self.util.read_s(schema=self.generate_read_s(), instance=instance)
+        schema = (
+            self.generate_read_s()
+            if self.generate_detail_s() is None
+            else self.generate_detail_s()
+        )
+        return await self.util.read_s(schema=schema, instance=instance)
 
     async def models_dump(
         self, instances: models.QuerySet[models.Model]

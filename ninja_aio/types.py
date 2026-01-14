@@ -4,9 +4,9 @@ from joserfc import jwk
 from django.db.models import Model
 from typing import TypeAlias
 
-S_TYPES = Literal["read", "create", "update"]
+S_TYPES = Literal["read", "detail", "create", "update"]
 F_TYPES = Literal["fields", "customs", "optionals", "excludes"]
-SCHEMA_TYPES = Literal["In", "Out", "Patch", "Related"]
+SCHEMA_TYPES = Literal["In", "Out", "Detail", "Patch", "Related"]
 VIEW_TYPES = Literal["list", "retrieve", "create", "update", "delete", "all"]
 JwtKeys: TypeAlias = jwk.RSAKey | jwk.ECKey | jwk.OctKey
 
