@@ -173,3 +173,16 @@ class TestModelSerializerManyToMany(BaseTestModelSerializer):
 
     class CreateSerializer:
         fields = BaseTestModelSerializer.CreateSerializer.fields
+
+
+class TestModelSerializerWithDetail(BaseTestModelSerializer):
+    """Model with separate read and detail serializer configurations."""
+
+    extra_info = models.TextField(blank=True, default="")
+
+    class ReadSerializer:
+        fields = ["id", "name"]
+
+    class DetailSerializer:
+        fields = ["id", "name", "description", "extra_info"]
+        customs = [("computed_field", str, "computed_value")]

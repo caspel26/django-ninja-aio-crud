@@ -289,3 +289,124 @@ class UnionSerializerTestCase(TestCase):
         schema = SingleStringRefSerializer.generate_read_s()
         self.assertIsNotNone(schema)
         self.assertIn("test_model_foreign_keys", schema.model_fields)
+
+
+@tag("serializers", "detail")
+class DetailSerializerTestCase(TestCase):
+    """Test cases for Detail schema generation support."""
+
+    def setUp(self):
+        warnings.simplefilter("ignore", UserWarning)
+
+    def test_generate_detail_schema_with_serializer(self):
+        """Test generate_detail_s() with Serializer class."""
+
+        class DetailTestSerializer(serializers.Serializer):
+            class Meta:
+                model = TestModelForeignKey
+                schema_out = serializers.SchemaModelConfig(
+                    fields=["id", "name"]
+                )
+                schema_detail = serializers.SchemaModelConfig(
+                    fields=["id", "name", "description", "test_model"]
+                )
+
+        # Out schema should have fewer fields
+        schema_out = DetailTestSerializer.generate_read_s()
+        self.assertIsNotNone(schema_out)
+        self.assertIn("id", schema_out.model_fields)
+        self.assertIn("name", schema_out.model_fields)
+        self.assertNotIn("description", schema_out.model_fields)
+
+        # Detail schema should have more fields
+        schema_detail = DetailTestSerializer.generate_detail_s()
+        self.assertIsNotNone(schema_detail)
+        self.assertIn("id", schema_detail.model_fields)
+        self.assertIn("name", schema_detail.model_fields)
+        self.assertIn("description", schema_detail.model_fields)
+        self.assertIn("test_model", schema_detail.model_fields)
+
+    def test_generate_detail_schema_returns_none_when_not_configured(self):
+        """Test generate_detail_s() returns None when no detail config exists."""
+
+        class NoDetailSerializer(serializers.Serializer):
+            class Meta:
+                model = TestModelForeignKey
+                schema_out = serializers.SchemaModelConfig(
+                    fields=["id", "name"]
+                )
+
+        # Detail schema should be None when not configured
+        schema_detail = NoDetailSerializer.generate_detail_s()
+        self.assertIsNone(schema_detail)
+
+    def test_detail_schema_with_relations(self):
+        """Test detail schema includes relation serializers."""
+
+        class DetailWithRelationsSerializer(serializers.Serializer):
+            class Meta:
+                model = TestModelReverseForeignKey
+                schema_out = serializers.SchemaModelConfig(
+                    fields=["id", "name"]
+                )
+                schema_detail = serializers.SchemaModelConfig(
+                    fields=["id", "name", "description", "test_model_foreign_keys"]
+                )
+                relations_serializers = {
+                    "test_model_foreign_keys": TestModelForeignKeySerializer,
+                }
+
+        # Out schema should be minimal
+        schema_out = DetailWithRelationsSerializer.generate_read_s()
+        self.assertIn("id", schema_out.model_fields)
+        self.assertIn("name", schema_out.model_fields)
+        self.assertNotIn("test_model_foreign_keys", schema_out.model_fields)
+
+        # Detail schema should include relations
+        schema_detail = DetailWithRelationsSerializer.generate_detail_s()
+        self.assertIsNotNone(schema_detail)
+        self.assertIn("id", schema_detail.model_fields)
+        self.assertIn("name", schema_detail.model_fields)
+        self.assertIn("description", schema_detail.model_fields)
+        self.assertIn("test_model_foreign_keys", schema_detail.model_fields)
+
+    def test_detail_schema_with_custom_fields(self):
+        """Test detail schema supports custom fields."""
+
+        class DetailWithCustomsSerializer(serializers.Serializer):
+            class Meta:
+                model = TestModelForeignKey
+                schema_out = serializers.SchemaModelConfig(
+                    fields=["id", "name"]
+                )
+                schema_detail = serializers.SchemaModelConfig(
+                    fields=["id", "name", "description"],
+                    customs=[("extra_info", str, "default_value")],
+                )
+
+        schema_detail = DetailWithCustomsSerializer.generate_detail_s()
+        self.assertIsNotNone(schema_detail)
+        self.assertIn("id", schema_detail.model_fields)
+        self.assertIn("name", schema_detail.model_fields)
+        self.assertIn("description", schema_detail.model_fields)
+        self.assertIn("extra_info", schema_detail.model_fields)
+
+    def test_detail_schema_with_optionals(self):
+        """Test detail schema supports optional fields."""
+
+        class DetailWithOptionalsSerializer(serializers.Serializer):
+            class Meta:
+                model = TestModelForeignKey
+                schema_out = serializers.SchemaModelConfig(
+                    fields=["id", "name"]
+                )
+                schema_detail = serializers.SchemaModelConfig(
+                    fields=["id", "name"],
+                    optionals=[("description", str)],
+                )
+
+        schema_detail = DetailWithOptionalsSerializer.generate_detail_s()
+        self.assertIsNotNone(schema_detail)
+        self.assertIn("id", schema_detail.model_fields)
+        self.assertIn("name", schema_detail.model_fields)
+        self.assertIn("description", schema_detail.model_fields)

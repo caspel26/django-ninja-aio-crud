@@ -225,6 +225,7 @@ class APIViewSet(API):
     serializer_class: serializers.Serializer | None = None
     schema_in: Schema | None = None
     schema_out: Schema | None = None
+    schema_detail: Schema | None = None
     schema_update: Schema | None = None
     get_auth: list | None = NOT_SET
     post_auth: list | None = NOT_SET
@@ -262,7 +263,9 @@ class APIViewSet(API):
             if not isinstance(self.model, ModelSerializerMeta)
             else self.model.util
         )
-        self.schema_out, self.schema_in, self.schema_update = self.get_schemas()
+        self.schema_out, self.schema_detail, self.schema_in, self.schema_update = (
+            self.get_schemas()
+        )
         self.path_schema = self._generate_path_schema()
         self.filters_schema = self._generate_filters_schema()
         self.model_verbose_name = (
@@ -365,22 +368,24 @@ class APIViewSet(API):
 
     def get_schemas(self):
         """
-        Compute and return (schema_out, schema_in, schema_update).
+        Compute and return (schema_out, schema_detail, schema_in, schema_update).
 
-        - If model is a ModelSerializer (ModelSerializerMeta), auto-generate read/create/update schemas.
+        - If model is a ModelSerializer (ModelSerializerMeta), auto-generate read/detail/create/update schemas.
         - Otherwise, use existing schemas or generate from serializer_class if provided.
         """
         # ModelSerializer case: prefer explicitly set schemas, otherwise generate from the model
         if isinstance(self.model, ModelSerializerMeta):
             return (
                 self.schema_out or self.model.generate_read_s(),
+                self.schema_detail or self.model.generate_detail_s(),
                 self.schema_in or self.model.generate_create_s(),
                 self.schema_update or self.model.generate_update_s(),
             )
 
         # Non-ModelSerializer: start from provided schemas
-        schema_out, schema_in, schema_update = (
+        schema_out, schema_detail, schema_in, schema_update = (
             self.schema_out,
+            self.schema_detail,
             self.schema_in,
             self.schema_update,
         )
@@ -389,9 +394,10 @@ class APIViewSet(API):
         if self.serializer_class:
             schema_in = schema_in or self.serializer_class.generate_create_s()
             schema_out = schema_out or self.serializer_class.generate_read_s()
+            schema_detail = schema_detail or self.serializer_class.generate_detail_s()
             schema_update = schema_update or self.serializer_class.generate_update_s()
 
-        return (schema_out, schema_in, schema_update)
+        return (schema_out, schema_detail, schema_in, schema_update)
 
     async def query_params_handler(
         self, queryset: QuerySet[ModelSerializer], filters: dict
@@ -456,23 +462,31 @@ class APIViewSet(API):
 
         return list
 
+    def _get_retrieve_schema(self) -> Schema:
+        """
+        Return the schema to use for retrieve endpoint.
+        Uses schema_detail if available, otherwise falls back to schema_out.
+        """
+        return self.schema_detail or self.schema_out
+
     def retrieve_view(self):
         """
         Register retrieve endpoint.
         """
+        retrieve_schema = self._get_retrieve_schema()
 
         @self.router.get(
             self.get_path_retrieve,
             auth=self.get_view_auth(),
             summary=f"Retrieve {self.model_verbose_name}",
             description=self.retrieve_docs,
-            response={200: self.schema_out, self.error_codes: GenericMessageSchema},
+            response={200: retrieve_schema, self.error_codes: GenericMessageSchema},
         )
         @decorate_view(unique_view(self), *self.extra_decorators.retrieve)
         async def retrieve(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
             query_data = self._get_query_data()
             return await self.model_util.read_s(
-                self.schema_out,
+                retrieve_schema,
                 request,
                 query_data=QuerySchema(
                     getters={"pk": self._get_pk(pk)}, **query_data.model_dump()

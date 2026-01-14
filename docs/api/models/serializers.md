@@ -37,7 +37,8 @@ Define a Serializer subclass with a nested Meta:
 
 - **model**: Django model class
 - **schema_in**: SchemaModelConfig for create inputs
-- **schema_out**: SchemaModelConfig for read outputs
+- **schema_out**: SchemaModelConfig for read outputs (list endpoint)
+- **schema_detail**: SchemaModelConfig for detail outputs (retrieve endpoint)
 - **schema_update**: SchemaModelConfig for patch/update inputs
 - **relations_serializers**: Mapping of relation field name -> Serializer class, **string reference**, or **Union of serializers** (supports forward/circular dependencies and polymorphic relations)
 
@@ -55,12 +56,36 @@ Generate schemas explicitly using these methods:
 ```python
 # Explicitly generate schemas when needed
 ArticleSerializer.generate_create_s()  # Returns create (In) schema
-ArticleSerializer.generate_read_s()    # Returns read (Out) schema
+ArticleSerializer.generate_read_s()    # Returns read (Out) schema for list endpoint
+ArticleSerializer.generate_detail_s()  # Returns detail (Out) schema for retrieve endpoint
 ArticleSerializer.generate_update_s()  # Returns update (Patch) schema
 ArticleSerializer.generate_related_s() # Returns related (nested) schema
 ```
 
 Schemas support **forward references and circular dependencies** via string references in `relations_serializers`.
+
+### Detail Schema for Retrieve Endpoint
+
+Use `schema_detail` when you want the retrieve endpoint to return more fields than the list endpoint:
+
+```python
+class ArticleSerializer(serializers.Serializer):
+    class Meta:
+        model = models.Article
+        schema_out = serializers.SchemaModelConfig(
+            # List view: minimal fields for performance
+            fields=["id", "title", "summary"]
+        )
+        schema_detail = serializers.SchemaModelConfig(
+            # Detail view: all fields including expensive relations
+            fields=["id", "title", "summary", "content", "author", "tags"],
+            customs=[("reading_time", int, lambda obj: len(obj.content.split()) // 200)]
+        )
+```
+
+When used with `APIViewSet`:
+- **List endpoint** (`GET /articles/`) uses `schema_out`
+- **Retrieve endpoint** (`GET /articles/{pk}`) uses `schema_detail` (falls back to `schema_out` if not defined)
 
 ## Example: simple FK
 

@@ -4,6 +4,7 @@ from django.test import tag, TestCase
 from django.utils import timezone
 
 from ninja_aio.models import ModelUtil
+from ninja_aio.models import serializers as ninja_serializers
 from tests.generics.views import Tests
 from tests.test_app import schema, models, views, serializers
 from ninja_aio import NinjaAIO
@@ -43,6 +44,7 @@ class BaseTests:
         def schemas(self):
             return (
                 self.model.generate_read_s(),
+                self.model.generate_detail_s(),
                 self.model.generate_create_s(),
                 self.model.generate_update_s(),
             )
@@ -406,6 +408,7 @@ class ApiViewSetModelTestCase(
     def schemas(self):
         return (
             schema.TestModelSchemaOut,
+            None,  # No detail schema for plain model
             schema.TestModelSchemaIn,
             schema.TestModelSchemaPatch,
         )
@@ -423,6 +426,7 @@ class ApiViewSetModelForeignKeyTestCase(BaseTests.ApiViewSetForeignKeyTestCaseBa
     def schemas(self):
         return (
             schema.TestModelForeignKeySchemaOut,
+            None,  # No detail schema for plain model
             schema.TestModelForeignKeySchemaIn,
             schema.TestModelSchemaPatch,
         )
@@ -448,6 +452,7 @@ class ApiViewSetModelReverseForeignKeyTestCase(
     def schemas(self):
         return (
             schema.TestModelReverseForeignKeySchemaOut,
+            None,  # No detail schema for plain model
             schema.TestModelReverseForeignKeySchemaIn,
             schema.TestModelSchemaPatch,
         )
@@ -464,6 +469,7 @@ class ApiViewSetModelOneToOneTestCase(ApiViewSetModelForeignKeyTestCase):
     def schemas(self):
         return (
             schema.TestModelForeignKeySchemaOut,
+            None,  # No detail schema for plain model
             schema.TestModelForeignKeySchemaIn,
             schema.TestModelSchemaPatch,
         )
@@ -481,6 +487,7 @@ class ApiViewSetModelReverseOneToOneTestCase(ApiViewSetModelReverseForeignKeyTes
     def schemas(self):
         return (
             schema.TestModelReverseOneToOneSchemaOut,
+            None,  # No detail schema for plain model
             schema.TestModelReverseForeignKeySchemaIn,
             schema.TestModelSchemaPatch,
         )
@@ -509,6 +516,7 @@ class ApiViewSetModelManyToManyTestCase(BaseTests.ApiViewSetManyToManyTestCaseBa
     def schemas(self):
         return (
             schema.TestModelManyToManySchemaOut,
+            None,  # No detail schema for plain model
             schema.TestModelSchemaIn,
             schema.TestModelSchemaPatch,
         )
@@ -529,6 +537,7 @@ class ApiViewSetModelReverseManyToManyTestCase(
     def schemas(self):
         return (
             schema.TestModelReverseManyToManySchemaOut,
+            None,  # No detail schema for plain model
             schema.TestModelSchemaIn,
             schema.TestModelSchemaPatch,
         )
@@ -548,6 +557,7 @@ class ApiViewSetModelForeignKeySerializerTestCase(
     def schemas(self):
         return (
             serializers.TestModelForeignKeySerializer.generate_read_s(),
+            serializers.TestModelForeignKeySerializer.generate_detail_s(),
             serializers.TestModelForeignKeySerializer.generate_create_s(),
             serializers.TestModelForeignKeySerializer.generate_update_s(),
         )
@@ -661,3 +671,134 @@ class ViewSetDecoratorOperationsTestCase(TestCase):
         payload = schema.SumSchemaIn(a=3, b=4)
         sum_result = schema.SumSchemaOut(result=payload.a + payload.b).model_dump()
         self.assertEqual(sum_result, {"result": 7})
+
+
+# ==========================================================
+#               DETAIL SCHEMA TEST CASES
+# ==========================================================
+
+
+@tag("detail_schema")
+class DetailSchemaModelSerializerTestCase(TestCase):
+    """Test detail schema generation for ModelSerializer."""
+
+    namespace = "test_detail_schema_modelserializer"
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.api = NinjaAIO(urls_namespace=cls.namespace)
+
+        @cls.api.viewset(model=models.TestModelSerializerWithDetail)
+        class DetailMSViewSet(APIViewSet):
+            pass
+
+        # The decorator returns the instance, not the class
+        cls.viewset = DetailMSViewSet
+
+    def test_read_schema_has_minimal_fields(self):
+        """Test that read schema only includes ReadSerializer fields."""
+        schema_out = self.viewset.schema_out
+        self.assertIsNotNone(schema_out)
+        self.assertIn("id", schema_out.model_fields)
+        self.assertIn("name", schema_out.model_fields)
+        self.assertNotIn("description", schema_out.model_fields)
+        self.assertNotIn("extra_info", schema_out.model_fields)
+
+    def test_detail_schema_has_extended_fields(self):
+        """Test that detail schema includes DetailSerializer fields."""
+        schema_detail = self.viewset.schema_detail
+        self.assertIsNotNone(schema_detail)
+        self.assertIn("id", schema_detail.model_fields)
+        self.assertIn("name", schema_detail.model_fields)
+        self.assertIn("description", schema_detail.model_fields)
+        self.assertIn("extra_info", schema_detail.model_fields)
+        self.assertIn("computed_field", schema_detail.model_fields)
+
+    def test_get_retrieve_schema_returns_detail(self):
+        """Test that _get_retrieve_schema returns detail schema when available."""
+        retrieve_schema = self.viewset._get_retrieve_schema()
+        self.assertEqual(retrieve_schema, self.viewset.schema_detail)
+
+    def test_get_schemas_returns_four_tuple(self):
+        """Test that get_schemas returns a 4-tuple with detail schema."""
+        result = self.viewset.get_schemas()
+        self.assertEqual(len(result), 4)
+        schema_out, schema_detail, schema_in, schema_update = result
+        self.assertIsNotNone(schema_out)
+        self.assertIsNotNone(schema_detail)
+
+
+@tag("detail_schema")
+class DetailSchemaSerializerTestCase(TestCase):
+    """Test detail schema generation for Serializer class."""
+
+    namespace = "test_detail_schema_serializer"
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.api = NinjaAIO(urls_namespace=cls.namespace)
+
+        class TestDetailSerializer(ninja_serializers.Serializer):
+            class Meta:
+                model = models.TestModel
+                schema_in = ninja_serializers.SchemaModelConfig(
+                    fields=["name", "description"]
+                )
+                schema_out = ninja_serializers.SchemaModelConfig(
+                    fields=["id", "name"]
+                )
+                schema_detail = ninja_serializers.SchemaModelConfig(
+                    fields=["id", "name", "description"]
+                )
+
+        @cls.api.viewset(model=models.TestModel)
+        class DetailSerializerViewSet(APIViewSet):
+            serializer_class = TestDetailSerializer
+
+        cls.serializer_class = TestDetailSerializer
+        # The decorator returns the instance, not the class
+        cls.viewset = DetailSerializerViewSet
+
+    def test_serializer_generates_detail_schema(self):
+        """Test that Serializer generates detail schema from Meta.schema_detail."""
+        schema_detail = self.serializer_class.generate_detail_s()
+        self.assertIsNotNone(schema_detail)
+        self.assertIn("id", schema_detail.model_fields)
+        self.assertIn("name", schema_detail.model_fields)
+        self.assertIn("description", schema_detail.model_fields)
+
+    def test_viewset_uses_serializer_detail_schema(self):
+        """Test that APIViewSet uses Serializer's detail schema."""
+        schema_detail = self.viewset.schema_detail
+        self.assertIsNotNone(schema_detail)
+        self.assertIn("description", schema_detail.model_fields)
+
+    def test_retrieve_uses_detail_schema(self):
+        """Test that retrieve endpoint uses detail schema."""
+        retrieve_schema = self.viewset._get_retrieve_schema()
+        self.assertIn("description", retrieve_schema.model_fields)
+
+
+@tag("detail_schema")
+class DetailSchemaFallbackTestCase(TestCase):
+    """Test detail schema fallback behavior."""
+
+    namespace = "test_detail_schema_fallback"
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.api = NinjaAIO(urls_namespace=cls.namespace)
+
+        @cls.api.viewset(model=models.TestModelSerializer)
+        class NoDetailViewSet(APIViewSet):
+            pass
+
+        # The decorator returns the instance, not the class
+        cls.viewset = NoDetailViewSet
+
+    def test_fallback_to_schema_out_when_no_detail(self):
+        """Test that _get_retrieve_schema falls back to schema_out when no detail."""
+        # TestModelSerializer has no DetailSerializer defined
+        self.assertIsNone(self.viewset.schema_detail)
+        retrieve_schema = self.viewset._get_retrieve_schema()
+        self.assertEqual(retrieve_schema, self.viewset.schema_out)

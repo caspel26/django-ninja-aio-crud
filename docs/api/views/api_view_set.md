@@ -4,13 +4,13 @@
 
 ## Generated CRUD Endpoints
 
-| Method | Path            | Summary        | Response                           |
-| ------ | --------------- | -------------- | ---------------------------------- |
-| POST   | `/{base}/`      | Create Model   | `201 schema_out`                   |
-| GET    | `/{base}/`      | List Models    | `200 List[schema_out]` (paginated) |
-| GET    | `/{base}/{pk}`  | Retrieve Model | `200 schema_out`                   |
-| PATCH  | `/{base}/{pk}/` | Update Model   | `200 schema_out`                   |
-| DELETE | `/{base}/{pk}/` | Delete Model   | `204 No Content`                   |
+| Method | Path            | Summary        | Response                                      |
+| ------ | --------------- | -------------- | --------------------------------------------- |
+| POST   | `/{base}/`      | Create Model   | `201 schema_out`                              |
+| GET    | `/{base}/`      | List Models    | `200 List[schema_out]` (paginated)            |
+| GET    | `/{base}/{pk}`  | Retrieve Model | `200 schema_detail` (or `schema_out` if none) |
+| PATCH  | `/{base}/{pk}/` | Update Model   | `200 schema_out`                              |
+| DELETE | `/{base}/{pk}/` | Delete Model   | `204 No Content`                              |
 
 Notes:
 
@@ -100,7 +100,8 @@ class ArticleViewSet(APIViewSet):
 | `api`                       | `NinjaAPI`                    | —                                                  | API instance (required)                                                 |
 | `serializer_class`          | `Serializer \| None`          | `None`                                             | Serializer class for plain models (alternative to ModelSerializer)      |
 | `schema_in`                 | `Schema \| None`              | `None` (auto)                                      | Create input schema override                                            |
-| `schema_out`                | `Schema \| None`              | `None` (auto)                                      | Read/output schema override                                             |
+| `schema_out`                | `Schema \| None`              | `None` (auto)                                      | List/output schema override                                             |
+| `schema_detail`             | `Schema \| None`              | `None` (auto)                                      | Retrieve/detail schema override (falls back to `schema_out`)            |
 | `schema_update`             | `Schema \| None`              | `None` (auto)                                      | Update input schema override                                            |
 | `pagination_class`          | `type[AsyncPaginationBase]`   | `PageNumberPagination`                             | Pagination strategy                                                     |
 | `query_params`              | `dict[str, tuple[type, ...]]` | `{}`                                               | List endpoint filters definition                                        |
@@ -150,6 +151,7 @@ The transaction behavior is applied by default. Custom decorators can be added v
 If `model` is a subclass of `ModelSerializerMeta`:
 
 - `schema_out` is generated from `ReadSerializer`
+- `schema_detail` is generated from `DetailSerializer` (optional, falls back to `schema_out`)
 - `schema_in` from `CreateSerializer`
 - `schema_update` from `UpdateSerializer`
 
@@ -173,7 +175,42 @@ class ArticleViewSet(APIViewSet):
     serializer_class = ArticleSerializer
 ```
 
-Otherwise provide schemas manually via `schema_in`, `schema_out`, and `schema_update` attributes.
+Otherwise provide schemas manually via `schema_in`, `schema_out`, `schema_detail`, and `schema_update` attributes.
+
+### Detail Schema for Retrieve Endpoint
+
+Use `schema_detail` (or `DetailSerializer` on ModelSerializer) when you want the retrieve endpoint to return more fields than the list endpoint. This is useful for:
+
+- **Performance optimization**: List endpoints return minimal fields, retrieve endpoints include expensive relations
+- **API design**: Clients get a summary in lists and full details on individual requests
+
+```python
+from ninja_aio.models import ModelSerializer
+from django.db import models
+
+class Article(ModelSerializer):
+    title = models.CharField(max_length=200)
+    summary = models.TextField()
+    content = models.TextField()
+    author = models.ForeignKey(User, on_delete=models.CASCADE)
+    tags = models.ManyToManyField(Tag)
+
+    class ReadSerializer:
+        # List view: minimal fields
+        fields = ["id", "title", "summary"]
+
+    class DetailSerializer:
+        # Detail view: all fields
+        fields = ["id", "title", "summary", "content", "author", "tags"]
+
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    pass  # Schemas auto-generated from model
+```
+
+Endpoints behavior:
+- `GET /articles/` returns `[{"id": 1, "title": "...", "summary": "..."}, ...]`
+- `GET /articles/1` returns `{"id": 1, "title": "...", "summary": "...", "content": "...", "author": {...}, "tags": [...]}`
 
 ## List Filtering
 
