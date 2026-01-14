@@ -333,7 +333,7 @@ class BaseSerializer:
     @classmethod
     def get_fields(cls, s_type: type[S_TYPES]):
         """Return explicit declared fields for the serializer type."""
-        if s_type == "detail" and not cls._get_fields(s_type, "fields"):
+        if s_type == "detail" and not cls._get_fields("detail", "fields"):
             # Detail schema falls back to read fields if none declared
             return cls._get_fields("read", "fields")
         return cls._get_fields(s_type, "fields")
