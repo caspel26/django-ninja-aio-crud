@@ -10,10 +10,15 @@ SCHEMA_TYPES = Literal["In", "Out", "Patch", "Related"]
 VIEW_TYPES = Literal["list", "retrieve", "create", "update", "delete", "all"]
 JwtKeys: TypeAlias = jwk.RSAKey | jwk.ECKey | jwk.OctKey
 
-class ModelSerializerType(type):
-    def __repr__(self):
-        return self.__name__
+
+class SerializerMeta(type):
+    """Metaclass for serializers - extend with custom behavior as needed."""
+
+    def __repr__(cls):
+        return cls.__name__
 
 
-class ModelSerializerMeta(ModelSerializerType, type(Model)):
+class ModelSerializerMeta(SerializerMeta, type(Model)):
+    """Metaclass combining SerializerMeta with Django's ModelBase."""
+
     pass
