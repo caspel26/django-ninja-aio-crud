@@ -402,78 +402,99 @@ class BaseSerializer:
         return (field_name, schema | None, None)
 
     @classmethod
-    def get_schema_out_data(cls, type: Literal["Out", "Detail"] = "Out"):
-        """
-        Collect components for 'Out' read schema generation.
-        Returns (fields, reverse_rel_descriptors, excludes, custom_fields_with_forward_relations, optionals).
-        Enforces relation serializers only when provided by subclass via _get_relations_serializers.
-        """
-        if type not in ("Out", "Detail"):
-            raise ValueError(
-                "get_schema_out_data only supports 'Out' or 'Detail' types"
+    def _is_reverse_relation(cls, field_obj) -> bool:
+        """Check if field is a reverse relation (M2M, reverse FK, reverse O2O)."""
+        return isinstance(
+            field_obj,
+            (ManyToManyDescriptor, ReverseManyToOneDescriptor, ReverseOneToOneDescriptor),
+        )
+
+    @classmethod
+    def _is_forward_relation(cls, field_obj) -> bool:
+        """Check if field is a forward relation (FK, O2O)."""
+        return isinstance(
+            field_obj, (ForwardOneToOneDescriptor, ForwardManyToOneDescriptor)
+        )
+
+    @classmethod
+    def _warn_missing_relation_serializer(cls, field_name: str, model) -> None:
+        """Emit warning for reverse relations without explicit serializer mapping."""
+        if (
+            not isinstance(model, ModelSerializerMeta)
+            and not getattr(settings, "NINJA_AIO_TESTING", False)
+        ):
+            warnings.warn(
+                f"{cls.__name__}: reverse relation '{field_name}' is listed in read fields "
+                "but has no entry in relations_serializers; it will be auto-resolved only "
+                "for ModelSerializer relations, otherwise skipped.",
+                UserWarning,
+                stacklevel=3,
             )
+
+    @classmethod
+    def _process_field(
+        cls,
+        field_name: str,
+        model,
+        relations_serializers: dict,
+    ) -> tuple[str | None, tuple | None, tuple | None]:
+        """
+        Process a single field and determine its classification.
+
+        Returns:
+            (plain_field, reverse_rel, forward_rel) - only one will be non-None
+        """
+        field_obj = getattr(model, field_name)
+
+        if cls._is_reverse_relation(field_obj):
+            if field_name not in relations_serializers:
+                cls._warn_missing_relation_serializer(field_name, model)
+            rel_tuple = cls._build_schema_reverse_rel(field_name, field_obj)
+            return (None, rel_tuple, None)
+
+        if cls._is_forward_relation(field_obj):
+            rel_tuple = cls._build_schema_forward_rel(field_name, field_obj)
+            if rel_tuple is True:
+                return (field_name, None, None)
+            return (None, None, rel_tuple)
+
+        return (field_name, None, None)
+
+    @classmethod
+    def get_schema_out_data(cls, schema_type: Literal["Out", "Detail"] = "Out"):
+        """
+        Collect components for output schema generation (Out or Detail).
+
+        Returns:
+            tuple: (fields, reverse_rels, excludes, customs_with_forward_rels, optionals)
+        """
+        if schema_type not in ("Out", "Detail"):
+            raise ValueError("get_schema_out_data only supports 'Out' or 'Detail' types")
+
+        fields_type = "read" if schema_type == "Out" else "detail"
+        model = cls._get_model()
+        relations_serializers = cls._get_relations_serializers() or {}
 
         fields: list[str] = []
         reverse_rels: list[tuple] = []
-        rels: list[tuple] = []
-        relations_serializers = cls._get_relations_serializers() or {}
-        model = cls._get_model()
+        forward_rels: list[tuple] = []
 
-        fields_type = "read" if type == "Out" else "detail"
-
-        for f in cls.get_fields(fields_type):
-            field_obj = getattr(model, f)
-            is_reverse = isinstance(
-                field_obj,
-                (
-                    ManyToManyDescriptor,
-                    ReverseManyToOneDescriptor,
-                    ReverseOneToOneDescriptor,
-                ),
+        for field_name in cls.get_fields(fields_type):
+            plain, reverse, forward = cls._process_field(
+                field_name, model, relations_serializers
             )
-            is_forward = isinstance(
-                field_obj, (ForwardOneToOneDescriptor, ForwardManyToOneDescriptor)
-            )
-
-            # If explicit relation serializers are declared, require mapping presence.
-            if (
-                is_reverse
-                and not isinstance(model, ModelSerializerMeta)
-                and f not in relations_serializers
-                and not getattr(settings, "NINJA_AIO_TESTING", False)
-            ):
-                warnings.warn(
-                    f"{cls.__name__}: reverse relation '{f}' is listed in read fields but has no entry in relations_serializers; "
-                    "it will be auto-resolved only for ModelSerializer relations, otherwise skipped.",
-                    UserWarning,
-                    stacklevel=2,
-                )
-
-            # Reverse relations
-            if is_reverse:
-                rel_tuple = cls._build_schema_reverse_rel(f, field_obj)
-                if rel_tuple:
-                    reverse_rels.append(rel_tuple)
-                continue
-
-            # Forward relations
-            if is_forward:
-                rel_tuple = cls._build_schema_forward_rel(f, field_obj)
-                if rel_tuple is True:
-                    fields.append(f)
-                elif rel_tuple:
-                    rels.append(rel_tuple)
-                # None -> skip entirely
-                continue
-
-            # Plain field
-            fields.append(f)
+            if plain:
+                fields.append(plain)
+            if reverse:
+                reverse_rels.append(reverse)
+            if forward:
+                forward_rels.append(forward)
 
         return (
             fields,
             reverse_rels,
             cls.get_excluded_fields(fields_type),
-            cls.get_custom_fields(fields_type) + rels,
+            cls.get_custom_fields(fields_type) + forward_rels,
             cls.get_optional_fields(fields_type),
         )
 
