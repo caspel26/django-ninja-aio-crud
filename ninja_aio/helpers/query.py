@@ -75,6 +75,9 @@ class QueryUtil:
         self.queryset_request_config: ModelQuerySetSchema = self._configs.get(
             self.SCOPES.QUERYSET_REQUEST, ModelQuerySetSchema()
         )
+        self.detail_config: ModelQuerySetSchema = self._configs.get(
+            self.SCOPES.DETAIL, ModelQuerySetSchema()
+        )
 
     def _get_config(self, conf_name: str) -> ModelQuerySetSchema:
         """Helper method to retrieve configuration attributes."""

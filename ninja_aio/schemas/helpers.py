@@ -162,10 +162,12 @@ class QueryUtilBaseScopesSchema(BaseModel):
     Schema defining base scopes for query utilities.
     Attributes:
         READ (str): Scope for read operations.
+        DETAIL (str): Scope for detail operations.
         QUERYSET_REQUEST (str): Scope for queryset request operations.
     """
 
     READ: str = "read"
+    DETAIL: str = "detail"
     QUERYSET_REQUEST: str = "queryset_request"
 
 

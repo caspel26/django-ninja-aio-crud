@@ -61,6 +61,7 @@ class BaseSerializer:
         """
 
         read = ModelQuerySetSchema()
+        detail = ModelQuerySetSchema()
         queryset_request = ModelQuerySetSchema()
         extras: list[ModelQuerySetExtraSchema] = []
 
