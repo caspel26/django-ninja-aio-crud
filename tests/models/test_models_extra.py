@@ -178,7 +178,7 @@ class ModelUtilReadSQuerysetErrorTestCase(TestCase):
                 request=None,
                 obj=None,
                 query_data=QuerySchema(),
-                is_for_read=True,
+                is_for="read",
             )
 
 
@@ -247,7 +247,7 @@ class ModelUtilApplyQueryOptimizationsTestCase(TestCase):
             ) as m_pref,
         ):
             _ = self.util_fk._apply_query_optimizations(
-                qs, query_data, is_for_read=True
+                qs, query_data, is_for="read"
             )
             sel_args = m_sel.call_args[0][1:]
             self.assertEqual(sel_args[0], "custom_sel")
@@ -265,7 +265,7 @@ class ModelUtilApplyQueryOptimizationsTestCase(TestCase):
             autospec=True,
         ) as m_sel:
             _ = self.util_fk._apply_query_optimizations(
-                qs, query_data, is_for_read=False
+                qs, query_data, is_for=None
             )
             sel_args = m_sel.call_args[0][1:]
             self.assertEqual(sel_args, ("only_custom",))
@@ -288,7 +288,7 @@ class ModelUtilApplyQueryOptimizationsTestCase(TestCase):
             ) as m_sel,
         ):
             _ = self.util_rev._apply_query_optimizations(
-                qs, query_data, is_for_read=True
+                qs, query_data, is_for="read"
             )
             pref_args = m_pref.call_args[0][1:]
             self.assertEqual(pref_args[0], "custom_prefetch")
@@ -307,7 +307,7 @@ class ModelUtilApplyQueryOptimizationsTestCase(TestCase):
             autospec=True,
         ) as m_pref:
             _ = self.util_rev._apply_query_optimizations(
-                qs, query_data, is_for_read=False
+                qs, query_data, is_for=None
             )
             pref_args = m_pref.call_args[0][1:]
             self.assertEqual(pref_args, ("only_custom_prefetch",))
