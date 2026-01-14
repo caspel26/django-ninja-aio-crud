@@ -149,11 +149,13 @@ class User(ModelSerializer):
 
 Describes how to build a detail (single object) output schema. Use this when you want the retrieve endpoint to return more fields than the list endpoint.
 
+**Fallback Behavior:** If `DetailSerializer` is not defined, `generate_detail_s()` automatically falls back to the read schema (same as `generate_read_s()`). This means you only need to define `DetailSerializer` when you want different fields for single-object retrieval vs list views.
+
 **Attributes:**
 
 | Attribute   | Type                     | Description                                                                   |
 | ----------- | ------------------------ | ----------------------------------------------------------------------------- |
-| `fields`    | `list[str]`              | Model fields to include in detail view                                        |
+| `fields`    | `list[str]`              | Model fields to include in detail view (falls back to ReadSerializer fields if not defined) |
 | `excludes`  | `list[str]`              | Fields to exclude from detail view                                            |
 | `customs`   | `list[tuple]`            | Computed fields: `(name, type)` required; `(name, type, default)` optional    |
 | `optionals` | `list[tuple[str, type]]` | Optional output fields                                                        |
@@ -280,7 +282,7 @@ class User(ModelSerializer):
 # Auto-generate schemas
 UserCreateSchema = User.generate_create_s()
 UserReadSchema = User.generate_read_s()
-UserDetailSchema = User.generate_detail_s()  # Returns None if DetailSerializer not defined
+UserDetailSchema = User.generate_detail_s()  # Falls back to read schema if DetailSerializer not defined
 UserUpdateSchema = User.generate_update_s()
 UserRelatedSchema = User.generate_related_s()
 ```
