@@ -1,7 +1,7 @@
 from typing import List, Optional, Type
 
 from ninja import Schema
-from ninja_aio.types import ModelSerializerMeta
+from ninja_aio.types import ModelSerializerMeta, SerializerMeta
 from django.db.models import Model
 from pydantic import BaseModel, ConfigDict, model_validator
 
@@ -38,6 +38,10 @@ class M2MRelationSchema(BaseModel):
             Optional explicit schema to represent related objects in responses.
             If `model` is a ModelSerializerMeta, this is auto-derived via `model.generate_related_s()`.
             If `model` is a plain Django model, this must be provided.
+            If `model` is a plain DJango model and this is not provided but serializer_class is provided this last one would be used to generate it.
+        serializer_class (Serializer | None):
+            Optional serializer class associated with the related model. If provided alongside a plain Django model,
+            it can be used to auto-generate the `related_schema`.
         append_slash (bool):
             Whether to append a trailing slash to the generated GET endpoint path. Defaults to False for backward compatibility.
 
@@ -63,6 +67,7 @@ class M2MRelationSchema(BaseModel):
     auth: Optional[list] = None
     filters: Optional[dict[str, tuple]] = None
     related_schema: Optional[Type[Schema]] = None
+    serializer_class: Optional[SerializerMeta] = None
     append_slash: bool = False
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -70,15 +75,30 @@ class M2MRelationSchema(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def validate_related_schema(cls, data):
-        related_schema = data.get("related_schema")
-        if related_schema is not None:
+        # Early return if related_schema is already provided
+        if data.get("related_schema") is not None:
             return data
+
         model = data.get("model")
-        if not isinstance(model, ModelSerializerMeta):
+        serializer_class = data.get("serializer_class")
+        is_model_serializer = isinstance(model, ModelSerializerMeta)
+
+        # Validate incompatible parameters
+        if is_model_serializer and serializer_class:
             raise ValueError(
-                "related_schema must be provided if model is not a ModelSerializer",
+                "Cannot provide serializer_class when model is a ModelSerializerMeta"
             )
-        data["related_schema"] = model.generate_related_s()
+
+        # Generate related_schema based on available information
+        if is_model_serializer:
+            data["related_schema"] = model.generate_related_s()
+        elif serializer_class:
+            data["related_schema"] = serializer_class.generate_related_s()
+        else:
+            raise ValueError(
+                "related_schema must be provided if model is not a ModelSerializer"
+            )
+
         return data
 
 
@@ -95,6 +115,7 @@ class ModelQuerySetExtraSchema(ModelQuerySetSchema):
         select_related (Optional[list[str]]): List of related fields for select_related optimization.
         prefetch_related (Optional[list[str]]): List of related fields for prefetch_related optimization
     """
+
     scope: str
 
 
@@ -106,6 +127,7 @@ class ObjectQuerySchema(ModelQuerySetSchema):
         select_related (Optional[list[str]]): List of related fields for select_related optimization.
         prefetch_related (Optional[list[str]]): List of related fields for prefetch_related optimization
     """
+
     getters: Optional[dict] = {}
 
 
@@ -117,6 +139,7 @@ class ObjectsQuerySchema(ModelQuerySetSchema):
         select_related (Optional[list[str]]): List of related fields for select_related optimization.
         prefetch_related (Optional[list[str]]): List of related fields for prefetch_related optimization
     """
+
     filters: Optional[dict] = {}
 
 
@@ -129,6 +152,7 @@ class QuerySchema(ModelQuerySetSchema):
         select_related (Optional[list[str]]): List of related fields for select_related optimization.
         prefetch_related (Optional[list[str]]): List of related fields for prefetch_related optimization
     """
+
     filters: Optional[dict] = {}
     getters: Optional[dict] = {}
 
@@ -140,6 +164,7 @@ class QueryUtilBaseScopesSchema(BaseModel):
         READ (str): Scope for read operations.
         QUERYSET_REQUEST (str): Scope for queryset request operations.
     """
+
     READ: str = "read"
     QUERYSET_REQUEST: str = "queryset_request"
 
@@ -163,6 +188,7 @@ class DecoratorsSchema(Schema):
           Consider initializing these in __init__ or using default_factory (if using pydantic/dataclasses)
           to avoid unintended side effects.
     """
+
     list: Optional[List] = []
     retrieve: Optional[List] = []
     create: Optional[List] = []
