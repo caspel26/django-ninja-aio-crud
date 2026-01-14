@@ -407,7 +407,11 @@ class BaseSerializer:
         """Check if field is a reverse relation (M2M, reverse FK, reverse O2O)."""
         return isinstance(
             field_obj,
-            (ManyToManyDescriptor, ReverseManyToOneDescriptor, ReverseOneToOneDescriptor),
+            (
+                ManyToManyDescriptor,
+                ReverseManyToOneDescriptor,
+                ReverseOneToOneDescriptor,
+            ),
         )
 
     @classmethod
@@ -420,9 +424,8 @@ class BaseSerializer:
     @classmethod
     def _warn_missing_relation_serializer(cls, field_name: str, model) -> None:
         """Emit warning for reverse relations without explicit serializer mapping."""
-        if (
-            not isinstance(model, ModelSerializerMeta)
-            and not getattr(settings, "NINJA_AIO_TESTING", False)
+        if not isinstance(model, ModelSerializerMeta) and not getattr(
+            settings, "NINJA_AIO_TESTING", False
         ):
             warnings.warn(
                 f"{cls.__name__}: reverse relation '{field_name}' is listed in read fields "
@@ -470,7 +473,9 @@ class BaseSerializer:
             tuple: (fields, reverse_rels, excludes, customs_with_forward_rels, optionals)
         """
         if schema_type not in ("Out", "Detail"):
-            raise ValueError("get_schema_out_data only supports 'Out' or 'Detail' types")
+            raise ValueError(
+                "get_schema_out_data only supports 'Out' or 'Detail' types"
+            )
 
         fields_type = "read" if schema_type == "Out" else "detail"
         model = cls._get_model()
@@ -603,7 +608,7 @@ class BaseSerializer:
     @classmethod
     def generate_detail_s(cls, depth: int = 1) -> Schema:
         """Generate detail (single object Out) schema."""
-        return cls._generate_model_schema("Detail", depth)
+        return cls._generate_model_schema("Detail", depth) or cls.generate_read_s(depth)
 
     @classmethod
     def generate_create_s(cls) -> Schema:
