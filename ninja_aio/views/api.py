@@ -458,7 +458,9 @@ class APIViewSet(API):
             )
             if filters is not None:
                 qs = await self.query_params_handler(qs, filters.model_dump())
-            return await self.model_util.list_read_s(self.schema_out, request, qs)
+            return await self.model_util.list_read_s(
+                self.schema_out, request, qs, is_for_read=True
+            )
 
         return list
 
@@ -491,6 +493,7 @@ class APIViewSet(API):
                 query_data=QuerySchema(
                     getters={"pk": self._get_pk(pk)}, **query_data.model_dump()
                 ),
+                is_for_read=True,
             )
 
         return retrieve
