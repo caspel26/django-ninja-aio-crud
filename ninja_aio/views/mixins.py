@@ -56,7 +56,7 @@ class IcontainsFilterViewSetMixin(APIViewSet):
             **{
                 f"{key}__icontains": value
                 for key, value in filters.items()
-                if isinstance(value, str)
+                if isinstance(value, str) and not self._check_relations_filters(key)
             }
         )
 
@@ -95,7 +95,11 @@ class BooleanFilterViewSetMixin(APIViewSet):
         """
         base_qs = await super().query_params_handler(queryset, filters)
         return base_qs.filter(
-            **{key: value for key, value in filters.items() if isinstance(value, bool)}
+            **{
+                key: value
+                for key, value in filters.items()
+                if isinstance(value, bool) and not self._check_relations_filters(key)
+            }
         )
 
 
@@ -137,6 +141,7 @@ class NumericFilterViewSetMixin(APIViewSet):
                 key: value
                 for key, value in filters.items()
                 if isinstance(value, (int, float))
+                and not self._check_relations_filters(key)
             }
         )
 
@@ -179,6 +184,7 @@ class DateFilterViewSetMixin(APIViewSet):
                 f"{key}{self._compare_attr}": value
                 for key, value in filters.items()
                 if hasattr(value, "isoformat")
+                and not self._check_relations_filters(key)
             }
         )
 
@@ -324,6 +330,10 @@ class RelationFilterViewSetMixin(APIViewSet):
                 for rel_filter in cls.relations_filters
             },
         }
+
+    @property
+    def relations_filters_fields(self):
+        return [rel_filter.query_param for rel_filter in self.relations_filters]
 
     async def query_params_handler(self, queryset, filters):
         """
