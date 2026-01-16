@@ -24,7 +24,6 @@ class MatchConditionFilterSchema(Schema):
     Attributes:
         query_filter: The Django ORM lookup to apply (e.g., "status", "category__name").
         include: Whether to include records matching the condition (default: True).
-        exclude: Whether to exclude records matching the condition (default: False).
     """
     query_filter: dict[str, Any]
     include: bool = True
