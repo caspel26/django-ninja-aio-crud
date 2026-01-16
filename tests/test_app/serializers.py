@@ -29,3 +29,19 @@ class TestModelReverseForeignKeySerializer(serializers.Serializer):
         relations_serializers = {
             "test_model_foreign_keys": TestModelForeignKeySerializer,
         }
+
+
+class TestModelOneToOneSerializer(serializers.Serializer):
+    """Serializer for TestModelOneToOne to test ForwardOneToOneDescriptor coverage."""
+
+    class Meta:
+        model = models.TestModelOneToOne
+        schema_in = serializers.SchemaModelConfig(
+            fields=["name", "description", "test_model"]
+        )
+        schema_out = serializers.SchemaModelConfig(
+            fields=["id", "name", "description", "test_model"]
+        )
+        schema_update = serializers.SchemaModelConfig(
+            optionals=[("name", str), ("description", str)]
+        )
