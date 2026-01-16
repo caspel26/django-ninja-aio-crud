@@ -774,10 +774,10 @@ class RelationFilterViewSetMixinTestCase(
     async def test_relation_filter_with_none_value(self):
         """Test that None filter values are ignored."""
         await self._drop_all_objects()
-        await self.model.objects.acreate(
+        obj_1 = await self.model.objects.acreate(
             name="obj1", description="desc1", test_model_serializer=self.related_obj_1
         )
-        await self.model.objects.acreate(
+        obj_2 = await self.model.objects.acreate(
             name="obj2", description="desc2", test_model_serializer=self.related_obj_2
         )
         # Filter with None should return all objects
