@@ -48,3 +48,28 @@ class ORJSONRendererParserTestCase(TestCase):
             [base64.b64encode(b"a").decode(), base64.b64encode(b"b").decode()],
         )
         self.assertEqual(decoded["plain"], "value")
+
+    def test_renderer_non_dict_data(self):
+        """Test that renderer handles non-dict data (covers lines 23-24)."""
+        # When data is not a dict, it triggers the AttributeError branch
+        # and falls back to self.dumps(data)
+        non_dict_data = "plain string"
+        rendered = self.renderer.render(DummyRequest(), non_dict_data, response_status=200)
+        decoded = orjson.loads(rendered)
+        self.assertEqual(decoded, "plain string")
+
+    def test_renderer_list_data(self):
+        """Test that renderer handles list data directly."""
+        # A list doesn't have .items() method
+        list_data = [1, 2, 3]
+        rendered = self.renderer.render(DummyRequest(), list_data, response_status=200)
+        decoded = orjson.loads(rendered)
+        self.assertEqual(decoded, [1, 2, 3])
+
+    def test_renderer_primitive_data(self):
+        """Test that renderer handles primitive data."""
+        # An integer doesn't have .items() method
+        int_data = 42
+        rendered = self.renderer.render(DummyRequest(), int_data, response_status=200)
+        decoded = orjson.loads(rendered)
+        self.assertEqual(decoded, 42)
