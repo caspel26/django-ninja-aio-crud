@@ -1,5 +1,5 @@
 from ninja_aio.views.api import APIViewSet
-from ninja_aio.schemas import RelationFilterSchema
+from ninja_aio.schemas import RelationFilterSchema, MatchCaseFilterSchema
 
 
 class IcontainsFilterViewSetMixin(APIViewSet):
@@ -56,7 +56,7 @@ class IcontainsFilterViewSetMixin(APIViewSet):
             **{
                 f"{key}__icontains": value
                 for key, value in filters.items()
-                if isinstance(value, str) and not self._check_relations_filters(key)
+                if isinstance(value, str) and not self._is_special_filter(key)
             }
         )
 
@@ -98,7 +98,7 @@ class BooleanFilterViewSetMixin(APIViewSet):
             **{
                 key: value
                 for key, value in filters.items()
-                if isinstance(value, bool) and not self._check_relations_filters(key)
+                if isinstance(value, bool) and not self._is_special_filter(key)
             }
         )
 
@@ -140,8 +140,7 @@ class NumericFilterViewSetMixin(APIViewSet):
             **{
                 key: value
                 for key, value in filters.items()
-                if isinstance(value, (int, float))
-                and not self._check_relations_filters(key)
+                if isinstance(value, (int, float)) and not self._is_special_filter(key)
             }
         )
 
@@ -183,8 +182,7 @@ class DateFilterViewSetMixin(APIViewSet):
             **{
                 f"{key}{self._compare_attr}": value
                 for key, value in filters.items()
-                if hasattr(value, "isoformat")
-                and not self._check_relations_filters(key)
+                if hasattr(value, "isoformat") and not self._is_special_filter(key)
             }
         )
 
@@ -346,3 +344,70 @@ class RelationFilterViewSetMixin(APIViewSet):
             if value is not None:
                 rel_filters[rel_filter.query_filter] = value
         return base_qs.filter(**rel_filters) if rel_filters else base_qs
+
+
+class MatchCaseFilterViewSetMixin(APIViewSet):
+    """
+    Mixin providing match-case filtering for Django QuerySets.
+    This mixin applies filters based on boolean query parameters defined in
+    MatchCaseFilterSchema entries. Each entry specifies different filter conditions
+    for True and False cases.
+    Attributes:
+        filters_match_cases: List of MatchCaseFilterSchema defining the match-case filters.
+            Each schema specifies:
+            - query_param: The API query parameter name (e.g., "is_active")
+            - cases: A BooleanMatchFilterSchema with 'true' and 'false' MatchConditionFilterSchema
+    Example:
+        class UserViewSet(MatchCaseFilterViewSetMixin, APIViewSet):
+            filters_match_cases = [
+                MatchCaseFilterSchema(
+                    query_param="is_active",
+                    cases=BooleanMatchFilterSchema(
+                        true=MatchConditionFilterSchema(
+                            query_filter={"status": "active"},
+                            include=True,
+                        ),
+                        false=MatchConditionFilterSchema(
+                            query_filter={"status": "inactive"},
+                            include=True,
+                        ),
+                    ),
+                ),
+            ]
+        # GET /users?is_active=true -> queryset.filter(status="active")
+        # GET /users?is_active=false -> queryset.filter(status="inactive")
+    Notes:
+        - If the query parameter is not provided, no filtering is applied for that case.
+        - This mixin automatically registers query_params from filters_match_cases.
+    """
+
+    filters_match_cases: list[MatchCaseFilterSchema] = []
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        cls.query_params = {
+            **cls.query_params,
+            **{
+                filter_match.query_param: filter_match.filter_type
+                for filter_match in cls.filters_match_cases
+            },
+        }
+
+    @property
+    def filters_match_cases_fields(self):
+        return [filter_match.query_param for filter_match in self.filters_match_cases]
+
+    async def query_params_handler(self, queryset, filters):
+        base_qs = await super().query_params_handler(queryset, filters)
+        for filter_match in self.filters_match_cases:
+            value = filters.get(filter_match.query_param)
+            if value is not None:
+                case_filter = (
+                    filter_match.cases.true if value else filter_match.cases.false
+                )
+                lookup = case_filter.query_filter
+                if case_filter.include:
+                    base_qs = base_qs.filter(**lookup)
+                else:
+                    base_qs = base_qs.exclude(**lookup)
+        return base_qs
