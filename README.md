@@ -13,6 +13,7 @@
 
 ## ✨ Features
 
+- Serializer (Meta-driven) first-class: dynamic schemas for existing Django models without inheriting ModelSerializer
 - Async CRUD ViewSets (create, list, retrieve, update, delete)
 - Automatic Pydantic schemas from `ModelSerializer` (read/create/update)
 - Dynamic query params (runtime schema via `pydantic.create_model`)
@@ -26,19 +27,38 @@
 
 ---
 
-## 📦 Installation
+## 🚀 Quick Start (Serializer)
 
-```bash
-pip install django-ninja-aio-crud
+If you already have Django models, start with the Meta-driven Serializer for instant CRUD without changing model base classes.
+
+```python
+from ninja_aio.models import serializers
+from ninja_aio.views import APIViewSet
+from ninja_aio import NinjaAIO
+from . import models
+
+class BookSerializer(serializers.Serializer):
+    class Meta:
+        model = models.Book
+        schema_in = serializers.SchemaModelConfig(fields=["title", "published"])
+        schema_out = serializers.SchemaModelConfig(fields=["id", "title", "published"])
+        schema_update = serializers.SchemaModelConfig(optionals=[("title", str), ("published", bool)])
+
+api = NinjaAIO()
+
+@api.viewset(models.Book)
+class BookViewSet(APIViewSet):
+    serializer_class = BookSerializer
 ```
 
-Add to your project’s dependencies and ensure Django Ninja is installed.
+Visit `/docs` → CRUD endpoints ready.
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick Start (ModelSerializer)
 
 models.py
+
 ```python
 from django.db import models
 from ninja_aio.models import ModelSerializer
@@ -58,6 +78,7 @@ class Book(ModelSerializer):
 ```
 
 views.py
+
 ```python
 from ninja_aio import NinjaAIO
 from ninja_aio.views import APIViewSet
@@ -65,11 +86,10 @@ from .models import Book
 
 api = NinjaAIO()
 
+@api.viewset(Book)
 class BookViewSet(APIViewSet):
-    model = Book
-    api = api
+    pass
 
-BookViewSet().add_views_to_route()
 ```
 
 Visit `/docs` → CRUD endpoints ready.
@@ -79,9 +99,8 @@ Visit `/docs` → CRUD endpoints ready.
 ## 🔄 Query Filtering
 
 ```python
+@api.viewset(Book)
 class BookViewSet(APIViewSet):
-    model = Book
-    api = api
     query_params = {"published": (bool, None), "title": (str, None)}
 
     async def query_params_handler(self, queryset, filters):
@@ -93,6 +112,7 @@ class BookViewSet(APIViewSet):
 ```
 
 Request:
+
 ```
 GET /book/?published=true&title=python
 ```
@@ -116,9 +136,8 @@ class Article(ModelSerializer):
     class ReadSerializer:
         fields = ["id", "title", "tags"]
 
+@api.viewset(Article)
 class ArticleViewSet(APIViewSet):
-    model = Article
-    api = api
     m2m_relations = [
         M2MRelationSchema(
             model=Tag,
@@ -133,10 +152,10 @@ class ArticleViewSet(APIViewSet):
             queryset = queryset.filter(name__icontains=n)
         return queryset
 
-ArticleViewSet().add_views_to_route()
 ```
 
 Endpoints:
+
 - `GET /article/{pk}/tag?name=dev`
 - `POST /article/{pk}/tag/` body: `{"add":[1,2],"remove":[3]}`
 
@@ -160,9 +179,8 @@ class JWTAuth(AsyncJwtBearer):
         book_id = self.dcd.claims.get("sub")
         return await Book.objects.aget(id=book_id)
 
+@api.viewset(Book)
 class SecureBookViewSet(APIViewSet):
-    model = Book
-    api = api
     auth = [JWTAuth()]
     get_auth = None  # list/retrieve public
 ```
@@ -172,6 +190,7 @@ class SecureBookViewSet(APIViewSet):
 ## 📑 Lifecycle Hooks (ModelSerializer)
 
 Available on every save/delete:
+
 - `on_create_before_save`
 - `on_create_after_save`
 - `before_save`
@@ -185,10 +204,21 @@ Available on every save/delete:
 ## 🧩 Adding Custom Endpoints
 
 ```python
-class BookViewSet(APIViewSet):
-    model = Book
-    api = api
+from ninja_aio.decorators import api_get
 
+@api.viewset(Book)
+class BookViewSet(APIViewSet):
+    @api_get("/stats/")
+    async def stats(self, request):
+        total = await Book.objects.acount()
+        return {"total": total}
+```
+
+Or
+
+```python
+@api.viewset(Book)
+class BookViewSet(APIViewSet):
     def views(self):
         @self.router.get("/stats/")
         async def stats(request):
@@ -209,17 +239,23 @@ class LargePagination(PageNumberPagination):
     page_size = 50
     max_page_size = 200
 
+@api.viewset(Book)
 class BookViewSet(APIViewSet):
-    model = Book
-    api = api
     pagination_class = LargePagination
 ```
+
+---
+
+## Meta-driven Serializer (for vanilla Django models)
+
+Moved above as the primary quick start.
 
 ---
 
 ## 🛠 Project Structure & Docs
 
 Documentation (MkDocs + Material):
+
 ```
 docs/
   getting_started/
@@ -232,17 +268,19 @@ docs/
 ```
 
 Browse full reference:
+
 - APIViewSet: `docs/api/views/api_view_set.md`
 - APIView: `docs/api/views/api_view.md`
 - ModelSerializer: `docs/api/models/model_serializer.md`
 - Authentication: `docs/api/authentication.md`
-- Pagination: `docs/api/pagination.md`
+- Example repository: https://github.com/caspel26/ninja-aio-blog-example
 
 ---
 
 ## 🧪 Tests
 
 Use Django test runner + async ORM patterns. Example async pattern:
+
 ```python
 obj = await Book.objects.acreate(title="T1", published=True)
 count = await Book.objects.acount()
@@ -253,9 +291,8 @@ count = await Book.objects.acount()
 ## 🚫 Disable Operations
 
 ```python
+@api.viewset(Book)
 class ReadOnlyBookViewSet(APIViewSet):
-    model = Book
-    api = api
     disable = ["update", "delete"]
 ```
 
@@ -283,6 +320,7 @@ class ReadOnlyBookViewSet(APIViewSet):
 ## ⭐ Support
 
 Star the repo or donate:
+
 - [Buy me a coffee](https://buymeacoffee.com/caspel26)
 
 ---
@@ -295,10 +333,11 @@ MIT License. See [LICENSE](LICENSE).
 
 ## 🔗 Quick Links
 
-| Item | Link |
-|------|------|
-| PyPI | https://pypi.org/project/django-ninja-aio-crud/ |
-| Docs | https://django-ninja-aio.com
-| Issues | https://github.com/caspel26/django-ninja-aio-crud/issues |
+| Item    | Link                                                     |
+| ------- | -------------------------------------------------------- |
+| PyPI    | https://pypi.org/project/django-ninja-aio-crud/          |
+| Docs    | https://django-ninja-aio.com                             |
+| Issues  | https://github.com/caspel26/django-ninja-aio-crud/issues |
+| Example | https://github.com/caspel26/ninja-aio-blog-example       |
 
 ---

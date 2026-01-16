@@ -1,4 +1,4 @@
-from ninja_aio.types import ModelSerializerMeta
+from ninja_aio.models.serializers import Serializer, ModelSerializer
 from ninja_aio.schemas.helpers import (
     ModelQuerySetSchema,
     QueryUtilBaseScopesSchema,
@@ -8,10 +8,12 @@ from ninja_aio.schemas.helpers import (
 
 class ScopeNamespace:
     def __init__(self, **scopes):
+        """Create a simple namespace where each provided scope becomes an attribute."""
         for key, value in scopes.items():
             setattr(self, key, value)
 
     def __iter__(self):
+        """Iterate over the stored scope values."""
         return iter(self.__dict__.values())
 
 
@@ -50,7 +52,8 @@ class QueryUtil:
 
     SCOPES: QueryUtilBaseScopesSchema
 
-    def __init__(self, model: ModelSerializerMeta):
+    def __init__(self, model: ModelSerializer | Serializer):
+        """Initialize QueryUtil, resolving base and extra scope configurations for a model."""
         self.model = model
         self._configuration = getattr(self.model, "QuerySet", None)
         self._extra_configuration: list[ModelQuerySetExtraSchema] = getattr(
@@ -66,9 +69,14 @@ class QueryUtil:
             **{scope: self._get_config(scope) for scope in self._BASE_SCOPES.values()},
             **self.extra_configs,
         }
-        self.read_config: ModelQuerySetSchema = self._configs.get(self.SCOPES.READ, ModelQuerySetSchema())
+        self.read_config: ModelQuerySetSchema = self._configs.get(
+            self.SCOPES.READ, ModelQuerySetSchema()
+        )
         self.queryset_request_config: ModelQuerySetSchema = self._configs.get(
             self.SCOPES.QUERYSET_REQUEST, ModelQuerySetSchema()
+        )
+        self.detail_config: ModelQuerySetSchema = self._configs.get(
+            self.SCOPES.DETAIL, ModelQuerySetSchema()
         )
 
     def _get_config(self, conf_name: str) -> ModelQuerySetSchema:

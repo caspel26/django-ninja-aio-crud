@@ -20,10 +20,11 @@ nav:
       - APIView: api/views/api_view.md
       - APIViewSet: api/views/api_view_set.md
       - Decorators: api/views/decorators.md
-      - Mixins: docs/mixins.md
+      - Mixins: api/views/mixins.md
     - Models:
       - ModelSerializer: api/models/model_serializer.md
       - ModelUtil: api/models/model_util.md
+      - Serializer (Meta-driven): api/models/serializers.md
     - Authentication: api/authentication.md
     - Pagination: api/pagination.md
   - Authentication:
@@ -97,7 +98,6 @@ extra:
   version:
     provider: mike
     repo: caspel26/django-ninja-aio-crud
-    stable: true
     default: latest
 
 plugins:

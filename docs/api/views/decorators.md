@@ -50,9 +50,8 @@ Attach decorators to CRUD operations without redefining views:
 ```python
 from ninja_aio.schemas.helpers import DecoratorsSchema
 
+@api.viewset(MyModel)
 class MyViewSet(APIViewSet):
-    api = api
-    model = MyModel
     extra_decorators = DecoratorsSchema(
         list=[require_auth, cache_page(30)],
         retrieve=[require_auth],
@@ -63,3 +62,41 @@ class MyViewSet(APIViewSet):
 ```
 
 These are applied in combination with built-ins (e.g., unique_view, paginate) using decorate_view in the implementation.
+
+## ApiMethodFactory.decorators
+
+Example: use api_get within a ViewSet with extra decorators:
+
+```python
+from ninja.pagination import PageNumberPagination
+from ninja_aio.decorators.operations import api_get
+from ninja_aio.views import APIViewSet
+from ninja_aio.models import ModelSerializer
+from ninja_aio.decorators import unique_view
+from ninja.pagination import paginate
+
+from . import models
+
+api = NinjaAIO()
+
+@api.viewset(models.Book)
+class BookAPI(APIViewSet):
+    query_params = {
+        "title": (str, None),
+    }
+
+    @api_get(
+        "/custom-get",
+        response={200: list[GenericMessageSchema]},
+        decorators=[paginate(PageNumberPagination), unique_view("test-unique-view")],
+    )
+    async def get_test(self, request):
+        return [{"message": "This is a custom GET method in BookAPI"}]
+```
+
+Notes:
+
+- Provide decorators as a list; they are applied in reverse order internally.
+- paginate(PageNumberPagination) enables async pagination on the handler.
+- unique_view(name) marks the route as unique to avoid duplicate registration.
+- Works with @api.viewset(Model) classes extending APIViewSet.

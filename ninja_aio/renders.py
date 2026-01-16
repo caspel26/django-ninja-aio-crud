@@ -6,6 +6,7 @@ import orjson
 from django.http import HttpRequest
 from django.conf import settings
 from ninja.renderers import BaseRenderer
+from pydantic import AnyUrl
 
 
 class ORJSONRenderer(BaseRenderer):
@@ -38,7 +39,7 @@ class ORJSONRenderer(BaseRenderer):
     def transform(cls, value):
         if isinstance(value, bytes):
             return base64.b64encode(value).decode()
-        if isinstance(value, (IPv4Address, IPv6Address)):
+        if isinstance(value, (IPv4Address, IPv6Address, AnyUrl)):
             return str(value)
         if isinstance(value, dict):
             return {k: cls.transform(v) for k, v in value.items()}

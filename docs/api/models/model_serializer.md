@@ -145,6 +145,68 @@ class User(ModelSerializer):
 }
 ```
 
+### DetailSerializer
+
+Describes how to build a detail (single object) output schema. Use this when you want the retrieve endpoint to return more fields than the list endpoint.
+
+**Fallback Behavior:** If `DetailSerializer` is not defined, `generate_detail_s()` automatically falls back to the read schema (same as `generate_read_s()`). This means you only need to define `DetailSerializer` when you want different fields for single-object retrieval vs list views.
+
+**Attributes:**
+
+| Attribute   | Type                     | Description                                                                   |
+| ----------- | ------------------------ | ----------------------------------------------------------------------------- |
+| `fields`    | `list[str]`              | Model fields to include in detail view (falls back to ReadSerializer fields if not defined) |
+| `excludes`  | `list[str]`              | Fields to exclude from detail view                                            |
+| `customs`   | `list[tuple]`            | Computed fields: `(name, type)` required; `(name, type, default)` optional    |
+| `optionals` | `list[tuple[str, type]]` | Optional output fields                                                        |
+
+**Example:**
+
+```python
+class Article(ModelSerializer):
+    title = models.CharField(max_length=200)
+    summary = models.TextField()
+    content = models.TextField()
+    author = models.ForeignKey(User, on_delete=models.CASCADE)
+    tags = models.ManyToManyField(Tag)
+    view_count = models.IntegerField(default=0)
+
+    class ReadSerializer:
+        # List view: minimal fields for performance
+        fields = ["id", "title", "summary", "author"]
+
+    class DetailSerializer:
+        # Detail view: all fields including expensive relations
+        fields = ["id", "title", "summary", "content", "author", "tags", "view_count"]
+        customs = [
+            ("reading_time", int, lambda obj: len(obj.content.split()) // 200),
+        ]
+```
+
+**Generated Output (List):**
+
+```json
+[
+  {"id": 1, "title": "Getting Started", "summary": "...", "author": {...}},
+  {"id": 2, "title": "Advanced Topics", "summary": "...", "author": {...}}
+]
+```
+
+**Generated Output (Detail):**
+
+```json
+{
+  "id": 1,
+  "title": "Getting Started",
+  "summary": "...",
+  "content": "Full article content here...",
+  "author": {...},
+  "tags": [{"id": 1, "name": "python"}, {"id": 2, "name": "django"}],
+  "view_count": 1234,
+  "reading_time": 5
+}
+```
+
 ### UpdateSerializer
 
 Describes how to build an update (partial/full) input schema.
@@ -194,14 +256,15 @@ class User(ModelSerializer):
 
 ### Auto-Generated Schemas
 
-ModelSerializer automatically generates four schema types:
+ModelSerializer automatically generates five schema types:
 
-| Method                     | Schema Type        | Purpose                        |
-| -------------------------- | ------------------ | ------------------------------ |
-| `generate_create_s()`      | Input ("In")       | POST endpoint payload          |
-| `generate_update_s()`      | Input ("Patch")    | PATCH/PUT endpoint payload     |
-| `generate_read_s(depth=1)` | Output ("Out")     | Response with nested relations |
-| `generate_related_s()`     | Output ("Related") | Compact nested representation  |
+| Method                       | Schema Type        | Purpose                              |
+| ---------------------------- | ------------------ | ------------------------------------ |
+| `generate_create_s()`        | Input ("In")       | POST endpoint payload                |
+| `generate_update_s()`        | Input ("Patch")    | PATCH/PUT endpoint payload           |
+| `generate_read_s(depth=1)`   | Output ("Out")     | List response with nested relations  |
+| `generate_detail_s(depth=1)` | Output ("Detail")  | Single object response (retrieve)    |
+| `generate_related_s()`       | Output ("Related") | Compact nested representation        |
 
 **Example:**
 
@@ -219,6 +282,7 @@ class User(ModelSerializer):
 # Auto-generate schemas
 UserCreateSchema = User.generate_create_s()
 UserReadSchema = User.generate_read_s()
+UserDetailSchema = User.generate_detail_s()  # Falls back to read schema if DetailSerializer not defined
 UserUpdateSchema = User.generate_update_s()
 UserRelatedSchema = User.generate_related_s()
 ```

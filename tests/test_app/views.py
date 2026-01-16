@@ -2,8 +2,7 @@ import datetime
 from ninja_aio.views import mixins
 
 from tests.generics.views import GenericAPIViewSet
-from tests.test_app import models
-from tests.test_app import schema
+from tests.test_app import models, schema, serializers
 
 # ==========================================================
 #                  MODEL SERIALIZERS APIS
@@ -139,3 +138,18 @@ class TestModelReverseManyToManyAPI(GenericAPIViewSet):
     schema_in = schema.TestModelSchemaIn
     schema_out = schema.TestModelReverseManyToManySchemaOut
     schema_update = schema.TestModelSchemaPatch
+
+
+# ==========================================================
+#                       SERIALIZERS APIS
+# ==========================================================
+
+
+class TestModelForeignKeySerializerAPI(GenericAPIViewSet):
+    model = models.TestModelForeignKey
+    serializer_class = serializers.TestModelForeignKeySerializer
+
+
+class TestModelReverseForeignKeySerializerAPI(GenericAPIViewSet):
+    model = models.TestModelReverseForeignKey
+    serializer_class = serializers.TestModelReverseForeignKeySerializer

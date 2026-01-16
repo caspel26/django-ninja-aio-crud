@@ -46,3 +46,5 @@ LOGGING = {
         },
     },
 }
+
+NINJA_AIO_TESTING = True

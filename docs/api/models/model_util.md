@@ -17,14 +17,35 @@ ModelUtil acts as a bridge between Django Ninja schemas and Django ORM, handling
 ```python
 from ninja_aio.models import ModelUtil
 
-util = ModelUtil(model)
+util = ModelUtil(model, serializer_class=None)
 ```
 
 **Parameters:**
 
 - `model` (`type[ModelSerializer] | models.Model`): Django model or ModelSerializer subclass
+- `serializer_class` (`Serializer | None`): Optional Serializer class for plain Django models
 
 ## Properties
+
+### `with_serializer`
+
+Indicates if a serializer_class is associated.
+
+```python
+util = ModelUtil(User, serializer_class=UserSerializer)
+print(util.with_serializer)  # True
+```
+
+### `pk_field_type`
+
+Returns the Python type corresponding to the model's primary key field.
+
+```python
+util = ModelUtil(User)
+print(util.pk_field_type)  # <class 'int'>
+```
+
+Uses the Django field's internal type and `ninja.orm.fields.TYPES` mapping. Raises `ConfigError` if the internal type is not registered.
 
 ### `model_pk_name`
 
@@ -45,9 +66,9 @@ print(util.model_fields)
 # ["id", "username", "email", "created_at", "is_active"]
 ```
 
-### `schema_out_fields`
+### `serializable_fields`
 
-Returns serializable fields (ReadSerializer fields or all model fields).
+Returns serializable fields for read operations (ReadSerializer fields or all model fields).
 
 ```python
 class User(ModelSerializer):
@@ -59,8 +80,38 @@ class User(ModelSerializer):
         fields = ["id", "username", "email"]
 
 util = ModelUtil(User)
-print(util.schema_out_fields)
+print(util.serializable_fields)
 # ["id", "username", "email"]  (password excluded)
+```
+
+### `serializable_detail_fields`
+
+Returns serializable fields for detail operations (DetailSerializer fields, or falls back to ReadSerializer fields).
+
+```python
+class Article(ModelSerializer):
+    title = models.CharField(max_length=200)
+    summary = models.TextField()
+    content = models.TextField()
+
+    class ReadSerializer:
+        fields = ["id", "title", "summary"]
+
+    class DetailSerializer:
+        fields = ["id", "title", "summary", "content"]
+
+util = ModelUtil(Article)
+print(util.serializable_fields)        # ["id", "title", "summary"]
+print(util.serializable_detail_fields) # ["id", "title", "summary", "content"]
+```
+
+### `model_name`
+
+Returns the Django internal model name.
+
+```python
+util = ModelUtil(User)
+print(util.model_name)  # "user"
 ```
 
 ### `serializer_meta`
@@ -88,6 +139,10 @@ class Book(ModelSerializer):
             select_related=["author", "category"],
             prefetch_related=["tags"],
         )
+        detail = ModelQuerySetSchema(
+            select_related=["author", "category", "publisher"],
+            prefetch_related=["tags", "reviews"],
+        )
         queryset_request = ModelQuerySetSchema(
             select_related=[],
             prefetch_related=["related_items"],
@@ -101,9 +156,10 @@ class Book(ModelSerializer):
         ]
 ```
 
-- read: applied to read operations (list/retrieve).
-- queryset_request: applied inside queryset_request hook.
-- extras: named configurations available via QueryUtil.SCOPES.
+- **read**: applied to list operations (`is_for="read"`).
+- **detail**: applied to retrieve operations (`is_for="detail"`). Falls back to `read` if not defined.
+- **queryset_request**: applied inside queryset_request hook.
+- **extras**: named configurations available via QueryUtil.SCOPES.
 
 ## QueryUtil
 
@@ -147,9 +203,19 @@ qs = await ModelUtil(Book).get_objects(
         select_related=["author"],
         prefetch_related=["tags"],
     ),
-    is_for_read=True,  # union with auto-discovered relations
+    with_qs_request=True,  # Apply queryset_request hook
+    is_for="read",  # union with auto-discovered relations for read
 )
 ```
+
+**Parameters:**
+
+- `request` (`HttpRequest`): Current HTTP request
+- `query_data` (`ObjectsQuerySchema | None`): Query configuration (filters, select_related, prefetch_related)
+- `with_qs_request` (`bool`): Apply queryset_request hook if available (default: True)
+- `is_for` (`Literal["read", "detail"] | None`): Purpose of the query, determines which serializable fields to use for optimization. Use `"read"` for list operations, `"detail"` for retrieve operations. If `None`, only query_data optimizations are applied. (default: None)
+
+**Returns:** Optimized `QuerySet`
 
 ### `get_object`
 
@@ -158,12 +224,13 @@ Fetch a single object by pk or getters with optimizations:
 ```python
 from ninja_aio.schemas.helpers import ObjectQuerySchema, QuerySchema
 
-# by pk + select/prefetch
+# by pk + select/prefetch for detail view
 obj = await ModelUtil(Book).get_object(
     request,
     pk=42,
     query_data=ObjectQuerySchema(select_related=["author"]),
-    is_for_read=True,
+    with_qs_request=True,
+    is_for="detail",
 )
 
 # by getters (required if pk omitted)
@@ -173,10 +240,20 @@ obj = await ModelUtil(Book).get_object(
 )
 ```
 
-Errors:
+**Parameters:**
 
-- ValueError if neither pk nor getters provided.
-- NotFoundError if no match.
+- `request` (`HttpRequest`): Current HTTP request
+- `pk` (`int | str | None`): Primary key value (optional if getters provided)
+- `query_data` (`ObjectQuerySchema | QuerySchema | None`): Query configuration
+- `with_qs_request` (`bool`): Apply queryset_request hook if available (default: True)
+- `is_for` (`Literal["read", "detail"] | None`): Purpose of the query. Use `"detail"` for single object retrieval, `"read"` for list operations. (default: None)
+
+**Returns:** Model instance
+
+**Errors:**
+
+- `ValueError` if neither pk nor getters provided
+- `NotFoundError` if no match found
 
 ### `read_s` and `list_read_s`
 
@@ -184,16 +261,17 @@ Uniform serialization methods that accept either instances or query data:
 
 ```python
 schema = Book.generate_read_s()
+detail_schema = Book.generate_detail_s()
 
 # single instance
 data = await ModelUtil(Book).read_s(schema, request, instance=obj)
 
-# single via getters
+# single via getters (detail view)
 data = await ModelUtil(Book).read_s(
-    schema,
+    detail_schema,
     request,
     query_data=ObjectQuerySchema(getters={"pk": 42}),
-    is_for_read=True,
+    is_for="detail",
 )
 
 # list from queryset
@@ -204,14 +282,32 @@ items = await ModelUtil(Book).list_read_s(
     schema,
     request,
     query_data=ObjectsQuerySchema(filters={"is_published": True}),
-    is_for_read=True,
+    is_for="read",
 )
 ```
 
-Behavior:
+**Parameters (read_s):**
 
-- When is_for_read=True, select_related and prefetch_related are merged with model-discovered relations.
-- Passing instances skips fetching; passing query_data fetches automatically.
+- `schema` (`Schema`): Output schema for serialization
+- `request` (`HttpRequest`): Current HTTP request
+- `instance` (`Model | None`): Model instance to serialize (optional)
+- `query_data` (`ObjectQuerySchema | QuerySchema | None`): Query configuration for fetching (optional)
+- `is_for` (`Literal["read", "detail"] | None`): Purpose of the query. Use `"detail"` for single object views, `"read"` for list views. (default: None)
+
+**Parameters (list_read_s):**
+
+- `schema` (`Schema`): Output schema for serialization
+- `request` (`HttpRequest`): Current HTTP request
+- `instances` (`QuerySet | list[Model] | None`): Instances to serialize (optional)
+- `query_data` (`ObjectsQuerySchema | None`): Query configuration for fetching (optional)
+- `is_for` (`Literal["read", "detail"] | None`): Purpose of the query. Typically `"read"` for list views. (default: None)
+
+**Behavior:**
+
+- When `is_for` is specified, select_related and prefetch_related are merged with model-discovered relations based on the operation type
+- When `is_for="detail"` but no `QuerySet.detail` is configured, falls back to `QuerySet.read` optimizations
+- Passing `instance`/`instances` skips fetching; passing `query_data` fetches automatically
+- Either `instance`/`instances` OR `query_data` must be provided, not both
 
 ### `get_reverse_relations()`
 

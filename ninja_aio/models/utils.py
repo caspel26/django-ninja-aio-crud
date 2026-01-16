@@ -1,9 +1,9 @@
 import asyncio
 import base64
-from typing import Any, ClassVar
+from typing import Any, Literal
 
 from ninja import Schema
-from ninja.orm import create_schema, fields
+from ninja.orm import fields
 from ninja.errors import ConfigError
 
 from django.db import models
@@ -19,15 +19,14 @@ from django.db.models.fields.related_descriptors import (
 )
 
 from ninja_aio.exceptions import SerializeError, NotFoundError
-from ninja_aio.types import S_TYPES, F_TYPES, SCHEMA_TYPES, ModelSerializerMeta
+from ninja_aio.models.serializers import ModelSerializer
+from ninja_aio.types import ModelSerializerMeta
 from ninja_aio.schemas.helpers import (
     ModelQuerySetSchema,
-    ModelQuerySetExtraSchema,
     QuerySchema,
     ObjectQuerySchema,
     ObjectsQuerySchema,
 )
-from ninja_aio.helpers.query import QueryUtil
 
 
 async def agetattr(obj, name: str, default=None):
@@ -95,7 +94,9 @@ class ModelUtil:
     - Stateless wrapper; safe per-request instantiation.
     """
 
-    def __init__(self, model: type["ModelSerializer"] | models.Model):
+    def __init__(
+        self, model: type["ModelSerializer"] | models.Model, serializer_class=None
+    ):
         """
         Initialize with a Django model or ModelSerializer subclass.
 
@@ -104,7 +105,26 @@ class ModelUtil:
         model : Model | ModelSerializerMeta
             Target model class.
         """
+        from ninja_aio.models.serializers import Serializer
+
         self.model = model
+        self.serializer_class: Serializer = serializer_class
+        if serializer_class is not None and isinstance(model, ModelSerializerMeta):
+            raise ConfigError(
+                "ModelUtil cannot accept both model and serializer_class if the model is a ModelSerializer."
+            )
+        self.serializer: Serializer = serializer_class() if serializer_class else None
+
+    @property
+    def with_serializer(self) -> bool:
+        """
+        Indicates if a serializer_class is associated.
+
+        Returns
+        -------
+        bool
+        """
+        return self.serializer_class is not None
 
     @property
     def pk_field_type(self):
@@ -147,9 +167,19 @@ class ModelUtil:
         list[str]
             Explicit read fields if ModelSerializerMeta, otherwise all model fields.
         """
-        if isinstance(self.model, ModelSerializerMeta):
-            return self.model.get_fields("read")
-        return self.model_fields
+        return self._get_serializable_field_names("read")
+
+    @property
+    def serializable_detail_fields(self):
+        """
+        List of fields considered serializable for detail operations.
+
+        Returns
+        -------
+        list[str]
+            Explicit detail fields if ModelSerializerMeta, otherwise all model fields.
+        """
+        return self._get_serializable_field_names("detail")
 
     @property
     def model_fields(self):
@@ -215,12 +245,29 @@ class ModelUtil:
         """
         return self.model_verbose_name_plural.replace(" ", "")
 
+    def _get_serializable_field_names(
+        self, fields_type: Literal["read", "detail"]
+    ) -> list[str]:
+        """
+        Get serializable field names for the model.
+
+        Returns
+        -------
+        list[str]
+            List of serializable field names.
+        """
+        if isinstance(self.model, ModelSerializerMeta):
+            return self.model.get_fields(fields_type)
+        if self.with_serializer:
+            return self.serializer_class.get_fields(fields_type)
+        return self.model_fields
+
     async def _get_base_queryset(
         self,
         request: HttpRequest,
         query_data: QuerySchema,
         with_qs_request: bool,
-        is_for_read: bool,
+        is_for: Literal["read", "detail"] | None = None,
     ) -> models.QuerySet[type["ModelSerializer"] | models.Model]:
         """
         Build base queryset with optimizations and filters.
@@ -233,8 +280,9 @@ class ModelUtil:
             Query configuration with filters and optimizations.
         with_qs_request : bool
             Whether to apply queryset_request hook.
-        is_for_read : bool
-            Whether this is a read operation.
+        is_for : Literal["read", "detail"] | None
+            Purpose of the query, determines which serializable fields to use.
+            If None, only query_data optimizations are applied.
 
         Returns
         -------
@@ -242,10 +290,14 @@ class ModelUtil:
             Optimized and filtered queryset.
         """
         # Start with base queryset
-        obj_qs = self.model.objects.all()
+        obj_qs = (
+            self.model.objects.all()
+            if self.serializer_class is None
+            else await self.serializer_class.queryset_request(request)
+        )
 
         # Apply query optimizations
-        obj_qs = self._apply_query_optimizations(obj_qs, query_data, is_for_read)
+        obj_qs = self._apply_query_optimizations(obj_qs, query_data, is_for)
 
         # Apply queryset_request hook if available
         if isinstance(self.model, ModelSerializerMeta) and with_qs_request:
@@ -262,7 +314,7 @@ class ModelUtil:
         request: HttpRequest,
         query_data: ObjectsQuerySchema = None,
         with_qs_request=True,
-        is_for_read: bool = False,
+        is_for: Literal["read", "detail"] | None = None,
     ) -> models.QuerySet[type["ModelSerializer"] | models.Model]:
         """
         Retrieve a queryset with optimized database queries.
@@ -281,9 +333,9 @@ class ModelUtil:
         with_qs_request : bool, optional
             Whether to apply the model's queryset_request hook if available.
             Defaults to True.
-        is_for_read : bool, optional
-            Flag indicating if the query is for read operations, which may affect
-            query optimization strategies. Defaults to False.
+        is_for : Literal["read", "detail"] | None, optional
+            Purpose of the query, determines which serializable fields to use.
+            If None, only query_data optimizations are applied.
 
         Returns
         -------
@@ -299,7 +351,7 @@ class ModelUtil:
             query_data = ObjectsQuerySchema()
 
         return await self._get_base_queryset(
-            request, query_data, with_qs_request, is_for_read
+            request, query_data, with_qs_request, is_for
         )
 
     async def get_object(
@@ -308,7 +360,7 @@ class ModelUtil:
         pk: int | str = None,
         query_data: ObjectQuerySchema = None,
         with_qs_request=True,
-        is_for_read: bool = False,
+        is_for: Literal["read", "detail"] | None = None,
     ) -> type["ModelSerializer"] | models.Model:
         """
         Retrieve a single object with optimized database queries.
@@ -329,9 +381,9 @@ class ModelUtil:
         with_qs_request : bool, optional
             Whether to apply the model's queryset_request hook if available.
             Defaults to True.
-        is_for_read : bool, optional
-            Flag indicating if the query is for read operations, which may affect
-            query optimization strategies. Defaults to False.
+        is_for : Literal["read", "detail"] | None, optional
+            Purpose of the query, determines which serializable fields to use.
+            If None, only query_data optimizations are applied.
 
         Returns
         -------
@@ -361,7 +413,7 @@ class ModelUtil:
         # Build lookup query and get optimized queryset
         get_q = self._build_lookup_query(pk, query_data.getters)
         obj_qs = await self._get_base_queryset(
-            request, query_data, with_qs_request, is_for_read
+            request, query_data, with_qs_request, is_for
         )
 
         # Perform lookup
@@ -397,7 +449,7 @@ class ModelUtil:
         self,
         queryset: models.QuerySet,
         query_data: QuerySchema,
-        is_for_read: bool,
+        is_for: Literal["read", "detail"] | None = None,
     ) -> models.QuerySet:
         """
         Apply select_related and prefetch_related optimizations to queryset.
@@ -408,8 +460,9 @@ class ModelUtil:
             Base queryset to optimize.
         query_data : ModelQuerySchema
             Query configuration with select_related/prefetch_related lists.
-        is_for_read : bool
-            Whether to include model-level relation discovery.
+        is_for : Literal["read", "detail"] | None
+            Purpose of the query, determines which serializable fields to use.
+            If None, only query_data optimizations are applied.
 
         Returns
         -------
@@ -417,13 +470,13 @@ class ModelUtil:
             Optimized queryset.
         """
         select_related = (
-            query_data.select_related + self.get_select_relateds()
-            if is_for_read
+            query_data.select_related + self.get_select_relateds(is_for)
+            if is_for
             else query_data.select_related
         )
         prefetch_related = (
-            query_data.prefetch_related + self.get_reverse_relations()
-            if is_for_read
+            query_data.prefetch_related + self.get_reverse_relations(is_for)
+            if is_for
             else query_data.prefetch_related
         )
 
@@ -434,17 +487,52 @@ class ModelUtil:
 
         return queryset
 
-    def get_reverse_relations(self) -> list[str]:
+    def _get_read_optimizations(
+        self, is_for: Literal["read", "detail"] = "read"
+    ) -> ModelQuerySetSchema:
+        """
+        Retrieve read optimizations from model or serializer class.
+
+        When is_for="detail" and no detail config exists, falls back to read config.
+
+        Returns
+        -------
+        ModelQuerySetSchema
+            Read optimization configuration.
+        """
+        if isinstance(self.model, ModelSerializerMeta):
+            result = getattr(self.model.QuerySet, is_for, None)
+            if result is None and is_for == "detail":
+                result = getattr(self.model.QuerySet, "read", None)
+            return result or ModelQuerySetSchema()
+        if self.with_serializer:
+            result = getattr(self.serializer_class.QuerySet, is_for, None)
+            if result is None and is_for == "detail":
+                result = getattr(self.serializer_class.QuerySet, "read", None)
+            return result or ModelQuerySetSchema()
+        return ModelQuerySetSchema()
+
+    def get_reverse_relations(
+        self, is_for: Literal["read", "detail"] = "read"
+    ) -> list[str]:
         """
         Discover reverse relation names for safe prefetching.
+
+        Parameters
+        ----------
+        is_for : Literal["read", "detail"]
+            Purpose of the query, determines which serializable fields to use.
 
         Returns
         -------
         list[str]
             Relation attribute names.
         """
-        reverse_rels = []
-        for f in self.serializable_fields:
+        reverse_rels = self._get_read_optimizations(is_for).prefetch_related.copy()
+        if reverse_rels:
+            return reverse_rels
+        serializable_fields = self._get_serializable_field_names(is_for)
+        for f in serializable_fields:
             field_obj = getattr(self.model, f)
             if isinstance(field_obj, ManyToManyDescriptor):
                 reverse_rels.append(f)
@@ -456,17 +544,27 @@ class ModelUtil:
                 reverse_rels.append(field_obj.related.name)
         return reverse_rels
 
-    def get_select_relateds(self) -> list[str]:
+    def get_select_relateds(
+        self, is_for: Literal["read", "detail"] = "read"
+    ) -> list[str]:
         """
         Discover forward relation names for safe select_related.
+
+        Parameters
+        ----------
+        is_for : Literal["read", "detail"]
+            Purpose of the query, determines which serializable fields to use.
 
         Returns
         -------
         list[str]
             Relation attribute names.
         """
-        select_rels = []
-        for f in self.serializable_fields:
+        select_rels = self._get_read_optimizations(is_for).select_related.copy()
+        if select_rels:
+            return select_rels
+        serializable_fields = self._get_serializable_field_names(is_for)
+        for f in serializable_fields:
             field_obj = getattr(self.model, f)
             if isinstance(field_obj, ForwardManyToOneDescriptor):
                 select_rels.append(f)
@@ -532,17 +630,15 @@ class ModelUtil:
         request: HttpRequest,
         query_data: QuerySchema,
         schema: Schema,
-        is_for_read: bool,
+        is_for: Literal["read", "detail"] | None = None,
     ):
         """Handle different query modes (filters vs getters)."""
         if hasattr(query_data, "filters") and query_data.filters:
-            return await self._serialize_queryset(
-                request, query_data, schema, is_for_read
-            )
+            return await self._serialize_queryset(request, query_data, schema, is_for)
 
         if hasattr(query_data, "getters") and query_data.getters:
             return await self._serialize_single_object(
-                request, query_data, schema, is_for_read
+                request, query_data, schema, is_for
             )
 
         raise SerializeError(
@@ -554,12 +650,10 @@ class ModelUtil:
         request: HttpRequest,
         query_data: QuerySchema,
         schema: Schema,
-        is_for_read: bool,
+        is_for: Literal["read", "detail"] | None = None,
     ):
         """Serialize a queryset of objects."""
-        objs = await self.get_objects(
-            request, query_data=query_data, is_for_read=is_for_read
-        )
+        objs = await self.get_objects(request, query_data=query_data, is_for=is_for)
         return [await self._bump_object_from_schema(obj, schema) async for obj in objs]
 
     async def _serialize_single_object(
@@ -567,12 +661,10 @@ class ModelUtil:
         request: HttpRequest,
         query_data: QuerySchema,
         obj_schema: Schema,
-        is_for_read: bool,
+        is_for: Literal["read", "detail"] | None = None,
     ):
         """Serialize a single object."""
-        obj = await self.get_object(
-            request, query_data=query_data, is_for_read=is_for_read
-        )
+        obj = await self.get_object(request, query_data=query_data, is_for=is_for)
         return await self._bump_object_from_schema(obj, obj_schema)
 
     async def parse_input_data(self, request: HttpRequest, data: Schema):
@@ -604,7 +696,10 @@ class ModelUtil:
         """
         payload = data.model_dump(mode="json")
 
-        is_serializer = isinstance(self.model, ModelSerializerMeta)
+        is_serializer = (
+            isinstance(self.model, ModelSerializerMeta) or self.with_serializer
+        )
+        serializer = self.serializer if self.with_serializer else self.model
 
         # Collect custom and optional fields (only if ModelSerializerMeta)
         customs: dict[str, Any] = {}
@@ -613,10 +708,10 @@ class ModelUtil:
             customs = {
                 k: v
                 for k, v in payload.items()
-                if self.model.is_custom(k) and k not in self.model_fields
+                if serializer.is_custom(k) and k not in self.model_fields
             }
             optionals = [
-                k for k, v in payload.items() if self.model.is_optional(k) and v is None
+                k for k, v in payload.items() if serializer.is_optional(k) and v is None
             ]
 
         skip_keys = set()
@@ -625,8 +720,8 @@ class ModelUtil:
             skip_keys = {
                 k
                 for k, v in payload.items()
-                if (self.model.is_custom(k) and k not in self.model_fields)
-                or (self.model.is_optional(k) and v is None)
+                if (serializer.is_custom(k) and k not in self.model_fields)
+                or (serializer.is_optional(k) and v is None)
             }
 
         # Process payload fields
@@ -663,10 +758,19 @@ class ModelUtil:
             Serialized created object.
         """
         payload, customs = await self.parse_input_data(request, data)
-        pk = (await self.model.objects.acreate(**payload)).pk
+        pk = (
+            (await self.model.objects.acreate(**payload)).pk
+            if not self.with_serializer
+            else (await self.serializer.create(payload)).pk
+        )
         obj = await self.get_object(request, pk)
         if isinstance(self.model, ModelSerializerMeta):
             await asyncio.gather(obj.custom_actions(customs), obj.post_create())
+        if self.with_serializer:
+            await asyncio.gather(
+                self.serializer.custom_actions(customs, obj),
+                self.serializer.post_create(obj),
+            )
         return await self.read_s(obj_schema, request, obj)
 
     async def _read_s(
@@ -677,7 +781,7 @@ class ModelUtil:
         | type["ModelSerializer"]
         | models.Model = None,
         query_data: QuerySchema = None,
-        is_for_read: bool = False,
+        is_for: Literal["read", "detail"] | None = None,
     ):
         """
         Internal serialization method handling both single instances and querysets.
@@ -692,8 +796,8 @@ class ModelUtil:
             Instance(s) to serialize. If None, fetches based on query_data.
         query_data : QuerySchema, optional
             Query parameters for fetching objects when instance is None.
-        is_for_read : bool, optional
-            Whether to apply read-specific query optimizations.
+        is_for : Literal["read", "detail"] | None, optional
+            Purpose of the query, determines which serializable fields to use.
 
         Returns
         -------
@@ -717,7 +821,7 @@ class ModelUtil:
             return await self._bump_object_from_schema(instance, schema)
 
         self._validate_read_params(request, query_data)
-        return await self._handle_query_mode(request, query_data, schema, is_for_read)
+        return await self._handle_query_mode(request, query_data, schema, is_for)
 
     async def read_s(
         self,
@@ -725,7 +829,7 @@ class ModelUtil:
         request: HttpRequest = None,
         instance: type["ModelSerializer"] = None,
         query_data: ObjectQuerySchema = None,
-        is_for_read: bool = False,
+        is_for: Literal["read", "detail"] | None = None,
     ) -> dict:
         """
         Serialize a single model instance or fetch and serialize using query parameters.
@@ -744,8 +848,9 @@ class ModelUtil:
         query_data : ObjectQuerySchema, optional
             Query parameters with getters for single object lookup.
             Required when instance is None.
-        is_for_read : bool, optional
-            Whether to apply read-specific query optimizations. Defaults to False.
+        is_for : Literal["read", "detail"] | None, optional
+            Purpose of the query, determines which serializable fields to use.
+            Defaults to None.
 
         Returns
         -------
@@ -765,14 +870,14 @@ class ModelUtil:
         -----
         - Uses Pydantic's from_orm() with mode="json" for serialization
         - When instance is provided, request and query_data are ignored
-        - Query optimizations applied when is_for_read=True
+        - Query optimizations applied when is_for is specified
         """
         return await self._read_s(
             schema,
             request,
             instance,
             query_data,
-            is_for_read,
+            is_for,
         )
 
     async def list_read_s(
@@ -781,7 +886,7 @@ class ModelUtil:
         request: HttpRequest = None,
         instances: models.QuerySet[type["ModelSerializer"] | models.Model] = None,
         query_data: ObjectsQuerySchema = None,
-        is_for_read: bool = False,
+        is_for: Literal["read", "detail"] | None = None,
     ) -> list[dict]:
         """
         Serialize multiple model instances or fetch and serialize using query parameters.
@@ -800,8 +905,9 @@ class ModelUtil:
         query_data : ObjectsQuerySchema, optional
             Query parameters with filters for multiple object lookup.
             Required when instances is None.
-        is_for_read : bool, optional
-            Whether to apply read-specific query optimizations. Defaults to False.
+        is_for : Literal["read", "detail"] | None, optional
+            Purpose of the query, determines which serializable fields to use.
+            Defaults to None.
 
         Returns
         -------
@@ -819,7 +925,7 @@ class ModelUtil:
         -----
         - Uses Pydantic's from_orm() with mode="json" for serialization
         - When instances is provided, request and query_data are ignored
-        - Query optimizations applied when is_for_read=True
+        - Query optimizations applied when is_for is specified
         - Processes queryset asynchronously for efficiency
         """
         return await self._read_s(
@@ -827,7 +933,7 @@ class ModelUtil:
             request,
             instances,
             query_data,
-            is_for_read,
+            is_for,
         )
 
     async def update_s(
@@ -860,7 +966,11 @@ class ModelUtil:
                 setattr(obj, k, v)
         if isinstance(self.model, ModelSerializerMeta):
             await obj.custom_actions(customs)
-        await obj.asave()
+        if self.with_serializer:
+            await self.serializer.custom_actions(customs, obj)
+            await self.serializer.save(obj)
+        else:
+            await obj.asave()
         updated_object = await self.get_object(request, pk)
         return await self.read_s(obj_schema, request, updated_object)
 
@@ -881,657 +991,3 @@ class ModelUtil:
         obj = await self.get_object(request, pk)
         await obj.adelete()
         return None
-
-
-class ModelSerializer(models.Model, metaclass=ModelSerializerMeta):
-    """
-    ModelSerializer
-    =================
-    Abstract mixin for Django models centralizing (on the model class itself) the
-    declarative configuration required to auto-generate create / update / read /
-    related schemas.
-
-    Goals
-    -----
-    - Remove duplication between Model and separate serializer classes.
-    - Provide clear extension points (sync + async hooks, custom synthetic fields).
-
-    See inline docstrings for per-method behavior.
-    """
-
-    util: ClassVar[ModelUtil]
-    query_util: ClassVar[QueryUtil]
-
-    class Meta:
-        abstract = True
-
-    def __init_subclass__(cls, **kwargs):
-        super().__init_subclass__(**kwargs)
-        # Bind a ModelUtil instance to the subclass for convenient access
-        cls.util = ModelUtil(cls)
-        cls.query_util = QueryUtil(cls)
-
-    class QuerySet:
-        """
-        Configuration container describing how to build query schemas for a model.
-        Purpose
-        -------
-        Describes which fields and extras are available when querying for model
-        instances. A factory/metaclass can read this configuration to generate
-        Pydantic / Ninja query schemas.
-        Attributes
-        ----------
-        read : ModelQuerySetSchema
-            Schema configuration for read operations.
-        queryset_request : ModelQuerySetSchema
-            Schema configuration for queryset_request hook.
-        extras : list[ModelQuerySetExtraSchema]
-            Additional computed / synthetic query parameters.
-        """
-        read = ModelQuerySetSchema()
-        queryset_request = ModelQuerySetSchema()
-        extras: list[ModelQuerySetExtraSchema] = []
-
-    class CreateSerializer:
-        """Configuration container describing how to build a create (input) schema for a model.
-
-        Purpose
-        -------
-        Describes which fields are accepted (and in what form) when creating a new
-        instance. A factory/metaclass can read this configuration to generate a
-        Pydantic / Ninja input schema.
-
-        Attributes
-        ----------
-        fields : list[str]
-            REQUIRED model fields.
-        optionals : list[tuple[str, type]]
-            Optional model fields (nullable / patch-like).
-        customs : list[tuple[str, type, Any]]
-            Synthetic input fields (non-model).
-        excludes : list[str]
-            Disallowed model fields on create (e.g., id, timestamps).
-        """
-
-        fields: list[str] = []
-        customs: list[tuple[str, type, Any]] = []
-        optionals: list[tuple[str, type]] = []
-        excludes: list[str] = []
-
-    class ReadSerializer:
-        """Configuration describing how to build a read (output) schema.
-
-        Attributes
-        ----------
-        fields : list[str]
-            Explicit model fields to include.
-        excludes : list[str]
-            Fields to force exclude (safety).
-        customs : list[tuple[str, type, Any]]
-            Computed / synthetic output attributes.
-        """
-
-        fields: list[str] = []
-        excludes: list[str] = []
-        customs: list[tuple[str, type, Any]] = []
-
-    class UpdateSerializer:
-        """Configuration describing update (PATCH/PUT) schema.
-
-        Attributes
-        ----------
-        fields : list[str]
-            Required update fields (rare).
-        optionals : list[tuple[str, type]]
-            Editable optional fields.
-        customs : list[tuple[str, type, Any]]
-            Synthetic operational inputs.
-        excludes : list[str]
-            Immutable / blocked fields.
-        """
-
-        fields: list[str] = []
-        customs: list[tuple[str, type, Any]] = []
-        optionals: list[tuple[str, type]] = []
-        excludes: list[str] = []
-
-    @classmethod
-    def _get_fields(cls, s_type: type[S_TYPES], f_type: type[F_TYPES]):
-        """
-        Internal accessor for raw configuration lists.
-
-        Parameters
-        ----------
-        s_type : str
-            Serializer type ("create" | "update" | "read").
-        f_type : str
-            Field category ("fields" | "optionals" | "customs" | "excludes").
-
-        Returns
-        -------
-        list
-            Raw configuration list or empty list.
-        """
-        match s_type:
-            case "create":
-                fields = getattr(cls.CreateSerializer, f_type, [])
-            case "update":
-                fields = getattr(cls.UpdateSerializer, f_type, [])
-            case "read":
-                fields = getattr(cls.ReadSerializer, f_type, [])
-        return fields
-
-    @classmethod
-    def _is_special_field(
-        cls, s_type: type[S_TYPES], field: str, f_type: type[F_TYPES]
-    ):
-        """
-        Determine if a field is declared in a given category for a serializer type.
-
-        Parameters
-        ----------
-        s_type : str
-        field : str
-        f_type : str
-
-        Returns
-        -------
-        bool
-        """
-        special_fields = cls._get_fields(s_type, f_type)
-        return any(field in special_f for special_f in special_fields)
-
-    @classmethod
-    def _generate_model_schema(
-        cls,
-        schema_type: type[SCHEMA_TYPES],
-        depth: int = None,
-    ) -> Schema:
-        """
-        Core schema factory bridging configuration and ninja.orm.create_schema.
-
-        Parameters
-        ----------
-        schema_type : str
-            "In" | "Patch" | "Out" | "Related".
-        depth : int, optional
-            Relation depth for read schema.
-
-        Returns
-        -------
-        Schema | None
-            Generated schema class or None if no fields.
-        """
-        match schema_type:
-            case "In":
-                s_type = "create"
-            case "Patch":
-                s_type = "update"
-            case "Out":
-                fields, reverse_rels, excludes, customs = cls.get_schema_out_data()
-                if not fields and not reverse_rels and not excludes and not customs:
-                    return None
-                return create_schema(
-                    model=cls,
-                    name=f"{cls._meta.model_name}SchemaOut",
-                    depth=depth,
-                    fields=fields,
-                    custom_fields=reverse_rels + customs,
-                    exclude=excludes,
-                )
-            case "Related":
-                fields, customs = cls.get_related_schema_data()
-                if not fields and not customs:
-                    return None
-                return create_schema(
-                    model=cls,
-                    name=f"{cls._meta.model_name}SchemaRelated",
-                    fields=fields,
-                    custom_fields=customs,
-                )
-
-        fields = cls.get_fields(s_type)
-        optionals = cls.get_optional_fields(s_type)
-        customs = cls.get_custom_fields(s_type) + optionals
-        excludes = cls.get_excluded_fields(s_type)
-        if not fields and not excludes:
-            fields = [f[0] for f in optionals]
-        return (
-            create_schema(
-                model=cls,
-                name=f"{cls._meta.model_name}Schema{schema_type}",
-                fields=fields,
-                custom_fields=customs,
-                exclude=excludes,
-            )
-            if fields or customs or excludes
-            else None
-        )
-
-    @classmethod
-    def verbose_name_path_resolver(cls) -> str:
-        """
-        Slugify plural verbose name for URL path segment.
-
-        Returns
-        -------
-        str
-        """
-        return "-".join(cls._meta.verbose_name_plural.split(" "))
-
-    def has_changed(self, field: str) -> bool:
-        """
-        Check if a model field has changed compared to the persisted value.
-
-        Parameters
-        ----------
-        field : str
-            Field name.
-
-        Returns
-        -------
-        bool
-            True if in-memory value differs from DB value.
-        """
-        if not self.pk:
-            return False
-        old_value = (
-            self.__class__._default_manager.filter(pk=self.pk)
-            .values(field)
-            .get()[field]
-        )
-        return getattr(self, field) != old_value
-
-    @classmethod
-    async def queryset_request(cls, request: HttpRequest):
-        """
-        Override to return a request-scoped filtered queryset.
-
-        Parameters
-        ----------
-        request : HttpRequest
-
-        Returns
-        -------
-        QuerySet
-        """
-        return cls.query_util.apply_queryset_optimizations(
-            queryset=cls.objects.all(),
-            scope=cls.query_util.SCOPES.QUERYSET_REQUEST,
-        )
-
-    async def post_create(self) -> None:
-        """
-        Async hook executed after first persistence (create path).
-        """
-        pass
-
-    async def custom_actions(self, payload: dict[str, Any]):
-        """
-        Async hook for reacting to provided custom (synthetic) fields.
-
-        Parameters
-        ----------
-        payload : dict
-            Custom field name/value pairs.
-        """
-        pass
-
-    @classmethod
-    def get_related_schema_data(cls):
-        """
-        Build field/custom lists for 'Related' schema (flattening non-relational fields).
-
-        Returns
-        -------
-        tuple[list[str] | None, list[tuple] | None]
-            (related_fields, custom_related_fields) or (None, None)
-        """
-        fields = cls.get_fields("read")
-        custom_f = {
-            name: (value, default)
-            for name, value, default in cls.get_custom_fields("read")
-        }
-        _related_fields = []
-        for f in fields + list(custom_f.keys()):
-            field_obj = getattr(cls, f)
-            if not isinstance(
-                field_obj,
-                (
-                    ManyToManyDescriptor,
-                    ReverseManyToOneDescriptor,
-                    ReverseOneToOneDescriptor,
-                    ForwardManyToOneDescriptor,
-                    ForwardOneToOneDescriptor,
-                ),
-            ):
-                _related_fields.append(f)
-
-        if not _related_fields:
-            return None, None
-
-        custom_related_fields = [
-            (f, *custom_f[f]) for f in _related_fields if f in custom_f
-        ]
-        related_fields = [f for f in _related_fields if f not in custom_f]
-        return related_fields, custom_related_fields
-
-    @classmethod
-    def _build_schema_reverse_rel(cls, field_name: str, descriptor: Any):
-        """
-        Build a reverse relation schema component for 'Out' schema generation.
-        """
-        if isinstance(descriptor, ManyToManyDescriptor):
-            rel_model: ModelSerializer = descriptor.field.related_model
-            if descriptor.reverse:  # reverse side of M2M
-                rel_model = descriptor.field.model
-            rel_type = "many"
-        elif isinstance(descriptor, ReverseManyToOneDescriptor):
-            rel_model = descriptor.field.model
-            rel_type = "many"
-        else:  # ReverseOneToOneDescriptor
-            rel_model = descriptor.related.related_model
-            rel_type = "one"
-
-        if not isinstance(rel_model, ModelSerializerMeta):
-            return None
-        if not rel_model.get_fields("read") and not rel_model.get_custom_fields("read"):
-            return None
-
-        rel_schema = (
-            rel_model.generate_related_s()
-            if rel_type == "one"
-            else list[rel_model.generate_related_s()]
-        )
-        return (field_name, rel_schema | None, None)
-
-    @classmethod
-    def _build_schema_forward_rel(cls, field_name: str, descriptor: Any):
-        """
-        Build a forward relation schema component for 'Out' schema generation.
-        """
-        rel_model = descriptor.field.related_model
-        if not isinstance(rel_model, ModelSerializerMeta):
-            return True  # Signal: treat as plain field
-        if not rel_model.get_fields("read") and not rel_model.get_custom_fields("read"):
-            return None  # Skip entirely
-        rel_schema = rel_model.generate_related_s()
-        return (field_name, rel_schema | None, None)
-
-    @classmethod
-    def get_schema_out_data(cls):
-        """
-        Collect components for 'Out' read schema generation.
-
-        Returns
-        -------
-        tuple
-            (fields, reverse_rel_descriptors, excludes, custom_fields_with_forward_relations)
-        """
-
-        fields: list[str] = []
-        reverse_rels: list[tuple] = []
-        rels: list[tuple] = []
-
-        for f in cls.get_fields("read"):
-            field_obj = getattr(cls, f)
-
-            # Reverse relations
-            if isinstance(
-                field_obj,
-                (
-                    ManyToManyDescriptor,
-                    ReverseManyToOneDescriptor,
-                    ReverseOneToOneDescriptor,
-                ),
-            ):
-                rel_tuple = cls._build_schema_reverse_rel(f, field_obj)
-                if rel_tuple:
-                    reverse_rels.append(rel_tuple)
-                    continue
-
-            # Forward relations
-            if isinstance(
-                field_obj, (ForwardOneToOneDescriptor, ForwardManyToOneDescriptor)
-            ):
-                rel_tuple = cls._build_schema_forward_rel(f, field_obj)
-                if rel_tuple is True:
-                    fields.append(f)
-                elif rel_tuple:
-                    rels.append(rel_tuple)
-                # If rel_tuple is None -> skip
-                continue
-
-            # Plain field
-            fields.append(f)
-
-        return (
-            fields,
-            reverse_rels,
-            cls.get_excluded_fields("read"),
-            cls.get_custom_fields("read") + rels,
-        )
-
-    @classmethod
-    def is_custom(cls, field: str):
-        """
-        Check if a field is declared as a custom input (create or update).
-
-        Parameters
-        ----------
-        field : str
-
-        Returns
-        -------
-        bool
-        """
-        return cls._is_special_field(
-            "create", field, "customs"
-        ) or cls._is_special_field("update", field, "customs")
-
-    @classmethod
-    def is_optional(cls, field: str):
-        """
-        Check if a field is declared as optional (create or update).
-
-        Parameters
-        ----------
-        field : str
-
-        Returns
-        -------
-        bool
-        """
-        return cls._is_special_field(
-            "create", field, "optionals"
-        ) or cls._is_special_field("update", field, "optionals")
-
-    @classmethod
-    def get_custom_fields(cls, s_type: type[S_TYPES]) -> list[tuple[str, type, Any]]:
-        """
-        Normalize declared custom field specs into (name, py_type, default) triples.
-
-        Accepted tuple shapes:
-          (name, py_type, default) -> keeps provided default (callable or literal)
-          (name, py_type)          -> marks as required (default = Ellipsis)
-        Any other arity raises ValueError.
-
-        Parameters
-        ----------
-        s_type : str
-            "create" | "update" | "read"
-
-        Returns
-        -------
-        list[tuple[str, type, Any]]
-        """
-        raw_customs = cls._get_fields(s_type, "customs") or []
-        normalized: list[tuple[str, type, Any]] = []
-        for spec in raw_customs:
-            if not isinstance(spec, tuple):
-                raise ValueError(f"Custom field spec must be a tuple, got {type(spec)}")
-            match len(spec):
-                case 3:
-                    name, py_type, default = spec
-                case 2:
-                    name, py_type = spec
-                    default = ...
-                case _:
-                    raise ValueError(
-                        f"Custom field tuple must have length 2 or 3 (name, type[, default]); got {len(spec)}"
-                    )
-            normalized.append((name, py_type, default))
-        return normalized
-
-    @classmethod
-    def get_optional_fields(cls, s_type: type[S_TYPES]):
-        """
-        Return optional field specifications normalized to (name, type, None).
-
-        Parameters
-        ----------
-        s_type : str
-
-        Returns
-        -------
-        list[tuple[str, type, None]]
-        """
-        return [
-            (field, field_type, None)
-            for field, field_type in cls._get_fields(s_type, "optionals")
-        ]
-
-    @classmethod
-    def get_excluded_fields(cls, s_type: type[S_TYPES]):
-        """
-        Return excluded field names for a serializer type.
-
-        Parameters
-        ----------
-        s_type : str
-
-        Returns
-        -------
-        list[str]
-        """
-        return cls._get_fields(s_type, "excludes")
-
-    @classmethod
-    def get_fields(cls, s_type: type[S_TYPES]):
-        """
-        Return explicit declared fields for a serializer type.
-
-        Parameters
-        ----------
-        s_type : str
-
-        Returns
-        -------
-        list[str]
-        """
-        return cls._get_fields(s_type, "fields")
-
-    @classmethod
-    def generate_read_s(cls, depth: int = 1) -> Schema:
-        """
-        Generate read (Out) schema.
-
-        Parameters
-        ----------
-        depth : int
-            Relation depth.
-
-        Returns
-        -------
-        Schema | None
-        """
-        return cls._generate_model_schema("Out", depth)
-
-    @classmethod
-    def generate_create_s(cls) -> Schema:
-        """
-        Generate create (In) schema.
-
-        Returns
-        -------
-        Schema | None
-        """
-        return cls._generate_model_schema("In")
-
-    @classmethod
-    def generate_update_s(cls) -> Schema:
-        """
-        Generate update (Patch) schema.
-
-        Returns
-        -------
-        Schema | None
-        """
-        return cls._generate_model_schema("Patch")
-
-    @classmethod
-    def generate_related_s(cls) -> Schema:
-        """
-        Generate related (nested) schema.
-
-        Returns
-        -------
-        Schema | None
-        """
-        return cls._generate_model_schema("Related")
-
-    def after_save(self):
-        """
-        Sync hook executed after any save (create or update).
-        """
-        pass
-
-    def before_save(self):
-        """
-        Sync hook executed before any save (create or update).
-        """
-        pass
-
-    def on_create_after_save(self):
-        """
-        Sync hook executed only after initial creation save.
-        """
-        pass
-
-    def on_create_before_save(self):
-        """
-        Sync hook executed only before initial creation save.
-        """
-        pass
-
-    def on_delete(self):
-        """
-        Sync hook executed after delete.
-        """
-        pass
-
-    def save(self, *args, **kwargs):
-        """
-        Override save lifecycle to inject create/update hooks.
-        """
-        state_adding = self._state.adding
-        if state_adding:
-            self.on_create_before_save()
-        self.before_save()
-        super().save(*args, **kwargs)
-        if state_adding:
-            self.on_create_after_save()
-        self.after_save()
-
-    def delete(self, *args, **kwargs):
-        """
-        Override delete to inject on_delete hook.
-
-        Returns
-        -------
-        tuple(int, dict)
-            Django delete return signature.
-        """
-        res = super().delete(*args, **kwargs)
-        self.on_delete()
-        return res

@@ -13,6 +13,15 @@ on:
           - stable
           - "1.0"
           - "2.0"
+          - "2.2"
+          - "2.3"
+          - "2.4"
+          - "2.5"
+          - "2.6"
+          - "2.6.1"
+          - "2.7.0"
+          - "2.8"
+          - "2.9"
       make_latest:
         description: 'Set as "latest" and default?'
         type: boolean
@@ -29,6 +38,15 @@ on:
           - stable
           - "1.0"
           - "2.0"
+          - "2.2"
+          - "2.3"
+          - "2.4"
+          - "2.5"
+          - "2.6"
+          - "2.6.1"
+          - "2.7.0"
+          - "2.8"
+          - "2.9"
       delete_confirm:
         description: 'Confirm deletion of the selected version'
         type: boolean
@@ -96,7 +114,7 @@ jobs:
           if [ "$MAKE_LATEST" = "true" ]; then
             echo "Deploying $VERSION as latest and default"
             mike deploy --push --update-aliases "$VERSION" latest --ignore-remote-status
-            mike set-default "$VERSION"
+            mike set-default --push latest
           else
             echo "Deploying $VERSION (non-latest)"
             mike deploy --push "$VERSION" --ignore-remote-status

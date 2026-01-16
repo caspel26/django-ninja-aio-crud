@@ -213,7 +213,7 @@ class Tests:
                 self.request.get(),
                 instance=None,
                 query_data=QuerySchema(getters={self.pk_att: self.obj.pk}),
-                is_for_read=True,
+                is_for="read",
             )
             self.assertEqual(auto[self.pk_att], self.obj.pk)
 
@@ -287,7 +287,7 @@ class Tests:
                 await self.model_util.get_object(
                     self.request.get(),
                     query_data=query_data,
-                    is_for_read=True,
+                    is_for="read",
                 )
                 sel_args = m_sel.call_args[0][1:] if m_sel.call_args else []
                 pref_args = m_pref.call_args[0][1:] if m_pref.call_args else []
@@ -361,7 +361,7 @@ class Tests:
                         filters={self.pk_att: self.obj.pk},
                         getters={self.pk_att: self.obj.pk},
                     ),
-                    is_for_read=True,
+                    is_for="read",
                 )
 
         async def test_list_read_s_with_filters(self):
@@ -369,7 +369,7 @@ class Tests:
                 self.schema_out,
                 self.request.get(),
                 query_data=ObjectsQuerySchema(filters={self.pk_att: self.obj.pk}),
-                is_for_read=True,
+                is_for="read",
             )
             self.assertEqual(response, [self.read_data])
 
@@ -382,14 +382,14 @@ class Tests:
                     self.schema_out,
                     self.request.get(),
                     query_data=ObjectsQuerySchema(),
-                    is_for_read=True,
+                    is_for="read",
                 )
 
         async def test_read_s_with_reverse_relations(self):
             if not self.reverse_relations:
                 return  # Skip if no reverse relations defined
             response = await self.model_util.read_s(
-                self.schema_out, self.request.get(), self.obj, is_for_read=True
+                self.schema_out, self.request.get(), self.obj, is_for="read"
             )
             for rel in self.reverse_relations:
                 self.assertIn(rel, response)
@@ -401,7 +401,7 @@ class Tests:
                 self.schema_out,
                 self.request.get(),
                 self.model.objects.all(),
-                is_for_read=True,
+                is_for="read",
             )
             for item in response:
                 for rel in self.reverse_relations:

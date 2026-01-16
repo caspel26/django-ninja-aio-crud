@@ -11,6 +11,7 @@
 
 ## ✨ Key Features
 
+- 📦 Serializer (Meta-driven) — Define schemas for existing Django models without inheriting ModelSerializer
 - 🚀 **Fully Async** - Built for Django's async ORM
 - 🔄 **Automatic CRUD** - Generate complete REST APIs with minimal code
 - 📝 **ModelSerializer** - Define schemas directly on models
@@ -33,65 +34,64 @@ Traditional Django REST development requires:
 **Django Ninja Aio CRUD** eliminates this complexity:
 
 === "Traditional Approach"
-    ```python
-    # serializers.py
-    class UserSerializer(serializers.ModelSerializer):
+    ```python 
+    # schema.py
+    class UserSchemaOut(ModelSchema)
         class Meta:
-            model = User
-            fields = ['id', 'username', 'email']
-    
-    class UserCreateSerializer(serializers.ModelSerializer):
+        model = User
+        fields = ['id', 'username', 'email']
+
+    class UserSchemaIn(ModelSchema):
         class Meta:
             model = User
             fields = ['username', 'email', 'password']
-    
+
     # views.py
-    class UserListView(APIView):
-        async def get(self, request):
-            users = await sync_to_async(list)(User.objects.all())
-            serializer = UserSerializer(users, many=True)
-            return Response(serializer.data)
-    
-    class UserCreateView(APIView):
-        async def post(self, request):
-            serializer = UserCreateSerializer(data=request.data)
-            if serializer.is_valid():
-                user = await sync_to_async(serializer.save)()
-                return Response(UserSerializer(user).data)
-            return Response(serializer.errors, status=400)
-    
+    @api.get("/users", response={200: list[UserSchemaOut]})
+    async def list_users(request):
+        return [user async for user in User.objects.select_related().all()]
+
+    @api.post("/users/", response={201: UserSchemaOut})
+    async def create_user(request, data: UserSchemaIn):
+        user = await User.objects.select_related().acreate(**data.model_dump())
+        return 201, user
+
+
     # ... more views for retrieve, update, delete
     ```
 
 === "Django Ninja Aio CRUD"
-    ```python
+    ```python 
     # models.py
     class User(ModelSerializer):
         username = models.CharField(max_length=150)
         email = models.EmailField()
         password = models.CharField(max_length=128)
-        
+
         class ReadSerializer:
             fields = ["id", "username", "email"]
-        
+
         class CreateSerializer:
             fields = ["username", "email", "password"]
-        
+
         class UpdateSerializer:
             optionals = [("email", str)]
-    
+
     # views.py
+    @api.viewset(User)
     class UserViewSet(APIViewSet):
-        model = User
-        api = api
-    
-    UserViewSet().add_views_to_route()
+        pass
+
     # Done! List, Create, Retrieve, Update, Delete endpoints ready
     ```
 
 ### 📚 Documentation
 
 Explore detailed documentation for each component:
+
+#### Serializer (Meta-driven)
+
+- **[Serializer (Meta-driven)](api/models/serializers.md)** - Dynamic schemas for existing Django models without inheriting ModelSerializer
 
 #### Models
 
@@ -107,6 +107,35 @@ Explore detailed documentation for each component:
 
 - **[Authentication](api/authentication.md)** - JWT and custom auth
 - **[Pagination](api/pagination.md)** - Customize pagination behavior
+
+## Start with Serializer
+
+Use Meta-driven Serializer first if you already have Django models and want immediate CRUD without changing bases:
+
+```python
+from ninja_aio.models import serializers
+from . import models
+
+class BookSerializer(serializers.Serializer):
+    class Meta:
+        model = models.Book
+        schema_in = serializers.SchemaModelConfig(fields=["title", "published"])
+        schema_out = serializers.SchemaModelConfig(fields=["id", "title", "published"])
+        schema_update = serializers.SchemaModelConfig(optionals=[("title", str), ("published", bool)])
+````
+
+Attach to a ViewSet:
+
+```python
+from ninja_aio.views import APIViewSet
+from ninja_aio import NinjaAIO
+
+api = NinjaAIO()
+
+@api.viewset(models.Book)
+class BookViewSet(APIViewSet):
+    serializer_class = BookSerializer
+```
 
 ## Query optimization and schemas
 
@@ -217,19 +246,18 @@ from .models import Author, Category, Article, Tag
 api = NinjaAIO(title="Blog API", version="1.0.0")
 
 
+@api.viewset(Author)
 class AuthorViewSet(APIViewSet):
-    model = Author
-    api = api
+    pass
 
 
+@api.viewset(Category)
 class CategoryViewSet(APIViewSet):
-    model = Category
-    api = api
+    pass
 
 
+@api.viewset(Article)
 class ArticleViewSet(APIViewSet):
-    model = Article
-    api = api
     query_params = {
         "is_published": (bool, None),
         "category": (int, None),
@@ -246,16 +274,9 @@ class ArticleViewSet(APIViewSet):
         return queryset
 
 
+@api.viewset(Tag)
 class TagViewSet(APIViewSet):
-    model = Tag
-    api = api
-
-
-# Register all views
-AuthorViewSet().add_views_to_route()
-CategoryViewSet().add_views_to_route()
-ArticleViewSet().add_views_to_route()
-TagViewSet().add_views_to_route()
+    pass
 ```
 
 This creates a complete blog API with:
@@ -286,14 +307,38 @@ class User(ModelSerializer):
         optionals = [("username", str)]  # Partial update schema
 ```
 
+### Serializer (Meta-driven)
+
+Use when you have vanilla Django models and want dynamic serialization without changing your model base class.
+
+```python
+from ninja_aio.models import serializers
+from . import models
+
+class BookSerializer(serializers.Serializer):
+    class Meta:
+        model = models.Book
+        schema_in = serializers.SchemaModelConfig(fields=["title", "published"])
+        schema_out = serializers.SchemaModelConfig(fields=["id", "title", "published"])
+        schema_update = serializers.SchemaModelConfig(optionals=[("title", str), ("published", bool)])
+```
+
+Attach to an APIViewSet:
+
+```python
+@api.viewset(models.Book)
+class BookViewSet(APIViewSet):
+    serializer_class = BookSerializer
+```
+
 ### APIViewSet
 
 Automatically generates complete CRUD endpoints:
 
 ```python
+@api.viewset(User)
 class UserViewSet(APIViewSet):
-    model = User
-    api = api
+    pass
     # Generates: List, Create, Retrieve, Update, Delete
 ```
 
@@ -302,17 +347,16 @@ class UserViewSet(APIViewSet):
 Extend with custom endpoints:
 
 ```python
-class UserViewSet(APIViewSet):
-    model = User
-    api = api
+from ninja_aio.decorators import api_post
 
-    def views(self):
-        @self.router.post("/{pk}/activate/")
-        async def activate(request, pk: int):
-            user = await User.objects.aget(pk=pk)
-            user.is_active = True
-            await user.asave()
-            return {"message": "User activated"}
+@api.viewset(User)
+class UserViewSet(APIViewSet):
+    @api_post("/{pk}/activate")
+    async def activate(self, request, pk: int):
+        user = await User.objects.aget(pk=pk)
+        user.is_active = True
+        await user.asave()
+        return {"message": "User activated"}
 ```
 
 ## 📄 License
@@ -331,6 +375,7 @@ If you find Django Ninja Aio CRUD useful, consider supporting the project:
 - **GitHub:** [https://github.com/caspel26/django-ninja-aio-crud](https://github.com/caspel26/django-ninja-aio-crud)
 - **PyPI:** [https://pypi.org/project/django-ninja-aio-crud/](https://pypi.org/project/django-ninja-aio-crud/)
 - **Django Ninja:** [https://django-ninja.dev/](https://django-ninja.dev/)
+- **Example repository:** https://github.com/caspel26/ninja-aio-blog-example
 
 ---
 
