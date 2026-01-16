@@ -219,11 +219,6 @@ class ApiMethodFactoryMetadataExceptionTestCase(TestCase):
         """Test that _apply_metadata handles exceptions when setting __name__."""
         factory = ApiMethodFactory("get")
 
-        class MockView:
-            pass
-
-        # Create a handler that will trigger the exception path
-        # Using a callable that doesn't allow __name__ assignment
         class ImmutableName:
             """A callable with an immutable __name__."""
 
