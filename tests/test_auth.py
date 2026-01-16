@@ -122,3 +122,54 @@ class JwtAuthTests(TestCase):
         bearer = TBWrongAud()
         result = async_to_sync(bearer.authenticate)(HttpRequest(), token)
         self.assertFalse(result)
+
+    def test_async_bearer_authenticate_invalid_token_returns_false(self):
+        """Test that a malformed/invalid token returns False (covers lines 110-112)."""
+        pub = self.public_jwk
+
+        class TB(AsyncJwtBearer):
+            jwt_public = pub
+            claims = {
+                "iss": {"value": "test-issuer"},
+                "aud": {"value": "test-audience"},
+            }
+
+            async def auth_handler(self, request):
+                return "should-not-happen"
+
+        bearer = TB()
+        # The ValueError branch at 110-112 is for when jwt.decode raises ValueError
+        # Mock jwt.decode to raise ValueError to test that branch
+        import unittest.mock as mock
+
+        with mock.patch("ninja_aio.auth.jwt.decode") as mock_decode:
+            mock_decode.side_effect = ValueError("invalid token")
+            result = async_to_sync(bearer.authenticate)(HttpRequest(), "fake-token")
+            self.assertFalse(result)
+
+    def test_async_bearer_base_auth_handler_returns_none(self):
+        """Test that the base auth_handler returns None (covers line 101)."""
+        pub = self.public_jwk
+
+        class TB(AsyncJwtBearer):
+            jwt_public = pub
+            claims = {
+                "iss": {"value": "test-issuer"},
+                "aud": {"value": "test-audience"},
+            }
+            # Don't override auth_handler, use base implementation
+
+        token = encode_jwt({"sub": "42"}, duration=60)
+        bearer = TB()
+        result = async_to_sync(bearer.authenticate)(HttpRequest(), token)
+        # Base auth_handler returns None (pass statement)
+        self.assertIsNone(result)
+
+    def test_validate_mandatory_claims_skips_preset_claims(self):
+        """Test that validate_mandatory_claims skips claims already present (covers line 137)."""
+        # Pre-set both mandatory claims
+        claims = {"iss": "custom-issuer", "aud": "custom-audience"}
+        result = validate_mandatory_claims(claims)
+        # Should keep the pre-set values, not override with settings
+        self.assertEqual(result["iss"], "custom-issuer")
+        self.assertEqual(result["aud"], "custom-audience")
