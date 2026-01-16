@@ -1,5 +1,6 @@
 import datetime
 from ninja_aio.views import mixins
+from ninja_aio.schemas import RelationFilterSchema
 
 from tests.generics.views import GenericAPIViewSet
 from tests.test_app import models, schema, serializers
@@ -153,3 +154,27 @@ class TestModelForeignKeySerializerAPI(GenericAPIViewSet):
 class TestModelReverseForeignKeySerializerAPI(GenericAPIViewSet):
     model = models.TestModelReverseForeignKey
     serializer_class = serializers.TestModelReverseForeignKeySerializer
+
+
+# ==========================================================
+#                  RELATION FILTER MIXIN APIS
+# ==========================================================
+
+
+class TestModelSerializerForeignKeyRelationFilterAPI(
+    GenericAPIViewSet,
+    mixins.RelationFilterViewSetMixin,
+):
+    model = models.TestModelSerializerForeignKey
+    relations_filters = [
+        RelationFilterSchema(
+            query_param="test_model_serializer",
+            query_filter="test_model_serializer__id",
+            filter_type=(int, None),
+        ),
+        RelationFilterSchema(
+            query_param="test_model_serializer_name",
+            query_filter="test_model_serializer__name__icontains",
+            filter_type=(str, None),
+        ),
+    ]
