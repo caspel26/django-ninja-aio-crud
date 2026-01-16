@@ -571,7 +571,6 @@ class ModelUtil:
                 continue
             if isinstance(field_obj, ForwardManyToOneDescriptor):
                 select_rels.append(f)
-                continue
         return select_rels
 
     async def _get_field(self, k: str):
