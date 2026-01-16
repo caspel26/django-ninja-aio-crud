@@ -566,11 +566,12 @@ class ModelUtil:
         serializable_fields = self._get_serializable_field_names(is_for)
         for f in serializable_fields:
             field_obj = getattr(self.model, f)
+            if isinstance(field_obj, ForwardOneToOneDescriptor):
+                select_rels.append(f)
+                continue
             if isinstance(field_obj, ForwardManyToOneDescriptor):
                 select_rels.append(f)
                 continue
-            if isinstance(field_obj, ForwardOneToOneDescriptor):
-                select_rels.append(f)
         return select_rels
 
     async def _get_field(self, k: str):
