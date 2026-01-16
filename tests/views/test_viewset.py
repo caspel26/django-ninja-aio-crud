@@ -678,6 +678,173 @@ class ViewSetDecoratorOperationsTestCase(TestCase):
 # ==========================================================
 
 
+@tag("relation_filter_mixin")
+class RelationFilterViewSetMixinTestCase(
+    BaseTests.ModelSerializerViewSetTestCaseBase,
+    Tests.ViewSetTestCase,
+):
+    """Test RelationFilterViewSetMixin functionality."""
+
+    namespace = "test_relation_filter_mixin_viewset"
+    model = models.TestModelSerializerForeignKey
+    viewset = views.TestModelSerializerForeignKeyRelationFilterAPI()
+    relation_model = models.TestModelSerializerReverseForeignKey
+
+    @classmethod
+    def setUpTestData(cls):
+        # Create related objects first
+        cls.related_obj_1 = cls.relation_model.objects.create(
+            name="related_alpha", description="first related"
+        )
+        cls.related_obj_2 = cls.relation_model.objects.create(
+            name="related_beta", description="second related"
+        )
+        super().setUpTestData()
+
+    @property
+    def payload_create(self):
+        return {
+            **self._payload,
+            "test_model_serializer_id": self.related_obj_1.pk,
+        }
+
+    @property
+    def response_data(self):
+        return self._payload | {
+            "test_model_serializer": {
+                "id": self.related_obj_1.pk,
+                "name": self.related_obj_1.name,
+                "description": self.related_obj_1.description,
+            }
+        }
+
+    async def _drop_all_objects(self):
+        await self.model.objects.all().adelete()
+
+    async def test_relation_filter_by_id(self):
+        """Test filtering by related object's ID."""
+        await self._drop_all_objects()
+        obj_1 = await self.model.objects.acreate(
+            name="obj1", description="desc1", test_model_serializer=self.related_obj_1
+        )
+        obj_2 = await self.model.objects.acreate(
+            name="obj2", description="desc2", test_model_serializer=self.related_obj_2
+        )
+        # Filter by related_obj_1's ID
+        res = await self.viewset.query_params_handler(
+            self.model.objects.all(),
+            {"test_model_serializer": self.related_obj_1.pk},
+        )
+        self.assertEqual(await res.acount(), 1)
+        self.assertEqual(await res.afirst(), obj_1)
+
+        # Filter by related_obj_2's ID
+        res = await self.viewset.query_params_handler(
+            self.model.objects.all(),
+            {"test_model_serializer": self.related_obj_2.pk},
+        )
+        self.assertEqual(await res.acount(), 1)
+        self.assertEqual(await res.afirst(), obj_2)
+
+    async def test_relation_filter_by_name(self):
+        """Test filtering by related object's name with icontains."""
+        await self._drop_all_objects()
+        obj_1 = await self.model.objects.acreate(
+            name="obj1", description="desc1", test_model_serializer=self.related_obj_1
+        )
+        obj_2 = await self.model.objects.acreate(
+            name="obj2", description="desc2", test_model_serializer=self.related_obj_2
+        )
+        # Filter by partial name "alpha" (matches related_obj_1)
+        res = await self.viewset.query_params_handler(
+            self.model.objects.all(),
+            {"test_model_serializer_name": "alpha"},
+        )
+        self.assertEqual(await res.acount(), 1)
+        self.assertEqual(await res.afirst(), obj_1)
+
+        # Filter by partial name "beta" (matches related_obj_2)
+        res = await self.viewset.query_params_handler(
+            self.model.objects.all(),
+            {"test_model_serializer_name": "beta"},
+        )
+        self.assertEqual(await res.acount(), 1)
+        self.assertEqual(await res.afirst(), obj_2)
+
+    async def test_relation_filter_with_none_value(self):
+        """Test that None filter values are ignored."""
+        await self._drop_all_objects()
+        await self.model.objects.acreate(
+            name="obj1", description="desc1", test_model_serializer=self.related_obj_1
+        )
+        await self.model.objects.acreate(
+            name="obj2", description="desc2", test_model_serializer=self.related_obj_2
+        )
+        # Filter with None should return all objects
+        res = await self.viewset.query_params_handler(
+            self.model.objects.all(),
+            {"test_model_serializer": None, "test_model_serializer_name": None},
+        )
+        self.assertEqual(await res.acount(), 2)
+
+    async def test_relation_filter_combined(self):
+        """Test filtering by multiple relation filters at once."""
+        await self._drop_all_objects()
+        obj_1 = await self.model.objects.acreate(
+            name="obj1", description="desc1", test_model_serializer=self.related_obj_1
+        )
+        await self.model.objects.acreate(
+            name="obj2", description="desc2", test_model_serializer=self.related_obj_2
+        )
+        # Filter by both ID and name (both matching related_obj_1)
+        res = await self.viewset.query_params_handler(
+            self.model.objects.all(),
+            {
+                "test_model_serializer": self.related_obj_1.pk,
+                "test_model_serializer_name": "alpha",
+            },
+        )
+        self.assertEqual(await res.acount(), 1)
+        self.assertEqual(await res.afirst(), obj_1)
+
+    async def test_relation_filter_no_match(self):
+        """Test filtering with non-matching values returns empty queryset."""
+        await self._drop_all_objects()
+        await self.model.objects.acreate(
+            name="obj1", description="desc1", test_model_serializer=self.related_obj_1
+        )
+        # Filter by non-existent ID
+        res = await self.viewset.query_params_handler(
+            self.model.objects.all(),
+            {"test_model_serializer": 99999},
+        )
+        self.assertEqual(await res.acount(), 0)
+
+    async def test_relation_filter_empty_filters(self):
+        """Test that empty filters dict returns all objects."""
+        await self._drop_all_objects()
+        await self.model.objects.acreate(
+            name="obj1", description="desc1", test_model_serializer=self.related_obj_1
+        )
+        await self.model.objects.acreate(
+            name="obj2", description="desc2", test_model_serializer=self.related_obj_2
+        )
+        res = await self.viewset.query_params_handler(
+            self.model.objects.all(),
+            {},
+        )
+        self.assertEqual(await res.acount(), 2)
+
+    def test_query_params_registered(self):
+        """Test that relations_filters are properly registered in query_params."""
+        self.assertIn("test_model_serializer", self.viewset.query_params)
+        self.assertIn("test_model_serializer_name", self.viewset.query_params)
+        self.assertEqual(self.viewset.query_params["test_model_serializer"], (int, None))
+        self.assertEqual(
+            self.viewset.query_params["test_model_serializer_name"], (str, None)
+        )
+
+
 @tag("detail_schema")
 class DetailSchemaModelSerializerTestCase(TestCase):
     """Test detail schema generation for ModelSerializer."""

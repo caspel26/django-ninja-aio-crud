@@ -140,6 +140,49 @@ class EventViewSet(LessEqualDateFilterViewSetMixin, APIViewSet):
     query_params = {"created_at": (datetime, None)}
 ```
 
+## RelationFilterViewSetMixin
+
+Filters by related model fields using configurable `RelationFilterSchema` entries.
+
+- Behavior: Maps query parameters to Django ORM lookups on related models.
+- Configuration: Define `relations_filters` as a list of `RelationFilterSchema` objects.
+- Query params are automatically registered from `relations_filters`.
+
+Each `RelationFilterSchema` requires:
+
+- `query_param`: The API query parameter name exposed to clients.
+- `query_filter`: The Django ORM lookup path (e.g., `author__id`, `category__name__icontains`).
+- `filter_type`: Tuple of `(type, default)` for schema generation (e.g., `(int, None)`).
+
+Example:
+
+```python
+from ninja_aio.views.mixins import RelationFilterViewSetMixin
+from ninja_aio.views.api import APIViewSet
+from ninja_aio.schemas import RelationFilterSchema
+
+class BookViewSet(RelationFilterViewSetMixin, APIViewSet):
+    model = models.Book
+    api = api
+    relations_filters = [
+        RelationFilterSchema(
+            query_param="author",
+            query_filter="author__id",
+            filter_type=(int, None),
+        ),
+        RelationFilterSchema(
+            query_param="category_name",
+            query_filter="category__name__icontains",
+            filter_type=(str, None),
+        ),
+    ]
+```
+
+This enables:
+
+- `GET /books?author=5` → `queryset.filter(author__id=5)`
+- `GET /books?category_name=fiction` → `queryset.filter(category__name__icontains="fiction")`
+
 ## Tips
 
 - Align `query_params` types with expected filter values; prefer Pydantic `date`/`datetime` for date filters so values implement `isoformat`.

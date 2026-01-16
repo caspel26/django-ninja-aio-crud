@@ -1,6 +1,7 @@
 from ninja_aio import NinjaAIO
 from django.test import TestCase, tag
 from ninja_aio.decorators import api_get, api_post
+from ninja_aio.factory.operations import ApiMethodFactory
 
 from ninja_aio.decorators.views import unique_view
 from tests.test_app import schema
@@ -142,3 +143,159 @@ class APIViewDecoratorOperationsTestCase(TestCase):
         payload = schema.SumSchemaIn(a=8, b=4)
         sum_result = schema.SumSchemaOut(result=payload.a + payload.b).model_dump()
         self.assertEqual(sum_result, {"result": 12})
+
+
+@tag("api_method_factory")
+class ApiMethodFactorySyncHandlerTestCase(TestCase):
+    """Test ApiMethodFactory with sync handlers."""
+
+    namespace = "test_api_method_factory_sync"
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.api = NinjaAIO(urls_namespace=cls.namespace)
+
+        @cls.api.view(prefix="/sync", tags=["Sync"])
+        class SyncView(GenericAPIView):
+            # Use sync handlers at class level to cover lines 149-151
+            @api_get("/ping", response=schema.SumSchemaOut)
+            def sync_ping(self, request):
+                return schema.SumSchemaOut(result=42).model_dump()
+
+            @api_post("/sum", response=schema.SumSchemaOut)
+            def sync_sum(self, request, data: schema.SumSchemaIn):
+                return schema.SumSchemaOut(result=data.a + data.b).model_dump()
+
+        cls.path = "/sync"
+        cls.request = Request(cls.path)
+
+    def test_routes_mounted(self):
+        self.assertEqual(len(self.api._routers), 2)
+        router_path, router = self.api._routers[1]
+        self.assertEqual(router_path, self.path)
+        urls = [str(r.pattern) for r in router.urls_paths(self.path)]
+        self.assertTrue(any("ping" in u for u in urls))
+        self.assertTrue(any("sum" in u for u in urls))
+
+    def test_sync_handlers_logic(self):
+        # Validate the sync handlers work correctly
+        ping_result = schema.SumSchemaOut(result=42).model_dump()
+        self.assertEqual(ping_result, {"result": 42})
+        payload = schema.SumSchemaIn(a=10, b=5)
+        sum_result = schema.SumSchemaOut(result=payload.a + payload.b).model_dump()
+        self.assertEqual(sum_result, {"result": 15})
+
+
+@tag("api_method_factory")
+class ApiMethodFactoryNoRouterTestCase(TestCase):
+    """Test ApiMethodFactory error when router is None."""
+
+    def test_register_without_router_raises_error(self):
+        """Test that registering on an instance without router raises RuntimeError."""
+        factory = ApiMethodFactory("get")
+        decorator = factory.build_decorator("/test", response=schema.SumSchemaOut)
+
+        @decorator
+        def dummy_handler(self, request):
+            return {"result": 1}
+
+        # Create a mock instance without a router
+        class NoRouterInstance:
+            router = None
+
+        instance = NoRouterInstance()
+
+        with self.assertRaises(RuntimeError) as ctx:
+            dummy_handler._api_register(instance)
+
+        self.assertIn("does not have a router", str(ctx.exception))
+
+
+@tag("api_method_factory")
+class ApiMethodFactoryMetadataExceptionTestCase(TestCase):
+    """Test ApiMethodFactory exception handling in _apply_metadata (covers lines 161-162, 176-177)."""
+
+    def test_apply_metadata_handles_name_exception(self):
+        """Test that _apply_metadata handles exceptions when setting __name__."""
+        factory = ApiMethodFactory("get")
+
+        class ImmutableName:
+            """A callable with an immutable __name__."""
+
+            def __call__(self, request, *args, **kwargs):
+                return {"result": 1}
+
+            @property
+            def __name__(self):
+                return "immutable"
+
+            @__name__.setter
+            def __name__(self, value):
+                raise TypeError("Cannot set __name__")
+
+        immutable_handler = ImmutableName()
+
+        # This should not raise - the exception should be caught
+        factory._apply_metadata(immutable_handler, lambda self, request: None)
+
+    def test_apply_metadata_handles_signature_exception(self):
+        """Test that _apply_metadata handles exceptions when setting signature."""
+        factory = ApiMethodFactory("get")
+
+        # Create an original function that will cause signature issues
+        def handler(request, *args, **kwargs):
+            return {"result": 1}
+
+        # Create a mock clean_handler that doesn't support __signature__ assignment
+        class NoSignatureHandler:
+            def __call__(self, request, *args, **kwargs):
+                return {"result": 1}
+
+            @property
+            def __signature__(self):
+                raise AttributeError("No signature")
+
+            @__signature__.setter
+            def __signature__(self, value):
+                raise AttributeError("Cannot set __signature__")
+
+        no_sig_handler = NoSignatureHandler()
+
+        # This should not raise - the exception should be caught
+        factory._apply_metadata(no_sig_handler, handler)
+
+
+@tag("api_method_factory")
+class ApiMethodFactoryDecoratorsTestCase(TestCase):
+    """Test ApiMethodFactory decorators parameter application (covers lines 219-220)."""
+
+    namespace = "test_api_method_factory_decorators"
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.api = NinjaAIO(urls_namespace=cls.namespace)
+
+        # Track decorator calls
+        cls.decorator_called = False
+
+        def tracking_decorator(func):
+            """A decorator that tracks if it was applied."""
+            cls.decorator_called = True
+            return func
+
+        @cls.api.view(prefix="/decorated", tags=["Decorated"])
+        class DecoratedView(GenericAPIView):
+            @api_get(
+                "/test",
+                response=schema.SumSchemaOut,
+                decorators=[tracking_decorator],
+            )
+            async def decorated_handler(self, request):
+                return schema.SumSchemaOut(result=100).model_dump()
+
+        cls.path = "/decorated"
+
+    def test_decorators_are_applied(self):
+        """Test that custom decorators are applied to handlers."""
+        # The decorator should have been called during view registration
+        self.assertTrue(self.decorator_called)

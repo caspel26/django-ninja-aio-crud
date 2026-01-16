@@ -1,6 +1,7 @@
 from unittest import mock
 from django.test import TestCase, tag
 from tests.test_app import models as app_models
+from ninja_aio.helpers.query import ScopeNamespace
 
 
 @tag("query_util_dedicated")
@@ -93,3 +94,24 @@ class QueryUtilDedicatedTestCase(TestCase):
             _ = util_simple.apply_queryset_optimizations(qs, util_simple.SCOPES.READ)
             m_sel.assert_not_called()
             m_pref.assert_not_called()
+
+
+@tag("scope_namespace")
+class ScopeNamespaceTestCase(TestCase):
+    """Tests for ScopeNamespace class (covers line 17 - __iter__)."""
+
+    def test_scope_namespace_iter(self):
+        """Test that ScopeNamespace is iterable (covers line 17)."""
+        namespace = ScopeNamespace(READ="read", WRITE="write", CUSTOM="custom")
+        # Test iteration
+        values = list(namespace)
+        self.assertEqual(len(values), 3)
+        self.assertIn("read", values)
+        self.assertIn("write", values)
+        self.assertIn("custom", values)
+
+    def test_scope_namespace_attributes(self):
+        """Test that ScopeNamespace sets attributes correctly."""
+        namespace = ScopeNamespace(FOO="foo", BAR="bar")
+        self.assertEqual(namespace.FOO, "foo")
+        self.assertEqual(namespace.BAR, "bar")

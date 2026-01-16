@@ -1,4 +1,5 @@
 from ninja_aio.views.api import APIViewSet
+from ninja_aio.schemas import RelationFilterSchema
 
 
 class IcontainsFilterViewSetMixin(APIViewSet):
@@ -273,3 +274,65 @@ class LessEqualDateFilterViewSetMixin(DateFilterViewSetMixin):
     """
 
     _compare_attr = "__lte"
+
+
+class RelationFilterViewSetMixin(APIViewSet):
+    """
+    Mixin providing filtering for related fields in Django QuerySets.
+
+    This mixin applies filters on related fields based on configured RelationFilterSchema
+    entries. Each entry maps a query parameter name to a Django ORM lookup path.
+
+    Attributes:
+        relations_filters: List of RelationFilterSchema defining the relation filters.
+            Each schema specifies:
+            - query_param: The API query parameter name (e.g., "author_id")
+            - query_filter: The Django ORM lookup (e.g., "author__id")
+            - filter_type: Tuple of (type, default) for schema generation
+
+    Example:
+        class BookViewSet(RelationFilterViewSetMixin, APIViewSet):
+            relations_filters = [
+                RelationFilterSchema(
+                    query_param="author_id",
+                    query_filter="author__id",
+                    filter_type=(int, None),
+                ),
+                RelationFilterSchema(
+                    query_param="category_slug",
+                    query_filter="category__slug",
+                    filter_type=(str, None),
+                ),
+            ]
+
+        # GET /books?author_id=5 -> queryset.filter(author__id=5)
+        # GET /books?category_slug=fiction -> queryset.filter(category__slug="fiction")
+
+    Notes:
+        - Filter values that are None or falsy are skipped.
+        - This mixin automatically registers query_params from relations_filters.
+    """
+
+    relations_filters: list[RelationFilterSchema] = []
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        cls.query_params = {
+            **cls.query_params,
+            **{
+                rel_filter.query_param: rel_filter.filter_type
+                for rel_filter in cls.relations_filters
+            },
+        }
+
+    async def query_params_handler(self, queryset, filters):
+        """
+        Apply relation filters to the queryset based on configured relations_filters.
+        """
+        base_qs = await super().query_params_handler(queryset, filters)
+        rel_filters = {}
+        for rel_filter in self.relations_filters:
+            value = filters.get(rel_filter.query_param)
+            if value is not None:
+                rel_filters[rel_filter.query_filter] = value
+        return base_qs.filter(**rel_filters) if rel_filters else base_qs
