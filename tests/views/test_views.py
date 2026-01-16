@@ -209,3 +209,98 @@ class ApiMethodFactoryNoRouterTestCase(TestCase):
             dummy_handler._api_register(instance)
 
         self.assertIn("does not have a router", str(ctx.exception))
+
+
+@tag("api_method_factory")
+class ApiMethodFactoryMetadataExceptionTestCase(TestCase):
+    """Test ApiMethodFactory exception handling in _apply_metadata (covers lines 161-162, 176-177)."""
+
+    def test_apply_metadata_handles_name_exception(self):
+        """Test that _apply_metadata handles exceptions when setting __name__."""
+        factory = ApiMethodFactory("get")
+
+        class MockView:
+            pass
+
+        # Create a handler that will trigger the exception path
+        # Using a callable that doesn't allow __name__ assignment
+        class ImmutableName:
+            """A callable with an immutable __name__."""
+
+            def __call__(self, request, *args, **kwargs):
+                return {"result": 1}
+
+            @property
+            def __name__(self):
+                return "immutable"
+
+            @__name__.setter
+            def __name__(self, value):
+                raise TypeError("Cannot set __name__")
+
+        immutable_handler = ImmutableName()
+
+        # This should not raise - the exception should be caught
+        factory._apply_metadata(immutable_handler, lambda self, request: None)
+
+    def test_apply_metadata_handles_signature_exception(self):
+        """Test that _apply_metadata handles exceptions when setting signature."""
+        factory = ApiMethodFactory("get")
+
+        # Create an original function that will cause signature issues
+        def handler(request, *args, **kwargs):
+            return {"result": 1}
+
+        # Create a mock clean_handler that doesn't support __signature__ assignment
+        class NoSignatureHandler:
+            def __call__(self, request, *args, **kwargs):
+                return {"result": 1}
+
+            @property
+            def __signature__(self):
+                raise AttributeError("No signature")
+
+            @__signature__.setter
+            def __signature__(self, value):
+                raise AttributeError("Cannot set __signature__")
+
+        no_sig_handler = NoSignatureHandler()
+
+        # This should not raise - the exception should be caught
+        factory._apply_metadata(no_sig_handler, handler)
+
+
+@tag("api_method_factory")
+class ApiMethodFactoryDecoratorsTestCase(TestCase):
+    """Test ApiMethodFactory decorators parameter application (covers lines 219-220)."""
+
+    namespace = "test_api_method_factory_decorators"
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.api = NinjaAIO(urls_namespace=cls.namespace)
+
+        # Track decorator calls
+        cls.decorator_called = False
+
+        def tracking_decorator(func):
+            """A decorator that tracks if it was applied."""
+            cls.decorator_called = True
+            return func
+
+        @cls.api.view(prefix="/decorated", tags=["Decorated"])
+        class DecoratedView(GenericAPIView):
+            @api_get(
+                "/test",
+                response=schema.SumSchemaOut,
+                decorators=[tracking_decorator],
+            )
+            async def decorated_handler(self, request):
+                return schema.SumSchemaOut(result=100).model_dump()
+
+        cls.path = "/decorated"
+
+    def test_decorators_are_applied(self):
+        """Test that custom decorators are applied to handlers."""
+        # The decorator should have been called during view registration
+        self.assertTrue(self.decorator_called)
