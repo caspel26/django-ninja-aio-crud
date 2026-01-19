@@ -3,7 +3,7 @@ from ipaddress import IPv4Address, IPv6Address
 from typing import Any
 
 import orjson
-from django.http import HttpRequest
+from django.http import HttpRequest, HttpResponseBase
 from django.conf import settings
 from ninja.renderers import BaseRenderer
 from pydantic import AnyUrl
@@ -14,6 +14,8 @@ class ORJSONRenderer(BaseRenderer):
     option = getattr(settings, "NINJA_AIO_ORJSON_RENDERER_OPTION", None)
 
     def render(self, request: HttpRequest, data: dict, *, response_status):
+        if isinstance(data, HttpResponseBase):
+            return data
         try:
             old_d = data
             for k, v in old_d.items():

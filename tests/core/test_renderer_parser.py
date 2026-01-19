@@ -1,6 +1,7 @@
 import base64
 from ipaddress import IPv4Address, IPv6Address
 
+from django.http import HttpResponse, StreamingHttpResponse
 from django.test import TestCase, tag
 import orjson
 from ninja_aio.renders import ORJSONRenderer
@@ -73,3 +74,25 @@ class ORJSONRendererParserTestCase(TestCase):
         rendered = self.renderer.render(DummyRequest(), int_data, response_status=200)
         decoded = orjson.loads(rendered)
         self.assertEqual(decoded, 42)
+
+    def test_renderer_http_response_passthrough(self):
+        """Test that renderer returns HttpResponse as-is without serialization."""
+        response = HttpResponse(
+            b"-----BEGIN PUBLIC KEY-----\ntest\n-----END PUBLIC KEY-----",
+            content_type="application/x-pem-file",
+            status=200,
+        )
+        rendered = self.renderer.render(DummyRequest(), response, response_status=200)
+        self.assertIs(rendered, response)
+        self.assertEqual(rendered.content, b"-----BEGIN PUBLIC KEY-----\ntest\n-----END PUBLIC KEY-----")
+        self.assertEqual(rendered["Content-Type"], "application/x-pem-file")
+
+    def test_renderer_streaming_http_response_passthrough(self):
+        """Test that renderer returns StreamingHttpResponse as-is."""
+        response = StreamingHttpResponse(
+            iter([b"chunk1", b"chunk2"]),
+            content_type="application/octet-stream",
+        )
+        rendered = self.renderer.render(DummyRequest(), response, response_status=200)
+        self.assertIs(rendered, response)
+        self.assertEqual(rendered["Content-Type"], "application/octet-stream")
