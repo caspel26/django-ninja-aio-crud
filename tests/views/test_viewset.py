@@ -971,3 +971,163 @@ class DetailSchemaFallbackTestCase(TestCase):
         retrieve_schema = self.viewset._get_retrieve_schema()
         # The retrieve schema should be the detail schema (which is the fallback)
         self.assertEqual(retrieve_schema, self.viewset.schema_detail)
+
+
+# ==========================================================
+#               MATCH CASE FILTER MIXIN TESTS
+# ==========================================================
+
+
+@tag("match_case_filter_mixin")
+class MatchCaseFilterViewSetMixinTestCase(
+    BaseTests.ModelSerializerViewSetTestCaseBase,
+    Tests.ViewSetTestCase,
+):
+    """Test MatchCaseFilterViewSetMixin functionality."""
+
+    namespace = "test_match_case_filter_mixin_viewset"
+    model = models.TestModelSerializer
+    viewset = views.TestModelSerializerMatchCaseFilterAPI()
+
+    async def _drop_all_objects(self):
+        await self.model.objects.all().adelete()
+
+    async def test_match_case_filter_true_includes(self):
+        """Test filtering with True value includes matching records."""
+        await self._drop_all_objects()
+        obj_approved = await self.model.objects.acreate(
+            name="approved_item", description="desc", status="approved"
+        )
+        obj_pending = await self.model.objects.acreate(
+            name="pending_item", description="desc", status="pending"
+        )
+        obj_rejected = await self.model.objects.acreate(
+            name="rejected_item", description="desc", status="rejected"
+        )
+        # Filter with is_approved=True should return only approved items
+        res = await self.viewset.query_params_handler(
+            self.model.objects.all(),
+            {"is_approved": True},
+        )
+        self.assertEqual(await res.acount(), 1)
+        self.assertEqual(await res.afirst(), obj_approved)
+
+    async def test_match_case_filter_false_excludes(self):
+        """Test filtering with False value excludes matching records."""
+        await self._drop_all_objects()
+        obj_approved = await self.model.objects.acreate(
+            name="approved_item", description="desc", status="approved"
+        )
+        obj_pending = await self.model.objects.acreate(
+            name="pending_item", description="desc", status="pending"
+        )
+        obj_rejected = await self.model.objects.acreate(
+            name="rejected_item", description="desc", status="rejected"
+        )
+        # Filter with is_approved=False should exclude approved items
+        res = await self.viewset.query_params_handler(
+            self.model.objects.all(),
+            {"is_approved": False},
+        )
+        self.assertEqual(await res.acount(), 2)
+        results = [obj async for obj in res]
+        self.assertIn(obj_pending, results)
+        self.assertIn(obj_rejected, results)
+        self.assertNotIn(obj_approved, results)
+
+    async def test_match_case_filter_none_no_filtering(self):
+        """Test that None filter value doesn't apply any filtering."""
+        await self._drop_all_objects()
+        await self.model.objects.acreate(
+            name="approved_item", description="desc", status="approved"
+        )
+        await self.model.objects.acreate(
+            name="pending_item", description="desc", status="pending"
+        )
+        await self.model.objects.acreate(
+            name="rejected_item", description="desc", status="rejected"
+        )
+        # Filter with None should return all objects
+        res = await self.viewset.query_params_handler(
+            self.model.objects.all(),
+            {"is_approved": None},
+        )
+        self.assertEqual(await res.acount(), 3)
+
+    async def test_match_case_filter_empty_filters(self):
+        """Test that empty filters dict returns all objects."""
+        await self._drop_all_objects()
+        await self.model.objects.acreate(
+            name="approved_item", description="desc", status="approved"
+        )
+        await self.model.objects.acreate(
+            name="pending_item", description="desc", status="pending"
+        )
+        res = await self.viewset.query_params_handler(
+            self.model.objects.all(),
+            {},
+        )
+        self.assertEqual(await res.acount(), 2)
+
+    def test_query_params_registered(self):
+        """Test that filters_match_cases are properly registered in query_params."""
+        self.assertIn("is_approved", self.viewset.query_params)
+        self.assertEqual(self.viewset.query_params["is_approved"], (bool, None))
+
+    def test_filters_match_cases_fields_property(self):
+        """Test that filters_match_cases_fields property returns correct list."""
+        self.assertEqual(self.viewset.filters_match_cases_fields, ["is_approved"])
+
+
+@tag("match_case_filter_mixin_exclude")
+class MatchCaseFilterViewSetMixinExcludeTestCase(TestCase):
+    """Test MatchCaseFilterViewSetMixin with exclude behavior."""
+
+    model = models.TestModelSerializer
+    viewset = views.TestModelSerializerMatchCaseExcludeFilterAPI()
+
+    async def _drop_all_objects(self):
+        await self.model.objects.all().adelete()
+
+    async def test_match_case_exclude_true(self):
+        """Test filtering with True value excludes matching records."""
+        await self._drop_all_objects()
+        obj_approved = await self.model.objects.acreate(
+            name="approved_item", description="desc", status="approved"
+        )
+        obj_pending = await self.model.objects.acreate(
+            name="pending_item", description="desc", status="pending"
+        )
+        obj_rejected = await self.model.objects.acreate(
+            name="rejected_item", description="desc", status="rejected"
+        )
+        # Filter with hide_pending=True should exclude pending items
+        res = await self.viewset.query_params_handler(
+            self.model.objects.all(),
+            {"hide_pending": True},
+        )
+        self.assertEqual(await res.acount(), 2)
+        results = [obj async for obj in res]
+        self.assertIn(obj_approved, results)
+        self.assertIn(obj_rejected, results)
+        self.assertNotIn(obj_pending, results)
+
+    async def test_match_case_exclude_false_includes_only(self):
+        """Test filtering with False value includes only matching records."""
+        await self._drop_all_objects()
+        obj_approved = await self.model.objects.acreate(
+            name="approved_item", description="desc", status="approved"
+        )
+        obj_pending = await self.model.objects.acreate(
+            name="pending_item", description="desc", status="pending"
+        )
+        obj_rejected = await self.model.objects.acreate(
+            name="rejected_item", description="desc", status="rejected"
+        )
+        # Filter with hide_pending=False should include only pending items
+        res = await self.viewset.query_params_handler(
+            self.model.objects.all(),
+            {"hide_pending": False},
+        )
+        self.assertEqual(await res.acount(), 1)
+        self.assertEqual(await res.afirst(), obj_pending)
