@@ -183,6 +183,89 @@ This enables:
 - `GET /books?author=5` → `queryset.filter(author__id=5)`
 - `GET /books?category_name=fiction` → `queryset.filter(category__name__icontains="fiction")`
 
+## MatchCaseFilterViewSetMixin
+
+Applies conditional filtering based on boolean query parameters, where different filter conditions are applied for `True` and `False` values. This is useful when you need to map a simple boolean API parameter to complex underlying filter logic.
+
+- Behavior: For each `MatchCaseFilterSchema` entry, applies different Django ORM filters based on the boolean value of the query parameter.
+- Configuration: Define `filters_match_cases` as a list of `MatchCaseFilterSchema` objects.
+- Query params are automatically registered from `filters_match_cases`.
+- Supports both `filter()` (include) and `exclude()` operations via the `include` attribute.
+
+Each `MatchCaseFilterSchema` requires:
+
+- `query_param`: The API query parameter name exposed to clients.
+- `cases`: A `BooleanMatchFilterSchema` defining the filter conditions for `True` and `False` cases.
+
+Each `MatchConditionFilterSchema` (used within `BooleanMatchFilterSchema`) requires:
+
+- `query_filter`: A dictionary of Django ORM lookups to apply (e.g., `{"status": "active"}`).
+- `include`: Boolean indicating whether to use `filter()` (True) or `exclude()` (False). Defaults to `True`.
+
+Example - Simple status filtering:
+
+```python
+from ninja_aio.views.mixins import MatchCaseFilterViewSetMixin
+from ninja_aio.views.api import APIViewSet
+from ninja_aio.schemas import (
+    MatchCaseFilterSchema,
+    MatchConditionFilterSchema,
+    BooleanMatchFilterSchema,
+)
+
+class OrderViewSet(MatchCaseFilterViewSetMixin, APIViewSet):
+    model = models.Order
+    api = api
+    filters_match_cases = [
+        MatchCaseFilterSchema(
+            query_param="is_completed",
+            cases=BooleanMatchFilterSchema(
+                true=MatchConditionFilterSchema(
+                    query_filter={"status": "completed"},
+                    include=True,
+                ),
+                false=MatchConditionFilterSchema(
+                    query_filter={"status": "completed"},
+                    include=False,  # excludes completed orders
+                ),
+            ),
+        ),
+    ]
+```
+
+This enables:
+
+- `GET /orders?is_completed=true` → `queryset.filter(status="completed")`
+- `GET /orders?is_completed=false` → `queryset.exclude(status="completed")`
+
+Example - Complex filtering with multiple conditions:
+
+```python
+class TaskViewSet(MatchCaseFilterViewSetMixin, APIViewSet):
+    model = models.Task
+    api = api
+    filters_match_cases = [
+        MatchCaseFilterSchema(
+            query_param="show_active",
+            cases=BooleanMatchFilterSchema(
+                true=MatchConditionFilterSchema(
+                    query_filter={"status__in": ["pending", "in_progress"]},
+                    include=True,
+                ),
+                false=MatchConditionFilterSchema(
+                    query_filter={"status__in": ["completed", "cancelled"]},
+                    include=True,
+                ),
+            ),
+        ),
+    ]
+```
+
+This enables:
+
+- `GET /tasks?show_active=true` → `queryset.filter(status__in=["pending", "in_progress"])`
+- `GET /tasks?show_active=false` → `queryset.filter(status__in=["completed", "cancelled"])`
+
 ## Tips
 
 - Align `query_params` types with expected filter values; prefer Pydantic `date`/`datetime` for date filters so values implement `isoformat`.

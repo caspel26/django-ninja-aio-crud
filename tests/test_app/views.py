@@ -1,6 +1,11 @@
 import datetime
 from ninja_aio.views import mixins
-from ninja_aio.schemas import RelationFilterSchema
+from ninja_aio.schemas import (
+    RelationFilterSchema,
+    MatchCaseFilterSchema,
+    MatchConditionFilterSchema,
+    BooleanMatchFilterSchema,
+)
 
 from tests.generics.views import GenericAPIViewSet
 from tests.test_app import models, schema, serializers
@@ -176,5 +181,64 @@ class TestModelSerializerForeignKeyRelationFilterAPI(
             query_param="test_model_serializer_name",
             query_filter="test_model_serializer__name__icontains",
             filter_type=(str, None),
+        ),
+    ]
+
+
+# ==========================================================
+#                  MATCH CASE FILTER MIXIN APIS
+# ==========================================================
+
+
+class TestModelSerializerMatchCaseFilterAPI(
+    GenericAPIViewSet,
+    mixins.MatchCaseFilterViewSetMixin,
+):
+    """
+    ViewSet for testing MatchCaseFilterViewSetMixin.
+    Uses status field to filter by 'is_approved' boolean query param.
+    """
+
+    model = models.TestModelSerializer
+    filters_match_cases = [
+        MatchCaseFilterSchema(
+            query_param="is_approved",
+            cases=BooleanMatchFilterSchema(
+                true=MatchConditionFilterSchema(
+                    query_filter={"status": "approved"},
+                    include=True,
+                ),
+                false=MatchConditionFilterSchema(
+                    query_filter={"status": "approved"},
+                    include=False,
+                ),
+            ),
+        ),
+    ]
+
+
+class TestModelSerializerMatchCaseExcludeFilterAPI(
+    GenericAPIViewSet,
+    mixins.MatchCaseFilterViewSetMixin,
+):
+    """
+    ViewSet for testing MatchCaseFilterViewSetMixin with exclude behavior.
+    Uses status field to filter by 'hide_pending' boolean query param.
+    """
+
+    model = models.TestModelSerializer
+    filters_match_cases = [
+        MatchCaseFilterSchema(
+            query_param="hide_pending",
+            cases=BooleanMatchFilterSchema(
+                true=MatchConditionFilterSchema(
+                    query_filter={"status": "pending"},
+                    include=False,  # exclude pending when True
+                ),
+                false=MatchConditionFilterSchema(
+                    query_filter={"status": "pending"},
+                    include=True,  # include only pending when False
+                ),
+            ),
         ),
     ]

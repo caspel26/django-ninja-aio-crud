@@ -314,6 +314,14 @@ class APIViewSet(API):
     def _check_relations_filters(self, filter: str):
         return filter in getattr(self, "relations_filters_fields", [])
 
+    def _check_match_cases_filters(self, filter: str):
+        return filter in getattr(self, "filters_match_cases_fields", [])
+
+    def _is_special_filter(self, filter: str):
+        return self._check_relations_filters(filter) or self._check_match_cases_filters(
+            filter
+        )
+
     def _auth_view(self, view_type: str):
         """
         Resolve auth for a specific HTTP verb; falls back to self.auth if NOT_SET.

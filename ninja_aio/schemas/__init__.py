@@ -5,9 +5,20 @@ from .api import (
     M2MAddSchemaIn,
     M2MRemoveSchemaIn,
     M2MSchemaIn,
-    RelationFilterSchema,
 )
-from .helpers import M2MRelationSchema, QuerySchema, ModelQuerySetSchema, ObjectQuerySchema, ObjectsQuerySchema
+from .filters import (
+    RelationFilterSchema,
+    MatchCaseFilterSchema,
+    MatchConditionFilterSchema,
+    BooleanMatchFilterSchema,
+)
+from .helpers import (
+    M2MRelationSchema,
+    QuerySchema,
+    ModelQuerySetSchema,
+    ObjectQuerySchema,
+    ObjectsQuerySchema,
+)
 
 __all__ = [
     "GenericMessageSchema",
@@ -22,4 +33,7 @@ __all__ = [
     "ObjectQuerySchema",
     "ObjectsQuerySchema",
     "RelationFilterSchema",
+    "MatchCaseFilterSchema",
+    "MatchConditionFilterSchema",
+    "BooleanMatchFilterSchema",
 ]
