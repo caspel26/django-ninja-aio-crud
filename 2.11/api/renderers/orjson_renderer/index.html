@@ -20,7 +20,7 @@
     
     
       
-        <title>ORJSON renderer option - Django Ninja Aio CRUD</title>
+        <title>ORJSON Renderer - Django Ninja Aio CRUD</title>
       
     
     
@@ -86,7 +86,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#orjson-renderer-option" class="md-skip">
+        <a href="#orjson-renderer" class="md-skip">
           Skip to content
         </a>
       
@@ -123,7 +123,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              ORJSON renderer option
+              ORJSON Renderer
             
           </span>
         </div>
@@ -1249,8 +1249,10 @@
   
 
 
-<h1 id="orjson-renderer-option">ORJSON renderer option<a class="headerlink" href="#orjson-renderer-option" title="Permanent link">&para;</a></h1>
-<p>This package uses an internal ORJSON-based renderer. Configure serialization options via Django settings:</p>
+<h1 id="orjson-renderer">ORJSON Renderer<a class="headerlink" href="#orjson-renderer" title="Permanent link">&para;</a></h1>
+<p>This package uses an internal ORJSON-based renderer that automatically handles JSON serialization with support for special types.</p>
+<h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h2>
+<p>Configure serialization options via Django settings:</p>
 <div class="language-python highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># settings.py</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">orjson</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
@@ -1262,9 +1264,37 @@
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">orjson</span><span class="o">.</span><span class="n">OPT_INDENT_2</span> <span class="o">|</span> <span class="n">orjson</span><span class="o">.</span><span class="n">OPT_NON_STR_KEYS</span>
 </span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="p">)</span>
 </span></code></pre></div>
-<p>Notes:
-- The value is an orjson option bitmask (e.g., <code>orjson.OPT_INDENT_2</code>, <code>orjson.OPT_NON_STR_KEYS</code>), and you can combine multiple options using <code>|</code>.
-- If not set, the default <code>orjson.dumps</code> options are used.</p>
+<p>Notes:</p>
+<ul>
+<li>The value is an orjson option bitmask (e.g., <code>orjson.OPT_INDENT_2</code>, <code>orjson.OPT_NON_STR_KEYS</code>), and you can combine multiple options using <code>|</code>.</li>
+<li>If not set, the default <code>orjson.dumps</code> options are used.</li>
+</ul>
+<h2 id="httpresponse-passthrough">HttpResponse Passthrough<a class="headerlink" href="#httpresponse-passthrough" title="Permanent link">&para;</a></h2>
+<p>The renderer automatically detects when you return a Django <code>HttpResponse</code> (or any <code>HttpResponseBase</code> subclass) and passes it through without JSON serialization. This allows you to return custom responses with different content types.</p>
+<div class="language-python highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">django.http</span><span class="w"> </span><span class="kn">import</span> <span class="n">HttpResponse</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="nd">@api</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;/public-key&quot;</span><span class="p">)</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">get_public_key</span><span class="p">(</span><span class="n">request</span><span class="p">):</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="k">return</span> <span class="n">HttpResponse</span><span class="p">(</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>        <span class="n">settings</span><span class="o">.</span><span class="n">JWT_PUBLIC_KEY</span><span class="o">.</span><span class="n">as_pem</span><span class="p">(),</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>        <span class="n">content_type</span><span class="o">=</span><span class="s2">&quot;application/x-pem-file&quot;</span><span class="p">,</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>        <span class="n">status</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    <span class="p">)</span>
+</span></code></pre></div>
+<p>This also works with <code>StreamingHttpResponse</code> for large files:</p>
+<div class="language-python highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">django.http</span><span class="w"> </span><span class="kn">import</span> <span class="n">StreamingHttpResponse</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="nd">@api</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;/download&quot;</span><span class="p">)</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">download_file</span><span class="p">(</span><span class="n">request</span><span class="p">):</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="k">return</span> <span class="n">StreamingHttpResponse</span><span class="p">(</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>        <span class="n">file_iterator</span><span class="p">(),</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>        <span class="n">content_type</span><span class="o">=</span><span class="s2">&quot;application/octet-stream&quot;</span><span class="p">,</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="p">)</span>
+</span></code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>When returning an <code>HttpResponse</code> directly, the response bypasses the renderer entirely. Set the <code>status</code> parameter on the <code>HttpResponse</code> itself rather than using a tuple return like <code>return 200, HttpResponse(...)</code>.</p>
+</div>
 
 
 
