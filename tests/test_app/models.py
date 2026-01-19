@@ -82,6 +82,7 @@ class TestModelSerializer(BaseTestModelSerializer):
     age = models.PositiveIntegerField(default=0)
     active = models.BooleanField(default=True)
     active_from = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=20, default="pending")
 
 
 class TestModelSerializerReverseForeignKey(BaseTestModelSerializer):
