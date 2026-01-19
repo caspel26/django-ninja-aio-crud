@@ -9,6 +9,8 @@ from .api import (
 from .filters import (
     RelationFilterSchema,
     MatchCaseFilterSchema,
+    MatchConditionFilterSchema,
+    BooleanMatchFilterSchema,
 )
 from .helpers import M2MRelationSchema, QuerySchema, ModelQuerySetSchema, ObjectQuerySchema, ObjectsQuerySchema
 
@@ -26,4 +28,6 @@ __all__ = [
     "ObjectsQuerySchema",
     "RelationFilterSchema",
     "MatchCaseFilterSchema",
+    "MatchConditionFilterSchema",
+    "BooleanMatchFilterSchema",
 ]
