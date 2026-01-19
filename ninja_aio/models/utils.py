@@ -601,7 +601,7 @@ class ModelUtil:
     async def _bump_object_from_schema(
         self, obj: type["ModelSerializer"] | models.Model, schema: Schema
     ):
-        return (await sync_to_async(schema.from_orm)(obj)).model_dump(mode="json")
+        return (await sync_to_async(schema.from_orm)(obj)).model_dump()
 
     def _validate_read_params(self, request: HttpRequest, query_data: QuerySchema):
         """Validate required parameters for read operations."""
