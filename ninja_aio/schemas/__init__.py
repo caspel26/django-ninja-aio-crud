@@ -12,7 +12,13 @@ from .filters import (
     MatchConditionFilterSchema,
     BooleanMatchFilterSchema,
 )
-from .helpers import M2MRelationSchema, QuerySchema, ModelQuerySetSchema, ObjectQuerySchema, ObjectsQuerySchema
+from .helpers import (
+    M2MRelationSchema,
+    QuerySchema,
+    ModelQuerySetSchema,
+    ObjectQuerySchema,
+    ObjectsQuerySchema,
+)
 
 __all__ = [
     "GenericMessageSchema",
