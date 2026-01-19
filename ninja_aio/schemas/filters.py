@@ -63,11 +63,10 @@ class MatchCaseFilterSchema(FilterSchema):
 
     Attributes:
         filter_type: A tuple of (type, default_value) used to generate the query parameter
-            field in the filters schema. Example: (str, None) for optional string filter.
+            field in the filters schema. Defaults to (bool, None) for optional boolean filter.
         query_param: The name of the query parameter exposed in the API endpoint.
-            This is what clients will use in requests (e.g., ?status=active).
-        cases: A dictionary mapping case values to Django ORM lookups.
-            Example: {"active": "is_active", "inactive": "is_inactive"}.
+            This is what clients will use in requests (e.g., ?is_active=true).
+        cases: A BooleanMatchFilterSchema defining the filter conditions for True and False cases.
     """
 
     filter_type: tuple[type, Any] = (bool, None)
