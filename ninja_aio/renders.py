@@ -21,7 +21,7 @@ class ORJSONRenderer(BaseRenderer):
                     data |= {k: self.render_list(v)}
             return self.dumps(self.render_dict(data))
         except AttributeError:
-            return data
+            return self.dumps(data)
 
     @classmethod
     def dumps(cls, data: dict) -> bytes:
