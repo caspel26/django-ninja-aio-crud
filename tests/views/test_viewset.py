@@ -998,10 +998,10 @@ class MatchCaseFilterViewSetMixinTestCase(
         obj_approved = await self.model.objects.acreate(
             name="approved_item", description="desc", status="approved"
         )
-        obj_pending = await self.model.objects.acreate(
+        await self.model.objects.acreate(
             name="pending_item", description="desc", status="pending"
         )
-        obj_rejected = await self.model.objects.acreate(
+        await self.model.objects.acreate(
             name="rejected_item", description="desc", status="rejected"
         )
         # Filter with is_approved=True should return only approved items
@@ -1115,13 +1115,13 @@ class MatchCaseFilterViewSetMixinExcludeTestCase(TestCase):
     async def test_match_case_exclude_false_includes_only(self):
         """Test filtering with False value includes only matching records."""
         await self._drop_all_objects()
-        obj_approved = await self.model.objects.acreate(
+        await self.model.objects.acreate(
             name="approved_item", description="desc", status="approved"
         )
         obj_pending = await self.model.objects.acreate(
             name="pending_item", description="desc", status="pending"
         )
-        obj_rejected = await self.model.objects.acreate(
+        await self.model.objects.acreate(
             name="rejected_item", description="desc", status="rejected"
         )
         # Filter with hide_pending=False should include only pending items
