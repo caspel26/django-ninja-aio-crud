@@ -293,6 +293,7 @@ Relations are declared via `M2MRelationSchema` objects (not tuples). Each schema
 - `related_schema`: optional pre-built schema for the related model (auto-generated if the `model` is a `ModelSerializer`)
 - `serializer_class`: optional `Serializer` class for plain Django models. When provided, `related_schema` is auto-generated from the serializer. Cannot be used when `model` is a `ModelSerializer`.
 - `append_slash`: bool to control trailing slash for the GET relation endpoint path. Defaults to `False` (no trailing slash) for backward compatibility. When `True`, the GET path ends with a trailing slash.
+- `verbose_name_plural`: optional human-readable plural name for the related model, used in endpoint summaries and descriptions. When not provided, defaults to the related model's `_meta.verbose_name_plural`.
 
 If `path` is empty it falls back to the related model verbose name (lowercase plural).
 If `filters` is provided, a per-relation filters schema is auto-generated and exposed on the GET relation endpoint:
@@ -472,6 +473,19 @@ M2MRelationSchema(
     related_name="tags",
     filters={"name": (str, "")},
     append_slash=True,  # GET /{base}/{pk}/tags/
+)
+```
+
+Example with custom verbose name:
+
+```python
+M2MRelationSchema(
+    model=Tag,
+    related_name="tags",
+    verbose_name_plural="Article Tags",  # Used in summaries: "Get Article Tags", "Add or Remove Article Tags"
+    add=True,
+    remove=True,
+    get=True,
 )
 ```
 
