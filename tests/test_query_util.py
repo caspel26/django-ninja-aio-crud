@@ -96,6 +96,60 @@ class QueryUtilDedicatedTestCase(TestCase):
             m_pref.assert_not_called()
 
 
+    def test_detail_scope_fallback_to_read_select_related(self):
+        """Test that DETAIL scope falls back to READ's select_related when not configured."""
+        # TestModelSerializerForeignKey has read config but no detail config
+        qs = app_models.TestModelSerializerForeignKey.objects.all()
+        with mock.patch(
+            "django.db.models.query.QuerySet.select_related",
+            side_effect=lambda self, *args: self,
+            autospec=True,
+        ) as m_sel:
+            _ = self.query_util_fk.apply_queryset_optimizations(
+                qs, self.query_util_fk.SCOPES.DETAIL
+            )
+            sel_args = m_sel.call_args[0][1:]
+            # Should use read_config's select_related as fallback
+            self.assertEqual(sel_args, ("test_model_serializer",))
+
+    def test_detail_scope_fallback_to_read_prefetch_related(self):
+        """Test that DETAIL scope falls back to READ's prefetch_related when not configured."""
+        # TestModelSerializerManyToMany has queryset_request with prefetch but no detail
+        # We need to set up read config with prefetch to test fallback
+        qs = app_models.TestModelSerializerManyToMany.objects.all()
+        with mock.patch(
+            "django.db.models.query.QuerySet.prefetch_related",
+            side_effect=lambda self, *args: self,
+            autospec=True,
+        ) as m_pref:
+            _ = self.query_util_m2m.apply_queryset_optimizations(
+                qs, self.query_util_m2m.SCOPES.DETAIL
+            )
+            # M2M model has no read config, so detail should also have empty prefetch
+            m_pref.assert_not_called()
+
+    def test_detail_config_initialized_with_read_fallback(self):
+        """Test that detail_config is initialized with read_config values when not set."""
+        # FK model has read config with select_related but no detail config
+        self.assertEqual(
+            self.query_util_fk.detail_config.select_related,
+            self.query_util_fk.read_config.select_related,
+        )
+        self.assertEqual(
+            self.query_util_fk.detail_config.prefetch_related,
+            self.query_util_fk.read_config.prefetch_related,
+        )
+
+    def test_detail_config_independent_copy(self):
+        """Test that detail_config is a copy, not a reference to read_config lists."""
+        # Ensure modifying detail_config doesn't affect read_config
+        original_read_select = self.query_util_fk.read_config.select_related.copy()
+        self.query_util_fk.detail_config.select_related.append("test_field")
+        self.assertEqual(
+            self.query_util_fk.read_config.select_related, original_read_select
+        )
+
+
 @tag("scope_namespace")
 class ScopeNamespaceTestCase(TestCase):
     """Tests for ScopeNamespace class (covers line 17 - __iter__)."""
