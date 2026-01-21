@@ -333,11 +333,7 @@ class BaseSerializer:
     @classmethod
     def get_fields(cls, s_type: S_TYPES):
         """Return explicit declared fields for the serializer type."""
-        fields = cls._get_fields(s_type, "fields")
-        # Detail schema falls back to read fields if none declared
-        if not fields and s_type == "detail":
-            return cls._get_fields("read", "fields")
-        return fields
+        return cls._get_fields(s_type, "fields")
 
     @classmethod
     def is_custom(cls, field: str) -> bool:
@@ -781,7 +777,10 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
         if not config_class_name:
             return []
         config_class = getattr(cls, config_class_name)
-        return getattr(config_class, f_type, [])
+        fields = getattr(config_class, f_type, [])
+        if not fields and s_type == "detail":
+            fields = getattr(cls.ReadSerializer, f_type, [])
+        return fields
 
     @classmethod
     def _get_model(cls) -> "ModelSerializer":
@@ -1006,7 +1005,10 @@ class Serializer(BaseSerializer, metaclass=SerializerMeta):
             return []
         schema = cls._get_schema_meta(schema_key)
         if not schema:
-            return []
+            if s_type == "detail":
+                schema = cls._get_schema_meta("out")
+            else:
+                return []
         return getattr(schema, f_type, []) or []
 
     @classmethod

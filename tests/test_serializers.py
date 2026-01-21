@@ -298,6 +298,94 @@ class DetailSerializerTestCase(TestCase):
     def setUp(self):
         warnings.simplefilter("ignore", UserWarning)
 
+    def test_detail_fallback_customs_from_read(self):
+        """Test that detail schema falls back to read customs when not configured."""
+
+        class DetailFallbackCustomsSerializer(serializers.Serializer):
+            class Meta:
+                model = TestModelForeignKey
+                schema_out = serializers.SchemaModelConfig(
+                    fields=["id", "name"],
+                    customs=[("read_custom", str, "default")],
+                )
+                # No schema_detail defined - should fall back to schema_out
+
+        # Detail should inherit customs from read schema
+        schema_detail = DetailFallbackCustomsSerializer.generate_detail_s()
+        self.assertIsNotNone(schema_detail)
+        self.assertIn("id", schema_detail.model_fields)
+        self.assertIn("name", schema_detail.model_fields)
+        self.assertIn("read_custom", schema_detail.model_fields)
+
+    def test_detail_fallback_optionals_from_read(self):
+        """Test that detail schema falls back to read optionals when not configured."""
+
+        class DetailFallbackOptionalsSerializer(serializers.Serializer):
+            class Meta:
+                model = TestModelForeignKey
+                schema_out = serializers.SchemaModelConfig(
+                    fields=["id", "name"],
+                    optionals=[("description", str)],
+                )
+                # No schema_detail defined - should fall back to schema_out
+
+        # Detail should inherit optionals from read schema
+        schema_detail = DetailFallbackOptionalsSerializer.generate_detail_s()
+        self.assertIsNotNone(schema_detail)
+        self.assertIn("id", schema_detail.model_fields)
+        self.assertIn("name", schema_detail.model_fields)
+        self.assertIn("description", schema_detail.model_fields)
+
+    def test_detail_fallback_excludes_from_read(self):
+        """Test that detail schema falls back to read excludes when not configured."""
+
+        class DetailFallbackExcludesSerializer(serializers.Serializer):
+            class Meta:
+                model = TestModelForeignKey
+                schema_out = serializers.SchemaModelConfig(
+                    fields=["id", "name"],
+                    exclude=["test_model"],  # Exclude forward relation
+                )
+                # No schema_detail defined - should fall back to schema_out
+
+        # Detail should inherit excludes from read schema
+        schema_detail = DetailFallbackExcludesSerializer.generate_detail_s()
+        read_schema = DetailFallbackExcludesSerializer.generate_read_s()
+        self.assertIsNotNone(schema_detail)
+        # Both should have the same excludes applied
+        self.assertEqual(
+            set(schema_detail.model_fields.keys()),
+            set(read_schema.model_fields.keys()),
+        )
+
+    def test_detail_does_not_inherit_when_defined(self):
+        """Test that detail does NOT inherit from read when schema_detail is defined."""
+
+        class DetailDoesNotInheritSerializer(serializers.Serializer):
+            class Meta:
+                model = TestModelForeignKey
+                schema_out = serializers.SchemaModelConfig(
+                    fields=["id", "name"],
+                    customs=[("read_custom", str, "default")],
+                )
+                schema_detail = serializers.SchemaModelConfig(
+                    fields=["id", "name", "description"],
+                    # No customs defined - does NOT inherit from read
+                    # because schema_detail is defined (fallback is at schema level)
+                )
+
+        # Read schema should have the custom
+        schema_read = DetailDoesNotInheritSerializer.generate_read_s()
+        self.assertIn("read_custom", schema_read.model_fields)
+
+        # Detail schema does NOT inherit customs from read because schema_detail is defined
+        # (Serializer fallback is at the schema level, not per-field-type)
+        schema_detail = DetailDoesNotInheritSerializer.generate_detail_s()
+        self.assertIn("id", schema_detail.model_fields)
+        self.assertIn("name", schema_detail.model_fields)
+        self.assertIn("description", schema_detail.model_fields)
+        self.assertNotIn("read_custom", schema_detail.model_fields)
+
     def test_generate_detail_schema_with_serializer(self):
         """Test generate_detail_s() with Serializer class."""
 
@@ -416,3 +504,97 @@ class DetailSerializerTestCase(TestCase):
         self.assertIn("id", schema_detail.model_fields)
         self.assertIn("name", schema_detail.model_fields)
         self.assertIn("description", schema_detail.model_fields)
+
+
+@tag("serializers", "detail", "model_serializer")
+class ModelSerializerDetailFallbackTestCase(TestCase):
+    """Test cases for ModelSerializer detail->read fallback behavior."""
+
+    def setUp(self):
+        warnings.simplefilter("ignore", UserWarning)
+
+    def test_model_serializer_detail_fallback_fields(self):
+        """Test ModelSerializer detail falls back to read fields when not configured."""
+        from tests.test_app.models import TestModelSerializer
+
+        # TestModelSerializer has ReadSerializer with fields but no DetailSerializer
+        read_fields = TestModelSerializer.get_fields("read")
+        detail_fields = TestModelSerializer.get_fields("detail")
+
+        # Detail should fall back to read fields
+        self.assertEqual(read_fields, detail_fields)
+
+    def test_model_serializer_detail_fallback_customs(self):
+        """Test ModelSerializer detail falls back to read customs when not configured."""
+        from tests.test_app.models import TestModelSerializerWithReadCustoms
+
+        read_customs = TestModelSerializerWithReadCustoms.get_custom_fields("read")
+        detail_customs = TestModelSerializerWithReadCustoms.get_custom_fields("detail")
+
+        # Detail should fall back to read customs
+        self.assertEqual(read_customs, detail_customs)
+        self.assertEqual(len(detail_customs), 1)
+        self.assertEqual(detail_customs[0][0], "custom_field")
+
+    def test_model_serializer_detail_fallback_optionals(self):
+        """Test ModelSerializer detail falls back to read optionals when not configured."""
+        from tests.test_app.models import TestModelSerializerWithReadOptionals
+
+        read_optionals = TestModelSerializerWithReadOptionals.get_optional_fields("read")
+        detail_optionals = TestModelSerializerWithReadOptionals.get_optional_fields("detail")
+
+        # Detail should fall back to read optionals
+        self.assertEqual(read_optionals, detail_optionals)
+        self.assertEqual(len(detail_optionals), 1)
+        self.assertEqual(detail_optionals[0][0], "description")
+
+    def test_model_serializer_detail_fallback_excludes(self):
+        """Test ModelSerializer detail falls back to read excludes when not configured."""
+        from tests.test_app.models import TestModelSerializerWithReadExcludes
+
+        read_excludes = TestModelSerializerWithReadExcludes.get_excluded_fields("read")
+        detail_excludes = TestModelSerializerWithReadExcludes.get_excluded_fields("detail")
+
+        # Detail should fall back to read excludes
+        self.assertEqual(read_excludes, detail_excludes)
+        self.assertIn("description", detail_excludes)
+
+    def test_model_serializer_detail_inherits_per_field_type(self):
+        """Test ModelSerializer detail inherits from read per-field-type when empty."""
+        from tests.test_app.models import TestModelSerializerWithBothSerializers
+
+        read_customs = TestModelSerializerWithBothSerializers.get_custom_fields("read")
+        detail_customs = TestModelSerializerWithBothSerializers.get_custom_fields("detail")
+
+        # Read has customs defined
+        self.assertEqual(len(read_customs), 1)
+        # Detail inherits customs from read because DetailSerializer.customs is empty
+        # (fallback is per-field-type, not per-serializer)
+        self.assertEqual(len(detail_customs), 1)
+        self.assertEqual(detail_customs[0][0], "read_custom")
+
+        # But fields are different (DetailSerializer.fields overrides)
+        read_fields = TestModelSerializerWithBothSerializers.get_fields("read")
+        detail_fields = TestModelSerializerWithBothSerializers.get_fields("detail")
+        self.assertEqual(read_fields, ["id", "name"])
+        self.assertEqual(detail_fields, ["id", "name", "description"])
+
+    def test_model_serializer_with_detail_generates_different_schemas(self):
+        """Test that ModelSerializer with DetailSerializer generates distinct schemas."""
+        from tests.test_app.models import TestModelSerializerWithDetail
+
+        read_schema = TestModelSerializerWithDetail.generate_read_s()
+        detail_schema = TestModelSerializerWithDetail.generate_detail_s()
+
+        # Read schema should have fewer fields
+        self.assertIn("id", read_schema.model_fields)
+        self.assertIn("name", read_schema.model_fields)
+        self.assertNotIn("description", read_schema.model_fields)
+        self.assertNotIn("extra_info", read_schema.model_fields)
+
+        # Detail schema should have more fields plus custom
+        self.assertIn("id", detail_schema.model_fields)
+        self.assertIn("name", detail_schema.model_fields)
+        self.assertIn("description", detail_schema.model_fields)
+        self.assertIn("extra_info", detail_schema.model_fields)
+        self.assertIn("computed_field", detail_schema.model_fields)

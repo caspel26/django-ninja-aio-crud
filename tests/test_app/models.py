@@ -187,3 +187,39 @@ class TestModelSerializerWithDetail(BaseTestModelSerializer):
     class DetailSerializer:
         fields = ["id", "name", "description", "extra_info"]
         customs = [("computed_field", str, "computed_value")]
+
+
+class TestModelSerializerWithReadCustoms(BaseTestModelSerializer):
+    """Model with customs on ReadSerializer but no DetailSerializer."""
+
+    class ReadSerializer:
+        fields = ["id", "name"]
+        customs = [("custom_field", str, "default")]
+
+
+class TestModelSerializerWithReadOptionals(BaseTestModelSerializer):
+    """Model with optionals on ReadSerializer but no DetailSerializer."""
+
+    class ReadSerializer:
+        fields = ["id", "name"]
+        optionals = [("description", str)]
+
+
+class TestModelSerializerWithReadExcludes(BaseTestModelSerializer):
+    """Model with excludes on ReadSerializer but no DetailSerializer."""
+
+    class ReadSerializer:
+        fields = ["id", "name", "description"]
+        excludes = ["description"]
+
+
+class TestModelSerializerWithBothSerializers(BaseTestModelSerializer):
+    """Model with both ReadSerializer and DetailSerializer configured."""
+
+    class ReadSerializer:
+        fields = ["id", "name"]
+        customs = [("read_custom", str, "default")]
+
+    class DetailSerializer:
+        fields = ["id", "name", "description"]
+        # No customs defined - should NOT inherit from read
