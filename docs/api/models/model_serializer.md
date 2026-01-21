@@ -149,16 +149,23 @@ class User(ModelSerializer):
 
 Describes how to build a detail (single object) output schema. Use this when you want the retrieve endpoint to return more fields than the list endpoint.
 
-**Fallback Behavior:** If `DetailSerializer` is not defined, `generate_detail_s()` automatically falls back to the read schema (same as `generate_read_s()`). This means you only need to define `DetailSerializer` when you want different fields for single-object retrieval vs list views.
+**Fallback Behavior:** `DetailSerializer` supports **per-field-type fallback** to `ReadSerializer`. Each attribute (`fields`, `customs`, `optionals`, `excludes`) is checked independently:
+
+- If `DetailSerializer.fields` is empty → uses `ReadSerializer.fields`
+- If `DetailSerializer.customs` is empty → uses `ReadSerializer.customs`
+- If `DetailSerializer.optionals` is empty → uses `ReadSerializer.optionals`
+- If `DetailSerializer.excludes` is empty → uses `ReadSerializer.excludes`
+
+This allows partial overrides: define only `DetailSerializer.fields` while inheriting `customs` from `ReadSerializer`.
 
 **Attributes:**
 
 | Attribute   | Type                     | Description                                                                   |
 | ----------- | ------------------------ | ----------------------------------------------------------------------------- |
-| `fields`    | `list[str]`              | Model fields to include in detail view (falls back to ReadSerializer fields if not defined) |
-| `excludes`  | `list[str]`              | Fields to exclude from detail view                                            |
-| `customs`   | `list[tuple]`            | Computed fields: `(name, type)` required; `(name, type, default)` optional    |
-| `optionals` | `list[tuple[str, type]]` | Optional output fields                                                        |
+| `fields`    | `list[str]`              | Model fields to include in detail view (falls back to ReadSerializer.fields if empty) |
+| `excludes`  | `list[str]`              | Fields to exclude from detail view (falls back to ReadSerializer.excludes if empty) |
+| `customs`   | `list[tuple]`            | Computed fields: `(name, type)` required; `(name, type, default)` optional (falls back to ReadSerializer.customs if empty) |
+| `optionals` | `list[tuple[str, type]]` | Optional output fields (falls back to ReadSerializer.optionals if empty) |
 
 **Example:**
 
@@ -174,21 +181,22 @@ class Article(ModelSerializer):
     class ReadSerializer:
         # List view: minimal fields for performance
         fields = ["id", "title", "summary", "author"]
+        customs = [
+            ("word_count", int, lambda obj: len(obj.content.split())),
+        ]
 
     class DetailSerializer:
         # Detail view: all fields including expensive relations
+        # customs inherited from ReadSerializer (word_count)
         fields = ["id", "title", "summary", "content", "author", "tags", "view_count"]
-        customs = [
-            ("reading_time", int, lambda obj: len(obj.content.split()) // 200),
-        ]
 ```
 
 **Generated Output (List):**
 
 ```json
 [
-  {"id": 1, "title": "Getting Started", "summary": "...", "author": {...}},
-  {"id": 2, "title": "Advanced Topics", "summary": "...", "author": {...}}
+  {"id": 1, "title": "Getting Started", "summary": "...", "author": {...}, "word_count": 500},
+  {"id": 2, "title": "Advanced Topics", "summary": "...", "author": {...}, "word_count": 1200}
 ]
 ```
 
@@ -203,8 +211,24 @@ class Article(ModelSerializer):
   "author": {...},
   "tags": [{"id": 1, "name": "python"}, {"id": 2, "name": "django"}],
   "view_count": 1234,
-  "reading_time": 5
+  "word_count": 500
 }
+```
+
+**Example with Custom Override:**
+
+```python
+class Article(ModelSerializer):
+    # ... fields ...
+
+    class ReadSerializer:
+        fields = ["id", "title", "summary"]
+        customs = [("word_count", int, lambda obj: len(obj.content.split()))]
+
+    class DetailSerializer:
+        fields = ["id", "title", "summary", "content"]
+        # Override customs - reading_time instead of word_count
+        customs = [("reading_time", int, lambda obj: len(obj.content.split()) // 200)]
 ```
 
 ### UpdateSerializer

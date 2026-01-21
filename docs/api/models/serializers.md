@@ -87,6 +87,29 @@ When used with `APIViewSet`:
 - **List endpoint** (`GET /articles/`) uses `schema_out`
 - **Retrieve endpoint** (`GET /articles/{pk}`) uses `schema_detail` (falls back to `schema_out` if not defined)
 
+**Fallback Behavior:** Unlike `ModelSerializer`, `Serializer` uses **schema-level fallback**:
+
+- If `schema_detail` is **not defined** → all field types (`fields`, `customs`, `optionals`, `exclude`) fall back to `schema_out`
+- If `schema_detail` **is defined** → no inheritance from `schema_out`, even for empty field types
+
+This means you must explicitly define all needed configurations in `schema_detail` if you define it at all:
+
+```python
+class ArticleSerializer(serializers.Serializer):
+    class Meta:
+        model = models.Article
+        schema_out = serializers.SchemaModelConfig(
+            fields=["id", "title"],
+            customs=[("word_count", int, 0)],  # This custom...
+        )
+        schema_detail = serializers.SchemaModelConfig(
+            fields=["id", "title", "content"],
+            # ...is NOT inherited here because schema_detail is defined
+            # You must explicitly add it if needed:
+            # customs=[("word_count", int, 0)],
+        )
+```
+
 ## Example: simple FK
 
 ```python
