@@ -424,8 +424,9 @@ class BaseSerializer:
     @classmethod
     def _warn_missing_relation_serializer(cls, field_name: str, model) -> None:
         """Emit warning for reverse relations without explicit serializer mapping."""
-        if not isinstance(model, ModelSerializerMeta) and not getattr(
-            settings, "NINJA_AIO_TESTING", False
+        if not isinstance(model, ModelSerializerMeta) and (
+            not getattr(settings, "NINJA_AIO_TESTING", False)
+            or getattr(settings, "NINJA_AIO_RAISE_SERIALIZATION_WARNINGS", False)
         ):
             warnings.warn(
                 f"{cls.__name__}: reverse relation '{field_name}' is listed in read fields "
