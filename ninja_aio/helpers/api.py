@@ -358,6 +358,7 @@ class ManyToManyAPI:
         related_schema,
         filters_schema,
         append_slash: bool,
+        verbose_name_plural: str,
     ):
         @self.router.get(
             self._get_api_path(rel_path, append_slash=append_slash),
@@ -366,8 +367,8 @@ class ManyToManyAPI:
                 self.view_set.error_codes: GenericMessageSchema,
             },
             auth=m2m_auth,
-            summary=f"Get {rel_util.model._meta.verbose_name_plural.capitalize()}",
-            description=f"Get all related {rel_util.model._meta.verbose_name_plural.capitalize()}",
+            summary=f"Get {verbose_name_plural}",
+            description=f"Get all related {verbose_name_plural}",
         )
         @decorate_view(
             unique_view(f"get_{self.related_model_util.model_name}_{rel_path}"),
@@ -402,13 +403,13 @@ class ManyToManyAPI:
         related_model: ModelSerializer | Model,
         related_name: str,
         m2m_auth,
-        rel_util: ModelUtil,
         rel_path: str,
         m2m_add: bool,
         m2m_remove: bool,
+        verbose_name_plural: str,
     ):
         action, schema_in = self._resolve_action_schema(m2m_add, m2m_remove)
-        plural = rel_util.model._meta.verbose_name_plural.capitalize()
+        plural = verbose_name_plural
         summary = f"{action} {plural}"
 
         @self.router.post(
@@ -478,6 +479,10 @@ class ManyToManyAPI:
         m2m_add, m2m_remove, m2m_get = relation.add, relation.remove, relation.get
         filters_schema = self.relations_filters_schemas.get(related_name)
         append_slash = relation.append_slash
+        verbose_name_plural = (
+            relation.verbose_name_plural
+            or rel_util.model._meta.verbose_name_plural.capitalize()
+        )
 
         if m2m_get:
             self._register_get_relation_view(
@@ -488,6 +493,7 @@ class ManyToManyAPI:
                 related_schema=related_schema,
                 filters_schema=filters_schema,
                 append_slash=append_slash,
+                verbose_name_plural=verbose_name_plural,
             )
 
         if m2m_add or m2m_remove:
@@ -495,10 +501,10 @@ class ManyToManyAPI:
                 related_model=model,
                 related_name=related_name,
                 m2m_auth=m2m_auth,
-                rel_util=rel_util,
                 rel_path=rel_path,
                 m2m_add=m2m_add,
                 m2m_remove=m2m_remove,
+                verbose_name_plural=verbose_name_plural,
             )
 
     def _add_views(self):

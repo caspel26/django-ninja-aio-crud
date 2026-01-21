@@ -44,7 +44,9 @@ class M2MRelationSchema(BaseModel):
             it can be used to auto-generate the `related_schema`.
         append_slash (bool):
             Whether to append a trailing slash to the generated GET endpoint path. Defaults to False for backward compatibility.
-
+        verbose_name_plural (str | None):
+            Optional human-readable plural name for the related model, used in documentation and responses.
+            
     Validation:
         - If `model` is not a ModelSerializerMeta, `related_schema` is required.
         - When `model` is a ModelSerializerMeta and `related_schema` is not provided, it will be
@@ -69,6 +71,7 @@ class M2MRelationSchema(BaseModel):
     related_schema: Optional[Type[Schema]] = None
     serializer_class: Optional[SerializerMeta] = None
     append_slash: bool = False
+    verbose_name_plural: Optional[str] = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
