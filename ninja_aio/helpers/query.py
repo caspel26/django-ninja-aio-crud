@@ -78,6 +78,11 @@ class QueryUtil:
         self.detail_config: ModelQuerySetSchema = self._configs.get(
             self.SCOPES.DETAIL, ModelQuerySetSchema()
         )
+        # Fallback detail config to read config if not explicitly set
+        if not self.detail_config.select_related:
+            self.detail_config.select_related = self.read_config.select_related.copy()
+        if not self.detail_config.prefetch_related:
+            self.detail_config.prefetch_related = self.read_config.prefetch_related.copy()
 
     def _get_config(self, conf_name: str) -> ModelQuerySetSchema:
         """Helper method to retrieve configuration attributes."""
@@ -103,7 +108,7 @@ class QueryUtil:
             raise ValueError(
                 f"Invalid scope '{scope}' for QueryUtil. Supported scopes: {valid_scopes}"
             )
-        config = self._configs.get(scope, ModelQuerySetSchema())
+        config: ModelQuerySetSchema = self._configs.get(scope, ModelQuerySetSchema())
         if config.select_related:
             queryset = queryset.select_related(*config.select_related)
         if config.prefetch_related:
