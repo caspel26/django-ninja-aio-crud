@@ -1,4 +1,14 @@
-from typing import Any, List, Literal, Optional, Union, get_args, get_origin, ForwardRef
+from typing import (
+    Annotated,
+    Any,
+    List,
+    Literal,
+    Optional,
+    Union,
+    get_args,
+    get_origin,
+    ForwardRef,
+)
 import warnings
 import sys
 
@@ -14,6 +24,7 @@ from django.db.models.fields.related_descriptors import (
     ForwardManyToOneDescriptor,
     ForwardOneToOneDescriptor,
 )
+from pydantic import BeforeValidator, Field
 
 from ninja_aio.types import (
     S_TYPES,
@@ -26,6 +37,17 @@ from ninja_aio.schemas.helpers import (
     ModelQuerySetSchema,
     ModelQuerySetExtraSchema,
 )
+
+
+def _extract_pk(v: Any) -> Any:
+    """Extract primary key from a model instance or return value as-is."""
+    if hasattr(v, "pk"):
+        return v.pk
+    return v
+
+
+# Annotated type for extracting PK from model instances during serialization
+PkFromModel = Annotated[int, BeforeValidator(_extract_pk)]
 
 
 class BaseSerializer:
@@ -213,6 +235,11 @@ class BaseSerializer:
         return {}
 
     @classmethod
+    def _get_relations_as_id(cls) -> list[str]:
+        # Optional in subclasses. Default to no relations as ID.
+        return []
+
+    @classmethod
     def _generate_union_schema(cls, resolved_union: Any) -> Any:
         """
         Generate a Union schema from multiple resolved serializers.
@@ -350,10 +377,25 @@ class BaseSerializer:
         ) or cls._is_special_field("update", field, "optionals")
 
     @classmethod
-    def _build_schema_reverse_rel(cls, field_name: str, descriptor: Any):
+    def _build_schema_reverse_rel(
+        cls, field_name: str, descriptor: Any, relations_as_id: list[str]
+    ):
         """
         Build a reverse relation schema component for 'Out' schema generation.
-        Returns a custom field tuple or None to skip.
+
+        Parameters
+        ----------
+        field_name : str
+            Name of the relation field.
+        descriptor : Any
+            Django field descriptor (ManyToManyDescriptor, ReverseManyToOneDescriptor, etc.).
+        relations_as_id : list[str]
+            Pre-fetched list of fields to serialize as IDs.
+
+        Returns
+        -------
+        tuple | None
+            Custom field tuple for schema generation, or None to skip.
         """
         # Resolve related model and cardinality
         if isinstance(descriptor, ManyToManyDescriptor):
@@ -371,6 +413,15 @@ class BaseSerializer:
             rel_model = descriptor.related.related_model
             many = False
 
+        # Handle relations_as_id for reverse relations
+        if field_name in relations_as_id:
+            if many:
+                # For many relations, use PkFromModel to extract PKs from model instances
+                return (field_name, list[PkFromModel], Field(default_factory=list))
+            else:
+                # For single reverse relations (ReverseOneToOne), extract pk
+                return (field_name, PkFromModel | None, None)
+
         schema = cls._resolve_relation_schema(field_name, rel_model)
         if not schema:
             return None
@@ -379,13 +430,33 @@ class BaseSerializer:
         return (field_name, rel_schema_type | None, None)
 
     @classmethod
-    def _build_schema_forward_rel(cls, field_name: str, descriptor: Any):
+    def _build_schema_forward_rel(
+        cls, field_name: str, descriptor: Any, relations_as_id: list[str]
+    ):
         """
         Build a forward relation schema component for 'Out' schema generation.
-        Returns True to treat as plain field, a custom field tuple to include relation schema,
-        or None to skip entirely.
+
+        Parameters
+        ----------
+        field_name : str
+            Name of the relation field.
+        descriptor : Any
+            Django field descriptor (ForwardOneToOneDescriptor, ForwardManyToOneDescriptor).
+        relations_as_id : list[str]
+            Pre-fetched list of fields to serialize as IDs.
+
+        Returns
+        -------
+        True | tuple | None
+            True to treat as plain field, a custom field tuple to include relation schema,
+            or None to skip entirely.
         """
         rel_model = descriptor.field.related_model
+
+        # Handle relations_as_id: serialize as the raw FK ID
+        if field_name in relations_as_id:
+            # Use PkFromModel to extract pk from the related instance during serialization
+            return (field_name, PkFromModel | None, None)
 
         # Special case: ModelSerializer with no readable fields should be skipped entirely
         if isinstance(rel_model, ModelSerializerMeta):
@@ -441,23 +512,44 @@ class BaseSerializer:
         field_name: str,
         model,
         relations_serializers: dict,
+        relations_as_id: list[str],
     ) -> tuple[str | None, tuple | None, tuple | None]:
         """
         Process a single field and determine its classification.
 
-        Returns:
+        Parameters
+        ----------
+        field_name : str
+            Name of the field to process.
+        model : Model
+            Django model class.
+        relations_serializers : dict
+            Mapping of relation field names to serializer classes.
+        relations_as_id : list[str]
+            Pre-fetched list of fields to serialize as IDs.
+
+        Returns
+        -------
+        tuple
             (plain_field, reverse_rel, forward_rel) - only one will be non-None
         """
         field_obj = getattr(model, field_name)
 
         if cls._is_reverse_relation(field_obj):
-            if field_name not in relations_serializers:
+            if (
+                field_name not in relations_serializers
+                and field_name not in relations_as_id
+            ):
                 cls._warn_missing_relation_serializer(field_name, model)
-            rel_tuple = cls._build_schema_reverse_rel(field_name, field_obj)
+            rel_tuple = cls._build_schema_reverse_rel(
+                field_name, field_obj, relations_as_id
+            )
             return (None, rel_tuple, None)
 
         if cls._is_forward_relation(field_obj):
-            rel_tuple = cls._build_schema_forward_rel(field_name, field_obj)
+            rel_tuple = cls._build_schema_forward_rel(
+                field_name, field_obj, relations_as_id
+            )
             if rel_tuple is True:
                 return (field_name, None, None)
             return (None, None, rel_tuple)
@@ -469,8 +561,15 @@ class BaseSerializer:
         """
         Collect components for output schema generation (Out or Detail).
 
-        Returns:
-            tuple: (fields, reverse_rels, excludes, customs_with_forward_rels, optionals)
+        Parameters
+        ----------
+        schema_type : Literal["Out", "Detail"]
+            Type of schema to generate.
+
+        Returns
+        -------
+        tuple
+            (fields, reverse_rels, excludes, customs_with_forward_rels, optionals)
         """
         if schema_type not in ("Out", "Detail"):
             raise ValueError(
@@ -480,6 +579,8 @@ class BaseSerializer:
         fields_type = "read" if schema_type == "Out" else "detail"
         model = cls._get_model()
         relations_serializers = cls._get_relations_serializers() or {}
+        # Fetch once to avoid repeated method calls during field processing
+        relations_as_id = cls._get_relations_as_id()
 
         fields: list[str] = []
         reverse_rels: list[tuple] = []
@@ -487,7 +588,7 @@ class BaseSerializer:
 
         for field_name in cls.get_fields(fields_type):
             plain, reverse, forward = cls._process_field(
-                field_name, model, relations_serializers
+                field_name, model, relations_serializers, relations_as_id
             )
             if plain:
                 fields.append(plain)
@@ -701,12 +802,15 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
             Computed / synthetic output attributes.
         optionals : list[tuple[str, type]]
             Optional output fields.
+        relations_as_id : list[str]
+            Relation fields to serialize as IDs instead of nested objects.
         """
 
         fields: list[str] = []
         customs: list[tuple[str, type, Any]] = []
         optionals: list[tuple[str, type]] = []
         excludes: list[str] = []
+        relations_as_id: list[str] = []
 
     class DetailSerializer:
         """Configuration describing detail (single object) read schema.
@@ -755,6 +859,11 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
         "read": "ReadSerializer",
         "detail": "DetailSerializer",
     }
+
+    @classmethod
+    def _get_relations_as_id(cls) -> list[str]:
+        """Return relation fields to serialize as IDs instead of nested objects."""
+        return getattr(cls.ReadSerializer, "relations_as_id", [])
 
     @classmethod
     def _get_fields(cls, s_type: type[S_TYPES], f_type: type[F_TYPES]):
@@ -960,6 +1069,12 @@ class Serializer(BaseSerializer, metaclass=SerializerMeta):
         schema_update: Optional[SchemaModelConfig] = None
         schema_detail: Optional[SchemaModelConfig] = None
         relations_serializers: dict[str, "Serializer"] = {}
+        relations_as_id: list[str] = []
+
+    @classmethod
+    def _get_relations_as_id(cls) -> list[str]:
+        relations_as_id = cls._get_meta_data("relations_as_id")
+        return relations_as_id or []
 
     @classmethod
     def _get_meta_data(cls, attr_name: str) -> Any:
