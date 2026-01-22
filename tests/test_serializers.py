@@ -911,3 +911,443 @@ class RelationsAsIdIntegrationTestCase(TestCase):
         self.assertIsInstance(result.articles_as_id, list)
         self.assertEqual(len(result.articles_as_id), 1)
         self.assertIn(self.article.pk, result.articles_as_id)
+
+
+@tag("serializers", "relations_as_id", "uuid_pk")
+class RelationsAsIdUUIDModelSerializerTestCase(TestCase):
+    """Test cases for relations_as_id with UUID primary keys."""
+
+    def setUp(self):
+        warnings.simplefilter("ignore", UserWarning)
+
+    def test_forward_fk_uuid_relations_as_id_schema(self):
+        """Test forward FK field with UUID PK in relations_as_id generates UUID type."""
+        from tests.test_app.models import BookUUID
+        from uuid import UUID
+
+        schema = BookUUID.generate_read_s()
+        self.assertIsNotNone(schema)
+        self.assertIn("author_uuid", schema.model_fields)
+
+        field_info = schema.model_fields["author_uuid"]
+        self.assertTrue(
+            field_info.annotation is not None,
+            "author_uuid field should have a type annotation",
+        )
+
+    def test_reverse_fk_uuid_relations_as_id_schema(self):
+        """Test reverse FK field with UUID PK in relations_as_id generates list[UUID] type."""
+        from tests.test_app.models import AuthorUUID
+        from uuid import UUID
+
+        schema = AuthorUUID.generate_read_s()
+        self.assertIsNotNone(schema)
+        self.assertIn("books_uuid", schema.model_fields)
+
+        field_info = schema.model_fields["books_uuid"]
+        self.assertTrue(
+            field_info.annotation is not None,
+            "books_uuid field should have a type annotation",
+        )
+
+    def test_forward_o2o_uuid_relations_as_id_schema(self):
+        """Test forward O2O field with UUID PK in relations_as_id generates UUID type."""
+        from tests.test_app.models import UserUUID
+
+        schema = UserUUID.generate_read_s()
+        self.assertIsNotNone(schema)
+        self.assertIn("profile_uuid", schema.model_fields)
+
+        field_info = schema.model_fields["profile_uuid"]
+        self.assertTrue(
+            field_info.annotation is not None,
+            "profile_uuid field should have a type annotation",
+        )
+
+    def test_reverse_o2o_uuid_relations_as_id_schema(self):
+        """Test reverse O2O field with UUID PK in relations_as_id generates UUID type."""
+        from tests.test_app.models import ProfileUUID
+
+        schema = ProfileUUID.generate_read_s()
+        self.assertIsNotNone(schema)
+        self.assertIn("user_uuid", schema.model_fields)
+
+        field_info = schema.model_fields["user_uuid"]
+        self.assertTrue(
+            field_info.annotation is not None,
+            "user_uuid field should have a type annotation",
+        )
+
+    def test_forward_m2m_uuid_relations_as_id_schema(self):
+        """Test forward M2M field with UUID PK in relations_as_id generates list[UUID] type."""
+        from tests.test_app.models import ArticleUUID
+
+        schema = ArticleUUID.generate_read_s()
+        self.assertIsNotNone(schema)
+        self.assertIn("tags_uuid", schema.model_fields)
+
+        field_info = schema.model_fields["tags_uuid"]
+        self.assertTrue(
+            field_info.annotation is not None,
+            "tags_uuid field should have a type annotation",
+        )
+
+    def test_reverse_m2m_uuid_relations_as_id_schema(self):
+        """Test reverse M2M field with UUID PK in relations_as_id generates list[UUID] type."""
+        from tests.test_app.models import TagUUID
+
+        schema = TagUUID.generate_read_s()
+        self.assertIsNotNone(schema)
+        self.assertIn("articles_uuid", schema.model_fields)
+
+        field_info = schema.model_fields["articles_uuid"]
+        self.assertTrue(
+            field_info.annotation is not None,
+            "articles_uuid field should have a type annotation",
+        )
+
+
+@tag("serializers", "relations_as_id", "uuid_pk", "integration")
+class RelationsAsIdUUIDIntegrationTestCase(TestCase):
+    """Integration tests for relations_as_id with UUID primary keys and actual data serialization."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from tests.test_app.models import (
+            AuthorUUID,
+            BookUUID,
+            ProfileUUID,
+            UserUUID,
+            TagUUID,
+            ArticleUUID,
+        )
+
+        # Create test data for FK relations with UUID PKs
+        cls.author = AuthorUUID.objects.create(name="UUID Author 1")
+        cls.book1 = BookUUID.objects.create(name="UUID Book 1", author_uuid=cls.author)
+        cls.book2 = BookUUID.objects.create(name="UUID Book 2", author_uuid=cls.author)
+        cls.book_no_author = BookUUID.objects.create(name="UUID Book 3", author_uuid=None)
+
+        # Create test data for O2O relations with UUID PKs
+        cls.profile = ProfileUUID.objects.create(name="UUID Profile 1")
+        cls.user = UserUUID.objects.create(name="UUID User 1", profile_uuid=cls.profile)
+
+        # Create test data for M2M relations with UUID PKs
+        cls.tag1 = TagUUID.objects.create(name="UUID Tag 1")
+        cls.tag2 = TagUUID.objects.create(name="UUID Tag 2")
+        cls.article = ArticleUUID.objects.create(name="UUID Article 1")
+        cls.article.tags_uuid.add(cls.tag1, cls.tag2)
+
+    def setUp(self):
+        warnings.simplefilter("ignore", UserWarning)
+
+    def test_forward_fk_uuid_serialization(self):
+        """Test forward FK field with UUID PK serializes as UUID."""
+        from tests.test_app.models import BookUUID
+        from uuid import UUID
+
+        schema = BookUUID.generate_read_s()
+        result = schema.from_orm(self.book1)
+
+        self.assertIsInstance(result.author_uuid, UUID)
+        self.assertEqual(result.author_uuid, self.author.pk)
+
+    def test_forward_fk_uuid_null_serialization(self):
+        """Test forward FK field with UUID PK and null value serializes as None."""
+        from tests.test_app.models import BookUUID
+
+        schema = BookUUID.generate_read_s()
+        result = schema.from_orm(self.book_no_author)
+
+        self.assertIsNone(result.author_uuid)
+
+    def test_reverse_fk_uuid_serialization(self):
+        """Test reverse FK field with UUID PK serializes as list of UUIDs."""
+        from tests.test_app.models import AuthorUUID
+        from uuid import UUID
+
+        author = AuthorUUID.objects.prefetch_related("books_uuid").get(pk=self.author.pk)
+
+        schema = AuthorUUID.generate_read_s()
+        result = schema.from_orm(author)
+
+        self.assertIsInstance(result.books_uuid, list)
+        self.assertEqual(len(result.books_uuid), 2)
+        for book_id in result.books_uuid:
+            self.assertIsInstance(book_id, UUID)
+        self.assertIn(self.book1.pk, result.books_uuid)
+        self.assertIn(self.book2.pk, result.books_uuid)
+
+    def test_forward_o2o_uuid_serialization(self):
+        """Test forward O2O field with UUID PK serializes as UUID."""
+        from tests.test_app.models import UserUUID
+        from uuid import UUID
+
+        schema = UserUUID.generate_read_s()
+        result = schema.from_orm(self.user)
+
+        self.assertIsInstance(result.profile_uuid, UUID)
+        self.assertEqual(result.profile_uuid, self.profile.pk)
+
+    def test_reverse_o2o_uuid_serialization(self):
+        """Test reverse O2O field with UUID PK serializes as UUID."""
+        from tests.test_app.models import ProfileUUID
+        from uuid import UUID
+
+        profile = ProfileUUID.objects.select_related("user_uuid").get(pk=self.profile.pk)
+
+        schema = ProfileUUID.generate_read_s()
+        result = schema.from_orm(profile)
+
+        self.assertIsInstance(result.user_uuid, UUID)
+        self.assertEqual(result.user_uuid, self.user.pk)
+
+    def test_forward_m2m_uuid_serialization(self):
+        """Test forward M2M field with UUID PK serializes as list of UUIDs."""
+        from tests.test_app.models import ArticleUUID
+        from uuid import UUID
+
+        article = ArticleUUID.objects.prefetch_related("tags_uuid").get(pk=self.article.pk)
+
+        schema = ArticleUUID.generate_read_s()
+        result = schema.from_orm(article)
+
+        self.assertIsInstance(result.tags_uuid, list)
+        self.assertEqual(len(result.tags_uuid), 2)
+        for tag_id in result.tags_uuid:
+            self.assertIsInstance(tag_id, UUID)
+        self.assertIn(self.tag1.pk, result.tags_uuid)
+        self.assertIn(self.tag2.pk, result.tags_uuid)
+
+    def test_reverse_m2m_uuid_serialization(self):
+        """Test reverse M2M field with UUID PK serializes as list of UUIDs."""
+        from tests.test_app.models import TagUUID
+        from uuid import UUID
+
+        tag = TagUUID.objects.prefetch_related("articles_uuid").get(pk=self.tag1.pk)
+
+        schema = TagUUID.generate_read_s()
+        result = schema.from_orm(tag)
+
+        self.assertIsInstance(result.articles_uuid, list)
+        self.assertEqual(len(result.articles_uuid), 1)
+        self.assertIsInstance(result.articles_uuid[0], UUID)
+        self.assertIn(self.article.pk, result.articles_uuid)
+
+
+@tag("serializers", "relations_as_id", "string_pk")
+class RelationsAsIdStringPKModelSerializerTestCase(TestCase):
+    """Test cases for relations_as_id with string (CharField) primary keys."""
+
+    def setUp(self):
+        warnings.simplefilter("ignore", UserWarning)
+
+    def test_forward_fk_string_relations_as_id_schema(self):
+        """Test forward FK field with string PK in relations_as_id generates str type."""
+        from tests.test_app.models import BookStringPK
+
+        schema = BookStringPK.generate_read_s()
+        self.assertIsNotNone(schema)
+        self.assertIn("author_str", schema.model_fields)
+
+        field_info = schema.model_fields["author_str"]
+        self.assertTrue(
+            field_info.annotation is not None,
+            "author_str field should have a type annotation",
+        )
+
+    def test_reverse_fk_string_relations_as_id_schema(self):
+        """Test reverse FK field with string PK in relations_as_id generates list[str] type."""
+        from tests.test_app.models import AuthorStringPK
+
+        schema = AuthorStringPK.generate_read_s()
+        self.assertIsNotNone(schema)
+        self.assertIn("books_str", schema.model_fields)
+
+        field_info = schema.model_fields["books_str"]
+        self.assertTrue(
+            field_info.annotation is not None,
+            "books_str field should have a type annotation",
+        )
+
+    def test_forward_o2o_string_relations_as_id_schema(self):
+        """Test forward O2O field with string PK in relations_as_id generates str type."""
+        from tests.test_app.models import UserStringPK
+
+        schema = UserStringPK.generate_read_s()
+        self.assertIsNotNone(schema)
+        self.assertIn("profile_str", schema.model_fields)
+
+        field_info = schema.model_fields["profile_str"]
+        self.assertTrue(
+            field_info.annotation is not None,
+            "profile_str field should have a type annotation",
+        )
+
+    def test_reverse_o2o_string_relations_as_id_schema(self):
+        """Test reverse O2O field with string PK in relations_as_id generates str type."""
+        from tests.test_app.models import ProfileStringPK
+
+        schema = ProfileStringPK.generate_read_s()
+        self.assertIsNotNone(schema)
+        self.assertIn("user_str", schema.model_fields)
+
+        field_info = schema.model_fields["user_str"]
+        self.assertTrue(
+            field_info.annotation is not None,
+            "user_str field should have a type annotation",
+        )
+
+    def test_forward_m2m_string_relations_as_id_schema(self):
+        """Test forward M2M field with string PK in relations_as_id generates list[str] type."""
+        from tests.test_app.models import ArticleStringPK
+
+        schema = ArticleStringPK.generate_read_s()
+        self.assertIsNotNone(schema)
+        self.assertIn("tags_str", schema.model_fields)
+
+        field_info = schema.model_fields["tags_str"]
+        self.assertTrue(
+            field_info.annotation is not None,
+            "tags_str field should have a type annotation",
+        )
+
+    def test_reverse_m2m_string_relations_as_id_schema(self):
+        """Test reverse M2M field with string PK in relations_as_id generates list[str] type."""
+        from tests.test_app.models import TagStringPK
+
+        schema = TagStringPK.generate_read_s()
+        self.assertIsNotNone(schema)
+        self.assertIn("articles_str", schema.model_fields)
+
+        field_info = schema.model_fields["articles_str"]
+        self.assertTrue(
+            field_info.annotation is not None,
+            "articles_str field should have a type annotation",
+        )
+
+
+@tag("serializers", "relations_as_id", "string_pk", "integration")
+class RelationsAsIdStringPKIntegrationTestCase(TestCase):
+    """Integration tests for relations_as_id with string primary keys and actual data serialization."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from tests.test_app.models import (
+            AuthorStringPK,
+            BookStringPK,
+            ProfileStringPK,
+            UserStringPK,
+            TagStringPK,
+            ArticleStringPK,
+        )
+
+        # Create test data for FK relations with string PKs
+        cls.author = AuthorStringPK.objects.create(id="author-001", name="String Author 1")
+        cls.book1 = BookStringPK.objects.create(id="book-001", name="String Book 1", author_str=cls.author)
+        cls.book2 = BookStringPK.objects.create(id="book-002", name="String Book 2", author_str=cls.author)
+        cls.book_no_author = BookStringPK.objects.create(id="book-003", name="String Book 3", author_str=None)
+
+        # Create test data for O2O relations with string PKs
+        cls.profile = ProfileStringPK.objects.create(id="profile-001", name="String Profile 1")
+        cls.user = UserStringPK.objects.create(id="user-001", name="String User 1", profile_str=cls.profile)
+
+        # Create test data for M2M relations with string PKs
+        cls.tag1 = TagStringPK.objects.create(id="tag-001", name="String Tag 1")
+        cls.tag2 = TagStringPK.objects.create(id="tag-002", name="String Tag 2")
+        cls.article = ArticleStringPK.objects.create(id="article-001", name="String Article 1")
+        cls.article.tags_str.add(cls.tag1, cls.tag2)
+
+    def setUp(self):
+        warnings.simplefilter("ignore", UserWarning)
+
+    def test_forward_fk_string_serialization(self):
+        """Test forward FK field with string PK serializes as str."""
+        from tests.test_app.models import BookStringPK
+
+        schema = BookStringPK.generate_read_s()
+        result = schema.from_orm(self.book1)
+
+        self.assertIsInstance(result.author_str, str)
+        self.assertEqual(result.author_str, self.author.pk)
+        self.assertEqual(result.author_str, "author-001")
+
+    def test_forward_fk_string_null_serialization(self):
+        """Test forward FK field with string PK and null value serializes as None."""
+        from tests.test_app.models import BookStringPK
+
+        schema = BookStringPK.generate_read_s()
+        result = schema.from_orm(self.book_no_author)
+
+        self.assertIsNone(result.author_str)
+
+    def test_reverse_fk_string_serialization(self):
+        """Test reverse FK field with string PK serializes as list of strs."""
+        from tests.test_app.models import AuthorStringPK
+
+        author = AuthorStringPK.objects.prefetch_related("books_str").get(pk=self.author.pk)
+
+        schema = AuthorStringPK.generate_read_s()
+        result = schema.from_orm(author)
+
+        self.assertIsInstance(result.books_str, list)
+        self.assertEqual(len(result.books_str), 2)
+        for book_id in result.books_str:
+            self.assertIsInstance(book_id, str)
+        self.assertIn(self.book1.pk, result.books_str)
+        self.assertIn(self.book2.pk, result.books_str)
+
+    def test_forward_o2o_string_serialization(self):
+        """Test forward O2O field with string PK serializes as str."""
+        from tests.test_app.models import UserStringPK
+
+        schema = UserStringPK.generate_read_s()
+        result = schema.from_orm(self.user)
+
+        self.assertIsInstance(result.profile_str, str)
+        self.assertEqual(result.profile_str, self.profile.pk)
+        self.assertEqual(result.profile_str, "profile-001")
+
+    def test_reverse_o2o_string_serialization(self):
+        """Test reverse O2O field with string PK serializes as str."""
+        from tests.test_app.models import ProfileStringPK
+
+        profile = ProfileStringPK.objects.select_related("user_str").get(pk=self.profile.pk)
+
+        schema = ProfileStringPK.generate_read_s()
+        result = schema.from_orm(profile)
+
+        self.assertIsInstance(result.user_str, str)
+        self.assertEqual(result.user_str, self.user.pk)
+        self.assertEqual(result.user_str, "user-001")
+
+    def test_forward_m2m_string_serialization(self):
+        """Test forward M2M field with string PK serializes as list of strs."""
+        from tests.test_app.models import ArticleStringPK
+
+        article = ArticleStringPK.objects.prefetch_related("tags_str").get(pk=self.article.pk)
+
+        schema = ArticleStringPK.generate_read_s()
+        result = schema.from_orm(article)
+
+        self.assertIsInstance(result.tags_str, list)
+        self.assertEqual(len(result.tags_str), 2)
+        for tag_id in result.tags_str:
+            self.assertIsInstance(tag_id, str)
+        self.assertIn(self.tag1.pk, result.tags_str)
+        self.assertIn(self.tag2.pk, result.tags_str)
+
+    def test_reverse_m2m_string_serialization(self):
+        """Test reverse M2M field with string PK serializes as list of strs."""
+        from tests.test_app.models import TagStringPK
+
+        tag = TagStringPK.objects.prefetch_related("articles_str").get(pk=self.tag1.pk)
+
+        schema = TagStringPK.generate_read_s()
+        result = schema.from_orm(tag)
+
+        self.assertIsInstance(result.articles_str, list)
+        self.assertEqual(len(result.articles_str), 1)
+        self.assertIsInstance(result.articles_str[0], str)
+        self.assertIn(self.article.pk, result.articles_str)
+        self.assertEqual(result.articles_str[0], "article-001")

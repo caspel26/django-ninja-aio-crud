@@ -46,8 +46,23 @@ def _extract_pk(v: Any) -> Any:
     return v
 
 
-# Annotated type for extracting PK from model instances during serialization
-PkFromModel = Annotated[int, BeforeValidator(_extract_pk)]
+class PkFromModel:
+    """Subscriptable type for extracting PK from model instances during serialization.
+
+    Usage:
+        PkFromModel[int]   -> for integer PKs
+        PkFromModel[str]   -> for string PKs
+        PkFromModel[UUID]  -> for UUID PKs
+        PkFromModel        -> defaults to int (backwards compatible)
+    """
+
+    _default = Annotated[int, BeforeValidator(_extract_pk)]
+
+    def __class_getitem__(cls, pk_type: type) -> type:
+        return Annotated[pk_type, BeforeValidator(_extract_pk)]
+
+    def __new__(cls):
+        return cls._default
 
 
 class BaseSerializer:
@@ -415,12 +430,14 @@ class BaseSerializer:
 
         # Handle relations_as_id for reverse relations
         if field_name in relations_as_id:
+            from ninja_aio.models.utils import ModelUtil
+            pk_field_type = ModelUtil(rel_model).pk_field_type
             if many:
                 # For many relations, use PkFromModel to extract PKs from model instances
-                return (field_name, list[PkFromModel], Field(default_factory=list))
+                return (field_name, list[PkFromModel[pk_field_type]], Field(default_factory=list))
             else:
                 # For single reverse relations (ReverseOneToOne), extract pk
-                return (field_name, PkFromModel | None, None)
+                return (field_name, PkFromModel[pk_field_type] | None, None)
 
         schema = cls._resolve_relation_schema(field_name, rel_model)
         if not schema:
@@ -455,8 +472,10 @@ class BaseSerializer:
 
         # Handle relations_as_id: serialize as the raw FK ID
         if field_name in relations_as_id:
+            from ninja_aio.models.utils import ModelUtil
+            pk_field_type = ModelUtil(rel_model).pk_field_type
             # Use PkFromModel to extract pk from the related instance during serialization
-            return (field_name, PkFromModel | None, None)
+            return (field_name, PkFromModel[pk_field_type] | None, None)
 
         # Special case: ModelSerializer with no readable fields should be skipped entirely
         if isinstance(rel_model, ModelSerializerMeta):
