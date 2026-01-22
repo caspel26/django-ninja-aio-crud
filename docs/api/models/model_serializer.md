@@ -419,12 +419,14 @@ Use `relations_as_id` to serialize relation fields as IDs instead of nested obje
 
 | Relation Type      | Output Type       | Example Value        |
 |--------------------|-------------------|----------------------|
-| Forward FK         | `int \| None`     | `5` or `null`        |
-| Forward O2O        | `int \| None`     | `3` or `null`        |
-| Reverse FK         | `list[int]`       | `[1, 2, 3]`          |
-| Reverse O2O        | `int \| None`     | `7` or `null`        |
-| M2M (forward)      | `list[int]`       | `[1, 2]`             |
-| M2M (reverse)      | `list[int]`       | `[4, 5, 6]`          |
+| Forward FK         | `PK_TYPE \| None` | `5` or `null`        |
+| Forward O2O        | `PK_TYPE \| None` | `3` or `null`        |
+| Reverse FK         | `list[PK_TYPE]`   | `[1, 2, 3]`          |
+| Reverse O2O        | `PK_TYPE \| None` | `7` or `null`        |
+| M2M (forward)      | `list[PK_TYPE]`   | `[1, 2]`             |
+| M2M (reverse)      | `list[PK_TYPE]`   | `[4, 5, 6]`          |
+
+**Note:** `PK_TYPE` is automatically detected from the related model's primary key field. Supported types include `int` (default), `UUID`, `str`, and any other Django primary key type.
 
 **Example:**
 
@@ -491,6 +493,56 @@ class Article(ModelSerializer):
   "id": 1,
   "title": "Getting Started with Django",
   "tags": [1, 2, 5]
+}
+```
+
+**UUID Primary Key Example:**
+
+When models use UUID primary keys, the output type is automatically `UUID`:
+
+```python
+import uuid
+from django.db import models
+from ninja_aio.models import ModelSerializer
+
+class Author(ModelSerializer):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=200)
+
+    class ReadSerializer:
+        fields = ["id", "name", "books"]
+        relations_as_id = ["books"]
+
+class Book(ModelSerializer):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    title = models.CharField(max_length=200)
+    author = models.ForeignKey(Author, on_delete=models.CASCADE, related_name="books")
+
+    class ReadSerializer:
+        fields = ["id", "title", "author"]
+        relations_as_id = ["author"]
+```
+
+**Output (Author with UUID):**
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "name": "J.K. Rowling",
+  "books": [
+    "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+    "6ba7b811-9dad-11d1-80b4-00c04fd430c8"
+  ]
+}
+```
+
+**Output (Book with UUID):**
+
+```json
+{
+  "id": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+  "title": "Harry Potter",
+  "author": "550e8400-e29b-41d4-a716-446655440000"
 }
 ```
 
