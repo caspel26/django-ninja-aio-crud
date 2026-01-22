@@ -41,6 +41,7 @@ Define a Serializer subclass with a nested Meta:
 - **schema_detail**: SchemaModelConfig for detail outputs (retrieve endpoint)
 - **schema_update**: SchemaModelConfig for patch/update inputs
 - **relations_serializers**: Mapping of relation field name -> Serializer class, **string reference**, or **Union of serializers** (supports forward/circular dependencies and polymorphic relations)
+- **relations_as_id**: List of relation field names to serialize as IDs instead of nested objects
 
 SchemaModelConfig fields:
 
@@ -414,6 +415,134 @@ Notes:
 - Absolute import paths are useful for cross-module references and avoiding circular import issues at module load time.
 - Union types are resolved lazily, so forward and circular references work seamlessly.
 - The schema generator will create a union of all possible schemas from the serializers in the Union.
+
+## Relations as ID
+
+Use `relations_as_id` in Meta to serialize relation fields as IDs instead of nested objects. This is useful for:
+
+- Reducing response payload size
+- Avoiding circular serialization
+- Performance optimization when nested data isn't needed
+- API designs where clients fetch related data separately
+
+**Supported Relations:**
+
+| Relation Type      | Output Type       | Example Value        |
+|--------------------|-------------------|----------------------|
+| Forward FK         | `int \| None`     | `5` or `null`        |
+| Forward O2O        | `int \| None`     | `3` or `null`        |
+| Reverse FK         | `list[int]`       | `[1, 2, 3]`          |
+| Reverse O2O        | `int \| None`     | `7` or `null`        |
+| M2M (forward)      | `list[int]`       | `[1, 2]`             |
+| M2M (reverse)      | `list[int]`       | `[4, 5, 6]`          |
+
+**Example:**
+
+```python
+from ninja_aio.models import serializers
+from . import models
+
+class AuthorSerializer(serializers.Serializer):
+    class Meta:
+        model = models.Author
+        schema_out = serializers.SchemaModelConfig(
+            fields=["id", "name", "books"]
+        )
+        relations_as_id = ["books"]  # Serialize reverse FK as list of IDs
+
+class BookSerializer(serializers.Serializer):
+    class Meta:
+        model = models.Book
+        schema_out = serializers.SchemaModelConfig(
+            fields=["id", "title", "author"]
+        )
+        relations_as_id = ["author"]  # Serialize forward FK as ID
+```
+
+**Output (Author):**
+
+```json
+{
+  "id": 1,
+  "name": "J.K. Rowling",
+  "books": [1, 2, 3]
+}
+```
+
+**Output (Book):**
+
+```json
+{
+  "id": 1,
+  "title": "Harry Potter",
+  "author": 1
+}
+```
+
+**M2M Example:**
+
+```python
+class TagSerializer(serializers.Serializer):
+    class Meta:
+        model = models.Tag
+        schema_out = serializers.SchemaModelConfig(
+            fields=["id", "name", "articles"]
+        )
+        relations_as_id = ["articles"]  # Reverse M2M as list of IDs
+
+class ArticleSerializer(serializers.Serializer):
+    class Meta:
+        model = models.Article
+        schema_out = serializers.SchemaModelConfig(
+            fields=["id", "title", "tags"]
+        )
+        relations_as_id = ["tags"]  # Forward M2M as list of IDs
+```
+
+**Output (Article):**
+
+```json
+{
+  "id": 1,
+  "title": "Getting Started with Django",
+  "tags": [1, 2, 5]
+}
+```
+
+**Combining with relations_serializers:**
+
+You can use both `relations_as_id` and `relations_serializers` in the same serializer. Fields in `relations_as_id` take precedence:
+
+```python
+class ArticleSerializer(serializers.Serializer):
+    class Meta:
+        model = models.Article
+        schema_out = serializers.SchemaModelConfig(
+            fields=["id", "title", "author", "tags", "category"]
+        )
+        relations_serializers = {
+            "author": AuthorSerializer,      # Nested object
+            "category": CategorySerializer,  # Nested object
+        }
+        relations_as_id = ["tags"]           # Just IDs
+```
+
+**Query Optimization Note:** When using `relations_as_id`, you should still use `select_related()` for forward relations and `prefetch_related()` for reverse/M2M relations to avoid N+1 queries:
+
+```python
+class ArticleSerializer(serializers.Serializer):
+    class Meta:
+        model = models.Article
+        schema_out = serializers.SchemaModelConfig(
+            fields=["id", "title", "author", "tags"]
+        )
+        relations_as_id = ["author", "tags"]
+
+    class QuerySet:
+        read = ModelQuerySetSchema(
+            select_related=["author"],       # For forward FK
+            prefetch_related=["tags"],        # For M2M
+        )
 
 ## Using with APIViewSet
 

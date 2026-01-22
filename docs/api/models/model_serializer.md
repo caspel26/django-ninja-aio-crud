@@ -100,11 +100,12 @@ Describes how to build a read (output) schema for a model.
 
 **Attributes**
 
-| Attribute  | Type            | Description |
-|-----------|-----------------|-------------|
-| `fields`   | `list[str]`     | **REQUIRED.** Model fields / related names explicitly included in the read (output) schema. |
-| `excludes` | `list[str]`     | Fields / related names to always omit (takes precedence over `fields` and `optionals`). Use for sensitive or noisy data (e.g., passwords, internal flags). |
-| `customs`  | `list[tuple]`   | Computed / synthetic output values. Tuple formats:<br>• `(name, type)` = required resolvable attribute (object attribute or property). Serialization error if not resolvable.<br>• `(name, type, default)` = optional; default may be a callable (`lambda obj: ...`) or a literal value. |
+| Attribute        | Type            | Description |
+|------------------|-----------------|-------------|
+| `fields`         | `list[str]`     | **REQUIRED.** Model fields / related names explicitly included in the read (output) schema. |
+| `excludes`       | `list[str]`     | Fields / related names to always omit (takes precedence over `fields` and `optionals`). Use for sensitive or noisy data (e.g., passwords, internal flags). |
+| `customs`        | `list[tuple]`   | Computed / synthetic output values. Tuple formats:<br>• `(name, type)` = required resolvable attribute (object attribute or property). Serialization error if not resolvable.<br>• `(name, type, default)` = optional; default may be a callable (`lambda obj: ...`) or a literal value. |
+| `relations_as_id`| `list[str]`     | Relation fields to serialize as IDs instead of nested objects. Works with forward FK, forward O2O, reverse FK, reverse O2O, and M2M relations. |
 
 **Example:**
 
@@ -403,6 +404,107 @@ class Book(ModelSerializer):
     { "id": 2, "title": "Fantastic Beasts" }
   ]
 }
+```
+
+#### Relations as ID
+
+Use `relations_as_id` to serialize relation fields as IDs instead of nested objects. This is useful for:
+
+- Reducing response payload size
+- Avoiding circular serialization
+- Performance optimization when nested data isn't needed
+- API designs where clients fetch related data separately
+
+**Supported Relations:**
+
+| Relation Type      | Output Type       | Example Value        |
+|--------------------|-------------------|----------------------|
+| Forward FK         | `int \| None`     | `5` or `null`        |
+| Forward O2O        | `int \| None`     | `3` or `null`        |
+| Reverse FK         | `list[int]`       | `[1, 2, 3]`          |
+| Reverse O2O        | `int \| None`     | `7` or `null`        |
+| M2M (forward)      | `list[int]`       | `[1, 2]`             |
+| M2M (reverse)      | `list[int]`       | `[4, 5, 6]`          |
+
+**Example:**
+
+```python
+class Author(ModelSerializer):
+    name = models.CharField(max_length=200)
+
+    class ReadSerializer:
+        fields = ["id", "name", "books"]
+        relations_as_id = ["books"]  # Serialize as list of IDs
+
+class Book(ModelSerializer):
+    title = models.CharField(max_length=200)
+    author = models.ForeignKey(Author, on_delete=models.CASCADE, related_name="books")
+
+    class ReadSerializer:
+        fields = ["id", "title", "author"]
+        relations_as_id = ["author"]  # Serialize as ID
+```
+
+**Output (Author):**
+
+```json
+{
+  "id": 1,
+  "name": "J.K. Rowling",
+  "books": [1, 2, 3]
+}
+```
+
+**Output (Book):**
+
+```json
+{
+  "id": 1,
+  "title": "Harry Potter",
+  "author": 1
+}
+```
+
+**M2M Example:**
+
+```python
+class Tag(ModelSerializer):
+    name = models.CharField(max_length=50)
+
+    class ReadSerializer:
+        fields = ["id", "name", "articles"]
+        relations_as_id = ["articles"]  # Reverse M2M as IDs
+
+class Article(ModelSerializer):
+    title = models.CharField(max_length=200)
+    tags = models.ManyToManyField(Tag, related_name="articles")
+
+    class ReadSerializer:
+        fields = ["id", "title", "tags"]
+        relations_as_id = ["tags"]  # Forward M2M as IDs
+```
+
+**Output (Article):**
+
+```json
+{
+  "id": 1,
+  "title": "Getting Started with Django",
+  "tags": [1, 2, 5]
+}
+```
+
+**Query Optimization Note:** When using `relations_as_id`, you should still use `select_related()` for forward relations and `prefetch_related()` for reverse/M2M relations to avoid N+1 queries:
+
+```python
+class Article(ModelSerializer):
+    # ...
+
+    class QuerySet:
+        read = ModelQuerySetSchema(
+            select_related=["author"],       # For forward FK
+            prefetch_related=["tags"],        # For M2M
+        )
 ```
 
 ## Async Extension Points
