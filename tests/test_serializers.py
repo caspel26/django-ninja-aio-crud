@@ -598,3 +598,316 @@ class ModelSerializerDetailFallbackTestCase(TestCase):
         self.assertIn("description", detail_schema.model_fields)
         self.assertIn("extra_info", detail_schema.model_fields)
         self.assertIn("computed_field", detail_schema.model_fields)
+
+
+@tag("serializers", "relations_as_id")
+class RelationsAsIdModelSerializerTestCase(TestCase):
+    """Test cases for relations_as_id with ModelSerializer."""
+
+    def setUp(self):
+        warnings.simplefilter("ignore", UserWarning)
+
+    def test_forward_fk_relations_as_id_schema(self):
+        """Test forward FK field in relations_as_id generates int type."""
+        from tests.test_app.models import BookAsId
+
+        schema = BookAsId.generate_read_s()
+        self.assertIsNotNone(schema)
+        self.assertIn("author_as_id", schema.model_fields)
+
+        # Check the field type annotation includes int (PkFromModel extracts to int)
+        field_info = schema.model_fields["author_as_id"]
+        # Field should be Optional[int] (nullable FK)
+        self.assertTrue(
+            field_info.annotation is not None,
+            "author_as_id field should have a type annotation",
+        )
+
+    def test_reverse_fk_relations_as_id_schema(self):
+        """Test reverse FK field in relations_as_id generates list[int] type."""
+        from tests.test_app.models import AuthorAsId
+
+        schema = AuthorAsId.generate_read_s()
+        self.assertIsNotNone(schema)
+        self.assertIn("books_as_id", schema.model_fields)
+
+        # Check the field is present and has annotation
+        field_info = schema.model_fields["books_as_id"]
+        self.assertTrue(
+            field_info.annotation is not None,
+            "books_as_id field should have a type annotation",
+        )
+
+    def test_forward_o2o_relations_as_id_schema(self):
+        """Test forward O2O field in relations_as_id generates int type."""
+        from tests.test_app.models import UserAsId
+
+        schema = UserAsId.generate_read_s()
+        self.assertIsNotNone(schema)
+        self.assertIn("profile_as_id", schema.model_fields)
+
+        field_info = schema.model_fields["profile_as_id"]
+        self.assertTrue(
+            field_info.annotation is not None,
+            "profile_as_id field should have a type annotation",
+        )
+
+    def test_reverse_o2o_relations_as_id_schema(self):
+        """Test reverse O2O field in relations_as_id generates int type."""
+        from tests.test_app.models import ProfileAsId
+
+        schema = ProfileAsId.generate_read_s()
+        self.assertIsNotNone(schema)
+        self.assertIn("user_profile_as_id", schema.model_fields)
+
+        field_info = schema.model_fields["user_profile_as_id"]
+        self.assertTrue(
+            field_info.annotation is not None,
+            "user_profile_as_id field should have a type annotation",
+        )
+
+    def test_forward_m2m_relations_as_id_schema(self):
+        """Test forward M2M field in relations_as_id generates list[int] type."""
+        from tests.test_app.models import ArticleAsId
+
+        schema = ArticleAsId.generate_read_s()
+        self.assertIsNotNone(schema)
+        self.assertIn("tags_as_id", schema.model_fields)
+
+        field_info = schema.model_fields["tags_as_id"]
+        self.assertTrue(
+            field_info.annotation is not None,
+            "tags_as_id field should have a type annotation",
+        )
+
+    def test_reverse_m2m_relations_as_id_schema(self):
+        """Test reverse M2M field in relations_as_id generates list[int] type."""
+        from tests.test_app.models import TagAsId
+
+        schema = TagAsId.generate_read_s()
+        self.assertIsNotNone(schema)
+        self.assertIn("articles_as_id", schema.model_fields)
+
+        field_info = schema.model_fields["articles_as_id"]
+        self.assertTrue(
+            field_info.annotation is not None,
+            "articles_as_id field should have a type annotation",
+        )
+
+
+@tag("serializers", "relations_as_id")
+class RelationsAsIdSerializerTestCase(TestCase):
+    """Test cases for relations_as_id with Meta-driven Serializer."""
+
+    def setUp(self):
+        warnings.simplefilter("ignore", UserWarning)
+
+    def test_forward_fk_relations_as_id_schema(self):
+        """Test forward FK field in relations_as_id with Serializer."""
+        from tests.test_app.serializers import BookAsIdMetaSerializer
+
+        schema = BookAsIdMetaSerializer.generate_read_s()
+        self.assertIsNotNone(schema)
+        self.assertIn("test_model", schema.model_fields)
+
+        field_info = schema.model_fields["test_model"]
+        self.assertTrue(
+            field_info.annotation is not None,
+            "test_model field should have a type annotation",
+        )
+
+    def test_reverse_fk_relations_as_id_schema(self):
+        """Test reverse FK field in relations_as_id with Serializer."""
+        from tests.test_app.serializers import AuthorAsIdMetaSerializer
+
+        schema = AuthorAsIdMetaSerializer.generate_read_s()
+        self.assertIsNotNone(schema)
+        self.assertIn("test_model_foreign_keys", schema.model_fields)
+
+        field_info = schema.model_fields["test_model_foreign_keys"]
+        self.assertTrue(
+            field_info.annotation is not None,
+            "test_model_foreign_keys field should have a type annotation",
+        )
+
+    def test_forward_o2o_relations_as_id_schema(self):
+        """Test forward O2O field in relations_as_id with Serializer."""
+        from tests.test_app.serializers import UserAsIdMetaSerializer
+
+        schema = UserAsIdMetaSerializer.generate_read_s()
+        self.assertIsNotNone(schema)
+        self.assertIn("test_model", schema.model_fields)
+
+        field_info = schema.model_fields["test_model"]
+        self.assertTrue(
+            field_info.annotation is not None,
+            "test_model field should have a type annotation",
+        )
+
+    def test_reverse_o2o_relations_as_id_schema(self):
+        """Test reverse O2O field in relations_as_id with Serializer."""
+        from tests.test_app.serializers import ProfileAsIdMetaSerializer
+
+        schema = ProfileAsIdMetaSerializer.generate_read_s()
+        self.assertIsNotNone(schema)
+        self.assertIn("test_model_one_to_one", schema.model_fields)
+
+        field_info = schema.model_fields["test_model_one_to_one"]
+        self.assertTrue(
+            field_info.annotation is not None,
+            "test_model_one_to_one field should have a type annotation",
+        )
+
+    def test_forward_m2m_relations_as_id_schema(self):
+        """Test forward M2M field in relations_as_id with Serializer."""
+        from tests.test_app.serializers import ArticleAsIdMetaSerializer
+
+        schema = ArticleAsIdMetaSerializer.generate_read_s()
+        self.assertIsNotNone(schema)
+        self.assertIn("test_models", schema.model_fields)
+
+        field_info = schema.model_fields["test_models"]
+        self.assertTrue(
+            field_info.annotation is not None,
+            "test_models field should have a type annotation",
+        )
+
+    def test_reverse_m2m_relations_as_id_schema(self):
+        """Test reverse M2M field in relations_as_id with Serializer."""
+        from tests.test_app.serializers import TagAsIdMetaSerializer
+
+        schema = TagAsIdMetaSerializer.generate_read_s()
+        self.assertIsNotNone(schema)
+        self.assertIn("test_model_serializer_many_to_many", schema.model_fields)
+
+        field_info = schema.model_fields["test_model_serializer_many_to_many"]
+        self.assertTrue(
+            field_info.annotation is not None,
+            "test_model_serializer_many_to_many field should have a type annotation",
+        )
+
+
+@tag("serializers", "relations_as_id", "integration")
+class RelationsAsIdIntegrationTestCase(TestCase):
+    """Integration tests for relations_as_id with actual data serialization."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from tests.test_app.models import (
+            AuthorAsId,
+            BookAsId,
+            ProfileAsId,
+            UserAsId,
+            TagAsId,
+            ArticleAsId,
+        )
+
+        # Create test data for FK relations
+        cls.author = AuthorAsId.objects.create(name="Author 1", description="Test author")
+        cls.book1 = BookAsId.objects.create(
+            name="Book 1", description="Test book 1", author_as_id=cls.author
+        )
+        cls.book2 = BookAsId.objects.create(
+            name="Book 2", description="Test book 2", author_as_id=cls.author
+        )
+        cls.book_no_author = BookAsId.objects.create(
+            name="Book 3", description="Test book without author", author_as_id=None
+        )
+
+        # Create test data for O2O relations
+        cls.profile = ProfileAsId.objects.create(name="Profile 1", description="Test profile")
+        cls.user = UserAsId.objects.create(
+            name="User 1", description="Test user", profile_as_id=cls.profile
+        )
+
+        # Create test data for M2M relations
+        cls.tag1 = TagAsId.objects.create(name="Tag 1", description="Test tag 1")
+        cls.tag2 = TagAsId.objects.create(name="Tag 2", description="Test tag 2")
+        cls.article = ArticleAsId.objects.create(name="Article 1", description="Test article")
+        cls.article.tags_as_id.add(cls.tag1, cls.tag2)
+
+    def setUp(self):
+        warnings.simplefilter("ignore", UserWarning)
+
+    def test_forward_fk_serialization(self):
+        """Test forward FK field serializes as ID."""
+        from tests.test_app.models import BookAsId
+
+        schema = BookAsId.generate_read_s()
+        result = schema.from_orm(self.book1)
+
+        self.assertEqual(result.author_as_id, self.author.pk)
+
+    def test_forward_fk_null_serialization(self):
+        """Test forward FK field with null value serializes as None."""
+        from tests.test_app.models import BookAsId
+
+        schema = BookAsId.generate_read_s()
+        result = schema.from_orm(self.book_no_author)
+
+        self.assertIsNone(result.author_as_id)
+
+    def test_reverse_fk_serialization(self):
+        """Test reverse FK field serializes as list of IDs."""
+        from tests.test_app.models import AuthorAsId
+
+        # Prefetch the related books
+        author = AuthorAsId.objects.prefetch_related("books_as_id").get(pk=self.author.pk)
+
+        schema = AuthorAsId.generate_read_s()
+        result = schema.from_orm(author)
+
+        self.assertIsInstance(result.books_as_id, list)
+        self.assertEqual(len(result.books_as_id), 2)
+        self.assertIn(self.book1.pk, result.books_as_id)
+        self.assertIn(self.book2.pk, result.books_as_id)
+
+    def test_forward_o2o_serialization(self):
+        """Test forward O2O field serializes as ID."""
+        from tests.test_app.models import UserAsId
+
+        schema = UserAsId.generate_read_s()
+        result = schema.from_orm(self.user)
+
+        self.assertEqual(result.profile_as_id, self.profile.pk)
+
+    def test_reverse_o2o_serialization(self):
+        """Test reverse O2O field serializes as ID."""
+        from tests.test_app.models import ProfileAsId
+
+        # Get profile with prefetched user
+        profile = ProfileAsId.objects.select_related("user_profile_as_id").get(pk=self.profile.pk)
+
+        schema = ProfileAsId.generate_read_s()
+        result = schema.from_orm(profile)
+
+        self.assertEqual(result.user_profile_as_id, self.user.pk)
+
+    def test_forward_m2m_serialization(self):
+        """Test forward M2M field serializes as list of IDs."""
+        from tests.test_app.models import ArticleAsId
+
+        # Prefetch the related tags
+        article = ArticleAsId.objects.prefetch_related("tags_as_id").get(pk=self.article.pk)
+
+        schema = ArticleAsId.generate_read_s()
+        result = schema.from_orm(article)
+
+        self.assertIsInstance(result.tags_as_id, list)
+        self.assertEqual(len(result.tags_as_id), 2)
+        self.assertIn(self.tag1.pk, result.tags_as_id)
+        self.assertIn(self.tag2.pk, result.tags_as_id)
+
+    def test_reverse_m2m_serialization(self):
+        """Test reverse M2M field serializes as list of IDs."""
+        from tests.test_app.models import TagAsId
+
+        # Prefetch the related articles
+        tag = TagAsId.objects.prefetch_related("articles_as_id").get(pk=self.tag1.pk)
+
+        schema = TagAsId.generate_read_s()
+        result = schema.from_orm(tag)
+
+        self.assertIsInstance(result.articles_as_id, list)
+        self.assertEqual(len(result.articles_as_id), 1)
+        self.assertIn(self.article.pk, result.articles_as_id)

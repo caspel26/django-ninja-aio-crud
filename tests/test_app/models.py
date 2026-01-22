@@ -223,3 +223,78 @@ class TestModelSerializerWithBothSerializers(BaseTestModelSerializer):
     class DetailSerializer:
         fields = ["id", "name", "description"]
         # No customs defined - should NOT inherit from read
+
+
+# ==========================================================
+#              RELATIONS AS ID TEST MODELS
+# ==========================================================
+
+
+class AuthorAsId(BaseTestModelSerializer):
+    """Author model for testing relations_as_id on reverse FK."""
+
+    class ReadSerializer:
+        fields = ["id", "name", "description", "books_as_id"]
+        relations_as_id = ["books_as_id"]
+
+
+class BookAsId(BaseTestModelSerializer):
+    """Book model for testing relations_as_id on forward FK."""
+
+    author_as_id = models.ForeignKey(
+        AuthorAsId,
+        on_delete=models.CASCADE,
+        related_name="books_as_id",
+        null=True,
+        blank=True,
+    )
+
+    class ReadSerializer:
+        fields = ["id", "name", "description", "author_as_id"]
+        relations_as_id = ["author_as_id"]
+
+
+class ProfileAsId(BaseTestModelSerializer):
+    """Profile model for testing relations_as_id on reverse O2O."""
+
+    class ReadSerializer:
+        fields = ["id", "name", "description", "user_profile_as_id"]
+        relations_as_id = ["user_profile_as_id"]
+
+
+class UserAsId(BaseTestModelSerializer):
+    """User model for testing relations_as_id on forward O2O."""
+
+    profile_as_id = models.OneToOneField(
+        ProfileAsId,
+        on_delete=models.CASCADE,
+        related_name="user_profile_as_id",
+        null=True,
+        blank=True,
+    )
+
+    class ReadSerializer:
+        fields = ["id", "name", "description", "profile_as_id"]
+        relations_as_id = ["profile_as_id"]
+
+
+class TagAsId(BaseTestModelSerializer):
+    """Tag model for testing relations_as_id on reverse M2M."""
+
+    class ReadSerializer:
+        fields = ["id", "name", "description", "articles_as_id"]
+        relations_as_id = ["articles_as_id"]
+
+
+class ArticleAsId(BaseTestModelSerializer):
+    """Article model for testing relations_as_id on forward M2M."""
+
+    tags_as_id = models.ManyToManyField(
+        TagAsId,
+        related_name="articles_as_id",
+        blank=True,
+    )
+
+    class ReadSerializer:
+        fields = ["id", "name", "description", "tags_as_id"]
+        relations_as_id = ["tags_as_id"]
