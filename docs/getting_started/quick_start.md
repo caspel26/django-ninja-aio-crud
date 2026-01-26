@@ -1,8 +1,13 @@
-## 🚀 Quick Start
+## 🚀 Quick Start (ModelSerializer)
+
+This guide shows how to create a CRUD API using `ModelSerializer`, which combines your Django model and serialization configuration in a single class.
+
+!!! tip "Alternative Approach"
+    If you prefer to keep your models unchanged and define serialization separately, see [Quick Start (Serializer)](quick_start_serializer.md).
 
 ### 1. Create Your Model
 
-Define your model using `ModelSerializer`:
+Define your model using `ModelSerializer` with embedded serializer configuration:
 
 ```python
 # models.py
@@ -44,12 +49,9 @@ from .models import Article
 api = NinjaAIO(title="My Blog API", version="1.0.0")
 
 
+@api.viewset(model=Article)
 class ArticleViewSet(APIViewSet):
-    model = Article
-    api = api
-
-
-ArticleViewSet().add_views_to_route()
+    pass
 ```
 
 ### 3. Configure URLs

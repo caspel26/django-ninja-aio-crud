@@ -9,7 +9,8 @@ nav:
   - Home: index.md
   - Getting Started:
     - Installation: getting_started/installation.md
-    - Quick Start: getting_started/quick_start.md
+    - Quick Start (ModelSerializer): getting_started/quick_start.md
+    - Quick Start (Serializer): getting_started/quick_start_serializer.md
   - Tutorial:
     - 'Step 1: Define Your Model': tutorial/model.md
     - 'Step 2: Create CRUD Views': tutorial/crud.md
