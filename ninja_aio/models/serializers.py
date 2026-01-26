@@ -477,11 +477,10 @@ class BaseSerializer:
             return (field_name, PkFromModel[pk_field_type] | None, None)
 
         # Special case: ModelSerializer with no readable fields should be skipped entirely
-        if isinstance(rel_model, ModelSerializerMeta):
-            if not (
-                rel_model.get_fields("read") or rel_model.get_custom_fields("read")
-            ):
-                return None
+        if isinstance(rel_model, ModelSerializerMeta) and not (
+            rel_model.get_fields("read") or rel_model.get_custom_fields("read")
+        ):
+            return None
 
         schema = cls._resolve_relation_schema(field_name, rel_model)
         if not schema:
