@@ -107,7 +107,7 @@ class AsyncJwtBearer(HttpBearer):
         """
         try:
             self.dcd = jwt.decode(token, self.jwt_public, algorithms=self.algorithms)
-        except ValueError:
+        except errors.JoseError:
             # raise AuthError(", ".join(exc.args), 401)
             return False
 
