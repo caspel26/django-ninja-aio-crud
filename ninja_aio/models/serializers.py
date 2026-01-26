@@ -305,9 +305,8 @@ class BaseSerializer:
         """
         # Auto-resolve ModelSerializer with readable fields
         if isinstance(rel_model, ModelSerializerMeta):
-            if rel_model.get_fields("read") or rel_model.get_custom_fields("read"):
-                return rel_model.generate_related_s()
-            return None
+            has_readable_fields = rel_model.get_fields("read") or rel_model.get_custom_fields("read")
+            return rel_model.generate_related_s() if has_readable_fields else None
 
         # Resolve from explicit serializer mapping
         rel_serializers = cls._get_relations_serializers() or {}
