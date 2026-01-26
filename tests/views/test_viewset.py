@@ -890,7 +890,7 @@ class DetailSchemaModelSerializerTestCase(TestCase):
         """Test that get_schemas returns a 4-tuple with detail schema."""
         result = self.viewset.get_schemas()
         self.assertEqual(len(result), 4)
-        schema_out, schema_detail, schema_in, schema_update = result
+        schema_out, schema_detail, _, _ = result
         self.assertIsNotNone(schema_out)
         self.assertIsNotNone(schema_detail)
 
