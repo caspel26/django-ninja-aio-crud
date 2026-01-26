@@ -280,3 +280,158 @@ class M2MRelationSchemaValidationTestCase(TestCase):
             serializer_class=TestModelReverseManyToManySerializer,
         )
         self.assertEqual(schema.related_schema, CustomSchema)
+
+
+# Decorator tracking for tests
+_decorator_calls = {"get": 0, "post": 0}
+
+
+def track_get_decorator(func):
+    """Decorator that tracks GET endpoint calls."""
+    from functools import wraps
+
+    @wraps(func)
+    async def wrapper(*args, **kwargs):
+        _decorator_calls["get"] += 1
+        return await func(*args, **kwargs)
+
+    return wrapper
+
+
+def track_post_decorator(func):
+    """Decorator that tracks POST endpoint calls."""
+    from functools import wraps
+
+    @wraps(func)
+    async def wrapper(*args, **kwargs):
+        _decorator_calls["post"] += 1
+        return await func(*args, **kwargs)
+
+    return wrapper
+
+
+class TestM2MWithDecoratorsViewSet(GenericAPIViewSet):
+    """ViewSet using M2M relations with custom decorators."""
+
+    model = models.TestModelSerializerManyToMany
+    m2m_relations = [
+        M2MRelationSchema(
+            model=models.TestModelSerializerReverseManyToMany,
+            related_name="test_model_serializers",
+            filters={"name": (str, "")},
+            get_decorators=[track_get_decorator],
+            post_decorators=[track_post_decorator],
+            append_slash=True,
+        )
+    ]
+
+    def test_model_serializers_query_params_handler(self, queryset, filters):
+        name_filter = filters.get("name")
+        if name_filter:
+            queryset = queryset.filter(name=name_filter)
+        return queryset
+
+
+@tag("many_to_many_api", "decorators")
+class M2MRelationSchemaDecoratorsTestCase(Tests.BaseManyToManyAPITestCase):
+    """Test M2M API with custom decorators applied to GET and POST endpoints."""
+
+    viewset_class = TestM2MWithDecoratorsViewSet
+    related_model = models.TestModelSerializerReverseManyToMany
+    related_name = "test_model_serializers"
+    api_namespace = "m2m_decorators_test"
+    related_names = ["dec_a", "dec_b", "dec_c"]
+
+    def setUp(self):
+        super().setUp()
+        # Reset decorator call counts before each test
+        _decorator_calls["get"] = 0
+        _decorator_calls["post"] = 0
+
+    async def test_get_decorator_is_applied(self):
+        """Test that get_decorators are applied to the GET endpoint."""
+        # First add some related objects
+        await self._add_related()
+        initial_get_count = _decorator_calls["get"]
+
+        # Call the GET endpoint
+        await self.get_view(request=self.request.get(), pk=self.path_schema)
+
+        # Verify the get decorator was called
+        self.assertEqual(
+            _decorator_calls["get"],
+            initial_get_count + 1,
+            "GET decorator should have been called once",
+        )
+
+    async def test_post_decorator_is_applied(self):
+        """Test that post_decorators are applied to the POST endpoint."""
+        initial_post_count = _decorator_calls["post"]
+
+        # Call the POST endpoint to add related objects
+        await self._add_related()
+
+        # Verify the post decorator was called
+        self.assertEqual(
+            _decorator_calls["post"],
+            initial_post_count + 1,
+            "POST decorator should have been called once",
+        )
+
+    async def test_decorators_independent(self):
+        """Test that GET and POST decorators are applied independently."""
+        # Reset counts
+        _decorator_calls["get"] = 0
+        _decorator_calls["post"] = 0
+
+        # Call POST endpoint
+        await self._add_related()
+        self.assertEqual(_decorator_calls["post"], 1)
+        self.assertEqual(_decorator_calls["get"], 0)
+
+        # Call GET endpoint
+        await self.get_view(request=self.request.get(), pk=self.path_schema)
+        self.assertEqual(_decorator_calls["post"], 1)  # Still 1
+        self.assertEqual(_decorator_calls["get"], 1)
+
+
+@tag("many_to_many_api", "decorators", "schema")
+class M2MRelationSchemaDecoratorsFieldTestCase(TestCase):
+    """Test cases for M2MRelationSchema decorator fields."""
+
+    def test_decorators_default_to_empty_list(self):
+        """Test that decorators default to empty lists."""
+        schema = M2MRelationSchema(
+            model=models.TestModelSerializerReverseManyToMany,
+            related_name="test_model_serializers",
+        )
+        self.assertEqual(schema.get_decorators, [])
+        self.assertEqual(schema.post_decorators, [])
+
+    def test_decorators_accept_list_of_callables(self):
+        """Test that decorators accept a list of callables."""
+
+        def custom_decorator(func):
+            return func
+
+        schema = M2MRelationSchema(
+            model=models.TestModelSerializerReverseManyToMany,
+            related_name="test_model_serializers",
+            get_decorators=[custom_decorator],
+            post_decorators=[custom_decorator, custom_decorator],
+        )
+        self.assertEqual(len(schema.get_decorators), 1)
+        self.assertEqual(len(schema.post_decorators), 2)
+        self.assertEqual(schema.get_decorators[0], custom_decorator)
+
+    def test_decorators_can_be_none(self):
+        """Test that decorators can explicitly be set to None."""
+        schema = M2MRelationSchema(
+            model=models.TestModelSerializerReverseManyToMany,
+            related_name="test_model_serializers",
+            get_decorators=None,
+            post_decorators=None,
+        )
+        # None values should be accepted
+        self.assertIsNone(schema.get_decorators)
+        self.assertIsNone(schema.post_decorators)

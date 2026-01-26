@@ -359,6 +359,7 @@ class ManyToManyAPI:
         filters_schema,
         append_slash: bool,
         verbose_name_plural: str,
+        decorators: list,
     ):
         @self.router.get(
             self._get_api_path(rel_path, append_slash=append_slash),
@@ -373,6 +374,7 @@ class ManyToManyAPI:
         @decorate_view(
             unique_view(f"get_{self.related_model_util.model_name}_{rel_path}"),
             paginate(self.pagination_class),
+            *decorators,
         )
         async def get_related(
             request: HttpRequest,
@@ -407,6 +409,7 @@ class ManyToManyAPI:
         m2m_add: bool,
         m2m_remove: bool,
         verbose_name_plural: str,
+        decorators: list,
     ):
         action, schema_in = self._resolve_action_schema(m2m_add, m2m_remove)
         plural = verbose_name_plural
@@ -422,7 +425,10 @@ class ManyToManyAPI:
             summary=summary,
             description=summary,
         )
-        @unique_view(f"manage_{self.related_model_util.model_name}_{rel_path}")
+        @decorate_view(
+            unique_view(f"manage_{self.related_model_util.model_name}_{rel_path}"),
+            *decorators,
+        )
         async def manage_related(
             request: HttpRequest,
             pk: Path[self.path_schema],  # type: ignore
@@ -483,6 +489,8 @@ class ManyToManyAPI:
             relation.verbose_name_plural
             or rel_util.model._meta.verbose_name_plural.capitalize()
         )
+        get_decorators = relation.get_decorators or []
+        post_decorators = relation.post_decorators or []
 
         if m2m_get:
             self._register_get_relation_view(
@@ -494,6 +502,7 @@ class ManyToManyAPI:
                 filters_schema=filters_schema,
                 append_slash=append_slash,
                 verbose_name_plural=verbose_name_plural,
+                decorators=get_decorators,
             )
 
         if m2m_add or m2m_remove:
@@ -505,6 +514,7 @@ class ManyToManyAPI:
                 m2m_add=m2m_add,
                 m2m_remove=m2m_remove,
                 verbose_name_plural=verbose_name_plural,
+                decorators=post_decorators,
             )
 
     def _add_views(self):

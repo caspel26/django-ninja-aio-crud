@@ -1,4 +1,4 @@
-from typing import List, Optional, Type
+from typing import Callable, List, Optional, Type
 
 from ninja import Schema
 from ninja_aio.types import ModelSerializerMeta, SerializerMeta
@@ -46,7 +46,11 @@ class M2MRelationSchema(BaseModel):
             Whether to append a trailing slash to the generated GET endpoint path. Defaults to False for backward compatibility.
         verbose_name_plural (str | None):
             Optional human-readable plural name for the related model, used in documentation and responses.
-            
+        get_decorators (List | None):
+            Optional list of decorators to apply to the GET endpoint.
+        post_decorators (List | None):
+            Optional list of decorators to apply to the POST (add/remove) endpoints.
+
     Validation:
         - If `model` is not a ModelSerializerMeta, `related_schema` is required.
         - When `model` is a ModelSerializerMeta and `related_schema` is not provided, it will be
@@ -72,6 +76,8 @@ class M2MRelationSchema(BaseModel):
     serializer_class: Optional[SerializerMeta] = None
     append_slash: bool = False
     verbose_name_plural: Optional[str] = None
+    get_decorators: Optional[List[Callable]] = []
+    post_decorators: Optional[List[Callable]] = []
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
