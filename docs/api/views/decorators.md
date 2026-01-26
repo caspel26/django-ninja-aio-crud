@@ -63,6 +63,23 @@ class MyViewSet(APIViewSet):
 
 These are applied in combination with built-ins (e.g., unique_view, paginate) using decorate_view in the implementation.
 
+## M2MRelationSchema decorators
+
+Apply custom decorators to Many-to-Many relation endpoints via `get_decorators` and `post_decorators`:
+
+```python
+from ninja_aio.schemas import M2MRelationSchema
+
+M2MRelationSchema(
+    model=Tag,
+    related_name="tags",
+    get_decorators=[cache_decorator, log_decorator],   # Applied to GET (list related)
+    post_decorators=[rate_limit_decorator],            # Applied to POST (add/remove)
+)
+```
+
+These decorators are applied alongside built-in decorators (`unique_view`, `paginate`) using `decorate_view`. See [APIViewSet M2M Relations](api_view_set.md#many-to-many-relations) for more details.
+
 ## ApiMethodFactory.decorators
 
 Example: use api_get within a ViewSet with extra decorators:

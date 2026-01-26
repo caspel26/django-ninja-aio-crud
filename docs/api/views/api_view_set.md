@@ -294,6 +294,8 @@ Relations are declared via `M2MRelationSchema` objects (not tuples). Each schema
 - `serializer_class`: optional `Serializer` class for plain Django models. When provided, `related_schema` is auto-generated from the serializer. Cannot be used when `model` is a `ModelSerializer`.
 - `append_slash`: bool to control trailing slash for the GET relation endpoint path. Defaults to `False` (no trailing slash) for backward compatibility. When `True`, the GET path ends with a trailing slash.
 - `verbose_name_plural`: optional human-readable plural name for the related model, used in endpoint summaries and descriptions. When not provided, defaults to the related model's `_meta.verbose_name_plural`.
+- `get_decorators`: optional list of decorators to apply to the GET (list related objects) endpoint. Decorators are applied via `decorate_view()` alongside built-in decorators like `unique_view` and `paginate`.
+- `post_decorators`: optional list of decorators to apply to the POST (add/remove) endpoint. Decorators are applied via `decorate_view()` alongside the built-in `unique_view` decorator.
 
 If `path` is empty it falls back to the related model verbose name (lowercase plural).
 If `filters` is provided, a per-relation filters schema is auto-generated and exposed on the GET relation endpoint:
@@ -488,6 +490,44 @@ M2MRelationSchema(
     get=True,
 )
 ```
+
+Example with custom decorators:
+
+```python
+from functools import wraps
+
+def cache_response(timeout=60):
+    """Cache decorator for GET endpoints."""
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            # caching logic here
+            return await func(*args, **kwargs)
+        return wrapper
+    return decorator
+
+def rate_limit(max_calls=100):
+    """Rate limiting decorator for POST endpoints."""
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            # rate limiting logic here
+            return await func(*args, **kwargs)
+        return wrapper
+    return decorator
+
+M2MRelationSchema(
+    model=Tag,
+    related_name="tags",
+    get_decorators=[cache_response(timeout=300)],  # Cache GET for 5 minutes
+    post_decorators=[rate_limit(max_calls=50)],     # Rate limit POST operations
+    add=True,
+    remove=True,
+    get=True,
+)
+```
+
+Note: Decorators are applied in addition to built-in decorators (`unique_view`, `paginate`). The order follows standard Python decorator stacking: decorators listed first are applied outermost.
 
 ## Custom Views
 
