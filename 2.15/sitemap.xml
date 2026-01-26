@@ -2,82 +2,82 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://django-ninja-aio.com/2.15/</loc>
-         <lastmod>2026-01-22</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://django-ninja-aio.com/2.15/auth/</loc>
-         <lastmod>2026-01-22</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://django-ninja-aio.com/2.15/contributing/</loc>
-         <lastmod>2026-01-22</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://django-ninja-aio.com/2.15/release_notes/</loc>
-         <lastmod>2026-01-22</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://django-ninja-aio.com/2.15/api/authentication/</loc>
-         <lastmod>2026-01-22</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://django-ninja-aio.com/2.15/api/pagination/</loc>
-         <lastmod>2026-01-22</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://django-ninja-aio.com/2.15/api/models/model_serializer/</loc>
-         <lastmod>2026-01-22</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://django-ninja-aio.com/2.15/api/models/model_util/</loc>
-         <lastmod>2026-01-22</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://django-ninja-aio.com/2.15/api/models/serializers/</loc>
-         <lastmod>2026-01-22</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://django-ninja-aio.com/2.15/api/renderers/orjson_renderer/</loc>
-         <lastmod>2026-01-22</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://django-ninja-aio.com/2.15/api/views/api_view/</loc>
-         <lastmod>2026-01-22</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://django-ninja-aio.com/2.15/api/views/api_view_set/</loc>
-         <lastmod>2026-01-22</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://django-ninja-aio.com/2.15/api/views/decorators/</loc>
-         <lastmod>2026-01-22</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://django-ninja-aio.com/2.15/api/views/mixins/</loc>
-         <lastmod>2026-01-22</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://django-ninja-aio.com/2.15/getting_started/installation/</loc>
-         <lastmod>2026-01-22</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://django-ninja-aio.com/2.15/getting_started/quick_start/</loc>
-         <lastmod>2026-01-22</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://django-ninja-aio.com/2.15/tutorial/authentication/</loc>
-         <lastmod>2026-01-22</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://django-ninja-aio.com/2.15/tutorial/crud/</loc>
-         <lastmod>2026-01-22</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://django-ninja-aio.com/2.15/tutorial/filtering/</loc>
-         <lastmod>2026-01-22</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://django-ninja-aio.com/2.15/tutorial/model/</loc>
-         <lastmod>2026-01-22</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
 </urlset>
