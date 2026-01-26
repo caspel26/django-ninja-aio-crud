@@ -78,7 +78,7 @@ def _default_error(
 
 
 def _pydantic_validation_error(
-    request: HttpRequest, exc: ValidationError, api: type[NinjaAPI]
+    request: HttpRequest, exc: PydanticValidationError, api: type[NinjaAPI]
 ) -> HttpResponse:
     """Translate a pydantic ValidationError into a normalized API error response."""
     error = PydanticValidationError(exc.errors(include_input=False))
