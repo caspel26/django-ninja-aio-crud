@@ -138,12 +138,11 @@ class JwtAuthTests(TestCase):
                 return "should-not-happen"
 
         bearer = TB()
-        # The ValueError branch at 110-112 is for when jwt.decode raises ValueError
-        # Mock jwt.decode to raise ValueError to test that branch
+
         import unittest.mock as mock
 
         with mock.patch("ninja_aio.auth.jwt.decode") as mock_decode:
-            mock_decode.side_effect = ValueError("invalid token")
+            mock_decode.side_effect = errors.JoseError("invalid token")
             result = async_to_sync(bearer.authenticate)(HttpRequest(), "fake-token")
             self.assertFalse(result)
 
