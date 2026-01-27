@@ -1,6 +1,6 @@
 """Django Ninja AIO CRUD - Rest Framework"""
 
-__version__ = "2.16.0"
+__version__ = "2.16.1"
 
 from .api import NinjaAIO
 
