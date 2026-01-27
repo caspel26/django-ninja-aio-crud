@@ -1289,7 +1289,173 @@
 
 
 <h1 id="release-notes">Release Notes<a class="headerlink" href="#release-notes" title="Permanent link">&para;</a></h1>
-<div style='width:100%;overflow-x:auto;'><table style='width:100%;min-width:900px;border-collapse:collapse;table-layout:auto;font-size:.8rem;'><thead style='background:transparent;'><tr><th style='text-align:left;padding:.75rem 1rem;border-bottom:2px solid #ccc;width:15%;font-size:.85rem;'>Version</th><th style='text-align:left;padding:.75rem 1rem;border-bottom:2px solid #ccc;width:15%;font-size:.85rem;'>Date</th><th style='text-align:left;padding:.75rem 1rem;border-bottom:2px solid #ccc;width:70%;font-size:.85rem;'>Summary</th></tr></thead><tbody><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v2.16.1/'><strong>v2.16.1</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v2.15.0...v2.16.1'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2026-01-27</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><img alt='notes' src='https://img.shields.io/badge/notes-available-blue?style=flat' style='margin-right:6px;vertical-align:middle;height:20px;' /><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><h1>Release Notes</h1>
+<div style='width:100%;overflow-x:auto;'><table style='width:100%;min-width:900px;border-collapse:collapse;table-layout:auto;font-size:.8rem;'><thead style='background:transparent;'><tr><th style='text-align:left;padding:.75rem 1rem;border-bottom:2px solid #ccc;width:15%;font-size:.85rem;'>Version</th><th style='text-align:left;padding:.75rem 1rem;border-bottom:2px solid #ccc;width:15%;font-size:.85rem;'>Date</th><th style='text-align:left;padding:.75rem 1rem;border-bottom:2px solid #ccc;width:70%;font-size:.85rem;'>Summary</th></tr></thead><tbody><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v2.16.2/'><strong>v2.16.2</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v2.16.1...v2.16.2'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2026-01-27</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><img alt='notes' src='https://img.shields.io/badge/notes-available-blue?style=flat' style='margin-right:6px;vertical-align:middle;height:20px;' /><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><h1>Release Notes</h1>
+<h2>[v2.16.2] - 2026-01-27</h2>
+<hr />
+<h2>🐛 Bug Fixes</h2>
+<ul>
+<li><strong>Fixed Schema Generation with Only Custom Fields</strong> [<code>ninja_aio/models/serializers.py</code>]:</li>
+<li>Fixed an issue in <code>_generate_model_schema()</code> where defining only <code>customs</code> and/or <code>optionals</code> (without explicit <code>fields</code> or <code>excludes</code>) would incorrectly include all model fields in the generated schema.</li>
+<li>When only custom fields are defined, the schema now correctly excludes all concrete model fields, returning a schema with only the specified custom fields.</li>
+<li>This fix applies to both <code>Serializer</code> (Meta-driven) and <code>ModelSerializer</code> create/update schema generation.</li>
+</ul>
+<p><strong>Before (broken behavior):</strong>
+  ```python
+  class MySerializer(Serializer):
+      class Meta:
+          model = MyModel
+          schema_in = SchemaModelConfig(
+              customs=[("custom_input", str, ...)]
+          )</p>
+<p># Generated schema incorrectly included ALL model fields + custom_input
+  ```</p>
+<p><strong>After (fixed behavior):</strong>
+  ```python
+  class MySerializer(Serializer):
+      class Meta:
+          model = MyModel
+          schema_in = SchemaModelConfig(
+              customs=[("custom_input", str, ...)]
+          )</p>
+<p># Generated schema now correctly includes ONLY custom_input
+  ```</p>
+<hr />
+<h2>🔧 Improvements</h2>
+<ul>
+<li><strong>Union Type Support in SchemaModelConfig</strong> [<code>ninja_aio/models/serializers.py</code>]:</li>
+<li>Updated <code>optionals</code> and <code>customs</code> field type hints in <code>SchemaModelConfig</code> to accept <code>Any</code> instead of <code>type</code>.</li>
+<li>This allows using Union types and other complex type annotations in schema configurations.</li>
+</ul>
+<p><strong>Usage example:</strong>
+  ```python
+  from typing import Union</p>
+<p>schema_in = SchemaModelConfig(
+      optionals=[("status", str | None)],
+      customs=[
+          ("data", Union[str, int], None),
+          ("items", list[int], []),
+      ],
+  )
+  ```</p>
+<hr />
+<h2>🧪 Tests</h2>
+<ul>
+<li><strong>New Custom Fields Schema Tests</strong> [<code>tests/test_serializers.py</code>]:</li>
+<li>Added <code>CustomsOnlySchemaTestCase</code> test class with 7 new tests:<ul>
+<li><code>test_serializer_create_schema_with_only_customs</code>: Verifies create schema with only customs excludes model fields.</li>
+<li><code>test_serializer_update_schema_with_only_customs</code>: Verifies update schema with only customs excludes model fields.</li>
+<li><code>test_serializer_create_schema_with_customs_and_optionals</code>: Verifies customs + optionals includes only those fields.</li>
+<li><code>test_serializer_with_fields_still_works</code>: Confirms explicit fields behavior is preserved.</li>
+<li><code>test_serializer_with_only_excludes_and_customs</code>: Documents behavior when excludes defined without fields.</li>
+<li><code>test_serializer_empty_schema_returns_none</code>: Verifies empty schema returns None.</li>
+<li><code>test_serializer_multiple_customs_no_model_fields</code>: Verifies multiple customs work without model fields.</li>
+</ul>
+</li>
+</ul>
+<hr />
+<h2>📋 Summary</h2>
+<p>This patch release fixes a bug where schemas defined with only custom fields would incorrectly include all model fields, and adds support for Union types in <code>SchemaModelConfig</code> field definitions.</p>
+<h3>Files Changed</h3>
+<p>| File | Changes |
+|------|---------|
+| <code>ninja_aio/models/serializers.py</code> | Fixed <code>_generate_model_schema()</code> to exclude all model fields when only customs are defined; updated <code>SchemaModelConfig</code> type hints to allow Union types |
+| <code>tests/test_serializers.py</code> | Added 7 new tests in <code>CustomsOnlySchemaTestCase</code> |
+| <code>ninja_aio/__init__.py</code> | Bumped version to 2.16.2 |</p>
+<hr />
+<h2>[v2.16.0] - 2026-01-26</h2>
+<hr />
+<h2>✨ New Features</h2>
+<ul>
+<li><strong>Custom Decorators for M2M Relation Endpoints</strong> [<code>ninja_aio/schemas/helpers.py</code>, <code>ninja_aio/helpers/api.py</code>]:</li>
+<li>Added <code>get_decorators</code> field to <code>M2MRelationSchema</code> for applying custom decorators to GET (list related objects) endpoints.</li>
+<li>Added <code>post_decorators</code> field to <code>M2MRelationSchema</code> for applying custom decorators to POST (add/remove) endpoints.</li>
+<li>Decorators are unpacked and applied via <code>decorate_view()</code> alongside existing decorators like <code>unique_view</code> and <code>paginate</code>.</li>
+<li>Enables use cases such as rate limiting, caching, custom authentication, logging, or any other decorator-based middleware on M2M endpoints.</li>
+</ul>
+<p><strong>Usage example:</strong>
+  ```python
+  from ninja_aio.schemas import M2MRelationSchema</p>
+<p>M2MRelationSchema(
+      model=RelatedModel,
+      related_name="related_items",
+      get_decorators=[cache_decorator, log_decorator],
+      post_decorators=[rate_limit_decorator],
+  )
+  ```</p>
+<hr />
+<h2>🔧 Improvements</h2>
+<ul>
+<li><strong>Refactored Manage Relation View Registration</strong> [<code>ninja_aio/helpers/api.py</code>]:</li>
+<li>Updated <code>_register_manage_relation_view()</code> to use <code>decorate_view()</code> wrapper instead of direct <code>@unique_view</code> decorator.</li>
+<li>Ensures consistent decorator application pattern between GET and POST endpoints.</li>
+<li>
+<p>Allows decorator spreading via <code>*decorators</code> for extensibility.</p>
+</li>
+<li>
+<p><strong>Improved Type Hints</strong> [<code>ninja_aio/schemas/helpers.py</code>]:</p>
+</li>
+<li>Added <code>Callable</code> import from typing module.</li>
+<li>Updated <code>get_decorators</code> and <code>post_decorators</code> type hints to <code>Optional[List[Callable]]</code> for better IDE support and type checking.</li>
+</ul>
+<hr />
+<h2>🧪 Tests</h2>
+<ul>
+<li><strong>New Decorator Integration Tests</strong> [<code>tests/helpers/test_many_to_many_api.py</code>]:</li>
+<li>Added <code>M2MRelationSchemaDecoratorsTestCase</code> test class with integration tests:<ul>
+<li><code>test_get_decorator_is_applied</code>: Verifies GET decorators are invoked on list endpoint calls.</li>
+<li><code>test_post_decorator_is_applied</code>: Verifies POST decorators are invoked on add/remove endpoint calls.</li>
+<li><code>test_decorators_independent</code>: Confirms GET and POST decorators operate independently.</li>
+</ul>
+</li>
+<li>
+<p>Added <code>TestM2MWithDecoratorsViewSet</code> test viewset demonstrating decorator usage.</p>
+</li>
+<li>
+<p><strong>New Decorator Schema Validation Tests</strong> [<code>tests/helpers/test_many_to_many_api.py</code>]:</p>
+</li>
+<li>Added <code>M2MRelationSchemaDecoratorsFieldTestCase</code> test class with schema field tests:<ul>
+<li><code>test_decorators_default_to_empty_list</code>: Validates default empty list behavior.</li>
+<li><code>test_decorators_accept_list_of_callables</code>: Validates callable list acceptance.</li>
+<li><code>test_decorators_can_be_none</code>: Validates explicit <code>None</code> assignment.</li>
+</ul>
+</li>
+</ul>
+<hr />
+<h2>📚 Documentation</h2>
+<ul>
+<li><strong>Updated APIViewSet Documentation</strong> [<code>docs/api/views/api_view_set.md</code>]:</li>
+<li>Added <code>get_decorators</code> and <code>post_decorators</code> to M2MRelationSchema attributes list.</li>
+<li>Added comprehensive example showing custom decorator usage with M2M relations (cache and rate limiting patterns).</li>
+<li>
+<p>Added note explaining decorator application order and interaction with built-in decorators.</p>
+</li>
+<li>
+<p><strong>Updated Decorators Documentation</strong> [<code>docs/api/views/decorators.md</code>]:</p>
+</li>
+<li>Added new "M2MRelationSchema decorators" section.</li>
+<li>
+<p>Included usage example and cross-reference to APIViewSet M2M Relations documentation.</p>
+</li>
+<li>
+<p><strong>Split Quick Start into Two Guides</strong>:</p>
+</li>
+<li>[<code>docs/getting_started/quick_start.md</code>]: Dedicated to <code>ModelSerializer</code> approach with embedded serializer configuration.</li>
+<li>[<code>docs/getting_started/quick_start_serializer.md</code>]: New guide for <code>Serializer</code> approach with plain Django models, including examples for relationships, query optimization, and lifecycle hooks.</li>
+</ul>
+<hr />
+<h2>📋 Summary</h2>
+<p>This minor release introduces custom decorator support for Many-to-Many relation endpoints. Users can now apply custom decorators independently to GET and POST M2M endpoints via the new <code>get_decorators</code> and <code>post_decorators</code> fields in <code>M2MRelationSchema</code>. This enables flexible middleware patterns such as caching, rate limiting, and custom logging on relation endpoints.</p>
+<h3>Files Changed</h3>
+<p>| File | Changes |
+|------|---------|
+| <code>ninja_aio/schemas/helpers.py</code> | Added <code>get_decorators</code> and <code>post_decorators</code> fields with <code>Callable</code> type hints |
+| <code>ninja_aio/helpers/api.py</code> | Updated view registration to accept and apply custom decorators |
+| <code>tests/helpers/test_many_to_many_api.py</code> | Added 6 new tests across 2 test classes |
+| <code>docs/api/views/api_view_set.md</code> | Documented M2M decorator fields with usage examples |
+| <code>docs/api/views/decorators.md</code> | Added M2MRelationSchema decorators section |
+| <code>docs/getting_started/quick_start.md</code> | Dedicated to ModelSerializer approach |
+| <code>docs/getting_started/quick_start_serializer.md</code> | New guide for Serializer approach with plain Django models |
+| <code>mkdocs.yml</code> | Updated navigation with two Quick Start guides |</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v2.16.1/'><strong>v2.16.1</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v2.15.0...v2.16.1'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2026-01-27</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><img alt='notes' src='https://img.shields.io/badge/notes-available-blue?style=flat' style='margin-right:6px;vertical-align:middle;height:20px;' /><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><h1>Release Notes</h1>
 <h2>[v2.16.1] - 2026-01-27</h2>
 <hr />
 <h2>🐛 Bug Fixes</h2>
@@ -4185,14 +4351,7 @@ class ArticleViewSet(APIViewSet):
 <li>Verify path PK handling in custom routes that relied on a generic PK type.</li>
 <li>Review <code>QuerySet.read</code> / <code>QuerySet.queryset_request</code> for desired select/prefetch behavior.</li>
 <li>Optionally configure ORJSON via <code>NINJA_AIO_ORJSON_RENDERER_OPTION</code>.</li>
-</ol></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v2.0.0-rc1/'><strong>v2.0.0-rc1</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v2.0.0-rc2...v2.0.0-rc1'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-12-07</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v2.0.0-rc2/'><strong>v2.0.0-rc2</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v2.0.0-rc3...v2.0.0-rc2'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-12-12</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v2.0.0-rc3/'><strong>v2.0.0-rc3</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v2.0.0-rc4...v2.0.0-rc3'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-12-12</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v2.0.0-rc4/'><strong>v2.0.0-rc4</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v2.0.0-rc5...v2.0.0-rc4'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-12-12</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v2.0.0-rc5/'><strong>v2.0.0-rc5</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v2.0.0-rc6...v2.0.0-rc5'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-12-12</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><img alt='notes' src='https://img.shields.io/badge/notes-available-blue?style=flat' style='margin-right:6px;vertical-align:middle;height:20px;' /><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><h1>Release Notes</h1>
-<h2>[2.0.0-rc5] - 2025-12-12</h2>
-<hr />
-<h2>🛠 Changed</h2>
-<ul>
-<li>fix: update log messages to use 'pk' instead of 'id' for consistency in ManyToManyAPI</li>
-</ul>
-<hr /></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v2.0.0-rc6/'><strong>v2.0.0-rc6</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v2.0.0-rc7...v2.0.0-rc6'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-12-12</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><img alt='notes' src='https://img.shields.io/badge/notes-available-blue?style=flat' style='margin-right:6px;vertical-align:middle;height:20px;' /><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><h1>Release Notes</h1>
+</ol></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v2.0.0-rc1/'><strong>v2.0.0-rc1</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v2.0.0-rc2...v2.0.0-rc1'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-12-07</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v2.0.0-rc2/'><strong>v2.0.0-rc2</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v2.0.0-rc3...v2.0.0-rc2'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-12-12</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v2.0.0-rc3/'><strong>v2.0.0-rc3</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v2.0.0-rc4...v2.0.0-rc3'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-12-12</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v2.0.0-rc4/'><strong>v2.0.0-rc4</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v2.0.0-rc5...v2.0.0-rc4'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-12-12</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v2.0.0-rc5/'><strong>v2.0.0-rc5</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v2.0.0-rc6...v2.0.0-rc5'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-12-12</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><span style='opacity:.6;'>-</span><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><p>No release notes.</p></div></details></td></tr><tr><td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'><a href='/v2.0.0-rc6/'><strong>v2.0.0-rc6</strong></a><br/><small><a href='https://github.com/caspel26/django-ninja-aio-crud/compare/v2.0.0-rc7...v2.0.0-rc6'>diff</a></small></td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>2025-12-12</td><td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'><img alt='notes' src='https://img.shields.io/badge/notes-available-blue?style=flat' style='margin-right:6px;vertical-align:middle;height:20px;' /><details style='margin-top:.45rem;font-size:.7rem;'><summary style='cursor:pointer;'>Release notes</summary><div style='margin-top:.5rem;'><h1>Release Notes</h1>
 <h2>[2.0.0-rc6] - 2025-12-12</h2>
 <hr />
 <h2>✨ Added</h2>
