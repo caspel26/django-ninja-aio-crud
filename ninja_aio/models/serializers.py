@@ -1046,18 +1046,18 @@ class SchemaModelConfig(Schema):
     ----------
     fields : Optional[List[str]]
         Explicit model fields to include.
-    optionals : Optional[List[tuple[str, type]]]
-        Optional model fields.
+    optionals : Optional[List[tuple[str, Any]]]
+        Optional model fields. Type can be any valid type annotation including Union.
     exclude : Optional[List[str]]
         Model fields to exclude.
-    customs : Optional[List[tuple[str, type, Any]]]
-        Custom / synthetic fields.
+    customs : Optional[List[tuple[str, Any, Any]]]
+        Custom / synthetic fields. Type can be any valid type annotation including Union.
     """
 
     fields: Optional[List[str]] = None
-    optionals: Optional[List[tuple[str, type]]] = None
+    optionals: Optional[List[tuple[str, Any]]] = None
     exclude: Optional[List[str]] = None
-    customs: Optional[List[tuple[str, type, Any]]] = None
+    customs: Optional[List[tuple[str, Any, Any]]] = None
 
 
 class Serializer(BaseSerializer, metaclass=SerializerMeta):
