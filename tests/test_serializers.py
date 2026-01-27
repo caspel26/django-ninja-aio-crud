@@ -1227,6 +1227,161 @@ class RelationsAsIdStringPKModelSerializerTestCase(TestCase):
         )
 
 
+@tag("serializers", "customs_only")
+class CustomsOnlySchemaTestCase(TestCase):
+    """Test cases for schemas with only customs/optionals defined (no fields/excludes)."""
+
+    def setUp(self):
+        warnings.simplefilter("ignore", UserWarning)
+
+    def test_serializer_create_schema_with_only_customs(self):
+        """Test that create schema with only customs does NOT include model fields."""
+
+        class CustomsOnlyCreateSerializer(serializers.Serializer):
+            class Meta:
+                model = TestModelForeignKey
+                schema_in = serializers.SchemaModelConfig(
+                    customs=[("custom_input", str, ...)]
+                )
+                schema_out = serializers.SchemaModelConfig(fields=["id", "name"])
+
+        schema = CustomsOnlyCreateSerializer.generate_create_s()
+        self.assertIsNotNone(schema)
+        # Should only have the custom field, not model fields
+        self.assertIn("custom_input", schema.model_fields)
+        # Should NOT have model fields auto-included
+        self.assertNotIn("name", schema.model_fields)
+        self.assertNotIn("description", schema.model_fields)
+        self.assertNotIn("test_model", schema.model_fields)
+        self.assertNotIn("id", schema.model_fields)
+
+    def test_serializer_update_schema_with_only_customs(self):
+        """Test that update schema with only customs does NOT include model fields."""
+
+        class CustomsOnlyUpdateSerializer(serializers.Serializer):
+            class Meta:
+                model = TestModelForeignKey
+                schema_update = serializers.SchemaModelConfig(
+                    customs=[("custom_patch_field", str, None)]
+                )
+                schema_out = serializers.SchemaModelConfig(fields=["id", "name"])
+
+        schema = CustomsOnlyUpdateSerializer.generate_update_s()
+        self.assertIsNotNone(schema)
+        # Should only have the custom field
+        self.assertIn("custom_patch_field", schema.model_fields)
+        # Should NOT have model fields auto-included
+        self.assertNotIn("name", schema.model_fields)
+        self.assertNotIn("description", schema.model_fields)
+        self.assertNotIn("test_model", schema.model_fields)
+        self.assertNotIn("id", schema.model_fields)
+
+    def test_serializer_create_schema_with_customs_and_optionals(self):
+        """Test create schema with customs + optionals includes only those fields."""
+
+        class CustomsAndOptionalsSerializer(serializers.Serializer):
+            class Meta:
+                model = TestModelForeignKey
+                schema_in = serializers.SchemaModelConfig(
+                    customs=[("custom_field", str, ...)],
+                    optionals=[("name", str)],  # name is a model field made optional
+                )
+                schema_out = serializers.SchemaModelConfig(fields=["id", "name"])
+
+        schema = CustomsAndOptionalsSerializer.generate_create_s()
+        self.assertIsNotNone(schema)
+        # Should have custom field
+        self.assertIn("custom_field", schema.model_fields)
+        # Should have the optional model field
+        self.assertIn("name", schema.model_fields)
+        # Should NOT have other model fields
+        self.assertNotIn("description", schema.model_fields)
+        self.assertNotIn("test_model", schema.model_fields)
+        self.assertNotIn("id", schema.model_fields)
+
+    def test_serializer_with_fields_still_works(self):
+        """Test that defining fields still works as expected."""
+
+        class FieldsDefinedSerializer(serializers.Serializer):
+            class Meta:
+                model = TestModelForeignKey
+                schema_in = serializers.SchemaModelConfig(
+                    fields=["name", "description"],
+                    customs=[("extra", int, 0)],
+                )
+                schema_out = serializers.SchemaModelConfig(fields=["id", "name"])
+
+        schema = FieldsDefinedSerializer.generate_create_s()
+        self.assertIsNotNone(schema)
+        # Should have specified fields
+        self.assertIn("name", schema.model_fields)
+        self.assertIn("description", schema.model_fields)
+        # Should have custom field
+        self.assertIn("extra", schema.model_fields)
+        # Should NOT have other model fields
+        self.assertNotIn("test_model", schema.model_fields)
+        self.assertNotIn("id", schema.model_fields)
+
+    def test_serializer_with_only_excludes_and_customs(self):
+        """Test schema with excludes and customs but no fields only has customs."""
+
+        class ExcludesOnlySerializer(serializers.Serializer):
+            class Meta:
+                model = TestModelForeignKey
+                schema_in = serializers.SchemaModelConfig(
+                    exclude=["id", "test_model"],
+                    customs=[("extra", int, 0)],
+                )
+                schema_out = serializers.SchemaModelConfig(fields=["id", "name"])
+
+        schema = ExcludesOnlySerializer.generate_create_s()
+        self.assertIsNotNone(schema)
+        # With excludes but no fields, only customs are included
+        # because fields=[] is passed to create_schema (no model fields)
+        self.assertIn("extra", schema.model_fields)
+        # This is expected behavior: without explicit fields, no model fields included
+        self.assertEqual(len(schema.model_fields), 1)
+
+    def test_serializer_empty_schema_returns_none(self):
+        """Test that schema with nothing defined returns None."""
+
+        class EmptySchemaSerializer(serializers.Serializer):
+            class Meta:
+                model = TestModelForeignKey
+                schema_in = serializers.SchemaModelConfig()
+                schema_out = serializers.SchemaModelConfig(fields=["id", "name"])
+
+        schema = EmptySchemaSerializer.generate_create_s()
+        self.assertIsNone(schema)
+
+    def test_serializer_multiple_customs_no_model_fields(self):
+        """Test schema with multiple customs but no model fields."""
+
+        class MultipleCustomsSerializer(serializers.Serializer):
+            class Meta:
+                model = TestModelForeignKey
+                schema_in = serializers.SchemaModelConfig(
+                    customs=[
+                        ("custom1", str, ...),
+                        ("custom2", int, 0),
+                        ("custom3", bool, False),
+                    ]
+                )
+                schema_out = serializers.SchemaModelConfig(fields=["id", "name"])
+
+        schema = MultipleCustomsSerializer.generate_create_s()
+        self.assertIsNotNone(schema)
+        # Should have all custom fields
+        self.assertIn("custom1", schema.model_fields)
+        self.assertIn("custom2", schema.model_fields)
+        self.assertIn("custom3", schema.model_fields)
+        # Should NOT have any model fields
+        self.assertNotIn("name", schema.model_fields)
+        self.assertNotIn("description", schema.model_fields)
+        self.assertNotIn("test_model", schema.model_fields)
+        self.assertNotIn("id", schema.model_fields)
+
+
 @tag("serializers", "relations_as_id", "string_pk", "integration")
 class RelationsAsIdStringPKIntegrationTestCase(TestCase):
     """Integration tests for relations_as_id with string primary keys and actual data serialization."""

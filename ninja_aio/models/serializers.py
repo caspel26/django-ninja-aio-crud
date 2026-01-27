@@ -669,9 +669,18 @@ class BaseSerializer:
         customs = cls.get_custom_fields(s_type) + optionals
         excludes = cls.get_excluded_fields(s_type)
 
-        # If no explicit fields but have optionals, use optional field names as fields
+        # If no explicit fields and no excludes specified
         if not fields and not excludes:
-            fields = [f[0] for f in optionals]
+            if optionals:
+                # Use optional field names as the fields to include
+                fields = [f[0] for f in optionals]
+            elif customs:
+                # Only customs defined - exclude all model fields to prevent auto-inclusion
+                excludes = [
+                    f.name
+                    for f in model._meta.get_fields()
+                    if getattr(f, "concrete", False)
+                ]
 
         # Only create schema if we have something to include
         if not any([fields, customs, excludes]):
