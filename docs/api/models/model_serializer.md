@@ -49,7 +49,7 @@ Describes how to build a create (input) schema for a model.
 
 | Attribute   | Type                     | Description                                                                                                                       |
 | ----------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
-| `fields`    | `list[str]`              | REQUIRED model field names for creation                                                                                           |
+| `fields`    | `list[str \| tuple]`     | REQUIRED model field names for creation. Can also include inline custom tuples (see below)                                        |
 | `optionals` | `list[tuple[str, type]]` | Optional model fields: `(field_name, python_type)`                                                                                |
 | `customs`   | `list[tuple]`            | Synthetic inputs. Tuple forms: `(name, type)` = required (no default); `(name, type, default)` = optional (literal or callable)   |
 | `excludes`  | `list[str]`              | Field names rejected on create                                                                                                    |
@@ -74,6 +74,23 @@ class User(ModelSerializer):
         ]
         excludes = ["id", "created_at"]
 ```
+
+**Inline Custom Fields:**
+
+You can also define custom fields directly in the `fields` list as tuples:
+
+```python
+class User(ModelSerializer):
+    class CreateSerializer:
+        fields = [
+            "username",
+            "email",
+            ("password_confirm", str),          # 2-tuple: required
+            ("send_welcome", bool, True),       # 3-tuple: optional with default
+        ]
+```
+
+This is equivalent to using the separate `customs` list but keeps field definitions together.
 
 **Resolution Order for `customs`:**
 
@@ -100,12 +117,12 @@ Describes how to build a read (output) schema for a model.
 
 **Attributes**
 
-| Attribute        | Type            | Description |
-|------------------|-----------------|-------------|
-| `fields`         | `list[str]`     | **REQUIRED.** Model fields / related names explicitly included in the read (output) schema. |
-| `excludes`       | `list[str]`     | Fields / related names to always omit (takes precedence over `fields` and `optionals`). Use for sensitive or noisy data (e.g., passwords, internal flags). |
-| `customs`        | `list[tuple]`   | Computed / synthetic output values. Tuple formats:<br>• `(name, type)` = required resolvable attribute (object attribute or property). Serialization error if not resolvable.<br>• `(name, type, default)` = optional; default may be a callable (`lambda obj: ...`) or a literal value. |
-| `relations_as_id`| `list[str]`     | Relation fields to serialize as IDs instead of nested objects. Works with forward FK, forward O2O, reverse FK, reverse O2O, and M2M relations. |
+| Attribute        | Type                 | Description |
+|------------------|----------------------|-------------|
+| `fields`         | `list[str \| tuple]` | **REQUIRED.** Model fields / related names explicitly included in the read (output) schema. Can also include inline custom tuples. |
+| `excludes`       | `list[str]`          | Fields / related names to always omit (takes precedence over `fields` and `optionals`). Use for sensitive or noisy data (e.g., passwords, internal flags). |
+| `customs`        | `list[tuple]`        | Computed / synthetic output values. Tuple formats:<br>• `(name, type)` = required resolvable attribute (object attribute or property). Serialization error if not resolvable.<br>• `(name, type, default)` = optional; default may be a callable (`lambda obj: ...`) or a literal value. |
+| `relations_as_id`| `list[str]`          | Relation fields to serialize as IDs instead of nested objects. Works with forward FK, forward O2O, reverse FK, reverse O2O, and M2M relations. |
 
 **Example:**
 
@@ -163,7 +180,7 @@ This allows partial overrides: define only `DetailSerializer.fields` while inher
 
 | Attribute   | Type                     | Description                                                                   |
 | ----------- | ------------------------ | ----------------------------------------------------------------------------- |
-| `fields`    | `list[str]`              | Model fields to include in detail view (falls back to ReadSerializer.fields if empty) |
+| `fields`    | `list[str \| tuple]`     | Model fields to include in detail view. Can include inline custom tuples. Falls back to ReadSerializer.fields if empty |
 | `excludes`  | `list[str]`              | Fields to exclude from detail view (falls back to ReadSerializer.excludes if empty) |
 | `customs`   | `list[tuple]`            | Computed fields: `(name, type)` required; `(name, type, default)` optional (falls back to ReadSerializer.customs if empty) |
 | `optionals` | `list[tuple[str, type]]` | Optional output fields (falls back to ReadSerializer.optionals if empty) |
@@ -240,7 +257,7 @@ Describes how to build an update (partial/full) input schema.
 
 | Attribute   | Type                     | Description                                                                   |
 | ----------- | ------------------------ | ----------------------------------------------------------------------------- |
-| `fields`    | `list[str]`              | REQUIRED fields for update (rarely used)                                      |
+| `fields`    | `list[str \| tuple]`     | REQUIRED fields for update (rarely used). Can include inline custom tuples    |
 | `optionals` | `list[tuple[str, type]]` | Updatable optional fields (typical for PATCH)                                 |
 | `customs`   | `list[tuple]`            | Instruction fields: `(name, type)` required; `(name, type, default)` optional |
 | `excludes`  | `list[str]`              | Immutable fields that cannot be updated                                       |

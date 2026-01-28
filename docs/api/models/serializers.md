@@ -45,10 +45,47 @@ Define a Serializer subclass with a nested Meta:
 
 SchemaModelConfig fields:
 
-- **fields**: `list[str]` - Model field names to include
+- **fields**: `list[str | tuple]` - Model field names to include. Can also contain inline custom field tuples (see below)
 - **optionals**: `list[tuple[str, type]]` - Optional fields with their types
 - **exclude**: `list[str]` - Fields to exclude from schema
 - **customs**: `list[tuple[str, type, Any]]` - Custom/computed fields
+
+### Inline Custom Fields
+
+You can define custom fields directly in the `fields` list as tuples, providing a more concise syntax:
+
+```python
+class ArticleSerializer(serializers.Serializer):
+    class Meta:
+        model = models.Article
+        schema_out = serializers.SchemaModelConfig(
+            # Mix regular fields with inline custom tuples
+            fields=[
+                "id",
+                "title",
+                ("word_count", int, 0),           # 3-tuple: (name, type, default)
+                ("is_featured", bool),             # 2-tuple: (name, type) - required
+            ]
+        )
+```
+
+**Tuple formats:**
+
+- **2-tuple**: `(name, type)` - Required field (equivalent to default `...`)
+- **3-tuple**: `(name, type, default)` - Optional field with default value
+
+This is equivalent to using the separate `customs` list but keeps field definitions together:
+
+```python
+# These two are equivalent:
+
+# Using inline customs
+fields=["id", "title", ("extra", str, "default")]
+
+# Using separate customs list
+fields=["id", "title"]
+customs=[("extra", str, "default")]
+```
 
 ### Schema Generation
 
