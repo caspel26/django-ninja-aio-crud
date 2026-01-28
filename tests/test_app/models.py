@@ -227,6 +227,16 @@ class TestModelSerializerWithBothSerializers(BaseTestModelSerializer):
         # No customs defined - should NOT inherit from read
 
 
+class TestModelSerializerInlineCustoms(BaseTestModelSerializer):
+    """Model with inline custom fields defined directly in the fields list."""
+
+    class ReadSerializer:
+        fields = ["id", "name", ("inline_computed", str, "computed_value")]
+
+    class CreateSerializer:
+        fields = ["name", ("extra_create_input", str, "")]
+
+
 # ==========================================================
 #              RELATIONS AS ID TEST MODELS
 # ==========================================================

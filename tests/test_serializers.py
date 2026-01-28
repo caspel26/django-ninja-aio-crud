@@ -1506,3 +1506,232 @@ class RelationsAsIdStringPKIntegrationTestCase(TestCase):
         self.assertIsInstance(result.articles_str[0], str)
         self.assertIn(self.article.pk, result.articles_str)
         self.assertEqual(result.articles_str[0], "article-001")
+
+
+@tag("serializers", "inline_customs")
+class InlineCustomsSerializerTestCase(TestCase):
+    """Test cases for inline custom fields defined directly in the fields list."""
+
+    def setUp(self):
+        warnings.simplefilter("ignore", UserWarning)
+
+    def test_serializer_read_schema_with_inline_customs_3_tuple(self):
+        """Test that inline customs (3-tuple) in schema_out fields work correctly."""
+
+        class InlineCustomsReadSerializer(serializers.Serializer):
+            class Meta:
+                model = TestModelForeignKey
+                schema_out = serializers.SchemaModelConfig(
+                    fields=["id", "name", ("custom_read", str, "default_value")]
+                )
+
+        schema = InlineCustomsReadSerializer.generate_read_s()
+        self.assertIsNotNone(schema)
+        self.assertIn("id", schema.model_fields)
+        self.assertIn("name", schema.model_fields)
+        self.assertIn("custom_read", schema.model_fields)
+
+    def test_serializer_read_schema_with_inline_customs_2_tuple(self):
+        """Test that inline customs (2-tuple, required) in schema_out fields work correctly."""
+
+        class InlineCustoms2TupleSerializer(serializers.Serializer):
+            class Meta:
+                model = TestModelForeignKey
+                schema_out = serializers.SchemaModelConfig(
+                    fields=["id", "name", ("required_custom", int)]
+                )
+
+        schema = InlineCustoms2TupleSerializer.generate_read_s()
+        self.assertIsNotNone(schema)
+        self.assertIn("id", schema.model_fields)
+        self.assertIn("name", schema.model_fields)
+        self.assertIn("required_custom", schema.model_fields)
+
+    def test_serializer_create_schema_with_inline_customs(self):
+        """Test that inline customs in schema_in fields work correctly."""
+
+        class InlineCustomsCreateSerializer(serializers.Serializer):
+            class Meta:
+                model = TestModelForeignKey
+                schema_in = serializers.SchemaModelConfig(
+                    fields=["name", ("extra_input", str, "")]
+                )
+                schema_out = serializers.SchemaModelConfig(fields=["id", "name"])
+
+        schema = InlineCustomsCreateSerializer.generate_create_s()
+        self.assertIsNotNone(schema)
+        self.assertIn("name", schema.model_fields)
+        self.assertIn("extra_input", schema.model_fields)
+        # Should NOT have model fields that weren't explicitly listed
+        self.assertNotIn("description", schema.model_fields)
+
+    def test_serializer_update_schema_with_inline_customs(self):
+        """Test that inline customs in schema_update fields work correctly."""
+
+        class InlineCustomsUpdateSerializer(serializers.Serializer):
+            class Meta:
+                model = TestModelForeignKey
+                schema_update = serializers.SchemaModelConfig(
+                    fields=[("update_flag", bool, False)],
+                    optionals=[("name", str)],
+                )
+                schema_out = serializers.SchemaModelConfig(fields=["id", "name"])
+
+        schema = InlineCustomsUpdateSerializer.generate_update_s()
+        self.assertIsNotNone(schema)
+        self.assertIn("update_flag", schema.model_fields)
+        self.assertIn("name", schema.model_fields)
+
+    def test_serializer_inline_customs_combined_with_explicit_customs(self):
+        """Test that inline customs and explicit customs can coexist."""
+
+        class CombinedCustomsSerializer(serializers.Serializer):
+            class Meta:
+                model = TestModelForeignKey
+                schema_out = serializers.SchemaModelConfig(
+                    fields=["id", "name", ("inline_custom", str, "inline")],
+                    customs=[("explicit_custom", int, 0)],
+                )
+
+        schema = CombinedCustomsSerializer.generate_read_s()
+        self.assertIsNotNone(schema)
+        self.assertIn("id", schema.model_fields)
+        self.assertIn("name", schema.model_fields)
+        self.assertIn("inline_custom", schema.model_fields)
+        self.assertIn("explicit_custom", schema.model_fields)
+
+    def test_serializer_get_fields_excludes_inline_customs(self):
+        """Test that get_fields() returns only string field names."""
+
+        class FieldsOnlySerializer(serializers.Serializer):
+            class Meta:
+                model = TestModelForeignKey
+                schema_out = serializers.SchemaModelConfig(
+                    fields=["id", "name", ("custom", str, "val")]
+                )
+
+        fields = FieldsOnlySerializer.get_fields("read")
+        self.assertEqual(fields, ["id", "name"])
+        # Should not include tuples
+        self.assertNotIn(("custom", str, "val"), fields)
+
+    def test_serializer_get_inline_customs_returns_only_tuples(self):
+        """Test that get_inline_customs() returns only inline custom tuples."""
+
+        class InlineCustomsOnlySerializer(serializers.Serializer):
+            class Meta:
+                model = TestModelForeignKey
+                schema_out = serializers.SchemaModelConfig(
+                    fields=["id", "name", ("custom1", str, "val"), ("custom2", int)]
+                )
+
+        inline_customs = InlineCustomsOnlySerializer.get_inline_customs("read")
+        self.assertEqual(len(inline_customs), 2)
+        # First is a 3-tuple
+        self.assertEqual(inline_customs[0], ("custom1", str, "val"))
+        # Second is normalized from 2-tuple to 3-tuple with Ellipsis
+        self.assertEqual(inline_customs[1], ("custom2", int, ...))
+
+    def test_serializer_detail_schema_with_inline_customs(self):
+        """Test that inline customs work in schema_detail."""
+
+        class DetailInlineCustomsSerializer(serializers.Serializer):
+            class Meta:
+                model = TestModelForeignKey
+                schema_out = serializers.SchemaModelConfig(fields=["id", "name"])
+                schema_detail = serializers.SchemaModelConfig(
+                    fields=["id", "name", "description", ("detail_extra", str, "extra")]
+                )
+
+        read_schema = DetailInlineCustomsSerializer.generate_read_s()
+        detail_schema = DetailInlineCustomsSerializer.generate_detail_s()
+
+        # Read schema should NOT have detail_extra
+        self.assertNotIn("detail_extra", read_schema.model_fields)
+
+        # Detail schema should have all fields including inline custom
+        self.assertIn("id", detail_schema.model_fields)
+        self.assertIn("name", detail_schema.model_fields)
+        self.assertIn("description", detail_schema.model_fields)
+        self.assertIn("detail_extra", detail_schema.model_fields)
+
+    def test_serializer_related_schema_with_inline_customs(self):
+        """Test that inline customs are included in related schema for non-relation fields."""
+
+        class RelatedInlineCustomsSerializer(serializers.Serializer):
+            class Meta:
+                model = TestModelForeignKey
+                schema_out = serializers.SchemaModelConfig(
+                    fields=["id", "name", ("computed", str, "computed_value")]
+                )
+
+        related_schema = RelatedInlineCustomsSerializer.generate_related_s()
+        self.assertIsNotNone(related_schema)
+        self.assertIn("id", related_schema.model_fields)
+        self.assertIn("name", related_schema.model_fields)
+        self.assertIn("computed", related_schema.model_fields)
+
+    def test_inline_customs_only_schema(self):
+        """Test schema with only inline customs (no regular fields)."""
+
+        class OnlyInlineCustomsSerializer(serializers.Serializer):
+            class Meta:
+                model = TestModelForeignKey
+                schema_in = serializers.SchemaModelConfig(
+                    fields=[("custom_only", str, ...)]
+                )
+                schema_out = serializers.SchemaModelConfig(fields=["id"])
+
+        schema = OnlyInlineCustomsSerializer.generate_create_s()
+        self.assertIsNotNone(schema)
+        self.assertIn("custom_only", schema.model_fields)
+        # Should NOT have any model fields auto-included
+        self.assertNotIn("name", schema.model_fields)
+        self.assertNotIn("description", schema.model_fields)
+
+
+@tag("serializers", "inline_customs", "model_serializer")
+class InlineCustomsModelSerializerTestCase(TestCase):
+    """Test cases for inline custom fields with ModelSerializer."""
+
+    def setUp(self):
+        warnings.simplefilter("ignore", UserWarning)
+
+    def test_model_serializer_read_schema_with_inline_customs(self):
+        """Test ModelSerializer ReadSerializer with inline customs."""
+        from tests.test_app.models import TestModelSerializerInlineCustoms
+
+        schema = TestModelSerializerInlineCustoms.generate_read_s()
+        self.assertIsNotNone(schema)
+        self.assertIn("id", schema.model_fields)
+        self.assertIn("name", schema.model_fields)
+        self.assertIn("inline_computed", schema.model_fields)
+
+    def test_model_serializer_create_schema_with_inline_customs(self):
+        """Test ModelSerializer CreateSerializer with inline customs."""
+        from tests.test_app.models import TestModelSerializerInlineCustoms
+
+        schema = TestModelSerializerInlineCustoms.generate_create_s()
+        self.assertIsNotNone(schema)
+        self.assertIn("name", schema.model_fields)
+        self.assertIn("extra_create_input", schema.model_fields)
+
+    def test_model_serializer_get_inline_customs(self):
+        """Test get_inline_customs() works for ModelSerializer."""
+        from tests.test_app.models import TestModelSerializerInlineCustoms
+
+        inline_customs = TestModelSerializerInlineCustoms.get_inline_customs("read")
+        self.assertEqual(len(inline_customs), 1)
+        self.assertEqual(inline_customs[0][0], "inline_computed")
+
+    def test_model_serializer_get_fields_excludes_inline_customs(self):
+        """Test get_fields() excludes inline customs for ModelSerializer."""
+        from tests.test_app.models import TestModelSerializerInlineCustoms
+
+        fields = TestModelSerializerInlineCustoms.get_fields("read")
+        self.assertIn("id", fields)
+        self.assertIn("name", fields)
+        self.assertNotIn("inline_computed", fields)
+        # Should not contain tuples
+        for f in fields:
+            self.assertIsInstance(f, str)
