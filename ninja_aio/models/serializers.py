@@ -305,7 +305,9 @@ class BaseSerializer:
         """
         # Auto-resolve ModelSerializer with readable fields
         if isinstance(rel_model, ModelSerializerMeta):
-            has_readable_fields = rel_model.get_fields("read") or rel_model.get_custom_fields("read")
+            has_readable_fields = rel_model.get_fields(
+                "read"
+            ) or rel_model.get_custom_fields("read")
             return rel_model.generate_related_s() if has_readable_fields else None
 
         # Resolve from explicit serializer mapping
@@ -341,7 +343,7 @@ class BaseSerializer:
         - (name, py_type) -> default Ellipsis (required)
         """
         raw_customs = cls._get_fields(s_type, "customs") or []
-        normalized: list[tuple[str, type, Any]] = []
+        normalized: list[tuple[str, Any, Any]] = []
         for spec in raw_customs:
             if not isinstance(spec, tuple):
                 raise ValueError(f"Custom field spec must be a tuple, got {type(spec)}")
@@ -373,8 +375,39 @@ class BaseSerializer:
 
     @classmethod
     def get_fields(cls, s_type: S_TYPES):
-        """Return explicit declared fields for the serializer type."""
-        return cls._get_fields(s_type, "fields")
+        """Return explicit declared field names for the serializer type (excludes inline customs)."""
+        fields = cls._get_fields(s_type, "fields")
+        # Filter out inline custom field tuples, return only string field names
+        return [f for f in fields if isinstance(f, str)]
+
+    @classmethod
+    def get_inline_customs(cls, s_type: S_TYPES) -> list[tuple[str, Any, Any]]:
+        """
+        Return inline custom field tuples declared directly in the fields list.
+
+        These are tuples in the format (name, type, default) or (name, type) mixed
+        with regular string field names in the fields list.
+
+        Returns
+        -------
+        list[tuple[str, Any, Any]]
+            Normalized list of (name, type, default) tuples.
+        """
+        fields = cls._get_fields(s_type, "fields")
+        inline_customs: list[tuple[str, Any, Any]] = []
+        for spec in fields:
+            if isinstance(spec, tuple):
+                match len(spec):
+                    case 3:
+                        inline_customs.append(spec)
+                    case 2:
+                        name, py_type = spec
+                        inline_customs.append((name, py_type, ...))
+                    case _:
+                        raise ValueError(
+                            f"Inline custom field tuple must have length 2 or 3 (name, type[, default]); got {len(spec)}"
+                        )
+        return inline_customs
 
     @classmethod
     def is_custom(cls, field: str) -> bool:
@@ -430,10 +463,15 @@ class BaseSerializer:
         # Handle relations_as_id for reverse relations
         if field_name in relations_as_id:
             from ninja_aio.models.utils import ModelUtil
+
             pk_field_type = ModelUtil(rel_model).pk_field_type
             if many:
                 # For many relations, use PkFromModel to extract PKs from model instances
-                return (field_name, list[PkFromModel[pk_field_type]], Field(default_factory=list))
+                return (
+                    field_name,
+                    list[PkFromModel[pk_field_type]],
+                    Field(default_factory=list),
+                )
             else:
                 # For single reverse relations (ReverseOneToOne), extract pk
                 return (field_name, PkFromModel[pk_field_type] | None, None)
@@ -472,6 +510,7 @@ class BaseSerializer:
         # Handle relations_as_id: serialize as the raw FK ID
         if field_name in relations_as_id:
             from ninja_aio.models.utils import ModelUtil
+
             pk_field_type = ModelUtil(rel_model).pk_field_type
             # Use PkFromModel to extract pk from the related instance during serialization
             return (field_name, PkFromModel[pk_field_type] | None, None)
@@ -614,11 +653,18 @@ class BaseSerializer:
             if forward:
                 forward_rels.append(forward)
 
+        # Combine explicit customs, inline customs, and forward relation schemas
+        all_customs = (
+            cls.get_custom_fields(fields_type)
+            + cls.get_inline_customs(fields_type)
+            + forward_rels
+        )
+
         return (
             fields,
             reverse_rels,
             cls.get_excluded_fields(fields_type),
-            cls.get_custom_fields(fields_type) + forward_rels,
+            all_customs,
             cls.get_optional_fields(fields_type),
         )
 
@@ -666,7 +712,11 @@ class BaseSerializer:
         s_type = "create" if schema_type == "In" else "update"
         fields = cls.get_fields(s_type)
         optionals = cls.get_optional_fields(s_type)
-        customs = cls.get_custom_fields(s_type) + optionals
+        customs = (
+            cls.get_custom_fields(s_type)
+            + optionals
+            + cls.get_inline_customs(s_type)
+        )
         excludes = cls.get_excluded_fields(s_type)
 
         # If no explicit fields and no excludes specified
@@ -698,17 +748,19 @@ class BaseSerializer:
     def get_related_schema_data(cls):
         """
         Build field/custom lists for 'Related' schema, flattening non-relational fields.
+
+        Custom fields (both explicit and inline) are always included since they
+        are computed/synthetic and not relation descriptors.
         """
         fields = cls.get_fields("read")
-        custom_f = {
-            name: (value, default)
-            for name, value, default in cls.get_custom_fields("read")
-        }
-        _related_fields = []
+        customs = cls.get_custom_fields("read") + cls.get_inline_customs("read")
         model = cls._get_model()
-        for f in fields + list(custom_f.keys()):
-            field_obj = getattr(model, f)
-            if not isinstance(
+
+        # Filter out relation fields from model fields
+        non_relation_fields = []
+        for f in fields:
+            field_obj = getattr(model, f, None)
+            if field_obj is None or not isinstance(
                 field_obj,
                 (
                     ManyToManyDescriptor,
@@ -718,14 +770,13 @@ class BaseSerializer:
                     ForwardOneToOneDescriptor,
                 ),
             ):
-                _related_fields.append(f)
-        if not _related_fields:
+                non_relation_fields.append(f)
+
+        # No fields or customs means nothing to include
+        if not non_relation_fields and not customs:
             return None, None
-        custom_related_fields = [
-            (f, *custom_f[f]) for f in _related_fields if f in custom_f
-        ]
-        related_fields = [f for f in _related_fields if f not in custom_f]
-        return related_fields, custom_related_fields
+
+        return non_relation_fields, customs
 
     @classmethod
     def generate_read_s(cls, depth: int = 1) -> Schema:
@@ -810,9 +861,9 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
             Disallowed model fields on create (e.g., id, timestamps).
         """
 
-        fields: list[str] = []
-        customs: list[tuple[str, type, Any]] = []
-        optionals: list[tuple[str, type]] = []
+        fields: list[str | tuple[str, Any, Any]] = []
+        customs: list[tuple[str, Any, Any]] = []
+        optionals: list[tuple[str, Any]] = []
         excludes: list[str] = []
 
     class ReadSerializer:
@@ -832,9 +883,9 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
             Relation fields to serialize as IDs instead of nested objects.
         """
 
-        fields: list[str] = []
-        customs: list[tuple[str, type, Any]] = []
-        optionals: list[tuple[str, type]] = []
+        fields: list[str | tuple[str, Any, Any]] = []
+        customs: list[tuple[str, Any, Any]] = []
+        optionals: list[tuple[str, Any]] = []
         excludes: list[str] = []
         relations_as_id: list[str] = []
 
@@ -853,9 +904,9 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
             Optional output fields.
         """
 
-        fields: list[str] = []
-        customs: list[tuple[str, type, Any]] = []
-        optionals: list[tuple[str, type]] = []
+        fields: list[str | tuple[str, Any, Any]] = []
+        customs: list[tuple[str, Any, Any]] = []
+        optionals: list[tuple[str, Any]] = []
         excludes: list[str] = []
 
     class UpdateSerializer:
@@ -873,9 +924,9 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
             Immutable / blocked fields.
         """
 
-        fields: list[str] = []
-        customs: list[tuple[str, type, Any]] = []
-        optionals: list[tuple[str, type]] = []
+        fields: list[str | tuple[str, Any, Any]] = []
+        customs: list[tuple[str, Any, Any]] = []
+        optionals: list[tuple[str, Any]] = []
         excludes: list[str] = []
 
     # Serializer type to configuration class mapping
@@ -1044,8 +1095,10 @@ class SchemaModelConfig(Schema):
     Configuration container for declarative schema definitions.
     Attributes
     ----------
-    fields : Optional[List[str]]
-        Explicit model fields to include.
+    fields : Optional[List[str | tuple]]
+        Explicit model fields to include. Can also contain inline custom field tuples:
+        - 2-tuple: (name, type) - required field
+        - 3-tuple: (name, type, default) - optional field with default
     optionals : Optional[List[tuple[str, Any]]]
         Optional model fields. Type can be any valid type annotation including Union.
     exclude : Optional[List[str]]
@@ -1054,7 +1107,7 @@ class SchemaModelConfig(Schema):
         Custom / synthetic fields. Type can be any valid type annotation including Union.
     """
 
-    fields: Optional[List[str]] = None
+    fields: Optional[List[str | tuple[str, Any, Any] | tuple[str, Any]]] = None
     optionals: Optional[List[tuple[str, Any]]] = None
     exclude: Optional[List[str]] = None
     customs: Optional[List[tuple[str, Any, Any]]] = None
