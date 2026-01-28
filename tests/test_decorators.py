@@ -1,5 +1,5 @@
 from django.test import TestCase, tag
-from ninja_aio.decorators import aatomic, unique_view
+from ninja_aio.decorators import aatomic, unique_view, decorate_view
 from ninja_aio.models import ModelUtil
 from tests.test_app import models as app_models
 
@@ -82,3 +82,79 @@ class UniqueViewDecoratorTestCase(TestCase):
         original_name = func.__name__
         fn = unique_view(Empty())(func)
         self.assertEqual(fn.__name__, original_name)
+
+
+@tag("decorators_decorate_view")
+class DecorateViewTestCase(TestCase):
+    """Tests for the decorate_view decorator."""
+
+    def test_decorate_view_applies_decorators(self):
+        """Test that decorators are applied in correct order."""
+        call_order = []
+
+        def dec1(fn):
+            def wrapper(*args, **kwargs):
+                call_order.append("dec1_before")
+                result = fn(*args, **kwargs)
+                call_order.append("dec1_after")
+                return result
+            return wrapper
+
+        def dec2(fn):
+            def wrapper(*args, **kwargs):
+                call_order.append("dec2_before")
+                result = fn(*args, **kwargs)
+                call_order.append("dec2_after")
+                return result
+            return wrapper
+
+        @decorate_view(dec1, dec2)
+        def my_view():
+            call_order.append("view")
+            return "result"
+
+        result = my_view()
+        self.assertEqual(result, "result")
+        # dec1 wraps dec2 wraps view: dec1_before -> dec2_before -> view -> dec2_after -> dec1_after
+        self.assertEqual(call_order, ["dec1_before", "dec2_before", "view", "dec2_after", "dec1_after"])
+
+    def test_decorate_view_skips_none_decorators(self):
+        """Test that None decorators are skipped (covers line 215)."""
+        call_order = []
+
+        def dec1(fn):
+            def wrapper(*args, **kwargs):
+                call_order.append("dec1")
+                return fn(*args, **kwargs)
+            return wrapper
+
+        @decorate_view(dec1, None, None)
+        def my_view():
+            call_order.append("view")
+            return "ok"
+
+        result = my_view()
+        self.assertEqual(result, "ok")
+        self.assertEqual(call_order, ["dec1", "view"])
+
+    def test_decorate_view_with_all_none(self):
+        """Test decorate_view when all decorators are None."""
+        @decorate_view(None, None)
+        def my_view():
+            return "unchanged"
+
+        self.assertEqual(my_view(), "unchanged")
+
+    async def test_decorate_view_with_async_view(self):
+        """Test that decorate_view works with async views."""
+        def dec(fn):
+            async def wrapper(*args, **kwargs):
+                return await fn(*args, **kwargs)
+            return wrapper
+
+        @decorate_view(dec, None)
+        async def async_view():
+            return "async_result"
+
+        result = await async_view()
+        self.assertEqual(result, "async_result")

@@ -923,7 +923,6 @@ class RelationsAsIdUUIDModelSerializerTestCase(TestCase):
     def test_forward_fk_uuid_relations_as_id_schema(self):
         """Test forward FK field with UUID PK in relations_as_id generates UUID type."""
         from tests.test_app.models import BookUUID
-        from uuid import UUID
 
         schema = BookUUID.generate_read_s()
         self.assertIsNotNone(schema)
@@ -938,7 +937,6 @@ class RelationsAsIdUUIDModelSerializerTestCase(TestCase):
     def test_reverse_fk_uuid_relations_as_id_schema(self):
         """Test reverse FK field with UUID PK in relations_as_id generates list[UUID] type."""
         from tests.test_app.models import AuthorUUID
-        from uuid import UUID
 
         schema = AuthorUUID.generate_read_s()
         self.assertIsNotNone(schema)
@@ -1735,3 +1733,294 @@ class InlineCustomsModelSerializerTestCase(TestCase):
         # Should not contain tuples
         for f in fields:
             self.assertIsInstance(f, str)
+
+
+@tag("serializers", "pk_from_model")
+class PkFromModelTestCase(TestCase):
+    """Test cases for PkFromModel class (covers lines 46, 65)."""
+
+    def test_pk_from_model_extracts_pk_from_model_instance(self):
+        """Test _extract_pk extracts pk from model instance."""
+        from ninja_aio.models.serializers import _extract_pk
+
+        class MockModel:
+            pk = 42
+
+        result = _extract_pk(MockModel())
+        self.assertEqual(result, 42)
+
+    def test_pk_from_model_returns_value_as_is_when_no_pk(self):
+        """Test _extract_pk returns value as-is when no pk attribute (covers line 46)."""
+        from ninja_aio.models.serializers import _extract_pk
+
+        result = _extract_pk(123)
+        self.assertEqual(result, 123)
+
+        result = _extract_pk("string_value")
+        self.assertEqual(result, "string_value")
+
+    def test_pk_from_model_default_type(self):
+        """Test PkFromModel() returns default int type (covers line 65)."""
+        from ninja_aio.models.serializers import PkFromModel
+
+        default_type = PkFromModel()
+        self.assertIsNotNone(default_type)
+
+    def test_pk_from_model_subscriptable_with_int(self):
+        """Test PkFromModel[int] returns annotated int type."""
+        from ninja_aio.models.serializers import PkFromModel
+
+        int_type = PkFromModel[int]
+        self.assertIsNotNone(int_type)
+
+    def test_pk_from_model_subscriptable_with_str(self):
+        """Test PkFromModel[str] returns annotated str type."""
+        from ninja_aio.models.serializers import PkFromModel
+
+        str_type = PkFromModel[str]
+        self.assertIsNotNone(str_type)
+
+    def test_pk_from_model_subscriptable_with_uuid(self):
+        """Test PkFromModel[UUID] returns annotated UUID type."""
+        from ninja_aio.models.serializers import PkFromModel
+        from uuid import UUID
+
+        uuid_type = PkFromModel[UUID]
+        self.assertIsNotNone(uuid_type)
+
+
+@tag("serializers", "string_reference")
+class StringReferenceResolutionTestCase(TestCase):
+    """Test cases for string reference resolution errors (covers lines 144-179)."""
+
+    def setUp(self):
+        warnings.simplefilter("ignore", UserWarning)
+
+    def test_resolve_string_reference_absolute_import(self):
+        """Test resolving absolute import path."""
+        # This should work since the module exists
+        resolved = serializers.BaseSerializer._resolve_string_reference(
+            "tests.test_serializers.LocalTestSerializer"
+        )
+        self.assertEqual(resolved, LocalTestSerializer)
+
+    def test_resolve_string_reference_local_class(self):
+        """Test resolving local class name in same module."""
+        # The LocalTestSerializer is defined at module level in test_serializers.py
+        # We need a class that can be resolved from its own module
+
+        class TestResolveSerializer(serializers.Serializer):
+            class Meta:
+                model = TestModelForeignKey
+                schema_out = serializers.SchemaModelConfig(fields=["id"])
+
+        # Try to resolve from own module - this tests the local resolution path
+        resolved = TestResolveSerializer._resolve_string_reference("TestModelForeignKeySerializer")
+        self.assertEqual(resolved, TestModelForeignKeySerializer)
+
+    def test_resolve_string_reference_import_error(self):
+        """Test that invalid module path raises ValueError (covers lines 158-162)."""
+        with self.assertRaises(ValueError) as cm:
+            serializers.BaseSerializer._resolve_string_reference(
+                "nonexistent.module.SomeClass"
+            )
+        self.assertIn("failed to import module", str(cm.exception))
+
+    def test_resolve_string_reference_class_not_found_in_module(self):
+        """Test that missing class in valid module raises ValueError (covers lines 152-155)."""
+        with self.assertRaises(ValueError) as cm:
+            serializers.BaseSerializer._resolve_string_reference(
+                "tests.test_serializers.NonExistentClass"
+            )
+        self.assertIn("not found in module", str(cm.exception))
+
+    def test_resolve_string_reference_local_not_found(self):
+        """Test that missing local class raises ValueError (covers lines 176-179)."""
+        with self.assertRaises(ValueError) as cm:
+            serializers.BaseSerializer._resolve_string_reference(
+                "CompletelyFakeSerializerThatDoesNotExist"
+            )
+        self.assertIn("Cannot resolve serializer reference", str(cm.exception))
+
+
+@tag("serializers", "union_schema")
+class UnionSchemaTestCase(TestCase):
+    """Test cases for Union schema generation (covers lines 232, 280, 284)."""
+
+    def setUp(self):
+        warnings.simplefilter("ignore", UserWarning)
+
+    def test_single_type_union_optimization(self):
+        """Test that single-type Union is optimized (covers line 232)."""
+        # Create a Union with single type and test resolution
+        from typing import Union
+
+        single_union = Union[AltSerializer]
+
+        resolved = serializers.BaseSerializer._resolve_serializer_reference(single_union)
+        # Should be optimized to single type, not Union
+        self.assertEqual(resolved, AltSerializer)
+
+    def test_union_schema_all_none(self):
+        """Test _generate_union_schema when all schemas return None (covers line 280)."""
+        # This tests the case where all serializers in a Union have empty schemas
+        from typing import Union
+
+        class EmptySerializer1(serializers.Serializer):
+            class Meta:
+                model = TestModelForeignKey
+                schema_out = serializers.SchemaModelConfig(fields=[])
+
+            @classmethod
+            def generate_related_s(cls):
+                return None
+
+        class EmptySerializer2(serializers.Serializer):
+            class Meta:
+                model = TestModelForeignKey
+                schema_out = serializers.SchemaModelConfig(fields=[])
+
+            @classmethod
+            def generate_related_s(cls):
+                return None
+
+        empty_union = Union[EmptySerializer1, EmptySerializer2]
+        result = serializers.BaseSerializer._generate_union_schema(empty_union)
+        self.assertIsNone(result)
+
+    def test_union_schema_single_result(self):
+        """Test _generate_union_schema with only one non-None schema (covers line 284)."""
+        from typing import Union
+
+        class ValidSerializer(serializers.Serializer):
+            class Meta:
+                model = TestModelForeignKey
+                schema_out = serializers.SchemaModelConfig(fields=["id", "name"])
+
+        class EmptySerializer(serializers.Serializer):
+            class Meta:
+                model = TestModelForeignKey
+                schema_out = serializers.SchemaModelConfig(fields=[])
+
+            @classmethod
+            def generate_related_s(cls):
+                return None
+
+        mixed_union = Union[ValidSerializer, EmptySerializer]
+        result = serializers.BaseSerializer._generate_union_schema(mixed_union)
+        # Should return single schema, not Union
+        self.assertIsNotNone(result)
+
+
+@tag("serializers", "custom_fields_validation")
+class CustomFieldsValidationTestCase(TestCase):
+    """Test cases for custom fields validation errors (covers lines 354-355, 406-409)."""
+
+    def setUp(self):
+        warnings.simplefilter("ignore", UserWarning)
+
+    def test_get_custom_fields_2_tuple(self):
+        """Test get_custom_fields with 2-tuple format (covers lines 354-355)."""
+        from unittest.mock import patch
+
+        # Mock _get_fields to return 2-tuple customs
+        with patch.object(
+            serializers.BaseSerializer,
+            "_get_fields",
+            return_value=[("custom_required", str)],
+        ):
+            customs = serializers.BaseSerializer.get_custom_fields("read")
+            self.assertEqual(len(customs), 1)
+            name, py_type, default = customs[0]
+            self.assertEqual(name, "custom_required")
+            self.assertEqual(py_type, str)
+            self.assertEqual(default, ...)  # Ellipsis for required
+
+    def test_get_custom_fields_invalid_tuple_length(self):
+        """Test get_custom_fields raises error for invalid tuple length."""
+        from unittest.mock import patch
+
+        # Mock _get_fields to return 1-tuple (invalid)
+        with patch.object(
+            serializers.BaseSerializer,
+            "_get_fields",
+            return_value=[("only_name",)],
+        ):
+            with self.assertRaises(ValueError) as cm:
+                serializers.BaseSerializer.get_custom_fields("read")
+            self.assertIn("must have length 2 or 3", str(cm.exception))
+
+    def test_get_custom_fields_non_tuple(self):
+        """Test get_custom_fields raises error for non-tuple spec."""
+        from unittest.mock import patch
+
+        # Mock _get_fields to return non-tuple
+        with patch.object(
+            serializers.BaseSerializer,
+            "_get_fields",
+            return_value=["not_a_tuple"],
+        ):
+            with self.assertRaises(ValueError) as cm:
+                serializers.BaseSerializer.get_custom_fields("read")
+            self.assertIn("must be a tuple", str(cm.exception))
+
+    def test_get_inline_customs_invalid_tuple_length(self):
+        """Test get_inline_customs raises error for invalid tuple length (covers lines 406-409)."""
+        from unittest.mock import patch
+
+        # Mock _get_fields to return fields with invalid 1-tuple
+        with patch.object(
+            serializers.BaseSerializer,
+            "_get_fields",
+            return_value=["id", ("only_one",)],
+        ):
+            with self.assertRaises(ValueError) as cm:
+                serializers.BaseSerializer.get_inline_customs("read")
+            self.assertIn("must have length 2 or 3", str(cm.exception))
+
+
+@tag("serializers", "model_validation")
+class ModelValidationTestCase(TestCase):
+    """Test cases for model validation errors (covers lines 1189, 1191)."""
+
+    def setUp(self):
+        warnings.simplefilter("ignore", UserWarning)
+
+    def test_serializer_without_model_raises_error(self):
+        """Test that Serializer without model raises ValueError (covers line 1189)."""
+        with self.assertRaises(ValueError) as cm:
+            class NoModelSerializer(serializers.Serializer):
+                class Meta:
+                    schema_out = serializers.SchemaModelConfig(fields=["id"])
+
+            NoModelSerializer.generate_read_s()
+        self.assertIn("Meta.model must be defined", str(cm.exception))
+
+    def test_serializer_with_non_model_raises_error(self):
+        """Test that Serializer with non-Django model raises ValueError (covers line 1191)."""
+        with self.assertRaises(ValueError) as cm:
+            class NotAModel:
+                pass
+
+            class NonModelSerializer(serializers.Serializer):
+                class Meta:
+                    model = NotAModel
+                    schema_out = serializers.SchemaModelConfig(fields=["id"])
+
+            NonModelSerializer.generate_read_s()
+        self.assertIn("must be a Django model", str(cm.exception))
+
+
+@tag("serializers", "base_serializer")
+class BaseSerializerAbstractMethodsTestCase(TestCase):
+    """Test cases for BaseSerializer abstract method errors (covers lines 108, 113)."""
+
+    def test_get_fields_raises_not_implemented(self):
+        """Test _get_fields raises NotImplementedError (covers line 108)."""
+        with self.assertRaises(NotImplementedError):
+            serializers.BaseSerializer._get_fields("read", "fields")
+
+    def test_get_model_raises_not_implemented(self):
+        """Test _get_model raises NotImplementedError (covers line 113)."""
+        with self.assertRaises(NotImplementedError):
+            serializers.BaseSerializer._get_model()
