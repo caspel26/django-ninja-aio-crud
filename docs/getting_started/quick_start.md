@@ -130,3 +130,43 @@ Your API automatically includes:
 - :material-delete-sweep: Soft delete support
 - :material-sitemap: Cascade handling
 - :material-hook: Custom hooks
+
+---
+
+## :material-arrow-right-circle: Next Steps
+
+<div class="grid cards" markdown>
+
+-   :material-file-document-edit:{ .lg .middle } **ModelSerializer Reference**
+
+    ---
+
+    Deep dive into all ModelSerializer features
+
+    [:octicons-arrow-right-24: Learn more](../api/models/model_serializer.md)
+
+-   :material-view-grid:{ .lg .middle } **APIViewSet Features**
+
+    ---
+
+    Custom endpoints, pagination, and filtering
+
+    [:octicons-arrow-right-24: Explore](../api/views/api_view_set.md)
+
+-   :material-shield-lock:{ .lg .middle } **Authentication**
+
+    ---
+
+    Add JWT authentication to your API
+
+    [:octicons-arrow-right-24: Add auth](../api/authentication.md)
+
+-   :material-school:{ .lg .middle } **Full Tutorial**
+
+    ---
+
+    Step-by-step guide covering all features
+
+    [:octicons-arrow-right-24: Start tutorial](../tutorial/model.md)
+
+</div>

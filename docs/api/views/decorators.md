@@ -125,3 +125,43 @@ Notes:
 - paginate(PageNumberPagination) enables async pagination on the handler.
 - unique_view(name) marks the route as unique to avoid duplicate registration.
 - Works with @api.viewset(Model) classes extending APIViewSet.
+
+---
+
+## :material-arrow-right-circle: See Also
+
+<div class="grid cards" markdown>
+
+-   :material-view-grid:{ .lg .middle } **APIViewSet**
+
+    ---
+
+    Complete CRUD view generation with decorator support
+
+    [:octicons-arrow-right-24: Learn more](api_view_set.md)
+
+-   :material-eye:{ .lg .middle } **APIView**
+
+    ---
+
+    Base view class for custom endpoints
+
+    [:octicons-arrow-right-24: Learn more](api_view.md)
+
+-   :material-puzzle:{ .lg .middle } **Mixins**
+
+    ---
+
+    Reusable filtering and query behaviors
+
+    [:octicons-arrow-right-24: Learn more](mixins.md)
+
+-   :material-page-next:{ .lg .middle } **Pagination**
+
+    ---
+
+    Async pagination support for list endpoints
+
+    [:octicons-arrow-right-24: Learn more](../pagination.md)
+
+</div>

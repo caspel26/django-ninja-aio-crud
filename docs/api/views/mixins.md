@@ -272,3 +272,43 @@ This enables:
 - Align `query_params` types with expected filter values; prefer Pydantic `date`/`datetime` for date filters so values implement `isoformat`.
 - Validate field names and lookups to avoid runtime errors.
 - For multiple mixins, implement your own `async def query_params_handler(...)` and chain with `await super().query_params_handler(...)` to combine behaviors.
+
+---
+
+## :material-arrow-right-circle: See Also
+
+<div class="grid cards" markdown>
+
+-   :material-view-grid:{ .lg .middle } **APIViewSet**
+
+    ---
+
+    Complete CRUD operations with mixin support
+
+    [:octicons-arrow-right-24: Learn more](api_view_set.md)
+
+-   :material-filter:{ .lg .middle } **Filtering Tutorial**
+
+    ---
+
+    Step-by-step guide to filtering & pagination
+
+    [:octicons-arrow-right-24: Learn more](../../tutorial/filtering.md)
+
+-   :material-tag:{ .lg .middle } **Decorators**
+
+    ---
+
+    Route decorators for pagination and unique views
+
+    [:octicons-arrow-right-24: Learn more](decorators.md)
+
+-   :material-eye:{ .lg .middle } **APIView**
+
+    ---
+
+    Base view class for custom endpoints
+
+    [:octicons-arrow-right-24: Learn more](api_view.md)
+
+</div>
