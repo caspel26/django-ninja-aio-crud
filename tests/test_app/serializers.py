@@ -116,3 +116,51 @@ class TagAsIdMetaSerializer(serializers.Serializer):
             fields=["id", "name", "description", "test_model_serializer_many_to_many"]
         )
         relations_as_id = ["test_model_serializer_many_to_many"]
+
+
+# ==========================================================
+#              VALIDATOR TEST SERIALIZERS
+# ==========================================================
+
+
+class TestModelWithValidatorsMetaSerializer(serializers.Serializer):
+    """Meta-driven Serializer with validators via inner classes."""
+
+    from pydantic import field_validator, model_validator
+
+    class Meta:
+        model = models.TestModel
+        schema_in = serializers.SchemaModelConfig(fields=["name", "description"])
+        schema_out = serializers.SchemaModelConfig(
+            fields=["id", "name", "description"]
+        )
+        schema_update = serializers.SchemaModelConfig(
+            optionals=[("name", str), ("description", str)]
+        )
+
+    class CreateValidators:
+        from pydantic import field_validator
+
+        @field_validator("name")
+        @classmethod
+        def validate_name_min_length(cls, v):
+            if len(v) < 3:
+                raise ValueError("Name must be at least 3 characters")
+            return v
+
+    class ReadValidators:
+        from pydantic import model_validator
+
+        @model_validator(mode="after")
+        def add_display_check(self):
+            return self
+
+    class UpdateValidators:
+        from pydantic import field_validator
+
+        @field_validator("name")
+        @classmethod
+        def validate_name_not_empty(cls, v):
+            if v is not None and len(v.strip()) == 0:
+                raise ValueError("Name cannot be blank")
+            return v

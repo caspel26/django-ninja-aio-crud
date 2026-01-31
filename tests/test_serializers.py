@@ -2024,3 +2024,133 @@ class BaseSerializerAbstractMethodsTestCase(TestCase):
         """Test _get_model raises NotImplementedError (covers line 113)."""
         with self.assertRaises(NotImplementedError):
             serializers.BaseSerializer._get_model()
+
+
+@tag("serializers", "validators")
+class ValidatorsOnSerializersTestCase(TestCase):
+    """Test cases for @field_validator and @model_validator on serializers."""
+
+    def setUp(self):
+        warnings.simplefilter("ignore", UserWarning)
+
+    # ----- ModelSerializer validators -----
+
+    def test_model_serializer_field_validator_rejects_invalid(self):
+        """Test that @field_validator on CreateSerializer rejects invalid input."""
+        from tests.test_app.models import TestModelWithValidators
+        from pydantic import ValidationError
+
+        schema = TestModelWithValidators.generate_create_s()
+        with self.assertRaises(ValidationError) as cm:
+            schema(name="ab", description="test")
+        self.assertIn("Name must be at least 3 characters", str(cm.exception))
+
+    def test_model_serializer_field_validator_accepts_valid(self):
+        """Test that @field_validator on CreateSerializer accepts valid input."""
+        from tests.test_app.models import TestModelWithValidators
+
+        schema = TestModelWithValidators.generate_create_s()
+        instance = schema(name="abc", description="test")
+        self.assertEqual(instance.name, "abc")
+
+    def test_model_serializer_update_validator_rejects_blank(self):
+        """Test that @field_validator on UpdateSerializer rejects blank name."""
+        from tests.test_app.models import TestModelWithValidators
+        from pydantic import ValidationError
+
+        schema = TestModelWithValidators.generate_update_s()
+        with self.assertRaises(ValidationError) as cm:
+            schema(name="   ")
+        self.assertIn("Name cannot be blank", str(cm.exception))
+
+    def test_model_serializer_update_validator_accepts_valid(self):
+        """Test that @field_validator on UpdateSerializer accepts valid input."""
+        from tests.test_app.models import TestModelWithValidators
+
+        schema = TestModelWithValidators.generate_update_s()
+        instance = schema(name="valid")
+        self.assertEqual(instance.name, "valid")
+
+    def test_model_serializer_read_model_validator(self):
+        """Test that @model_validator on ReadSerializer is applied to output schema."""
+        from tests.test_app.models import TestModelWithValidators
+
+        schema = TestModelWithValidators.generate_read_s()
+        # model_validator(mode="after") should be present on the schema
+        self.assertIn("add_display_check", schema.__pydantic_decorators__.model_validators)
+
+    def test_model_serializer_no_validators_returns_plain_schema(self):
+        """Test that serializers without validators still work normally."""
+        from tests.test_app.models import TestModelSerializer
+
+        schema = TestModelSerializer.generate_create_s()
+        instance = schema(name="ab", description="test")
+        self.assertEqual(instance.name, "ab")  # No min-length validator here
+
+    # ----- Meta-driven Serializer validators -----
+
+    def test_meta_serializer_field_validator_rejects_invalid(self):
+        """Test that CreateValidators @field_validator rejects invalid input."""
+        from tests.test_app.serializers import TestModelWithValidatorsMetaSerializer
+        from pydantic import ValidationError
+
+        schema = TestModelWithValidatorsMetaSerializer.generate_create_s()
+        with self.assertRaises(ValidationError) as cm:
+            schema(name="ab", description="test")
+        self.assertIn("Name must be at least 3 characters", str(cm.exception))
+
+    def test_meta_serializer_field_validator_accepts_valid(self):
+        """Test that CreateValidators @field_validator accepts valid input."""
+        from tests.test_app.serializers import TestModelWithValidatorsMetaSerializer
+
+        schema = TestModelWithValidatorsMetaSerializer.generate_create_s()
+        instance = schema(name="abc", description="test")
+        self.assertEqual(instance.name, "abc")
+
+    def test_meta_serializer_update_validator_rejects_blank(self):
+        """Test that UpdateValidators @field_validator rejects blank name."""
+        from tests.test_app.serializers import TestModelWithValidatorsMetaSerializer
+        from pydantic import ValidationError
+
+        schema = TestModelWithValidatorsMetaSerializer.generate_update_s()
+        with self.assertRaises(ValidationError) as cm:
+            schema(name="   ")
+        self.assertIn("Name cannot be blank", str(cm.exception))
+
+    def test_meta_serializer_read_model_validator(self):
+        """Test that ReadValidators @model_validator is applied to output schema."""
+        from tests.test_app.serializers import TestModelWithValidatorsMetaSerializer
+
+        schema = TestModelWithValidatorsMetaSerializer.generate_read_s()
+        self.assertIn("add_display_check", schema.__pydantic_decorators__.model_validators)
+
+    # ----- Utility method tests -----
+
+    def test_collect_validators_returns_empty_for_none(self):
+        """Test _collect_validators returns empty dict for None input."""
+        result = serializers.BaseSerializer._collect_validators(None)
+        self.assertEqual(result, {})
+
+    def test_collect_validators_returns_empty_for_no_validators(self):
+        """Test _collect_validators returns empty dict for class without validators."""
+
+        class PlainClass:
+            fields = ["name"]
+
+        result = serializers.BaseSerializer._collect_validators(PlainClass)
+        self.assertEqual(result, {})
+
+    def test_apply_validators_returns_none_for_none_schema(self):
+        """Test _apply_validators returns None when schema is None."""
+        result = serializers.BaseSerializer._apply_validators(None, {"v": "val"})
+        self.assertIsNone(result)
+
+    def test_apply_validators_returns_schema_for_empty_validators(self):
+        """Test _apply_validators returns original schema when no validators."""
+        from ninja import Schema
+
+        class MySchema(Schema):
+            name: str
+
+        result = serializers.BaseSerializer._apply_validators(MySchema, {})
+        self.assertIs(result, MySchema)
