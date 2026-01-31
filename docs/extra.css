@@ -190,3 +190,168 @@
   margin-top: 0;
   color: #4caf50;
 }
+
+/* ─── Release notes timeline ─── */
+
+.release-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.release-entry {
+  padding: 1.5rem 1.75rem;
+  border-bottom: 1px solid var(--md-default-fg-color--lightest);
+  transition: background 0.2s ease;
+}
+.release-entry:last-child {
+  border-bottom: none;
+}
+.release-entry:hover {
+  background: var(--md-code-bg-color);
+}
+.release-entry--latest {
+  border-left: 4px solid var(--md-primary-fg-color);
+  padding-left: calc(1.75rem - 4px);
+}
+
+.release-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.release-version {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.release-tag {
+  font-size: 1.2rem;
+  font-weight: 700;
+  font-family: var(--md-code-font-family);
+}
+.release-badge {
+  display: inline-block;
+  padding: 0.15rem 0.65rem;
+  border-radius: 2rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+.release-badge--latest {
+  background: var(--md-primary-fg-color);
+  color: var(--md-primary-bg-color);
+}
+
+.release-meta {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  font-size: 0.82rem;
+  opacity: 0.7;
+}
+.release-date {
+  white-space: nowrap;
+}
+.release-links a {
+  text-decoration: none;
+  color: var(--md-typeset-a-color);
+}
+.release-links a:hover {
+  text-decoration: underline;
+}
+
+.release-notes-content {
+  font-size: 0.88rem;
+  line-height: 1.6;
+  padding-left: 0.25rem;
+}
+.release-notes-content p {
+  margin: 0.4rem 0;
+}
+.release-notes-content ul,
+.release-notes-content ol {
+  margin: 0.3rem 0;
+  padding-left: 1.5rem;
+}
+.release-notes-content li {
+  padding: 0.1rem 0;
+}
+.release-notes-empty {
+  font-size: 0.82rem;
+  opacity: 0.5;
+  font-style: italic;
+}
+
+/* ─── Release cards grid (alternative layout) ─── */
+
+.release-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.release-card {
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 10px;
+  padding: 1.25rem;
+  transition: box-shadow 0.25s ease, transform 0.25s ease;
+}
+.release-card:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+[data-md-color-scheme="slate"] .release-card:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+.release-card--latest {
+  border-color: var(--md-primary-fg-color);
+  border-width: 2px;
+}
+
+.release-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 0.75rem;
+}
+.release-card-header h4 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+.release-card-header h4 a {
+  text-decoration: none;
+  color: var(--md-typeset-a-color);
+}
+.release-card-date {
+  font-size: 0.78rem;
+  opacity: 0.6;
+  white-space: nowrap;
+}
+
+.release-card-body {
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+.release-card-body p {
+  margin: 0.3rem 0;
+}
+
+.release-card-footer {
+  margin-top: 0.75rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--md-default-fg-color--lightest);
+  font-size: 0.78rem;
+}
+.release-card-footer a {
+  text-decoration: none;
+  color: var(--md-typeset-a-color);
+}
+.release-card-footer a:hover {
+  text-decoration: underline;
+}

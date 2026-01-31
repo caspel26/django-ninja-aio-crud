@@ -1,16 +1,18 @@
-# API View
+# :material-eye: API View
 
 The `APIView` class provides a base for creating simple API endpoints with custom views.
 
-## Overview
+## :material-format-list-bulleted: Overview
 
 `APIView` is a lightweight wrapper around Django Ninja's `Router` that provides:
 
-- Organized routing with tags
-- Custom authentication configuration
-- Error handling with standard HTTP status codes
+- :material-tag: Organized routing with tags
+- :material-shield-lock: Custom authentication configuration
+- :material-alert-circle: Error handling with standard HTTP status codes
 
-## Class Definition
+---
+
+## :material-code-braces: Class Definition
 
 ```python
 class APIView:
@@ -20,7 +22,7 @@ class APIView:
     auth: list | None = NOT_SET
 ```
 
-## Attributes
+## :material-format-list-bulleted-type: Attributes
 
 | Attribute        | Type           | Description                                     |
 | ---------------- | -------------- | ----------------------------------------------- |
@@ -29,7 +31,9 @@ class APIView:
 | `api_route_path` | `str`          | Base path for all routes in this view           |
 | `auth`           | `list \| None` | Authentication classes (optional)               |
 
-## Methods
+---
+
+## :material-function-variant: Methods
 
 ### Recommended: decorator-based endpoints
 
@@ -128,7 +132,9 @@ Registers all defined views to the API instance.
 
 **Note:** When using `@api.view(prefix="/path", tags=[...])`, the router is mounted automatically and decorator-based endpoints are registered lazily on instantiation; manual registration via `add_views_to_route()` is not required.
 
-## Complete Example
+---
+
+## :material-code-braces: Complete Example
 
 **Recommended:**
 
@@ -190,7 +196,20 @@ Note:
 - Path schema PK type is inferred from the model’s primary key for ViewSets.
 - NinjaAIO remains API-compatible; global CSRF argument is no longer required in initialization.
 
-## See Also
+## :material-bookshelf: See Also
 
-- [API View Set](api_view_set.md) - Full CRUD operations
-- [Authentication](../authentication.md) - Authentication setup
+<div class="grid cards" markdown>
+
+-   :material-view-grid:{ .lg .middle } **APIViewSet**
+
+    ---
+
+    [:octicons-arrow-right-24: Full CRUD operations](api_view_set.md)
+
+-   :material-shield-lock:{ .lg .middle } **Authentication**
+
+    ---
+
+    [:octicons-arrow-right-24: Authentication setup](../authentication.md)
+
+</div>

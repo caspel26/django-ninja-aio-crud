@@ -72,129 +72,100 @@ def _tag_date(tag: str) -> str:
     return lines[-1] if lines else ""
 
 
-_CONV_PREFIX = re.compile(
-    r"^(feat|fix|docs|refactor|perf|test|build|ci|chore)(\([^)]*\))?:\s*"
-)
-
-
-def _commit_messages(tag: str, previous: str | None) -> list[str]:
-    rev_range = f"{previous}..{tag}" if previous else tag
-    log = _run(["git", "log", rev_range, "--pretty=%s", "--no-merges"])
-    return [string.strip() for string in log.splitlines() if string.strip()]
-
-
-def _classify(msgs: list[str]):
-    feat, fix, other = [], [], []
-    for m in msgs:
-        prefix = _CONV_PREFIX.match(m)
-        clean = _CONV_PREFIX.sub("", m)
-        if not prefix:
-            other.append(clean)
-        else:
-            kind = prefix.group(1)
-            if kind == "feat":
-                feat.append(clean)
-            elif kind == "fix":
-                fix.append(clean)
-            else:
-                other.append(clean)
-    return feat, fix, other
-
-
-def _normalize_version(tag: str) -> str:
-    return tag
-
-
-def _fmt_date_iso(date_iso: str) -> str:
-    return (
-        datetime.fromisoformat(date_iso.replace("Z", "+00:00")).date().isoformat()
-        if date_iso
-        else ""
-    )
+def _fmt_date_human(date_iso: str) -> str:
+    """Format date as 'Jan 15, 2025' style."""
+    if not date_iso:
+        return ""
+    try:
+        dt = datetime.fromisoformat(date_iso.replace("Z", "+00:00")).date()
+        return dt.strftime("%b %d, %Y")
+    except Exception:
+        return date_iso
 
 
 def generate_release_table() -> str:
     tags = _get_tags()
     if not tags:
-        return '<div style="font-style:italic;">No git tags found. Create one with <code>git tag -a v0.1.0 -m "Release v0.1.0" && git push --tags</code>.</div>'
-
-    def badge(label: str, count: int, color: str):
-        if count == 0:
-            return ""
         return (
-            f'<img alt="{label}" '
-            f'src="https://img.shields.io/badge/{label}-{count}-{color}?style=flat" '
-            f'style="margin-right:6px;vertical-align:middle;height:20px;" />'
+            '<div class="admonition info">'
+            '<p class="admonition-title">No Releases Yet</p>'
+            "<p>No git tags found. Create one with:</p>"
+            "<pre><code>git tag -a v0.1.0 -m &quot;Release v0.1.0&quot; &amp;&amp; git push --tags</code></pre>"
+            "</div>"
         )
 
-    def li(items):
-        return "".join(f"<li>{escape(i)}</li>" for i in items) or "<li>None</li>"
-
-    rows_html: list[str] = []
+    cards_html: list[str] = []
     for i, tag in enumerate(tags):
         prev = tags[i + 1] if i + 1 < len(tags) else None
-        date_fmt = _fmt_date_iso(_tag_date(tag))
+        date_raw = _tag_date(tag)
+        date_fmt = _fmt_date_human(date_raw)
         notes = _get_release_notes(tag)
-        notes_html = markdown(notes) if notes else "<p>No release notes.</p>"
-        version_dir = _normalize_version(tag)
-        doc_link = f"/{version_dir}/"
+        notes_html = markdown(notes) if notes else ""
         diff_link = (
             f"https://github.com/{REPO_SLUG}/compare/{prev}...{tag}"
             if prev
             else f"https://github.com/{REPO_SLUG}/tree/{tag}"
         )
-        summary_badges = (
-            "<img alt='notes' "
-            "src='https://img.shields.io/badge/notes-available-blue?style=flat' "
-            "style='margin-right:6px;vertical-align:middle;height:20px;' />"
-            if notes
-            else "<span style='opacity:.6;'>-</span>"
+        gh_release_link = f"https://github.com/{REPO_SLUG}/releases/tag/{tag}"
+
+        # Determine if this is the latest release
+        is_latest = i == 0
+        latest_badge = (
+            '<span class="release-badge release-badge--latest">Latest</span>'
+            if is_latest
+            else ""
         )
 
-        details_html = (
-            "<details style='margin-top:.45rem;font-size:.7rem;'>"
-            "<summary style='cursor:pointer;'>Release notes</summary>"
-            f"<div style='margin-top:.5rem;'>{notes_html}</div>"
-            "</details>"
-        )
+        # Build notes section
+        if notes_html:
+            notes_section = (
+                '<div class="release-notes-content">'
+                f"{notes_html}"
+                "</div>"
+            )
+        else:
+            notes_section = (
+                '<div class="release-notes-empty">'
+                "No release notes for this version."
+                "</div>"
+            )
 
-        rows_html.append(
-            "<tr>"
-            f"<td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'>"
-            f"<a href='{doc_link}'><strong>{escape(tag)}</strong></a>"
-            f"<br/><small><a href='{diff_link}'>diff</a></small>"
-            "</td>"
-            f"<td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>{date_fmt}</td>"
-            f"<td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'>"
-            f"{summary_badges}{details_html}"
-            "</td>"
-            "</tr>"
+        cards_html.append(
+            f'<div class="release-entry{"  release-entry--latest" if is_latest else ""}">'
+            f'<div class="release-header">'
+            f'<div class="release-version">'
+            f'<span class="release-tag">{escape(tag)}</span>'
+            f"{latest_badge}"
+            f"</div>"
+            f'<div class="release-meta">'
+            f'<span class="release-date">{date_fmt}</span>'
+            f'<span class="release-links">'
+            f'<a href="{gh_release_link}" title="GitHub Release">GitHub</a>'
+            f' · <a href="{diff_link}" title="View diff">Diff</a>'
+            f"</span>"
+            f"</div>"
+            f"</div>"
+            f"{notes_section}"
+            f"</div>"
         )
 
     html = (
-        "<div style='width:100%;overflow-x:auto;'>"
-        "<table style='width:100%;min-width:900px;border-collapse:collapse;table-layout:auto;font-size:.8rem;'>"
-        "<thead style='background:transparent;'>"
-        "<tr>"
-        "<th style='text-align:left;padding:.75rem 1rem;border-bottom:2px solid #ccc;width:15%;font-size:.85rem;'>Version</th>"
-        "<th style='text-align:left;padding:.75rem 1rem;border-bottom:2px solid #ccc;width:15%;font-size:.85rem;'>Date</th>"
-        "<th style='text-align:left;padding:.75rem 1rem;border-bottom:2px solid #ccc;width:70%;font-size:.85rem;'>Summary</th>"
-        "</tr>"
-        "</thead>"
-        "<tbody>" + "".join(rows_html) + "</tbody></table></div>"
+        '<div class="release-timeline">'
+        + "".join(cards_html)
+        + "</div>"
     )
     return html
 
 
 def generate_full_changelog() -> str:
-    # NEWEST → OLDEST (removed reversal)
+    # NEWEST -> OLDEST (removed reversal)
     tags = _get_tags()
     if not tags:
         return "No versions yet."
     out: list[str] = []
-    for i, tag in enumerate(tags):
+    for tag in tags:
         notes = _get_release_notes(tag)
-        date_fmt = _fmt_date_iso(_tag_date(tag))
+        date_fmt = _fmt_date_human(_tag_date(tag))
         out.append(f"## {tag} ({date_fmt})\n")
         out.append(notes or "_No release notes for this release._")
         out.append("\n---\n")
@@ -202,37 +173,45 @@ def generate_full_changelog() -> str:
 
 
 def generate_release_cards() -> str:
-    # Optional alternative: card layout
     tags = _get_tags()
     if not tags:
-        return "<p>No versions yet.</p>"
-    parts = [
-        '<div class="release-cards" style="display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));">'
-    ]
+        return (
+            '<div class="admonition info">'
+            '<p class="admonition-title">No Releases Yet</p>'
+            "<p>No versions have been tagged yet.</p>"
+            "</div>"
+        )
+    parts = ['<div class="release-grid">']
     for i, tag in enumerate(tags):
         prev = tags[i + 1] if i + 1 < len(tags) else None
         notes = _get_release_notes(tag)
         notes_html = markdown(notes) if notes else "<p>No release notes.</p>"
-        date_fmt = _fmt_date_iso(_tag_date(tag))
+        date_fmt = _fmt_date_human(_tag_date(tag))
         diff_link = (
             f"https://github.com/{REPO_SLUG}/compare/{prev}...{tag}"
             if prev
             else f"https://github.com/{REPO_SLUG}/tree/{tag}"
         )
-        version_dir = _normalize_version(tag)
+        gh_release_link = f"https://github.com/{REPO_SLUG}/releases/tag/{tag}"
+        is_latest = i == 0
+        latest_cls = " release-card--latest" if is_latest else ""
+        latest_badge = (
+            '<span class="release-badge release-badge--latest">Latest</span>'
+            if is_latest
+            else ""
+        )
         parts.append(
-            f"""
-<div class="release-card" style="border:1px solid #ddd;border-radius:6px;padding:0.75rem;">
-  <h4 style="margin:0 0 .25rem;"><a href="/{version_dir}/">{escape(tag)}</a></h4>
-  <div style="font-size:.8rem;color:#666;margin-bottom:.5rem;">{date_fmt} · <a href="{diff_link}">diff</a></div>
-<details style="font-size:.75rem;">
-  <summary>Release notes</summary>
-  <div style="padding-left:1rem;margin:.25rem 0;">
-    {notes_html}
-  </div>
-</details>
-</div>
-""".strip()
+            f'<div class="release-card{latest_cls}">'
+            f'<div class="release-card-header">'
+            f'<h4><a href="{gh_release_link}">{escape(tag)}</a>{latest_badge}</h4>'
+            f'<span class="release-card-date">{date_fmt}</span>'
+            f"</div>"
+            f'<div class="release-card-body">{notes_html}</div>'
+            f'<div class="release-card-footer">'
+            f'<a href="{gh_release_link}">Release</a>'
+            f' · <a href="{diff_link}">Diff</a>'
+            f"</div>"
+            f"</div>"
         )
     parts.append("</div>")
     return "\n".join(parts)

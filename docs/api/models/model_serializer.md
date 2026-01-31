@@ -1,25 +1,27 @@
-# Model Serializer
+# :material-file-document-edit: Model Serializer
 
 `ModelSerializer` is a powerful abstract mixin for Django models that centralizes schema generation and serialization configuration directly on the model class.
 
-## Overview
+## :material-format-list-bulleted: Overview
 
 **Goals:**
 
-- Eliminate duplication between Model and separate serializer classes
-- Provide clear extension points (sync + async hooks, custom synthetic fields)
-- Auto-generate Ninja schemas from model metadata
-- Support nested serialization for relationships
+- :material-content-copy: Eliminate duplication between Model and separate serializer classes
+- :material-hook: Provide clear extension points (sync + async hooks, custom synthetic fields)
+- :material-auto-fix: Auto-generate Ninja schemas from model metadata
+- :material-link-variant: Support nested serialization for relationships
 
 **Key Features:**
 
-- Declarative schema configuration via inner classes
-- Automatic CRUD schema generation
-- Nested relationship handling
-- Sync and async lifecycle hooks
-- Custom field support (computed/synthetic fields)
+- :material-playlist-plus: Declarative schema configuration via inner classes
+- :material-sync: Automatic CRUD schema generation
+- :material-file-tree: Nested relationship handling
+- :material-hook: Sync and async lifecycle hooks
+- :material-pencil-plus: Custom field support (computed/synthetic fields)
 
-## Quick Start
+---
+
+## :material-rocket-launch: Quick Start
 
 ```python
 from django.db import models
@@ -39,7 +41,9 @@ class User(ModelSerializer):
         return self.username
 ```
 
-## Inner Configuration Classes
+---
+
+## :material-playlist-plus: Inner Configuration Classes
 
 ### CreateSerializer
 
@@ -294,7 +298,9 @@ class User(ModelSerializer):
 }
 ```
 
-## Schema Generation
+---
+
+## :material-auto-fix: Schema Generation
 
 ### Auto-Generated Schemas
 
@@ -576,7 +582,9 @@ class Article(ModelSerializer):
         )
 ```
 
-## Async Extension Points
+---
+
+## :material-lightning-bolt: Async Extension Points
 
 ### `queryset_request(request)`
 
@@ -651,7 +659,9 @@ class User(ModelSerializer):
             await send_email(self.email, "Welcome!")
 ```
 
-## Sync Lifecycle Hooks
+---
+
+## :material-hook: Sync Lifecycle Hooks
 
 ### Save Hooks
 
@@ -714,7 +724,9 @@ class User(ModelSerializer):
         )
 ```
 
-## Utility Methods
+---
+
+## :material-wrench: Utility Methods
 
 ### `has_changed(field)`
 
@@ -745,7 +757,9 @@ class BlogPost(ModelSerializer):
 path = BlogPost.verbose_name_path_resolver()
 ```
 
-## ModelUtil
+---
+
+## :material-cog-sync: ModelUtil
 
 Helper class for async CRUD operations with ModelSerializer.
 
@@ -925,7 +939,9 @@ except SerializeError as e:
     pass
 ```
 
-## Complete Example
+---
+
+## :material-code-braces: Complete Example
 
 ```python
 from django.db import models
@@ -1037,7 +1053,9 @@ class Tag(ModelSerializer):
         fields = ["id", "name"]
 ```
 
-## Custom Fields Normalization
+---
+
+## :material-pencil-plus: Custom Fields Normalization
 
 Custom tuples are normalized by `ModelSerializer.get_custom_fields()` to `(name, python_type, default)`.
 
@@ -1072,7 +1090,7 @@ At runtime:
 
 Required customs (Ellipsis) must be provided in input (create/update) or resolvable (read) or an error is raised.
 
-## Error Cases
+## :material-alert-circle: Error Cases
 
 | Situation                                    | Result              |
 | -------------------------------------------- | ------------------- |
@@ -1080,7 +1098,7 @@ Required customs (Ellipsis) must be provided in input (create/update) or resolva
 | Missing required custom (2‑tuple) in payload | Validation error    |
 | Unresolvable required read custom            | Serialization error |
 
-## Best Practices
+## :material-shield-star: Best Practices
 
 1. **Always exclude sensitive fields:**
 
@@ -1119,8 +1137,26 @@ Required customs (Ellipsis) must be provided in input (create/update) or resolva
        await send_welcome_email(self.email)
    ```
 
-## See Also
+## :material-bookshelf: See Also
 
-- [Model Util](model_util.md) - Deep dive into ModelUtil
-- [API ViewSet](../views/api_view_set.md) - Using ModelSerializer with ViewSets
-- [Authentication](../authentication.md) - Securing endpoints
+<div class="grid cards" markdown>
+
+-   :material-cog-sync:{ .lg .middle } **ModelUtil**
+
+    ---
+
+    [:octicons-arrow-right-24: Deep dive](model_util.md)
+
+-   :material-view-grid:{ .lg .middle } **APIViewSet**
+
+    ---
+
+    [:octicons-arrow-right-24: Using with ViewSets](../views/api_view_set.md)
+
+-   :material-shield-lock:{ .lg .middle } **Authentication**
+
+    ---
+
+    [:octicons-arrow-right-24: Securing endpoints](../authentication.md)
+
+</div>

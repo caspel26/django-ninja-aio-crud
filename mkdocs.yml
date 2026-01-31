@@ -13,6 +13,7 @@ nav:
     - Quick Start (Serializer): getting_started/quick_start_serializer.md
   - Tutorial:
     - 'Step 1: Define Your Model': tutorial/model.md
+    - 'Alternative: Define Your Serializer': tutorial/serializer.md
     - 'Step 2: Create CRUD Views': tutorial/crud.md
     - 'Step 3: Add Authentication': tutorial/authentication.md
     - 'Step 4: Add Filtering & Pagination': tutorial/filtering.md

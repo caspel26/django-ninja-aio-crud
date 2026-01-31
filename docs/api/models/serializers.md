@@ -1,14 +1,14 @@
-# Serializer (Meta-driven)
+# :material-cube-outline: Serializer (Meta-driven)
 
 The `Serializer` class provides dynamic schema generation and relation handling for existing Django models without requiring you to adopt the ModelSerializer base class. Use it when:
 
-- You already have vanilla Django models in a project and want dynamic Ninja schemas.
-- You prefer to keep models unchanged and define serialization externally.
-- You need to keep your models lean and define API concerns separately.
+- :material-database: You already have vanilla Django models in a project and want dynamic Ninja schemas.
+- :material-arrow-split-vertical: You prefer to keep models unchanged and define serialization externally.
+- :material-package-variant: You need to keep your models lean and define API concerns separately.
 
 It mirrors the behavior of ModelSerializer but reads configuration from a nested Meta class.
 
-## Key Differences from ModelSerializer
+## :material-scale-balance: Key Differences from ModelSerializer
 
 While both `ModelSerializer` and `Serializer` provide schema generation and CRUD operations, there are important differences:
 
@@ -22,7 +22,9 @@ While both `ModelSerializer` and `Serializer` provide schema generation and CRUD
 | Query optimization       | QuerySet nested class               | QuerySet nested class (inherited)             |
 | Relation serializers     | Auto-resolved                       | Explicit via relations_serializers (supports string refs & Union) |
 
-## Key points
+---
+
+## :material-key-variant: Key Points
 
 - Works with any Django model (no inheritance required).
 - Generates read/create/update/related schemas on demand via ninja.orm.create_schema.
@@ -31,7 +33,9 @@ While both `ModelSerializer` and `Serializer` provide schema generation and CRUD
 - **Supports Union types for polymorphic relations** (e.g., generic foreign keys, content types).
 - Plays nicely with APIViewSet to auto-wire schemas and queryset handling.
 
-## Configuration
+---
+
+## :material-cog: Configuration
 
 Define a Serializer subclass with a nested Meta:
 
@@ -148,7 +152,9 @@ class ArticleSerializer(serializers.Serializer):
         )
 ```
 
-## Example: simple FK
+---
+
+## :material-link-variant: Example: Simple FK
 
 ```python
 from ninja_aio.models import serializers
@@ -168,7 +174,9 @@ class ArticleSerializer(serializers.Serializer):
         )
 ```
 
-## Lifecycle Hooks
+---
+
+## :material-hook: Lifecycle Hooks
 
 Serializer supports lifecycle hooks similar to ModelSerializer, but with a key difference: **all hooks receive an `instance` parameter** instead of using `self`:
 
@@ -227,7 +235,9 @@ class ArticleSerializer(serializers.Serializer):
 | `on_create_after_save(i)`   | sync  | After creation save only  | `instance`              |
 | `on_delete(instance)`       | sync  | After deletion            | `instance`              |
 
-## Example: reverse relation with nested serialization
+---
+
+## :material-arrow-left-right: Example: Reverse Relation with Nested Serialization
 
 ```python
 class AuthorSerializer(serializers.Serializer):
@@ -241,7 +251,9 @@ class AuthorSerializer(serializers.Serializer):
         }
 ```
 
-## String References for Forward/Circular Dependencies
+---
+
+## :material-text-search: String References for Forward/Circular Dependencies
 
 You can use string references in `relations_serializers` to handle forward references and circular dependencies:
 
@@ -323,7 +335,9 @@ class UserSerializer(serializers.Serializer):
         }
 ```
 
-## Union Types for Polymorphic Relations
+---
+
+## :material-set-merge: Union Types for Polymorphic Relations
 
 You can use `Union` types in `relations_serializers` to handle polymorphic relationships where a field can reference multiple possible serializer types. This is particularly useful for generic foreign keys, content types, or any scenario where a relation can point to different model types.
 
@@ -453,7 +467,9 @@ Notes:
 - Union types are resolved lazily, so forward and circular references work seamlessly.
 - The schema generator will create a union of all possible schemas from the serializers in the Union.
 
-## Relations as ID
+---
+
+## :material-identifier: Relations as ID
 
 Use `relations_as_id` in Meta to serialize relation fields as IDs instead of nested objects. This is useful for:
 
@@ -617,7 +633,9 @@ class ArticleSerializer(serializers.Serializer):
             prefetch_related=["tags"],        # For M2M
         )
 
-## Using with APIViewSet
+---
+
+## :material-view-grid: Using with APIViewSet
 
 You can attach a Serializer to an APIViewSet to auto-generate schemas and leverage queryset_request when present:
 
@@ -641,7 +659,9 @@ Behavior:
 - ModelUtil creates a serializer instance and uses its `queryset_request()` hook if defined to build optimized querysets
 - Lifecycle hooks from the serializer are invoked during CRUD operations
 
-## CRUD Operations with Serializer
+---
+
+## :material-database-refresh: CRUD Operations with Serializer
 
 When using a Serializer with APIViewSet, CRUD operations automatically invoke the appropriate lifecycle hooks:
 
@@ -668,7 +688,9 @@ When using a Serializer with APIViewSet, CRUD operations automatically invoke th
 # 3. on_delete() - deletion hook
 ```
 
-## Advanced: customs and optionals
+---
+
+## :material-tune-variant: Advanced: Customs and Optionals
 
 Customs and optionals behave like ModelSerializer:
 
@@ -687,7 +709,9 @@ class PublishSerializer(serializers.Serializer):
 
 generate_update_s merges optionals and customs for the Patch schema.
 
-## Query Optimization with Serializer
+---
+
+## :material-lightning-bolt: Query Optimization with Serializer
 
 Like ModelSerializer, Serializer supports query optimization via a nested QuerySet class:
 
@@ -733,7 +757,9 @@ The QuerySet configuration is used by ModelUtil to automatically optimize databa
 - **queryset_request**: Applied inside the `queryset_request` hook
 - **extras**: Named configurations available via `QueryUtil.SCOPES`
 
-## Complete Example
+---
+
+## :material-code-braces: Complete Example
 
 ```python
 from ninja_aio.models import serializers
@@ -795,7 +821,9 @@ class ArticleViewSet(APIViewSet):
     serializer_class = ArticleSerializer
 ```
 
-## When to choose Serializer vs ModelSerializer
+---
+
+## :material-swap-horizontal: When to Choose Serializer vs ModelSerializer
 
 **Choose Serializer when:**
 
@@ -821,3 +849,27 @@ Both approaches support:
 - Integration with APIViewSet for auto-generated CRUD endpoints
 
 Choose the pattern that best fits your project architecture and team structure.
+
+---
+
+## :material-compass: See Also
+
+<div class="grid cards" markdown>
+
+- :material-file-document-edit: **Model Serializer** — Base class approach with auto-binding
+
+    [:octicons-arrow-right-24: Model Serializer](model_serializer.md)
+
+- :material-cog-sync: **Model Util** — Internal CRUD engine and query optimization
+
+    [:octicons-arrow-right-24: Model Util](model_util.md)
+
+- :material-view-grid: **APIViewSet** — Auto-generated CRUD endpoints
+
+    [:octicons-arrow-right-24: APIViewSet](../views/api_view_set.md)
+
+- :material-school: **Tutorial: Serializer** — Step-by-step guide
+
+    [:octicons-arrow-right-24: Serializer Tutorial](../../tutorial/serializer.md)
+
+</div>

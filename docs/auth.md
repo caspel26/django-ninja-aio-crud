@@ -1,17 +1,19 @@
-# JWT Authentication and AsyncJwtBearer
+# :material-shield-lock-outline: JWT Authentication and AsyncJwtBearer
 
 This page documents the JWT helpers and the `AsyncJwtBearer` class in `ninja_aio/auth.py`, including configuration, validation, and usage in Django Ninja.
 
-## Overview
+## :material-information-outline: Overview
 
-- `AsyncJwtBearer`: Asynchronous HTTP Bearer auth that verifies JWTs, validates claims via a registry, and delegates user resolution to `auth_handler`.
-- Helpers:
-  - `validate_key`: Ensures JWK keys are present and of the correct type.
-  - `validate_mandatory_claims`: Ensures `iss` and `aud` are present (from settings if not provided).
-  - `encode_jwt`: Signs a JWT with time-based claims (`iat`, `nbf`, `exp`) and mandatory `iss/aud`.
-  - `decode_jwt`: Verifies and decodes a JWT with a public key and allowed algorithms.
+- :material-shield-check: **AsyncJwtBearer** — Asynchronous HTTP Bearer auth that verifies JWTs, validates claims via a registry, and delegates user resolution to `auth_handler`.
+- :material-wrench: **Helpers:**
+  - :material-key-variant: `validate_key` — Ensures JWK keys are present and of the correct type.
+  - :material-check-decagram: `validate_mandatory_claims` — Ensures `iss` and `aud` are present (from settings if not provided).
+  - :material-pencil-lock: `encode_jwt` — Signs a JWT with time-based claims (`iat`, `nbf`, `exp`) and mandatory `iss/aud`.
+  - :material-lock-open-check: `decode_jwt` — Verifies and decodes a JWT with a public key and allowed algorithms.
 
-## Configuration without settings
+---
+
+## :material-cog-off: Configuration without Settings
 
 Settings are not required. Provide keys and claims explicitly:
 
@@ -39,11 +41,13 @@ decoded = decode_jwt(token=token, public_key=public_key, algorithms=["RS256"])
 # ...existing code...
 ```
 
-### Mandatory claims
+### Mandatory Claims
 
 The library enforces `iss` and `aud` via `JWT_MANDATORY_CLAIMS`. If you do not use settings, include them in the payload you pass to `encode_jwt`.
 
-## Configuration with settings (optional)
+---
+
+## :material-cog: Configuration with Settings (Optional)
 
 You can centralize configuration in Django settings and omit explicit keys/claims:
 
@@ -97,9 +101,11 @@ class SettingsBearer(AsyncJwtBearer):
         return {"user_id": sub}
 ```
 
-## AsyncJwtBearer
+---
 
-### Key points
+## :material-shield-check: AsyncJwtBearer
+
+### :material-key-variant: Key Points
 
 - `jwt_public`: Must be a JWK (RSA or EC) used to verify signatures.
 - `claims`: Dict passed to `jwt.JWTClaimsRegistry` defining validations (e.g., `iss`, `aud`, `exp`, `nbf`).
@@ -110,7 +116,7 @@ class SettingsBearer(AsyncJwtBearer):
 - `auth_handler(request)`: Async hook to resolve application user given the decoded token (`self.dcd`).
 - `authenticate(request, token)`: Decodes, validates, and delegates to `auth_handler`. Returns user or `False`.
 
-### Example
+### :material-code-braces: Example
 
 ```python
 from joserfc import jwk
@@ -138,7 +144,7 @@ def secure_endpoint(request):
     return {"ok": True}
 ```
 
-### Claims registry helper
+### :material-format-list-checks: Claims Registry Helper
 
 You can construct and reuse a registry from your class-level `claims`:
 
@@ -147,7 +153,9 @@ registry = MyBearer.get_claims()
 # registry.validate(token_claims)  # raises JoseError on failure
 ```
 
-## encode_jwt
+---
+
+## :material-pencil-lock: encode_jwt
 
 Signs a JWT with safe defaults:
 
@@ -170,7 +178,9 @@ token = encode_jwt(
 )
 ```
 
-## decode_jwt
+---
+
+## :material-lock-open-check: decode_jwt
 
 Verifies and decodes a JWT with a public key and algorithm allow-list.
 
@@ -190,7 +200,9 @@ claims = decoded.claims
 sub = claims.get("sub")
 ```
 
-## validate_key
+---
+
+## :material-key-check: validate_key
 
 If you do not use settings, pass keys directly. `validate_key` will raise `ValueError` only when neither an explicit key nor a configured setting is provided.
 
@@ -201,7 +213,9 @@ from joserfc import jwk
 pkey = validate_key(jwk.RSAKey.import_key(open("priv.jwk").read()), "JWT_PRIVATE_KEY")
 ```
 
-## validate_mandatory_claims
+---
+
+## :material-check-decagram: validate_mandatory_claims
 
 Ensures `iss` and `aud` are present; if settings are not used, include them in your input claims.
 
@@ -212,14 +226,39 @@ claims = {"sub": "123", "iss": "https://auth.example", "aud": "my-api"}
 claims = validate_mandatory_claims(claims)
 ```
 
-## Error handling
+---
+
+## :material-alert-circle: Error Handling
 
 - `authenticate` returns `False` on decode (`ValueError`) or claim validation failure (`JoseError`). Map this to 401/403 in your views as needed.
 - `validate_claims` raises `jose.errors.JoseError` for invalid claims.
 - `encode_jwt` and `decode_jwt` raise `ValueError` for missing/invalid keys or configuration.
 
-## Security notes
+---
 
-- Rotate keys and use `kid` headers to support key rotation.
-- Validate critical claims (`exp`, `nbf`, `iss`, `aud`) via the registry.
-- Do not log raw tokens or sensitive claims.
+## :material-security: Security Notes
+
+!!! warning "Security Best Practices"
+    - Rotate keys and use `kid` headers to support key rotation.
+    - Validate critical claims (`exp`, `nbf`, `iss`, `aud`) via the registry.
+    - Do not log raw tokens or sensitive claims.
+
+---
+
+## :material-compass: See Also
+
+<div class="grid cards" markdown>
+
+- :material-shield-lock: **API Authentication** — Authentication levels and ViewSet integration
+
+    [:octicons-arrow-right-24: API Authentication](api/authentication.md)
+
+- :material-school: **Tutorial: Authentication** — Step-by-step auth setup guide
+
+    [:octicons-arrow-right-24: Authentication Tutorial](tutorial/authentication.md)
+
+- :material-view-grid: **APIViewSet** — Auto-generated CRUD with auth support
+
+    [:octicons-arrow-right-24: APIViewSet](api/views/api_view_set.md)
+
+</div>

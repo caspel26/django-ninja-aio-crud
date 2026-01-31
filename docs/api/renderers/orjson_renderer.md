@@ -1,8 +1,8 @@
-# ORJSON Renderer
+# :material-code-json: ORJSON Renderer
 
 This package uses an internal ORJSON-based renderer that automatically handles JSON serialization with support for special types.
 
-## Configuration
+## :material-cog: Configuration
 
 Configure serialization options via Django settings:
 
@@ -24,7 +24,9 @@ Notes:
 - The value is an orjson option bitmask (e.g., `orjson.OPT_INDENT_2`, `orjson.OPT_NON_STR_KEYS`), and you can combine multiple options using `|`.
 - If not set, the default `orjson.dumps` options are used.
 
-## HttpResponse Passthrough
+---
+
+## :material-arrow-right-bold: HttpResponse Passthrough
 
 The renderer automatically detects when you return a Django `HttpResponse` (or any `HttpResponseBase` subclass) and passes it through without JSON serialization. This allows you to return custom responses with different content types.
 

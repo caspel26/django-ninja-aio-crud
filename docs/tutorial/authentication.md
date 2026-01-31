@@ -1,8 +1,18 @@
-# :material-numeric-3-circle: Step 3: Add Authentication
+<div class="tutorial-hero" markdown>
 
-In this step, you'll learn how to secure your API with JWT authentication and implement role-based access control.
+<span class="step-indicator">Step 3 of 4</span>
 
-## :material-school: What You'll Learn
+# Add Authentication
+
+<p class="tutorial-subtitle">
+Secure your API with JWT authentication and implement role-based access control.
+</p>
+
+</div>
+
+<div class="learning-objectives" markdown>
+
+### :material-school: What You'll Learn
 
 - :material-key: Setting up JWT authentication
 - :material-shield-lock: Protecting endpoints
@@ -10,11 +20,15 @@ In this step, you'll learn how to secure your API with JWT authentication and im
 - :material-login: Creating login/register endpoints
 - :material-test-tube: Testing authenticated requests
 
-## Prerequisites
+</div>
 
-Make sure you've completed:
-- [Step 1: Define Your Model](model.md)
-- [Step 2: Create CRUD Views](crud.md)
+<div class="prerequisites" markdown>
+
+**Prerequisites** — Make sure you've completed [Step 1: Define Your Model](model.md) and [Step 2: Create CRUD Views](crud.md).
+
+</div>
+
+---
 
 ## :material-key-variant: Setting Up JWT Keys
 
@@ -59,6 +73,8 @@ JWT_AUDIENCE = "your-api"
 
 !!! warning "Security"
     Never commit your private key to version control! Add `private_key.pem` to your `.gitignore`.
+
+---
 
 ## :material-account: Create User Model
 
@@ -121,6 +137,8 @@ AUTH_USER_MODEL = 'myapp.User'  # Replace 'myapp' with your app name
 python manage.py makemigrations
 python manage.py migrate
 ```
+
+---
 
 ## :material-shield-check: Create Authentication Class
 
@@ -212,6 +230,8 @@ def create_refresh_token(user_id: int) -> str:
 
     return token
 ```
+
+---
 
 ## :material-login: Create Login/Register Endpoints
 
@@ -396,6 +416,8 @@ async def refresh(request, refresh_token: str):
         )
 ```
 
+---
+
 ## :material-lock: Protect Your ViewSets
 
 Now let's add authentication to your CRUD endpoints:
@@ -457,6 +479,8 @@ class Article(ModelSerializer):
         # Call parent
         await super().custom_actions(payload)
 ```
+
+---
 
 ## :material-account-key: Role-Based Access Control
 
@@ -612,6 +636,8 @@ class ArticleViewSet(APIViewSet):
 
 ArticleViewSet().add_views_to_route()
 ```
+
+---
 
 ## :material-test-tube: Testing Authentication
 
@@ -805,6 +831,8 @@ class JWTAuth(AsyncJwtBearer):
         return user
 ```
 
+---
+
 ## :material-shield-star: Best Practices
 
 1. **Use RSA keys in production:**
@@ -847,19 +875,37 @@ class JWTAuth(AsyncJwtBearer):
 
 8. **Implement token blacklist** for logout functionality
 
-## :material-arrow-right-circle: Next Steps
+---
 
-Now that you have authentication set up, let's customize schemas in [Step 4: Filtering & Pagination](filtering.md).
+<div class="next-step" markdown>
 
-!!! success "What You've Learned"
-    - :material-check: Setting up JWT authentication
-    - :material-check: Creating login/register endpoints
-    - :material-check: Protecting API endpoints
-    - :material-check: Implementing role-based access control
-    - :material-check: Validating ownership
-    - :material-check: Testing authenticated requests
+**Ready for the next step?**
 
-## :material-bookshelf: See Also
+Now that you have authentication set up, let's add filtering and pagination!
 
-- [Authentication API Reference](../api/authentication.md) — Complete authentication documentation
-- [APIViewSet Auth Options](../api/views/api_view_set.md#authentication-attributes) — ViewSet authentication options
+[Step 4: Filtering & Pagination :material-arrow-right:](filtering.md){ .md-button .md-button--primary }
+
+</div>
+
+<div class="summary-checklist" markdown>
+
+### :material-check-all: What You've Learned
+
+- :material-check: Setting up JWT authentication
+- :material-check: Creating login/register endpoints
+- :material-check: Protecting API endpoints
+- :material-check: Implementing role-based access control
+- :material-check: Validating ownership
+- :material-check: Testing authenticated requests
+
+</div>
+
+<div class="grid cards" markdown>
+
+-   :material-book-open-variant:{ .lg .middle } **API Reference**
+
+    ---
+
+    [:octicons-arrow-right-24: Authentication](../api/authentication.md) &middot; [:octicons-arrow-right-24: APIViewSet Auth Options](../api/views/api_view_set.md#authentication-attributes)
+
+</div>

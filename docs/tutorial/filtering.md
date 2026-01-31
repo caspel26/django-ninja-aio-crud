@@ -1,8 +1,18 @@
-# :material-numeric-4-circle: Step 4: Add Filtering & Pagination
+<div class="tutorial-hero" markdown>
 
-In this final step, you'll learn how to implement advanced filtering, searching, and pagination for your API endpoints.
+<span class="step-indicator">Step 4 of 4</span>
 
-## :material-school: What You'll Learn
+# Add Filtering & Pagination
+
+<p class="tutorial-subtitle">
+Implement advanced filtering, searching, and pagination for your API endpoints.
+</p>
+
+</div>
+
+<div class="learning-objectives" markdown>
+
+### :material-school: What You'll Learn
 
 - :material-filter: Query parameter filtering
 - :material-magnify: Full-text search
@@ -11,13 +21,15 @@ In this final step, you'll learn how to implement advanced filtering, searching,
 - :material-set-merge: Filter combinations
 - :material-lightning-bolt: Performance optimization
 
-## Prerequisites
+</div>
 
-Make sure you've completed:
+<div class="prerequisites" markdown>
 
-- [Step 1: Define Your Model](model.md)
-- [Step 2: Create CRUD Views](crud.md)
-- [Step 3: Add Authentication](authentication.md)
+**Prerequisites** — Make sure you've completed [Step 1: Define Your Model](model.md), [Step 2: Create CRUD Views](crud.md), and [Step 3: Add Authentication](authentication.md).
+
+</div>
+
+---
 
 ## :material-filter: Basic Filtering
 
@@ -169,6 +181,8 @@ GET /api/article/?min_rating=4.5
 GET /api/article/?min_views=100&max_views=1000
 ```
 
+---
+
 ## :material-magnify: Search Functionality
 
 ### Simple Text Search
@@ -273,6 +287,8 @@ class ArticleViewSet(APIViewSet):
         return queryset
 ```
 
+---
+
 ## :material-sort: Ordering
 
 ### Basic Ordering
@@ -368,6 +384,8 @@ GET /api/article/?ordering=-created_at,title
 # Order by views, then rating
 GET /api/article/?ordering=-views,-rating
 ```
+
+---
 
 ## :material-filter-variant-plus: Advanced Filtering
 
@@ -514,6 +532,8 @@ GET /api/article/?exclude_author=5
 GET /api/article/?exclude_ids=1,2,3
 ```
 
+---
+
 ## :material-page-next: Pagination
 
 ### Default Pagination
@@ -657,6 +677,8 @@ GET /api/article/?preset=featured
 GET /api/article/?preset=recent&category=1
 ```
 
+---
+
 ## :material-lightning-bolt: Performance Optimization
 
 ### Select Related
@@ -721,6 +743,8 @@ class ArticleViewSet(APIViewSet):
 
         return queryset
 ```
+
+---
 
 ## :material-code-braces: Complete Example
 
@@ -902,9 +926,15 @@ curl "http://localhost:8000/api/article/?page=2&page_size=50"
 curl "http://localhost:8000/api/article/?search=tutorial&category=1&is_published=true&min_views=1000&ordering=-rating&page=1&page_size=20"
 ```
 
+---
+
 ## :material-party-popper: Congratulations!
 
-You've completed all tutorial steps and built a complete, production-ready API with:
+You've completed all tutorial steps and built a complete, production-ready API!
+
+<div class="summary-checklist" markdown>
+
+### :material-check-all: What You've Built
 
 - :material-check: Models with automatic schema generation
 - :material-check: Full CRUD operations
@@ -913,6 +943,8 @@ You've completed all tutorial steps and built a complete, production-ready API w
 - :material-check: Advanced filtering and search
 - :material-check: Pagination
 - :material-check: Performance optimization
+
+</div>
 
 ## :material-arrow-right-circle: Next Steps
 

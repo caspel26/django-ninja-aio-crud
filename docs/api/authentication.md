@@ -1,18 +1,21 @@
-# Authentication
+# :material-shield-lock: Authentication
 
 Django Ninja Aio CRUD provides built-in async JWT authentication support with flexible configuration and easy integration with your API endpoints.
 
-## Overview
+## :material-format-list-bulleted: Overview
 
 Authentication in Django Ninja Aio CRUD:
-- **Fully Async** - No blocking operations
-- **JWT-Based** - Industry-standard JSON Web Tokens
-- **Type-Safe** - Proper type hints and validation
-- **Flexible** - Per-endpoint or global authentication
-- **Customizable** - Override default behavior
-- **RSA/HMAC Support** - Multiple signing algorithms
 
-## Quick Start
+- :material-lightning-bolt: **Fully Async** — No blocking operations
+- :material-key: **JWT-Based** — Industry-standard JSON Web Tokens
+- :material-shield-check: **Type-Safe** — Proper type hints and validation
+- :material-tune: **Flexible** — Per-endpoint or global authentication
+- :material-cog: **Customizable** — Override default behavior
+- :material-lock: **RSA/HMAC Support** — Multiple signing algorithms
+
+---
+
+## :material-rocket-launch: Quick Start
 
 ### 1. Create Authentication Class
 
@@ -67,7 +70,9 @@ curl -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIs..." \
      http://localhost:8000/api/article/
 ```
 
-## AsyncJwtBearer
+---
+
+## :material-key-variant: AsyncJwtBearer
 
 Base class for JWT authentication.
 
@@ -87,7 +92,7 @@ class MyAuth(AsyncJwtBearer):
         pass
 ```
 
-### Required Attributes
+### :material-cog: Required Attributes
 
 #### `jwt_public`
 
@@ -201,7 +206,7 @@ class JWTAuth(AsyncJwtBearer):
     }
 ```
 
-### Required Methods
+### :material-function: Required Methods
 
 #### `auth_handler()`
 
@@ -301,7 +306,9 @@ async def auth_handler(self, request):
     return user
 ```
 
-## Authentication Levels
+---
+
+## :material-layers: Authentication Levels
 
 ### Global Authentication
 
@@ -399,7 +406,9 @@ class ArticleViewSet(APIViewSet):
     delete_auth = [AdminAuth()]  # Only admin can delete
 ```
 
-## Advanced Usage
+---
+
+## :material-cog-outline: Advanced Usage
 
 ### Role-Based Access Control (RBAC)
 
@@ -619,7 +628,9 @@ class ArticleViewSet(APIViewSet):
 
 Django Ninja will try both methods; if either succeeds, the request is authenticated.
 
-## Best Practices
+---
+
+## :material-shield-star: Best Practices
 
 1. **Use RSA (asymmetric) keys for production:**
    ```python
@@ -685,7 +696,9 @@ Django Ninja will try both methods; if either succeeds, the request is authentic
        pass
    ```
 
-## Integration Examples
+---
+
+## :material-puzzle: Integration Examples
 
 ### With Auth0
 
@@ -779,10 +792,26 @@ class FirebaseAuth(HttpBearer):
             return None
 ```
 
-## See Also
+## :material-bookshelf: See Also
 
-- [API ViewSet](views/api_view_set.md) - Applying auth to ViewSets
-- [Tutorial: Authentication](../tutorial/authentication.md) - Step-by-step guide
-- [Model Serializer](models/model_serializer.md) - Filtering by authenticated user
+<div class="grid cards" markdown>
 
----
+-   :material-view-grid:{ .lg .middle } **APIViewSet**
+
+    ---
+
+    [:octicons-arrow-right-24: Applying auth to ViewSets](views/api_view_set.md)
+
+-   :material-school:{ .lg .middle } **Tutorial**
+
+    ---
+
+    [:octicons-arrow-right-24: Step-by-step auth guide](../tutorial/authentication.md)
+
+-   :material-database:{ .lg .middle } **ModelSerializer**
+
+    ---
+
+    [:octicons-arrow-right-24: Filtering by user](models/model_serializer.md)
+
+</div>

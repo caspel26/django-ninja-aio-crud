@@ -1,8 +1,8 @@
-# APIViewSet
+# :material-view-grid: APIViewSet
 
 `APIViewSet` auto-generates async CRUD endpoints and optional Many-to-Many (M2M) endpoints for a Django `Model` or a `ModelSerializer`. It supports dynamic schema generation, per-verb authentication, pagination, list & relation filtering with runtime-built Pydantic schemas, and custom view injection.
 
-## Generated CRUD Endpoints
+## :material-auto-fix: Generated CRUD Endpoints
 
 | Method | Path            | Summary        | Response                                      |
 | ------ | --------------- | -------------- | --------------------------------------------- |
@@ -24,7 +24,7 @@ Notes:
   - When True (default, for backward compatibility), retrieve and POST paths includes a trailing slash into CRUD: `/{base}/{pk}/`.
   - When False, retrieve and post paths is generated without a trailing slash: `/{base}/{pk}`.
 
-## Recommended: Decorator-based extra endpoints
+## :material-star: Recommended: Decorator-based extra endpoints
 
 Use class method decorators to add non-CRUD endpoints to your ViewSet. This is the preferred way to extend a ViewSet with custom routes. The decorators lazily bind instance methods to the router and ensure correct OpenAPI signatures (no `self` in parameters).
 
@@ -69,7 +69,7 @@ Notes:
 - Sync methods are executed via `sync_to_async` automatically.
 - Signatures and type hints are preserved for OpenAPI (excluding `self`).
 
-## Legacy: views() method (still supported)
+## :material-history: Legacy: views() method (still supported)
 
 The previous pattern of injecting endpoints inside `views()` is still supported, but the decorator-based approach above is now recommended.
 
@@ -92,7 +92,7 @@ class ArticleViewSet(APIViewSet):
             return {"message": "published"}
 ```
 
-## Core Attributes
+## :material-cog: Core Attributes
 
 | Attribute                   | Type                          | Default                                            | Description                                                             |
 | --------------------------- | ----------------------------- | -------------------------------------------------- | ----------------------------------------------------------------------- |
@@ -118,7 +118,7 @@ class ArticleViewSet(APIViewSet):
 | `model_verbose_name`        | `str`                         | `""`                                               | Override model verbose name for display                                 |
 | `model_verbose_name_plural` | `str`                         | `""`                                               | Override model verbose name plural for display                          |
 
-## Authentication Attributes
+## :material-shield-lock: Authentication Attributes
 
 | Attribute     | Type           | Default   | Description              |
 | ------------- | -------------- | --------- | ------------------------ |
@@ -134,7 +134,7 @@ Resolution rules:
 - `None` makes the endpoint public (no authentication).
 - M2M endpoints use relation-level auth (`m2m_data.auth`) or fall back to `m2m_auth`.
 
-## Transaction Management
+## :material-database-sync: Transaction Management
 
 Create, update, and delete operations are automatically wrapped in atomic transactions using the `@aatomic` decorator. This ensures that database operations are rolled back on exceptions:
 
@@ -146,7 +146,7 @@ class ArticleViewSet(APIViewSet):
 
 The transaction behavior is applied by default. Custom decorators can be added via `extra_decorators` attribute.
 
-## Automatic Schema Generation
+## :material-file-document-edit: Automatic Schema Generation
 
 If `model` is a subclass of `ModelSerializerMeta`:
 
@@ -212,7 +212,7 @@ Endpoints behavior:
 - `GET /articles/` returns `[{"id": 1, "title": "...", "summary": "..."}, ...]`
 - `GET /articles/1` returns `{"id": 1, "title": "...", "summary": "...", "content": "...", "author": {...}, "tags": [...]}`
 
-## List Filtering
+## :material-filter: List Filtering
 
 Define filters for the list view with `query_params`:
 
@@ -241,7 +241,7 @@ async def query_params_handler(self, queryset, filters: dict):
 
 A dynamic Pydantic model (`FiltersSchema`) is built with `pydantic.create_model` from `query_params`.
 
-## List and Retrieve implementations
+## :material-format-list-bulleted: List and Retrieve implementations
 
 List now leverages ModelUtil.get_objects and list_read_s, automatically applying read optimizations and optional filters:
 
@@ -278,7 +278,7 @@ async def retrieve(request, pk: self.path_schema):
 
 - Path schema PK type is inferred from the model’s primary key field.
 
-## Many-to-Many Relations
+## :material-link-variant: Many-to-Many Relations
 
 Relations are declared via `M2MRelationSchema` objects (not tuples). Each schema can include:
 
@@ -529,7 +529,7 @@ M2MRelationSchema(
 
 Note: Decorators are applied in addition to built-in decorators (`unique_view`, `paginate`). The order follows standard Python decorator stacking: decorators listed first are applied outermost.
 
-## Custom Views
+## :material-pencil-plus: Custom Views
 
 Preferred (decorators): see the section above.
 
@@ -543,11 +543,11 @@ def views(self):
         return {"message": f"Total: {total}"}
 ```
 
-## Dynamic View Naming
+## :material-rename-box: Dynamic View Naming
 
 All generated handlers are decorated with `@unique_view(...)` to ensure stable unique function names (prevents collisions and ensures consistent OpenAPI schema generation). Relation endpoints use explicit names like `get_<model>_<rel_path>` and `manage_<model>_<rel_path>`.
 
-## Extra Decorators
+## :material-decagram: Extra Decorators
 
 Apply custom decorators to specific CRUD operations via the `extra_decorators` attribute:
 
@@ -578,7 +578,7 @@ Available decorator fields:
 - `update`: Decorators for update endpoint
 - `delete`: Decorators for delete endpoint
 
-## Overridable Hooks
+## :material-hook: Overridable Hooks
 
 | Hook                                                     | Purpose                         |
 | -------------------------------------------------------- | ------------------------------- |
@@ -586,11 +586,11 @@ Available decorator fields:
 | `query_params_handler(queryset, filters)`                | Apply list filters              |
 | `<related_name>_query_params_handler(queryset, filters)` | Apply relation-specific filters |
 
-## Error Handling
+## :material-alert-circle: Error Handling
 
 All CRUD and M2M endpoints may respond with `GenericMessageSchema` for error codes: 400 (validation), 401 (auth), 404 (not found).
 
-## Performance Tips
+## :material-lightning-bolt: Performance Tips
 
 1. Implement `@classmethod async def queryset_request(cls, request)` in your `ModelSerializer` to prefetch related objects.
 2. Use database indexes on filtered fields (`query_params` and relation `filters`).
@@ -598,7 +598,7 @@ All CRUD and M2M endpoints may respond with `GenericMessageSchema` for error cod
 4. Prefetch reverse relations via `model_util.get_reverse_relations()` (already applied in list view).
 5. Limit slice size for expensive searches if needed (`queryset = queryset[:1000]`).
 
-## Minimal Usage
+## :material-rocket-launch: Minimal Usage
 
 === "Recommended"
     ```python
@@ -640,7 +640,7 @@ All CRUD and M2M endpoints may respond with `GenericMessageSchema` for error cod
 
 Note: prefix and tags are optional. If omitted, the base path is inferred from the model verbose name plural and tags default to the model verbose name.
 
-## Disable Selected Views
+## :material-eye-off: Disable Selected Views
 
 ```python
 @api.viewset(model=User)
@@ -648,7 +648,7 @@ class ReadOnlyUserViewSet(APIViewSet):
     disable = ["create", "update", "delete"]
 ```
 
-## Authentication Example
+## :material-shield-lock: Authentication Example
 
 ```python
 @api.viewset(model=User)
@@ -658,7 +658,7 @@ class UserViewSet(APIViewSet):
     delete_auth = [AdminAuth()]  # delete restricted
 ```
 
-## Complete M2M + Filters Example
+## :material-code-braces: Complete M2M + Filters Example
 
 Recommended:
 
@@ -744,7 +744,7 @@ class UserViewSet(APIViewSet):
 UserViewSet().add_views_to_route()
 ```
 
-## ReadOnlyViewSet
+## :material-eye: ReadOnlyViewSet
 
 ReadOnlyViewSet enables only list and retrieve endpoints.
 
@@ -754,7 +754,7 @@ class MyModelReadOnlyViewSet(ReadOnlyViewSet):
     pass
 ```
 
-## WriteOnlyViewSet
+## :material-pencil: WriteOnlyViewSet
 
 WriteOnlyViewSet enables only create, update, and delete endpoints.
 
@@ -764,9 +764,32 @@ class MyModelWriteOnlyViewSet(WriteOnlyViewSet):
     pass
 ```
 
-## See Also
+## :material-bookshelf: See Also
 
-- [ModelSerializer](../models/model_serializer.md)
-- [Authentication](../authentication.md)
-- [Pagination](../pagination.md)
-- [APIView](api_view.md)
+<div class="grid cards" markdown>
+
+-   :material-database:{ .lg .middle } **ModelSerializer**
+
+    ---
+
+    [:octicons-arrow-right-24: Schema generation](../models/model_serializer.md)
+
+-   :material-shield-lock:{ .lg .middle } **Authentication**
+
+    ---
+
+    [:octicons-arrow-right-24: JWT auth setup](../authentication.md)
+
+-   :material-page-next:{ .lg .middle } **Pagination**
+
+    ---
+
+    [:octicons-arrow-right-24: Custom strategies](../pagination.md)
+
+-   :material-eye:{ .lg .middle } **APIView**
+
+    ---
+
+    [:octicons-arrow-right-24: Simple endpoints](api_view.md)
+
+</div>

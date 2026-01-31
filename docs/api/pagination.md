@@ -1,18 +1,20 @@
-# Pagination
+# :material-page-next: Pagination
 
 Django Ninja Aio CRUD provides built-in async pagination support for efficiently handling large datasets in your API responses.
 
-## Overview
+## :material-format-list-bulleted: Overview
 
 Pagination in Django Ninja Aio CRUD:
 
-- **Fully async** - No blocking database queries
-- **Customizable** - Override default behavior per ViewSet
-- **Type-safe** - Proper type hints and validation
-- **Automatic** - Works out of the box with APIViewSet
-- **Flexible** - Support for multiple pagination styles
+- :material-lightning-bolt: **Fully async** — No blocking database queries
+- :material-cog: **Customizable** — Override default behavior per ViewSet
+- :material-shield-check: **Type-safe** — Proper type hints and validation
+- :material-auto-fix: **Automatic** — Works out of the box with APIViewSet
+- :material-tune: **Flexible** — Support for multiple pagination styles
 
-## Default Pagination
+---
+
+## :material-cog: Default Pagination
 
 ### PageNumberPagination
 
@@ -64,7 +66,9 @@ The default pagination class used by `APIViewSet`.
 | `previous` | `int \| None` | Previous page number (null if first page) |
 | `results`  | `list`        | Array of items for current page           |
 
-## Basic Usage
+---
+
+## :material-rocket-launch: Basic Usage
 
 ### With APIViewSet
 
@@ -115,7 +119,9 @@ async def my_view(request: HttpRequest):
     return result
 ```
 
-## Query Parameters
+---
+
+## :material-filter-variant: Query Parameters
 
 ### page
 
@@ -164,7 +170,9 @@ GET /article/?page=2&page_size=25
 GET /article/?page=1&page_size=100
 ```
 
-## Custom Pagination
+---
+
+## :material-pencil-plus: Custom Pagination
 
 ### Override Default Page Size
 
@@ -197,7 +205,9 @@ class ArticleViewSet(APIViewSet):
     pagination_class = MobilePagination
 ```
 
-## AsyncPaginationBase
+---
+
+## :material-code-braces: AsyncPaginationBase
 
 Base class for creating custom pagination.
 
@@ -252,7 +262,9 @@ async def apaginate_queryset(
 
 Dictionary with pagination metadata and results.
 
-## Custom Pagination Examples
+---
+
+## :material-code-braces: Custom Pagination Examples
 
 ### Cursor-Based Pagination
 
@@ -429,7 +441,9 @@ Link: <http://api.example.com/article/?page=1&page_size=10>; rel="first",
       <http://api.example.com/article/?page=10&page_size=10>; rel="last"
 ```
 
-## Disable Pagination
+---
+
+## :material-eye-off: Disable Pagination
 
 ### For Specific ViewSet
 
@@ -480,7 +494,9 @@ GET /article/?page=1&page_size=10
 GET /article/?all=true
 ```
 
-## Integration with Filtering
+---
+
+## :material-filter: Integration with Filtering
 
 Pagination works seamlessly with query parameter filtering:
 
@@ -510,7 +526,9 @@ GET /article/?is_published=true&category=5&page=2&page_size=20
 
 The filtering is applied first, then pagination is applied to the filtered queryset.
 
-## Performance Optimization
+---
+
+## :material-lightning-bolt: Performance Optimization
 
 ### Count Optimization
 
@@ -607,7 +625,9 @@ class ApproximatePagination(PageNumberPagination):
         # ...
 ```
 
-## Error Handling
+---
+
+## :material-alert-circle: Error Handling
 
 ### Invalid Page Number
 
@@ -653,7 +673,9 @@ class StrictPagination(PageNumberPagination):
         # ...
 ```
 
-## Testing Pagination
+---
+
+## :material-test-tube: Testing Pagination
 
 ```python
 import pytest
@@ -711,7 +733,9 @@ async def test_page_size_limit():
     assert len(data["results"]) <= 100  # Clamped to max_page_size
 ```
 
-## Best Practices
+---
+
+## :material-shield-star: Best Practices
 
 1. **Choose appropriate page size:**
 
@@ -760,12 +784,26 @@ async def test_page_size_limit():
    use_approximate = queryset.count() > 1_000_000
    ```
 
-## See Also
+## :material-bookshelf: See Also
 
-- [API ViewSet](views/api_view_set.md) - Using pagination with ViewSets
-- [Model Util](models/model_util.md) - Query optimization
-- [Authentication](authentication.md) - Securing paginated endpoints
+<div class="grid cards" markdown>
 
----
+-   :material-view-grid:{ .lg .middle } **APIViewSet**
 
-**Next:** Learn about [Authentication](authentication.md) to secure your API endpoints.
+    ---
+
+    [:octicons-arrow-right-24: Using pagination with ViewSets](views/api_view_set.md)
+
+-   :material-database:{ .lg .middle } **ModelUtil**
+
+    ---
+
+    [:octicons-arrow-right-24: Query optimization](models/model_util.md)
+
+-   :material-shield-lock:{ .lg .middle } **Authentication**
+
+    ---
+
+    [:octicons-arrow-right-24: Securing paginated endpoints](authentication.md)
+
+</div>

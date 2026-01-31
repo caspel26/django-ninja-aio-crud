@@ -1,18 +1,20 @@
-# Model Util
+# :material-cog-sync: Model Util
 
 `ModelUtil` is an async utility class that provides high-level CRUD operations and serialization management for Django models and ModelSerializer instances.
 
-## Overview
+## :material-format-list-bulleted: Overview
 
 ModelUtil acts as a bridge between Django Ninja schemas and Django ORM, handling:
 
-- **Data normalization** (input/output)
-- **Relationship resolution** (FK/M2M)
-- **Binary field handling** (base64 encoding/decoding)
-- **Query optimization** (select_related/prefetch_related)
-- **Lifecycle hook invocation** (custom_actions, post_create, queryset_request)
+- :material-swap-horizontal: **Data normalization** — input/output
+- :material-link-variant: **Relationship resolution** — FK/M2M
+- :material-file-image: **Binary field handling** — base64 encoding/decoding
+- :material-lightning-bolt: **Query optimization** — select_related/prefetch_related
+- :material-hook: **Lifecycle hook invocation** — custom_actions, post_create, queryset_request
 
-## Class Definition
+---
+
+## :material-code-braces: Class Definition
 
 ```python
 from ninja_aio.models import ModelUtil
@@ -25,7 +27,7 @@ util = ModelUtil(model, serializer_class=None)
 - `model` (`type[ModelSerializer] | models.Model`): Django model or ModelSerializer subclass
 - `serializer_class` (`Serializer | None`): Optional Serializer class for plain Django models
 
-## Properties
+## :material-format-list-bulleted-type: Properties
 
 ### `with_serializer`
 
@@ -123,7 +125,9 @@ if util.serializer_meta:
     fields = util.serializer_meta.get_fields("create")
 ```
 
-## QuerySet configuration on ModelSerializer
+---
+
+## :material-database-search: QuerySet Configuration on ModelSerializer
 
 You can declare query optimizations directly on your ModelSerializer via a nested QuerySet:
 
@@ -161,7 +165,7 @@ class Book(ModelSerializer):
 - **queryset_request**: applied inside queryset_request hook.
 - **extras**: named configurations available via QueryUtil.SCOPES.
 
-## QueryUtil
+## :material-magnify: QueryUtil
 
 Each ModelSerializer now exposes a query_util helper:
 
@@ -173,7 +177,7 @@ qs = util.apply_queryset_optimizations(MyModel.objects.all(), util.SCOPES.READ)
 - SCOPES: includes READ, QUERYSET_REQUEST, plus any extras you've defined.
 - apply_queryset_optimizations: applies select_related/prefetch_related for a scope.
 
-## Query schemas
+## :material-file-document-edit: Query Schemas
 
 New helper schemas standardize filters and getters:
 
@@ -186,7 +190,9 @@ from ninja_aio.schemas.helpers import (
 )
 ```
 
-## Core Methods
+---
+
+## :material-function-variant: Core Methods
 
 ### `get_objects`
 
@@ -661,7 +667,9 @@ print(name)  # "Blog post"
 # "Update Blog post"
 ```
 
-## CRUD Operations
+---
+
+## :material-sync: CRUD Operations
 
 ### `create_s()`
 
@@ -974,7 +982,9 @@ await util.delete_s(request, pk=1)
 # Logs deletion and clears cache
 ```
 
-## Error Handling
+---
+
+## :material-alert-circle: Error Handling
 
 ModelUtil raises `SerializeError` for various failure scenarios:
 
@@ -1023,7 +1033,7 @@ except SerializeError as e:
     # {"author": "User with id 999 not found"}
 ```
 
-## Performance Optimization
+## :material-lightning-bolt: Performance Optimization
 
 ### Automatic Query Optimization
 
@@ -1070,7 +1080,7 @@ class Article(ModelSerializer):
         )
 ```
 
-## Integration with APIViewSet
+## :material-view-grid: Integration with APIViewSet
 
 ModelUtil is automatically used by APIViewSet:
 
@@ -1085,7 +1095,9 @@ class UserViewSet(APIViewSet):
     # All CRUD operations use ModelUtil methods
 ```
 
-## Complete Example
+---
+
+## :material-code-braces: Complete Example
 
 ```python
 from django.db import models
@@ -1164,7 +1176,7 @@ async def example(request: HttpRequest):
     await util.delete_s(request, created["id"])
 ```
 
-## Best Practices
+## :material-shield-star: Best Practices
 
 1. **Always use with async views:**
 
@@ -1211,7 +1223,20 @@ async def example(request: HttpRequest):
        pass
    ```
 
-## See Also
+## :material-bookshelf: See Also
 
-- [Model Serializer](model_serializer.md) - Define schemas on models
-- [API ViewSet](../views/api_view_set.md) - High-level CRUD views using ModelUtil
+<div class="grid cards" markdown>
+
+-   :material-file-document-edit:{ .lg .middle } **ModelSerializer**
+
+    ---
+
+    [:octicons-arrow-right-24: Define schemas on models](model_serializer.md)
+
+-   :material-view-grid:{ .lg .middle } **APIViewSet**
+
+    ---
+
+    [:octicons-arrow-right-24: High-level CRUD views](../views/api_view_set.md)
+
+</div>

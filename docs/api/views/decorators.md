@@ -1,11 +1,13 @@
-# View decorators
+# :material-decagram: View Decorators
 
 This package provides:
 
-- decorate_view: compose multiple decorators (sync/async views), preserving Python stacking order, and skipping None values.
-- APIViewSet.extra_decorators: declarative per-operation decorators.
+- :material-layers: **decorate_view** — compose multiple decorators (sync/async views), preserving Python stacking order, and skipping None values.
+- :material-cog: **APIViewSet.extra_decorators** — declarative per-operation decorators.
 
-## decorate_view
+---
+
+## :material-layers: decorate_view
 
 Behavior:
 
@@ -43,7 +45,9 @@ async def data(request):
 
 Note: decorate_view does not add an extra wrapper; each decorator should preserve metadata itself (e.g., functools.wraps).
 
-## APIViewSet.extra_decorators
+---
+
+## :material-cog: APIViewSet.extra_decorators
 
 Attach decorators to CRUD operations without redefining views:
 
@@ -63,7 +67,9 @@ class MyViewSet(APIViewSet):
 
 These are applied in combination with built-ins (e.g., unique_view, paginate) using decorate_view in the implementation.
 
-## M2MRelationSchema decorators
+---
+
+## :material-link-variant: M2MRelationSchema Decorators
 
 Apply custom decorators to Many-to-Many relation endpoints via `get_decorators` and `post_decorators`:
 
@@ -80,7 +86,9 @@ M2MRelationSchema(
 
 These decorators are applied alongside built-in decorators (`unique_view`, `paginate`) using `decorate_view`. See [APIViewSet M2M Relations](api_view_set.md#many-to-many-relations) for more details.
 
-## ApiMethodFactory.decorators
+---
+
+## :material-factory: ApiMethodFactory.decorators
 
 Example: use api_get within a ViewSet with extra decorators:
 

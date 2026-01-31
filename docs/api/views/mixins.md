@@ -1,8 +1,9 @@
-# ViewSet Mixins
+# :material-puzzle: ViewSet Mixins
 
-These mixins implement a query_params_handler to apply common filtering patterns to Django QuerySets. Import from `ninja_aio.views.mixins`. Values used for filtering come from validated query params in your viewset’s `query_params`.
+These mixins implement a `query_params_handler` to apply common filtering patterns to Django QuerySets. Import from `ninja_aio.views.mixins`. Values used for filtering come from validated query params in your viewset's `query_params`.
 
-Note: Each mixin overrides `query_params_handler`. When composing multiple mixins, define your own `query_params_handler` and call `super()` in the desired order.
+!!! note
+    Each mixin overrides `query_params_handler`. When composing multiple mixins, define your own `query_params_handler` and call `super()` in the desired order.
 
 ## IcontainsFilterViewSetMixin
 
