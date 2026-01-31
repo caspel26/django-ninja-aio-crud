@@ -1103,8 +1103,10 @@ class SchemaModelConfig(Schema):
         Optional model fields. Type can be any valid type annotation including Union.
     exclude : Optional[List[str]]
         Model fields to exclude.
-    customs : Optional[List[tuple[str, Any, Any]]]
+    customs : Optional[List[tuple[str, Any, Any] | tuple[str, Any]]]
         Custom / synthetic fields. Type can be any valid type annotation including Union.
+        - 2-tuple: (name, type) - required field
+        - 3-tuple: (name, type, default) - optional field with default
     """
 
     fields: Optional[List[str | tuple[str, Any, Any] | tuple[str, Any]]] = None
