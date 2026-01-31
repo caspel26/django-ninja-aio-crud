@@ -1,24 +1,37 @@
-# :material-numeric-1-circle: Step 1: Define Your Model
+<div class="tutorial-hero" markdown>
 
-In this first step, you'll learn how to define Django models using `ModelSerializer`, which allows you to declare schemas directly on your models.
+<span class="step-indicator">Step 1 of 4</span>
 
-## :material-school: What You'll Learn
+# Define Your Model
+
+<p class="tutorial-subtitle">
+Learn how to define Django models using <code>ModelSerializer</code> with automatic schema generation for your API.
+</p>
+
+</div>
+
+<div class="learning-objectives" markdown>
+
+### :material-school: What You'll Learn
 
 - :material-database: How to create a model with `ModelSerializer`
 - :material-file-document-edit: Defining serialization schemas (Create, Read, Update)
-- :material-link-variant: Working with relationships
-- :material-pencil-plus: Adding custom fields
+- :material-link-variant: Working with ForeignKey and ManyToMany relationships
+- :material-pencil-plus: Adding custom computed fields
+- :material-database-search: Query optimizations with `QuerySet`
 - :material-hook: Implementing lifecycle hooks
 
-## Prerequisites
+</div>
 
-Make sure you have:
+<div class="prerequisites" markdown>
 
-- Django 4.1+ installed
-- `django-ninja-aio-crud` installed
-- A Django project set up
+**Prerequisites** — Make sure you have Django 4.1+ installed, `django-ninja-aio-crud` installed, and a Django project set up.
 
-## Basic Model Definition
+</div>
+
+---
+
+## :material-cube-outline: Basic Model Definition
 
 Let's create a simple blog article model:
 
@@ -41,6 +54,8 @@ class Article(ModelSerializer):
 
 !!! tip "Why ModelSerializer?"
     `ModelSerializer` is a powerful mixin that combines Django's `Model` with automatic schema generation capabilities. Instead of creating separate serializer classes, you define everything on the model itself.
+
+---
 
 ## :material-playlist-plus: Adding Serializer Classes
 
@@ -121,7 +136,7 @@ class Article(ModelSerializer):
 ```
 
 !!! note "Auto-generated Fields"
-Fields like `id`, `created_at`, and `updated_at` are automatically handled by Django and shouldn't be in `CreateSerializer.fields`.
+    Fields like `id`, `created_at`, and `updated_at` are automatically handled by Django and shouldn't be in `CreateSerializer.fields`.
 
 ### UpdateSerializer
 
@@ -168,6 +183,8 @@ class Article(ModelSerializer):
   "is_published": true
 }
 ```
+
+---
 
 ## :material-link-variant: Working with Relationships
 
@@ -255,7 +272,7 @@ class Article(ModelSerializer):
 ```
 
 !!! tip "Automatic Nested Serialization"
-When `Author` is also a `ModelSerializer`, Django Ninja Aio CRUD automatically serializes it in the response!
+    When `Author` is also a `ModelSerializer`, Django Ninja Aio CRUD automatically serializes it in the response!
 
 ### ManyToMany Relationships
 
@@ -335,6 +352,8 @@ class Article(ModelSerializer):
 }
 ```
 
+---
+
 ## :material-pencil-plus: Adding Custom Fields
 
 Sometimes you need computed or synthetic fields in your API responses:
@@ -385,7 +404,9 @@ class Article(ModelSerializer):
 ```
 
 !!! info "Custom Fields in CreateSerializer"
-Custom fields in `CreateSerializer` are used for **instructions** (like flags or metadata), not stored in the database. They're passed to `custom_actions()` hook.
+    Custom fields in `CreateSerializer` are used for **instructions** (like flags or metadata), not stored in the database. They're passed to `custom_actions()` hook.
+
+---
 
 ## :material-database-search: Query Optimizations (QuerySet)
 
@@ -424,6 +445,8 @@ qs = Article.query_util.apply_queryset_optimizations(
 )
 ```
 
+---
+
 ## :material-cog-sync: Fetch and Serialize with ModelUtil
 
 ```python
@@ -448,6 +471,8 @@ item = await util.read_s(
     is_for_read=True,
 )
 ```
+
+---
 
 ## :material-hook: Lifecycle Hooks
 
@@ -537,6 +562,8 @@ class Article(ModelSerializer):
     **Create**: `on_create_before_save()` → `before_save()` → `save()` → `on_create_after_save()` → `after_save()` → `custom_actions()` → `post_create()`
 
     **Update**: `before_save()` → `save()` → `after_save()` → `custom_actions()`
+
+---
 
 ## :material-code-braces: Complete Example
 
@@ -702,6 +729,8 @@ Here's a complete blog model with all features:
             return self.title
     ```
 
+---
+
 ## :material-database-sync: Run Migrations
 
 After defining your models, create and run migrations:
@@ -714,18 +743,37 @@ python manage.py makemigrations
 python manage.py migrate
 ```
 
-## :material-arrow-right-circle: Next Steps
+---
 
-Now that you have your models defined, let's create CRUD views in [Step 2: Create CRUD Views](crud.md).
+<div class="next-step" markdown>
 
-!!! success "What You've Learned"
-    - :material-check: Creating models with `ModelSerializer`
-    - :material-check: Defining Read, Create, and Update serializers
-    - :material-check: Working with ForeignKey and ManyToMany relationships
-    - :material-check: Adding custom computed fields
-    - :material-check: Implementing lifecycle hooks
+**Ready for the next step?**
 
-## :material-bookshelf: See Also
+Now that you have your models defined, let's create CRUD views!
 
-- [ModelSerializer API Reference](../api/models/model_serializer.md) — Complete API documentation
-- [ModelUtil API Reference](../api/models/model_util.md) — Utility methods
+[Step 2: Create CRUD Views :material-arrow-right:](crud.md){ .md-button .md-button--primary }
+
+</div>
+
+<div class="summary-checklist" markdown>
+
+### :material-check-all: What You've Learned
+
+- :material-check: Creating models with `ModelSerializer`
+- :material-check: Defining Read, Create, and Update serializers
+- :material-check: Working with ForeignKey and ManyToMany relationships
+- :material-check: Adding custom computed fields
+- :material-check: Configuring query optimizations
+- :material-check: Implementing lifecycle hooks
+
+</div>
+
+<div class="grid cards" markdown>
+
+-   :material-book-open-variant:{ .lg .middle } **API Reference**
+
+    ---
+
+    [:octicons-arrow-right-24: ModelSerializer](../api/models/model_serializer.md) &middot; [:octicons-arrow-right-24: ModelUtil](../api/models/model_util.md)
+
+</div>
