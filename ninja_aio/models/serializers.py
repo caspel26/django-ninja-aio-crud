@@ -915,9 +915,7 @@ class BaseSerializer:
         fields = cls.get_fields(s_type)
         optionals = cls.get_optional_fields(s_type)
         customs = (
-            cls.get_custom_fields(s_type)
-            + optionals
-            + cls.get_inline_customs(s_type)
+            cls.get_custom_fields(s_type) + optionals + cls.get_inline_customs(s_type)
         )
         excludes = cls.get_excluded_fields(s_type)
 
@@ -1427,6 +1425,24 @@ class Serializer(BaseSerializer, metaclass=SerializerMeta):
         relations_serializers: dict[str, "Serializer"] = {}
         relations_as_id: list[str] = []
 
+    def _parse_payload(self, payload: dict[str, Any] | Schema) -> dict[str, Any]:
+        """
+        Parse and return the input payload.
+
+        Can be overridden to implement custom parsing logic.
+
+        Parameters
+        ----------
+        payload : dict | Schema
+            Input data.
+
+        Returns
+        -------
+        dict
+            Parsed payload.
+        """
+        return payload.model_dump() if isinstance(payload, Schema) else payload
+
     @classmethod
     def _get_relations_as_id(cls) -> list[str]:
         """
@@ -1606,13 +1622,13 @@ class Serializer(BaseSerializer, metaclass=SerializerMeta):
         self.after_save(instance)
         return instance
 
-    async def create(self, payload: dict[str, Any]) -> models.Model:
+    async def create(self, payload: dict[str, Any] | Schema) -> models.Model:
         """
         Create a new model instance from the provided payload.
 
         Parameters
         ----------
-        payload : dict
+        payload : dict | Schema
             Input data.
 
         Returns
@@ -1620,11 +1636,11 @@ class Serializer(BaseSerializer, metaclass=SerializerMeta):
         models.Model
             Created model instance.
         """
-        instance: models.Model = self.model(**payload)
+        instance: models.Model = self.model(**self._parse_payload(payload))
         return await self.save(instance)
 
     async def update(
-        self, instance: models.Model, payload: dict[str, Any]
+        self, instance: models.Model, payload: dict[str, Any] | Schema
     ) -> models.Model:
         """
         Update an existing model instance with the provided payload.
@@ -1633,7 +1649,7 @@ class Serializer(BaseSerializer, metaclass=SerializerMeta):
         ----------
         instance : models.Model
             The model instance to update.
-        payload : dict
+        payload : dict | Schema
             Input data.
 
         Returns
@@ -1641,7 +1657,7 @@ class Serializer(BaseSerializer, metaclass=SerializerMeta):
         models.Model
             Updated model instance.
         """
-        for attr, value in payload.items():
+        for attr, value in self._parse_payload(payload).items():
             setattr(instance, attr, value)
         return await self.save(instance)
 
