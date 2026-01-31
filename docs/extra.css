@@ -12,3 +12,56 @@
   height: 2.0rem;
   width: 2.0rem;
 }
+
+/* Hero section */
+.md-typeset .hero {
+  text-align: center;
+  padding: 2rem 0 1rem;
+}
+.md-typeset .hero h1 {
+  font-size: 2.4rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+.md-typeset .hero p.subtitle {
+  font-size: 1.15rem;
+  opacity: 0.8;
+  margin-bottom: 1.5rem;
+}
+
+/* Badge row */
+.md-typeset .badges {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+.md-typeset .badges a {
+  display: inline-block;
+  margin: 0.15rem;
+}
+
+/* Card grid polish */
+.md-typeset .grid.cards > ul > li {
+  border-radius: 10px;
+  transition: box-shadow 0.25s ease, transform 0.25s ease;
+}
+.md-typeset .grid.cards > ul > li:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+[data-md-color-scheme="slate"] .md-typeset .grid.cards > ul > li:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+
+/* Better inline code */
+.md-typeset code {
+  border-radius: 4px;
+}
+
+/* CTA buttons */
+.md-typeset .cta-buttons {
+  text-align: center;
+  margin: 1.5rem 0 2.5rem;
+}
+.md-typeset .cta-buttons a.md-button {
+  margin: 0.3rem;
+}

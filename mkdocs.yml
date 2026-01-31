@@ -28,6 +28,7 @@ nav:
       - Serializer (Meta-driven): api/models/serializers.md
     - Authentication: api/authentication.md
     - Pagination: api/pagination.md
+    - Renderers: api/renderers/orjson_renderer.md
   - Authentication:
       - JWT & AsyncJwtBearer: auth.md
   - Contributing: contributing.md
@@ -70,6 +71,7 @@ theme:
     - navigation.footer
     - navigation.sections
     - navigation.indexes
+    - navigation.expand
     - header.autohide
     - toc.follow
     - toc.integrate
@@ -153,6 +155,10 @@ markdown_extensions:
   - pymdownx.tilde
   - pymdownx.caret
   - pymdownx.mark
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - md_in_html
 
 extra_css:
   - extra.css
