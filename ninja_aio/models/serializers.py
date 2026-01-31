@@ -104,12 +104,43 @@ class BaseSerializer:
 
     @classmethod
     def _get_fields(cls, s_type: type[S_TYPES], f_type: type[F_TYPES]):
-        # Subclasses provide implementation.
+        """
+        Return raw configuration list for the given serializer/field category.
+
+        Parameters
+        ----------
+        s_type : S_TYPES
+            Serializer type (``"create"`` | ``"update"`` | ``"read"`` | ``"detail"``).
+        f_type : F_TYPES
+            Field category (``"fields"`` | ``"optionals"`` | ``"customs"`` | ``"excludes"``).
+
+        Returns
+        -------
+        list
+            Raw configuration list for the requested category.
+
+        Raises
+        ------
+        NotImplementedError
+            Subclasses must provide an implementation.
+        """
         raise NotImplementedError
 
     @classmethod
     def _get_model(cls) -> models.Model:
-        # Subclasses provide implementation.
+        """
+        Return the Django model class associated with this serializer.
+
+        Returns
+        -------
+        models.Model
+            The Django model class.
+
+        Raises
+        ------
+        NotImplementedError
+            Subclasses must provide an implementation.
+        """
         raise NotImplementedError
 
     @classmethod
@@ -246,12 +277,32 @@ class BaseSerializer:
 
     @classmethod
     def _get_relations_serializers(cls) -> dict[str, "Serializer"]:
-        # Optional in subclasses. Default to no explicit relation serializers.
+        """
+        Return mapping of relation field names to their serializer classes.
+
+        Subclasses may override to provide explicit serializer mappings for
+        relation fields used during read schema generation.
+
+        Returns
+        -------
+        dict[str, Serializer]
+            Mapping of field name to serializer class. Empty by default.
+        """
         return {}
 
     @classmethod
     def _get_relations_as_id(cls) -> list[str]:
-        # Optional in subclasses. Default to no relations as ID.
+        """
+        Return relation field names that should be serialized as IDs.
+
+        Subclasses may override to specify which relation fields should be
+        represented as primary key values instead of nested objects.
+
+        Returns
+        -------
+        list[str]
+            Field names to serialize as IDs. Empty by default.
+        """
         return []
 
     @classmethod
@@ -330,17 +381,50 @@ class BaseSerializer:
     def _is_special_field(
         cls, s_type: type[S_TYPES], field: str, f_type: type[F_TYPES]
     ) -> bool:
-        """Return True if field appears in the given category for s_type."""
+        """
+        Check whether a field appears in the given category for a serializer type.
+
+        Parameters
+        ----------
+        s_type : S_TYPES
+            Serializer type (``"create"`` | ``"update"`` | ``"read"`` | ``"detail"``).
+        field : str
+            The field name to look up.
+        f_type : F_TYPES
+            Field category (``"fields"`` | ``"optionals"`` | ``"customs"`` | ``"excludes"``).
+
+        Returns
+        -------
+        bool
+            ``True`` if the field is found in the specified category.
+        """
         special_fields = cls._get_fields(s_type, f_type)
         return any(field in special_f for special_f in special_fields)
 
     @classmethod
     def get_custom_fields(cls, s_type: type[S_TYPES]) -> list[tuple[str, type, Any]]:
         """
-        Normalize declared custom field specs into (name, py_type, default).
+        Normalize declared custom field specs into ``(name, py_type, default)`` tuples.
+
         Accepted tuple shapes:
-        - (name, py_type, default)
-        - (name, py_type) -> default Ellipsis (required)
+
+        - ``(name, py_type, default)`` -- field with explicit default.
+        - ``(name, py_type)`` -- required field (default set to ``Ellipsis``).
+
+        Parameters
+        ----------
+        s_type : S_TYPES
+            Serializer type whose custom fields to retrieve.
+
+        Returns
+        -------
+        list[tuple[str, type, Any]]
+            Normalized list of ``(name, type, default)`` tuples.
+
+        Raises
+        ------
+        ValueError
+            If a custom field spec is not a tuple or has an invalid length.
         """
         raw_customs = cls._get_fields(s_type, "customs") or []
         normalized: list[tuple[str, Any, Any]] = []
@@ -362,7 +446,19 @@ class BaseSerializer:
 
     @classmethod
     def get_optional_fields(cls, s_type: type[S_TYPES]):
-        """Return optional field specs normalized to (name, type, None)."""
+        """
+        Return optional field specs normalized to ``(name, type, None)`` tuples.
+
+        Parameters
+        ----------
+        s_type : S_TYPES
+            Serializer type whose optional fields to retrieve.
+
+        Returns
+        -------
+        list[tuple[str, type, None]]
+            Normalized list where each entry defaults to ``None``.
+        """
         return [
             (field, field_type, None)
             for field, field_type in cls._get_fields(s_type, "optionals")
@@ -370,12 +466,39 @@ class BaseSerializer:
 
     @classmethod
     def get_excluded_fields(cls, s_type: S_TYPES):
-        """Return excluded field names for the serializer type."""
+        """
+        Return excluded field names for the given serializer type.
+
+        Parameters
+        ----------
+        s_type : S_TYPES
+            Serializer type whose exclusions to retrieve.
+
+        Returns
+        -------
+        list[str]
+            Field names excluded from schema generation.
+        """
         return cls._get_fields(s_type, "excludes")
 
     @classmethod
     def get_fields(cls, s_type: S_TYPES):
-        """Return explicit declared field names for the serializer type (excludes inline customs)."""
+        """
+        Return explicit declared field names for the serializer type.
+
+        Filters out inline custom field tuples from the fields list, returning
+        only string field names.
+
+        Parameters
+        ----------
+        s_type : S_TYPES
+            Serializer type whose fields to retrieve.
+
+        Returns
+        -------
+        list[str]
+            Model field names (excludes inline custom tuples).
+        """
         fields = cls._get_fields(s_type, "fields")
         # Filter out inline custom field tuples, return only string field names
         return [f for f in fields if isinstance(f, str)]
@@ -411,14 +534,40 @@ class BaseSerializer:
 
     @classmethod
     def is_custom(cls, field: str) -> bool:
-        """True if field is declared as a custom input in create or update."""
+        """
+        Check if a field is declared as a custom input in create or update.
+
+        Parameters
+        ----------
+        field : str
+            The field name to check.
+
+        Returns
+        -------
+        bool
+            ``True`` if the field appears in the customs category for either
+            ``create`` or ``update`` serializer types.
+        """
         return cls._is_special_field(
             "create", field, "customs"
         ) or cls._is_special_field("update", field, "customs")
 
     @classmethod
     def is_optional(cls, field: str) -> bool:
-        """True if field is declared as optional in create or update."""
+        """
+        Check if a field is declared as optional in create or update.
+
+        Parameters
+        ----------
+        field : str
+            The field name to check.
+
+        Returns
+        -------
+        bool
+            ``True`` if the field appears in the optionals category for either
+            ``create`` or ``update`` serializer types.
+        """
         return cls._is_special_field(
             "create", field, "optionals"
         ) or cls._is_special_field("update", field, "optionals")
@@ -531,7 +680,20 @@ class BaseSerializer:
 
     @classmethod
     def _is_reverse_relation(cls, field_obj) -> bool:
-        """Check if field is a reverse relation (M2M, reverse FK, reverse O2O)."""
+        """
+        Check if a field descriptor represents a reverse relation.
+
+        Parameters
+        ----------
+        field_obj : Any
+            Django model field descriptor.
+
+        Returns
+        -------
+        bool
+            ``True`` if the descriptor is a ``ManyToManyDescriptor``,
+            ``ReverseManyToOneDescriptor``, or ``ReverseOneToOneDescriptor``.
+        """
         return isinstance(
             field_obj,
             (
@@ -543,14 +705,39 @@ class BaseSerializer:
 
     @classmethod
     def _is_forward_relation(cls, field_obj) -> bool:
-        """Check if field is a forward relation (FK, O2O)."""
+        """
+        Check if a field descriptor represents a forward relation.
+
+        Parameters
+        ----------
+        field_obj : Any
+            Django model field descriptor.
+
+        Returns
+        -------
+        bool
+            ``True`` if the descriptor is a ``ForwardOneToOneDescriptor``
+            or ``ForwardManyToOneDescriptor``.
+        """
         return isinstance(
             field_obj, (ForwardOneToOneDescriptor, ForwardManyToOneDescriptor)
         )
 
     @classmethod
     def _warn_missing_relation_serializer(cls, field_name: str, model) -> None:
-        """Emit warning for reverse relations without explicit serializer mapping."""
+        """
+        Emit a warning for reverse relations without an explicit serializer mapping.
+
+        Only warns when the related model is not a ``ModelSerializer`` and the
+        ``NINJA_AIO_RAISE_SERIALIZATION_WARNINGS`` setting is enabled (default).
+
+        Parameters
+        ----------
+        field_name : str
+            Name of the reverse relation field.
+        model : type
+            The Django model class owning the field.
+        """
         if not isinstance(model, ModelSerializerMeta) and getattr(
             settings, "NINJA_AIO_RAISE_SERIALIZATION_WARNINGS", True
         ):
@@ -675,8 +862,23 @@ class BaseSerializer:
         depth: int = None,
     ) -> Schema:
         """
-        Core schema factory bridging configuration to ninja.orm.create_schema.
-        Handles In/Patch/Out/Related.
+        Core schema factory bridging serializer configuration to ``ninja.orm.create_schema``.
+
+        Dispatches to the appropriate field/custom/exclude gathering logic based
+        on the requested schema type and delegates to Django Ninja's
+        ``create_schema`` for the actual Pydantic model construction.
+
+        Parameters
+        ----------
+        schema_type : SCHEMA_TYPES
+            One of ``"In"``, ``"Patch"``, ``"Out"``, ``"Detail"``, or ``"Related"``.
+        depth : int, optional
+            Nesting depth for related model schemas (used by ``Out`` and ``Detail``).
+
+        Returns
+        -------
+        Schema | None
+            Generated Pydantic schema, or ``None`` if no fields are configured.
         """
         model = cls._get_model()
 
@@ -780,27 +982,78 @@ class BaseSerializer:
 
     @classmethod
     def generate_read_s(cls, depth: int = 1) -> Schema:
-        """Generate read (Out) schema."""
+        """
+        Generate the read (Out) schema for list responses.
+
+        Parameters
+        ----------
+        depth : int, optional
+            Nesting depth for related models. Defaults to ``1``.
+
+        Returns
+        -------
+        Schema | None
+            Generated Pydantic schema, or ``None`` if no read fields are configured.
+        """
         return cls._generate_model_schema("Out", depth)
 
     @classmethod
     def generate_detail_s(cls, depth: int = 1) -> Schema:
-        """Generate detail (single object Out) schema."""
+        """
+        Generate the detail (single-object) read schema.
+
+        Falls back to the standard read schema if no detail-specific
+        configuration is defined.
+
+        Parameters
+        ----------
+        depth : int, optional
+            Nesting depth for related models. Defaults to ``1``.
+
+        Returns
+        -------
+        Schema
+            Generated Pydantic schema (never ``None``; falls back to read schema).
+        """
         return cls._generate_model_schema("Detail", depth) or cls.generate_read_s(depth)
 
     @classmethod
     def generate_create_s(cls) -> Schema:
-        """Generate create (In) schema."""
+        """
+        Generate the create (In) schema for input validation.
+
+        Returns
+        -------
+        Schema | None
+            Generated Pydantic schema, or ``None`` if no create fields are configured.
+        """
         return cls._generate_model_schema("In")
 
     @classmethod
     def generate_update_s(cls) -> Schema:
-        """Generate update (Patch) schema."""
+        """
+        Generate the update (Patch) schema for partial updates.
+
+        Returns
+        -------
+        Schema | None
+            Generated Pydantic schema, or ``None`` if no update fields are configured.
+        """
         return cls._generate_model_schema("Patch")
 
     @classmethod
     def generate_related_s(cls) -> Schema:
-        """Generate related (nested) schema."""
+        """
+        Generate the related (nested) schema for embedding in parent schemas.
+
+        Includes only non-relational model fields and custom fields, preventing
+        infinite nesting of related objects.
+
+        Returns
+        -------
+        Schema | None
+            Generated Pydantic schema, or ``None`` if no fields are configured.
+        """
         return cls._generate_model_schema("Related")
 
     @classmethod
@@ -861,8 +1114,8 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
             Disallowed model fields on create (e.g., id, timestamps).
         """
 
-        fields: list[str | tuple[str, Any, Any]] = []
-        customs: list[tuple[str, Any, Any]] = []
+        fields: list[str | tuple[str, Any, Any] | tuple[str, Any]] = []
+        customs: list[tuple[str, Any, Any] | tuple[str, Any]] = []
         optionals: list[tuple[str, Any]] = []
         excludes: list[str] = []
 
@@ -883,8 +1136,8 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
             Relation fields to serialize as IDs instead of nested objects.
         """
 
-        fields: list[str | tuple[str, Any, Any]] = []
-        customs: list[tuple[str, Any, Any]] = []
+        fields: list[str | tuple[str, Any, Any] | tuple[str, Any]] = []
+        customs: list[tuple[str, Any, Any] | tuple[str, Any]] = []
         optionals: list[tuple[str, Any]] = []
         excludes: list[str] = []
         relations_as_id: list[str] = []
@@ -904,8 +1157,8 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
             Optional output fields.
         """
 
-        fields: list[str | tuple[str, Any, Any]] = []
-        customs: list[tuple[str, Any, Any]] = []
+        fields: list[str | tuple[str, Any, Any] | tuple[str, Any]] = []
+        customs: list[tuple[str, Any, Any] | tuple[str, Any]] = []
         optionals: list[tuple[str, Any]] = []
         excludes: list[str] = []
 
@@ -939,7 +1192,16 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
 
     @classmethod
     def _get_relations_as_id(cls) -> list[str]:
-        """Return relation fields to serialize as IDs instead of nested objects."""
+        """
+        Return relation fields to serialize as primary key values.
+
+        Reads the ``relations_as_id`` attribute from ``ReadSerializer``.
+
+        Returns
+        -------
+        list[str]
+            Field names whose related objects should be serialized as IDs.
+        """
         return getattr(cls.ReadSerializer, "relations_as_id", [])
 
     @classmethod
@@ -970,17 +1232,30 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
 
     @classmethod
     def _get_model(cls) -> "ModelSerializer":
-        """Return the model class itself."""
+        """
+        Return the model class itself.
+
+        Since ``ModelSerializer`` is mixed directly into the model, the model
+        class is the serializer class.
+
+        Returns
+        -------
+        ModelSerializer
+            The model/serializer class.
+        """
         return cls
 
     @classmethod
     def verbose_name_path_resolver(cls) -> str:
         """
-        Slugify plural verbose name for URL path segment.
+        Slugify the plural verbose name for use as a URL path segment.
+
+        Replaces spaces with hyphens in the model's ``verbose_name_plural``.
 
         Returns
         -------
         str
+            Hyphen-separated URL-safe path segment.
         """
         return "-".join(cls._meta.verbose_name_plural.split(" "))
 
@@ -1154,24 +1429,76 @@ class Serializer(BaseSerializer, metaclass=SerializerMeta):
 
     @classmethod
     def _get_relations_as_id(cls) -> list[str]:
+        """
+        Return relation fields to serialize as primary key values.
+
+        Reads the ``relations_as_id`` attribute from ``Meta``.
+
+        Returns
+        -------
+        list[str]
+            Field names whose related objects should be serialized as IDs.
+        """
         relations_as_id = cls._get_meta_data("relations_as_id")
         return relations_as_id or []
 
     @classmethod
     def _get_meta_data(cls, attr_name: str) -> Any:
+        """
+        Retrieve an attribute from the nested ``Meta`` class.
+
+        Parameters
+        ----------
+        attr_name : str
+            Name of the ``Meta`` attribute to look up.
+
+        Returns
+        -------
+        Any
+            The attribute value, or ``None`` if not defined.
+        """
         return getattr(cls.Meta, attr_name, None)
 
     @classmethod
     def _get_model(cls) -> models.Model:
+        """
+        Return the Django model class from ``Meta.model``.
+
+        Returns
+        -------
+        models.Model
+            The validated Django model class.
+        """
         return cls._validate_model()
 
     @classmethod
     def _get_relations_serializers(cls) -> dict[str, "Serializer"]:
+        """
+        Return the explicit relation-to-serializer mapping from ``Meta``.
+
+        Returns
+        -------
+        dict[str, Serializer]
+            Mapping of relation field names to serializer classes.
+        """
         relations_serializers = cls._get_meta_data("relations_serializers")
         return relations_serializers or {}
 
     @classmethod
     def _get_schema_meta(cls, schema_type: str) -> SchemaModelConfig | None:
+        """
+        Retrieve the ``SchemaModelConfig`` for the given schema type.
+
+        Parameters
+        ----------
+        schema_type : str
+            One of ``"in"``, ``"out"``, ``"update"``, or ``"detail"``.
+
+        Returns
+        -------
+        SchemaModelConfig | None
+            The configuration object, or ``None`` if not defined.
+        """
         match schema_type:
             case "in":
                 return cls._get_meta_data("schema_in")
@@ -1186,6 +1513,19 @@ class Serializer(BaseSerializer, metaclass=SerializerMeta):
 
     @classmethod
     def _validate_model(cls):
+        """
+        Validate and return the model defined in ``Meta.model``.
+
+        Returns
+        -------
+        models.Model
+            The validated Django model class.
+
+        Raises
+        ------
+        ValueError
+            If ``Meta.model`` is not defined or is not a Django model subclass.
+        """
         model = cls._get_meta_data("model")
         if not model:
             raise ValueError("Meta.model must be defined for Serializer.")
@@ -1195,7 +1535,23 @@ class Serializer(BaseSerializer, metaclass=SerializerMeta):
 
     @classmethod
     def _get_fields(cls, s_type: type[S_TYPES], f_type: type[F_TYPES]):
-        """Internal accessor for raw configuration lists from Meta schemas."""
+        """
+        Return raw configuration list from the Meta schema for the given categories.
+
+        Falls back to the ``out`` schema when ``detail`` is requested but not defined.
+
+        Parameters
+        ----------
+        s_type : S_TYPES
+            Serializer type (``"create"`` | ``"update"`` | ``"read"`` | ``"detail"``).
+        f_type : F_TYPES
+            Field category (``"fields"`` | ``"optionals"`` | ``"customs"`` | ``"excludes"``).
+
+        Returns
+        -------
+        list
+            Raw configuration list, or empty list if not configured.
+        """
         schema_key = cls._SCHEMA_META_MAP.get(s_type)
         if not schema_key:
             return []
