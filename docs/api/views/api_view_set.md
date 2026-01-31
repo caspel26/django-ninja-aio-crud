@@ -601,7 +601,7 @@ All CRUD and M2M endpoints may respond with `GenericMessageSchema` for error cod
 ## Minimal Usage
 
 === "Recommended"
-    ````python
+    ```python
     from ninja_aio import NinjaAIO
     from ninja_aio.views import APIViewSet
     from .models import User
