@@ -29,6 +29,7 @@ nav:
       - ModelSerializer: api/models/model_serializer.md
       - ModelUtil: api/models/model_util.md
       - Serializer (Meta-driven): api/models/serializers.md
+      - Validators: api/models/validators.md
     - Authentication: api/authentication.md
     - Pagination: api/pagination.md
     - Renderers: api/renderers/orjson_renderer.md
