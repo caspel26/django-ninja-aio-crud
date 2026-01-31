@@ -1,15 +1,15 @@
-# Step 4: Add Filtering & Pagination
+# :material-numeric-4-circle: Step 4: Add Filtering & Pagination
 
 In this final step, you'll learn how to implement advanced filtering, searching, and pagination for your API endpoints.
 
-## What You'll Learn
+## :material-school: What You'll Learn
 
-- Query parameter filtering
-- Full-text search
-- Ordering and sorting
-- Custom pagination
-- Filter combinations
-- Performance optimization
+- :material-filter: Query parameter filtering
+- :material-magnify: Full-text search
+- :material-sort: Ordering and sorting
+- :material-page-next: Custom pagination
+- :material-set-merge: Filter combinations
+- :material-lightning-bolt: Performance optimization
 
 ## Prerequisites
 
@@ -19,7 +19,7 @@ Make sure you've completed:
 - [Step 2: Create CRUD Views](crud.md)
 - [Step 3: Add Authentication](authentication.md)
 
-## Basic Filtering
+## :material-filter: Basic Filtering
 
 ### Simple Field Filters
 
@@ -169,7 +169,7 @@ GET /api/article/?min_rating=4.5
 GET /api/article/?min_views=100&max_views=1000
 ```
 
-## Search Functionality
+## :material-magnify: Search Functionality
 
 ### Simple Text Search
 
@@ -273,7 +273,7 @@ class ArticleViewSet(APIViewSet):
         return queryset
 ```
 
-## Ordering
+## :material-sort: Ordering
 
 ### Basic Ordering
 
@@ -369,7 +369,7 @@ GET /api/article/?ordering=-created_at,title
 GET /api/article/?ordering=-views,-rating
 ```
 
-## Advanced Filtering
+## :material-filter-variant-plus: Advanced Filtering
 
 ### Related Field Filters
 
@@ -514,7 +514,7 @@ GET /api/article/?exclude_author=5
 GET /api/article/?exclude_ids=1,2,3
 ```
 
-## Pagination
+## :material-page-next: Pagination
 
 ### Default Pagination
 
@@ -590,7 +590,7 @@ class ConditionalPagination(PageNumberPagination):
         return await super().apaginate_queryset(queryset, pagination, request, **params)
 ```
 
-## Filter Presets
+## :material-bookmark-multiple: Filter Presets
 
 Create reusable filter combinations:
 
@@ -657,7 +657,7 @@ GET /api/article/?preset=featured
 GET /api/article/?preset=recent&category=1
 ```
 
-## Performance Optimization
+## :material-lightning-bolt: Performance Optimization
 
 ### Select Related
 
@@ -722,7 +722,7 @@ class ArticleViewSet(APIViewSet):
         return queryset
 ```
 
-## Complete Example
+## :material-code-braces: Complete Example
 
 Here's a comprehensive filtering implementation:
 
@@ -874,7 +874,7 @@ class ArticleViewSet(APIViewSet):
 ArticleViewSet().add_views_to_route()
 ```
 
-## Testing Filters
+## :material-test-tube: Testing Filters
 
 ```bash
 # Basic filtering
@@ -902,27 +902,46 @@ curl "http://localhost:8000/api/article/?page=2&page_size=50"
 curl "http://localhost:8000/api/article/?search=tutorial&category=1&is_published=true&min_views=1000&ordering=-rating&page=1&page_size=20"
 ```
 
-## Congratulations! 🎉
+## :material-party-popper: Congratulations!
 
 You've completed all tutorial steps and built a complete, production-ready API with:
 
-- ✅ Models with automatic schema generation
-- ✅ Full CRUD operations
-- ✅ JWT authentication
-- ✅ Custom schemas and validation
-- ✅ Advanced filtering and search
-- ✅ Pagination
-- ✅ Performance optimization
+- :material-check: Models with automatic schema generation
+- :material-check: Full CRUD operations
+- :material-check: JWT authentication
+- :material-check: Custom schemas and validation
+- :material-check: Advanced filtering and search
+- :material-check: Pagination
+- :material-check: Performance optimization
 
-## Next Steps
+## :material-arrow-right-circle: Next Steps
 
 Explore advanced topics:
 
-- [API Reference](../api/views/api_view_set.md) - Complete API documentation
-- [Authentication](../api/authentication.md) - Advanced auth patterns
-- [Pagination](../api/pagination.md) - Custom pagination strategies
+<div class="grid cards" markdown>
 
-## See Also
+-   :material-book-open-variant:{ .lg .middle } **API Reference**
 
-- [Pagination API Reference](../api/pagination.md) - Pagination classes
-- [ModelUtil](../api/models/model_util.md) - Query optimization
+    ---
+
+    [:octicons-arrow-right-24: Complete documentation](../api/views/api_view_set.md)
+
+-   :material-shield-lock:{ .lg .middle } **Authentication**
+
+    ---
+
+    [:octicons-arrow-right-24: Advanced auth patterns](../api/authentication.md)
+
+-   :material-page-next:{ .lg .middle } **Pagination**
+
+    ---
+
+    [:octicons-arrow-right-24: Custom strategies](../api/pagination.md)
+
+-   :material-database-search:{ .lg .middle } **ModelUtil**
+
+    ---
+
+    [:octicons-arrow-right-24: Query optimization](../api/models/model_util.md)
+
+</div>

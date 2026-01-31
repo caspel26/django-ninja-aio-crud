@@ -1,15 +1,15 @@
-# Step 2: Create CRUD Views
+# :material-numeric-2-circle: Step 2: Create CRUD Views
 
 In this step, you'll learn how to create a complete REST API with CRUD operations using `APIViewSet`.
 
-## What You'll Learn
+## :material-school: What You'll Learn
 
-- How to create a basic ViewSet
-- Understanding auto-generated endpoints
-- Customizing query parameters
-- Adding custom endpoints
-- Working with request context
-- Handling errors
+- :material-view-grid: How to create a basic ViewSet
+- :material-auto-fix: Understanding auto-generated endpoints
+- :material-filter: Customizing query parameters
+- :material-pencil-plus: Adding custom endpoints
+- :material-web: Working with request context
+- :material-alert-circle: Handling errors
 
 ## Prerequisites
 
@@ -19,7 +19,7 @@ Make sure you've completed:
 
 You should have the `Article`, `Author`, `Category`, and `Tag` models defined.
 
-## Basic ViewSet
+## :material-view-grid: Basic ViewSet
 
 Let's create a simple API for the Article model:
 
@@ -86,7 +86,7 @@ python manage.py runserver
 
 Visit **http://localhost:8000/api/docs** to see the auto-generated Swagger UI documentation.
 
-## Creating Multiple ViewSets
+## :material-view-grid-plus: Creating Multiple ViewSets
 
 Let's add APIs for all our models:
 
@@ -133,7 +133,7 @@ Now you have complete CRUD APIs for all models:
 - `/api/tag/`
 - `/api/article/`
 
-## Adding Query Parameters
+## :material-filter-variant: Adding Query Parameters
 
 Let's add filtering to the Article list endpoint:
 
@@ -200,7 +200,7 @@ GET /api/article/?is_published=true&author=5&category=3
 GET /api/article/?is_published=true&page=2&page_size=20
 ```
 
-## Custom Endpoints
+## :material-pencil-plus: Custom Endpoints
 
 Add custom endpoints beyond CRUD:
 
@@ -321,7 +321,7 @@ GET /api/article/popular/
 GET /api/article/popular/?limit=20
 ```
 
-## Request Context
+## :material-web: Request Context
 
 Access request information in your ViewSet:
 
@@ -371,7 +371,7 @@ class ArticleViewSet(APIViewSet):
 ArticleViewSet().add_views_to_route()
 ```
 
-## Filtering by User
+## :material-account-filter: Filtering by User
 
 Automatically filter queryset based on user:
 
@@ -409,7 +409,7 @@ class ArticleViewSet(APIViewSet):
 ArticleViewSet().add_views_to_route()
 ```
 
-## Custom Pagination
+## :material-page-next: Custom Pagination
 
 Override default pagination:
 
@@ -444,7 +444,7 @@ GET /api/article/?page_size=100
 GET /api/article/?page=2&page_size=50
 ```
 
-## Ordering
+## :material-sort: Ordering
 
 Add ordering to list endpoint:
 
@@ -504,7 +504,7 @@ GET /api/article/?ordering=-views
 GET /api/article/?ordering=-published_at
 ```
 
-## Error Handling
+## :material-alert-circle: Error Handling
 
 Handle errors gracefully:
 
@@ -546,7 +546,7 @@ class ArticleViewSet(APIViewSet):
 ArticleViewSet().add_views_to_route()
 ```
 
-## Disabling Endpoints
+## :material-eye-off: Disabling Endpoints
 
 Disable specific CRUD operations:
 
@@ -571,7 +571,7 @@ Now only these endpoints are available:
 - `POST /api/category/` - Create
 - `GET /api/category/{id}` - Retrieve
 
-## Response Customization
+## :material-code-json: Response Customization
 
 Customize response format:
 
@@ -628,7 +628,7 @@ class ArticleViewSet(APIViewSet):
 ArticleViewSet().add_views_to_route()
 ```
 
-## Complete Example
+## :material-code-braces: Complete Example
 
 Here's a complete ViewSet with all features:
 
@@ -823,7 +823,7 @@ TagViewSet().add_views_to_route()
 ArticleViewSet().add_views_to_route()
 ```
 
-## Testing Your API
+## :material-test-tube: Testing Your API
 
 Test your endpoints using curl, httpie, or the Swagger UI:
 
@@ -858,14 +858,21 @@ curl http://localhost:8000/api/article/stats/
 curl http://localhost:8000/api/article/popular/?limit=5
 ```
 
-## Next Steps
+## :material-arrow-right-circle: Next Steps
 
 Now that you have CRUD operations set up, let's add authentication in [Step 3: Add Authentication](authentication.md).
 
-!!! success "What You've Learned" - ✅ Creating ViewSets for CRUD operations - ✅ Understanding auto-generated endpoints - ✅ Adding query parameters and filtering - ✅ Creating custom endpoints - ✅ Working with pagination - ✅ Handling errors properly - ✅ Customizing responses
+!!! success "What You've Learned"
+    - :material-check: Creating ViewSets for CRUD operations
+    - :material-check: Understanding auto-generated endpoints
+    - :material-check: Adding query parameters and filtering
+    - :material-check: Creating custom endpoints
+    - :material-check: Working with pagination
+    - :material-check: Handling errors properly
+    - :material-check: Customizing responses
 
-## See Also
+## :material-bookshelf: See Also
 
-- [APIViewSet API Reference](../api/views/api_view_set.md) - Complete API documentation
-- [Pagination](../api/pagination.md) - Advanced pagination options
-- [ModelUtil](../api/models/model_util.md) - Working with models
+- [APIViewSet API Reference](../api/views/api_view_set.md) — Complete API documentation
+- [Pagination](../api/pagination.md) — Advanced pagination options
+- [ModelUtil](../api/models/model_util.md) — Working with models

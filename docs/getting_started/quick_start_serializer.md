@@ -1,4 +1,4 @@
-## 🚀 Quick Start (Serializer)
+## :material-rocket-launch: Quick Start (Serializer)
 
 This guide shows how to create a CRUD API using the `Serializer` class with plain Django models. This approach keeps your models unchanged and defines API configuration separately.
 
@@ -9,10 +9,10 @@ This guide shows how to create a CRUD API using the `Serializer` class with plai
 
 Choose the `Serializer` approach when:
 
-- You have existing Django models you don't want to modify
-- You want to keep models and API concerns separated
-- You're adding API functionality to an existing project
-- Multiple teams work on models vs. API layers
+- :material-database: You have existing Django models you don't want to modify
+- :material-arrow-split-vertical: You want to keep models and API concerns separated
+- :material-puzzle: You're adding API functionality to an existing project
+- :material-account-group: Multiple teams work on models vs. API layers
 
 ### 1. Create Your Model
 
@@ -212,9 +212,32 @@ class ArticleSerializer(serializers.Serializer):
         logger.info(f"Article {instance.id} deleted")
 ```
 
-## Next Steps
+## :material-arrow-right-circle: Next Steps
 
-- Learn more about [Serializer configuration](../api/models/serializers.md)
-- Explore [APIViewSet features](../api/views/api_view_set.md)
-- Add [Authentication](../api/authentication.md) to your API
-- Configure [Pagination](../api/pagination.md)
+<div class="grid cards" markdown>
+
+-   :material-cube-outline:{ .lg .middle } **Serializer Configuration**
+
+    ---
+
+    [:octicons-arrow-right-24: Learn more](../api/models/serializers.md)
+
+-   :material-view-grid:{ .lg .middle } **APIViewSet Features**
+
+    ---
+
+    [:octicons-arrow-right-24: Explore](../api/views/api_view_set.md)
+
+-   :material-shield-lock:{ .lg .middle } **Authentication**
+
+    ---
+
+    [:octicons-arrow-right-24: Add auth](../api/authentication.md)
+
+-   :material-page-next:{ .lg .middle } **Pagination**
+
+    ---
+
+    [:octicons-arrow-right-24: Configure](../api/pagination.md)
+
+</div>

@@ -1,14 +1,14 @@
-# Step 3: Add Authentication
+# :material-numeric-3-circle: Step 3: Add Authentication
 
 In this step, you'll learn how to secure your API with JWT authentication and implement role-based access control.
 
-## What You'll Learn
+## :material-school: What You'll Learn
 
-- Setting up JWT authentication
-- Protecting endpoints
-- Implementing role-based access
-- Creating login/register endpoints
-- Testing authenticated requests
+- :material-key: Setting up JWT authentication
+- :material-shield-lock: Protecting endpoints
+- :material-account-key: Implementing role-based access
+- :material-login: Creating login/register endpoints
+- :material-test-tube: Testing authenticated requests
 
 ## Prerequisites
 
@@ -16,7 +16,7 @@ Make sure you've completed:
 - [Step 1: Define Your Model](model.md)
 - [Step 2: Create CRUD Views](crud.md)
 
-## Setting Up JWT Keys
+## :material-key-variant: Setting Up JWT Keys
 
 ### Generate RSA Keys (Recommended for Production)
 
@@ -60,7 +60,7 @@ JWT_AUDIENCE = "your-api"
 !!! warning "Security"
     Never commit your private key to version control! Add `private_key.pem` to your `.gitignore`.
 
-## Create User Model
+## :material-account: Create User Model
 
 Update your User model to work with authentication:
 
@@ -122,7 +122,7 @@ python manage.py makemigrations
 python manage.py migrate
 ```
 
-## Create Authentication Class
+## :material-shield-check: Create Authentication Class
 
 ```python
 # auth.py
@@ -160,7 +160,7 @@ class JWTAuth(AsyncJwtBearer):
             return False
 ```
 
-## Create Token Generation Helper
+## :material-ticket-confirmation: Create Token Generation Helper
 
 ```python
 # utils.py
@@ -213,7 +213,7 @@ def create_refresh_token(user_id: int) -> str:
     return token
 ```
 
-## Create Login/Register Endpoints
+## :material-login: Create Login/Register Endpoints
 
 ```python
 # views.py
@@ -396,7 +396,7 @@ async def refresh(request, refresh_token: str):
         )
 ```
 
-## Protect Your ViewSets
+## :material-lock: Protect Your ViewSets
 
 Now let's add authentication to your CRUD endpoints:
 
@@ -458,7 +458,7 @@ class Article(ModelSerializer):
         await super().custom_actions(payload)
 ```
 
-## Role-Based Access Control
+## :material-account-key: Role-Based Access Control
 
 Create different authentication classes for different roles:
 
@@ -549,7 +549,7 @@ ArticleViewSet().add_views_to_route()
 UserViewSet().add_views_to_route()
 ```
 
-## Ownership Validation
+## :material-account-check: Ownership Validation
 
 Ensure users can only edit their own articles:
 
@@ -613,7 +613,7 @@ class ArticleViewSet(APIViewSet):
 ArticleViewSet().add_views_to_route()
 ```
 
-## Testing Authentication
+## :material-test-tube: Testing Authentication
 
 ### Register a User
 
@@ -679,7 +679,7 @@ curl -X POST http://localhost:8000/api/auth/refresh/ \
   -d '{"refresh_token": "YOUR_REFRESH_TOKEN"}'
 ```
 
-## Error Responses
+## :material-alert-circle: Error Responses
 
 ### Missing Token
 
@@ -740,7 +740,7 @@ curl -X DELETE http://localhost:8000/api/article/1/ \
 }
 ```
 
-## Using Swagger UI with Auth
+## :material-open-in-new: Using Swagger UI with Auth
 
 The Swagger UI at `/api/docs` has built-in authentication support:
 
@@ -749,7 +749,7 @@ The Swagger UI at `/api/docs` has built-in authentication support:
 3. Click **"Authorize"**
 4. Now all requests will include the token
 
-## Custom Claims
+## :material-tag-plus: Custom Claims
 
 Add custom claims to your tokens:
 
@@ -805,7 +805,7 @@ class JWTAuth(AsyncJwtBearer):
         return user
 ```
 
-## Best Practices
+## :material-shield-star: Best Practices
 
 1. **Use RSA keys in production:**
    ```python
@@ -847,19 +847,19 @@ class JWTAuth(AsyncJwtBearer):
 
 8. **Implement token blacklist** for logout functionality
 
-## Next Steps
+## :material-arrow-right-circle: Next Steps
 
 Now that you have authentication set up, let's customize schemas in [Step 4: Filtering & Pagination](filtering.md).
 
 !!! success "What You've Learned"
-    - ✅ Setting up JWT authentication
-    - ✅ Creating login/register endpoints
-    - ✅ Protecting API endpoints
-    - ✅ Implementing role-based access control
-    - ✅ Validating ownership
-    - ✅ Testing authenticated requests
+    - :material-check: Setting up JWT authentication
+    - :material-check: Creating login/register endpoints
+    - :material-check: Protecting API endpoints
+    - :material-check: Implementing role-based access control
+    - :material-check: Validating ownership
+    - :material-check: Testing authenticated requests
 
-## See Also
+## :material-bookshelf: See Also
 
-- [Authentication API Reference](../api/authentication.md) - Complete authentication documentation
-- [APIViewSet Auth Options](../api/views/api_view_set.md#authentication-attributes) - ViewSet authentication options
+- [Authentication API Reference](../api/authentication.md) — Complete authentication documentation
+- [APIViewSet Auth Options](../api/views/api_view_set.md#authentication-attributes) — ViewSet authentication options

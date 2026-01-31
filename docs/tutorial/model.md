@@ -1,14 +1,14 @@
-# Step 1: Define Your Model
+# :material-numeric-1-circle: Step 1: Define Your Model
 
 In this first step, you'll learn how to define Django models using `ModelSerializer`, which allows you to declare schemas directly on your models.
 
-## What You'll Learn
+## :material-school: What You'll Learn
 
-- How to create a model with `ModelSerializer`
-- Defining serialization schemas (Create, Read, Update)
-- Working with relationships
-- Adding custom fields
-- Implementing lifecycle hooks
+- :material-database: How to create a model with `ModelSerializer`
+- :material-file-document-edit: Defining serialization schemas (Create, Read, Update)
+- :material-link-variant: Working with relationships
+- :material-pencil-plus: Adding custom fields
+- :material-hook: Implementing lifecycle hooks
 
 ## Prerequisites
 
@@ -40,9 +40,9 @@ class Article(ModelSerializer):
 ```
 
 !!! tip "Why ModelSerializer?"
-`ModelSerializer` is a powerful mixin that combines Django's `Model` with automatic schema generation capabilities. Instead of creating separate serializer classes, you define everything on the model itself.
+    `ModelSerializer` is a powerful mixin that combines Django's `Model` with automatic schema generation capabilities. Instead of creating separate serializer classes, you define everything on the model itself.
 
-## Adding Serializer Classes
+## :material-playlist-plus: Adding Serializer Classes
 
 Now let's add serialization schemas to control which fields are exposed in different operations:
 
@@ -169,7 +169,7 @@ class Article(ModelSerializer):
 }
 ```
 
-## Working with Relationships
+## :material-link-variant: Working with Relationships
 
 ### ForeignKey Relationships
 
@@ -335,7 +335,7 @@ class Article(ModelSerializer):
 }
 ```
 
-## Adding Custom Fields
+## :material-pencil-plus: Adding Custom Fields
 
 Sometimes you need computed or synthetic fields in your API responses:
 
@@ -387,7 +387,7 @@ class Article(ModelSerializer):
 !!! info "Custom Fields in CreateSerializer"
 Custom fields in `CreateSerializer` are used for **instructions** (like flags or metadata), not stored in the database. They're passed to `custom_actions()` hook.
 
-## Query optimizations (QuerySet)
+## :material-database-search: Query Optimizations (QuerySet)
 
 Configure select_related/prefetch_related for read and queryset_request hooks:
 
@@ -424,7 +424,7 @@ qs = Article.query_util.apply_queryset_optimizations(
 )
 ```
 
-## Fetch and serialize with ModelUtil
+## :material-cog-sync: Fetch and Serialize with ModelUtil
 
 ```python
 from ninja_aio.models import ModelUtil
@@ -449,7 +449,7 @@ item = await util.read_s(
 )
 ```
 
-## Lifecycle Hooks
+## :material-hook: Lifecycle Hooks
 
 Add behavior at key points in the model lifecycle:
 
@@ -534,173 +534,175 @@ class Article(ModelSerializer):
 ```
 
 !!! warning "Execution Order"
-**Create**: `on_create_before_save()` → `before_save()` → `save()` → `on_create_after_save()` → `after_save()` → `custom_actions()` → `post_create()`
+    **Create**: `on_create_before_save()` → `before_save()` → `save()` → `on_create_after_save()` → `after_save()` → `custom_actions()` → `post_create()`
 
     **Update**: `before_save()` → `save()` → `after_save()` → `custom_actions()`
 
-## Complete Example
+## :material-code-braces: Complete Example
 
 Here's a complete blog model with all features:
 
-```python
-# models.py
-from django.db import models
-from django.utils.text import slugify
-from ninja_aio.models import ModelSerializer
+??? example "Full blog model code (click to expand)"
+
+    ```python
+    # models.py
+    from django.db import models
+    from django.utils.text import slugify
+    from ninja_aio.models import ModelSerializer
 
 
-class Author(ModelSerializer):
-    name = models.CharField(max_length=200)
-    email = models.EmailField(unique=True)
-    bio = models.TextField(blank=True)
-    avatar = models.URLField(blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    class Author(ModelSerializer):
+        name = models.CharField(max_length=200)
+        email = models.EmailField(unique=True)
+        bio = models.TextField(blank=True)
+        avatar = models.URLField(blank=True)
+        created_at = models.DateTimeField(auto_now_add=True)
 
-    class ReadSerializer:
-        fields = ["id", "name", "email", "bio", "avatar", "created_at"]
-        customs = [
-            ("article_count", int, lambda obj: obj.articles.count()),
-        ]
+        class ReadSerializer:
+            fields = ["id", "name", "email", "bio", "avatar", "created_at"]
+            customs = [
+                ("article_count", int, lambda obj: obj.articles.count()),
+            ]
 
-    class CreateSerializer:
-        fields = ["name", "email"]
-        optionals = [("bio", str), ("avatar", str)]
+        class CreateSerializer:
+            fields = ["name", "email"]
+            optionals = [("bio", str), ("avatar", str)]
 
-    class UpdateSerializer:
-        optionals = [
-            ("name", str),
-            ("bio", str),
-            ("avatar", str),
-        ]
-        excludes = ["email", "created_at"]
+        class UpdateSerializer:
+            optionals = [
+                ("name", str),
+                ("bio", str),
+                ("avatar", str),
+            ]
+            excludes = ["email", "created_at"]
 
-    def __str__(self):
-        return self.name
-
-
-class Category(ModelSerializer):
-    name = models.CharField(max_length=100)
-    slug = models.SlugField(unique=True, blank=True)
-    description = models.TextField(blank=True)
-
-    class ReadSerializer:
-        fields = ["id", "name", "slug", "description"]
-
-    class CreateSerializer:
-        fields = ["name"]
-        optionals = [("description", str)]
-
-    def before_save(self):
-        if not self.slug:
-            self.slug = slugify(self.name)
-
-    def __str__(self):
-        return self.name
+        def __str__(self):
+            return self.name
 
 
-class Tag(ModelSerializer):
-    name = models.CharField(max_length=50, unique=True)
-    slug = models.SlugField(unique=True, blank=True)
+    class Category(ModelSerializer):
+        name = models.CharField(max_length=100)
+        slug = models.SlugField(unique=True, blank=True)
+        description = models.TextField(blank=True)
 
-    class ReadSerializer:
-        fields = ["id", "name", "slug"]
+        class ReadSerializer:
+            fields = ["id", "name", "slug", "description"]
 
-    class CreateSerializer:
-        fields = ["name"]
+        class CreateSerializer:
+            fields = ["name"]
+            optionals = [("description", str)]
 
-    def before_save(self):
-        if not self.slug:
-            self.slug = slugify(self.name)
+        def before_save(self):
+            if not self.slug:
+                self.slug = slugify(self.name)
 
-    def __str__(self):
-        return self.name
+        def __str__(self):
+            return self.name
 
 
-class Article(ModelSerializer):
-    title = models.CharField(max_length=200)
-    slug = models.SlugField(unique=True, blank=True)
-    content = models.TextField()
-    excerpt = models.TextField(max_length=300, blank=True)
-    author = models.ForeignKey(Author, on_delete=models.CASCADE, related_name="articles")
-    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, related_name="articles")
-    tags = models.ManyToManyField(Tag, related_name="articles", blank=True)
-    cover_image = models.URLField(blank=True)
-    is_published = models.BooleanField(default=False)
-    published_at = models.DateTimeField(null=True, blank=True)
-    views = models.IntegerField(default=0)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    class Tag(ModelSerializer):
+        name = models.CharField(max_length=50, unique=True)
+        slug = models.SlugField(unique=True, blank=True)
 
-    class ReadSerializer:
-        fields = [
-            "id", "title", "slug", "content", "excerpt",
-            "author", "category", "tags", "cover_image",
-            "is_published", "published_at", "views",
-            "created_at", "updated_at"
-        ]
-        customs = [
-            ("word_count", int, lambda obj: len(obj.content.split())),
-            ("reading_time", int, lambda obj: max(1, len(obj.content.split()) // 200)),
-        ]
+        class ReadSerializer:
+            fields = ["id", "name", "slug"]
 
-    class CreateSerializer:
-        fields = ["title", "content", "author", "category"]
-        optionals = [
-            ("excerpt", str),
-            ("cover_image", str),
-            ("tags", list[int]),
-            ("is_published", bool),
-        ]
-        customs = [
-            ("notify_subscribers", bool, True),
-        ]
+        class CreateSerializer:
+            fields = ["name"]
 
-    class UpdateSerializer:
-        optionals = [
-            ("title", str),
-            ("content", str),
-            ("excerpt", str),
-            ("category", int),
-            ("tags", list[int]),
-            ("cover_image", str),
-            ("is_published", bool),
-        ]
-        excludes = ["author", "created_at", "views"]
+        def before_save(self):
+            if not self.slug:
+                self.slug = slugify(self.name)
 
-    def before_save(self):
-        # Generate slug from title
-        if not self.slug:
-            self.slug = slugify(self.title)
+        def __str__(self):
+            return self.name
 
-        # Auto-generate excerpt
-        if not self.excerpt and self.content:
-            self.excerpt = self.content[:297] + "..."
 
-        # Set published_at when publishing
-        if self.is_published and not self.published_at:
-            from django.utils import timezone
-            self.published_at = timezone.now()
+    class Article(ModelSerializer):
+        title = models.CharField(max_length=200)
+        slug = models.SlugField(unique=True, blank=True)
+        content = models.TextField()
+        excerpt = models.TextField(max_length=300, blank=True)
+        author = models.ForeignKey(Author, on_delete=models.CASCADE, related_name="articles")
+        category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, related_name="articles")
+        tags = models.ManyToManyField(Tag, related_name="articles", blank=True)
+        cover_image = models.URLField(blank=True)
+        is_published = models.BooleanField(default=False)
+        published_at = models.DateTimeField(null=True, blank=True)
+        views = models.IntegerField(default=0)
+        created_at = models.DateTimeField(auto_now_add=True)
+        updated_at = models.DateTimeField(auto_now=True)
 
-    async def post_create(self):
-        # Log creation
-        from myapp.models import ActivityLog
-        await ActivityLog.objects.acreate(
-            action="article_created",
-            article_id=self.id,
-            user_id=self.author_id
-        )
+        class ReadSerializer:
+            fields = [
+                "id", "title", "slug", "content", "excerpt",
+                "author", "category", "tags", "cover_image",
+                "is_published", "published_at", "views",
+                "created_at", "updated_at"
+            ]
+            customs = [
+                ("word_count", int, lambda obj: len(obj.content.split())),
+                ("reading_time", int, lambda obj: max(1, len(obj.content.split()) // 200)),
+            ]
 
-    async def custom_actions(self, payload: dict):
-        if payload.get("notify_subscribers"):
-            # Send notifications (implement your notification logic)
-            from myapp.tasks import notify_article_published
-            await notify_article_published(self.id)
+        class CreateSerializer:
+            fields = ["title", "content", "author", "category"]
+            optionals = [
+                ("excerpt", str),
+                ("cover_image", str),
+                ("tags", list[int]),
+                ("is_published", bool),
+            ]
+            customs = [
+                ("notify_subscribers", bool, True),
+            ]
 
-    def __str__(self):
-        return self.title
-```
+        class UpdateSerializer:
+            optionals = [
+                ("title", str),
+                ("content", str),
+                ("excerpt", str),
+                ("category", int),
+                ("tags", list[int]),
+                ("cover_image", str),
+                ("is_published", bool),
+            ]
+            excludes = ["author", "created_at", "views"]
 
-## Run Migrations
+        def before_save(self):
+            # Generate slug from title
+            if not self.slug:
+                self.slug = slugify(self.title)
+
+            # Auto-generate excerpt
+            if not self.excerpt and self.content:
+                self.excerpt = self.content[:297] + "..."
+
+            # Set published_at when publishing
+            if self.is_published and not self.published_at:
+                from django.utils import timezone
+                self.published_at = timezone.now()
+
+        async def post_create(self):
+            # Log creation
+            from myapp.models import ActivityLog
+            await ActivityLog.objects.acreate(
+                action="article_created",
+                article_id=self.id,
+                user_id=self.author_id
+            )
+
+        async def custom_actions(self, payload: dict):
+            if payload.get("notify_subscribers"):
+                # Send notifications (implement your notification logic)
+                from myapp.tasks import notify_article_published
+                await notify_article_published(self.id)
+
+        def __str__(self):
+            return self.title
+    ```
+
+## :material-database-sync: Run Migrations
 
 After defining your models, create and run migrations:
 
@@ -712,13 +714,18 @@ python manage.py makemigrations
 python manage.py migrate
 ```
 
-## Next Steps
+## :material-arrow-right-circle: Next Steps
 
 Now that you have your models defined, let's create CRUD views in [Step 2: Create CRUD Views](crud.md).
 
-!!! success "What You've Learned" - ✅ Creating models with `ModelSerializer` - ✅ Defining Read, Create, and Update serializers - ✅ Working with ForeignKey and ManyToMany relationships - ✅ Adding custom computed fields - ✅ Implementing lifecycle hooks
+!!! success "What You've Learned"
+    - :material-check: Creating models with `ModelSerializer`
+    - :material-check: Defining Read, Create, and Update serializers
+    - :material-check: Working with ForeignKey and ManyToMany relationships
+    - :material-check: Adding custom computed fields
+    - :material-check: Implementing lifecycle hooks
 
-## See Also
+## :material-bookshelf: See Also
 
-- [ModelSerializer API Reference](../api/models/model_serializer.md) - Complete API documentation
-- [ModelUtil API Reference](../api/models/model_util.md) - Utility methods
+- [ModelSerializer API Reference](../api/models/model_serializer.md) — Complete API documentation
+- [ModelUtil API Reference](../api/models/model_util.md) — Utility methods
