@@ -1,35 +1,54 @@
-# 🥷 django-ninja-aio-crud
+<p align="center">
+  <img src="https://raw.githubusercontent.com/caspel26/django-ninja-aio-crud/main/docs/images/logo.png" alt="django-ninja-aio-crud" width="120">
+</p>
 
-![Tests](https://github.com/caspel26/django-ninja-aio-crud/actions/workflows/coverage.yml/badge.svg)
-[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=caspel26_django-ninja-aio-crud&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=caspel26_django-ninja-aio-crud)
-[![codecov](https://codecov.io/gh/caspel26/django-ninja-aio-crud/graph/badge.svg?token=DZ5WDT3S20)](https://codecov.io/gh/caspel26/django-ninja-aio-crud/)
-[![PyPI - Version](https://img.shields.io/pypi/v/django-ninja-aio-crud?color=g&logo=pypi&logoColor=white)](https://pypi.org/project/django-ninja-aio-crud/)
-[![PyPI - License](https://img.shields.io/pypi/l/django-ninja-aio-crud)](LICENSE)
-[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+<h1 align="center">django-ninja-aio-crud</h1>
 
-> Lightweight async CRUD layer on top of **[Django Ninja](https://django-ninja.dev/)** with automatic schema generation, filtering, pagination, auth & Many‑to‑Many management.
+<p align="center">
+  <strong>Async CRUD framework for Django Ninja</strong><br>
+  Automatic schema generation · Filtering · Pagination · Auth · M2M management
+</p>
+
+<p align="center">
+  <a href="https://github.com/caspel26/django-ninja-aio-crud/actions/workflows/coverage.yml"><img src="https://github.com/caspel26/django-ninja-aio-crud/actions/workflows/coverage.yml/badge.svg" alt="Tests"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=caspel26_django-ninja-aio-crud"><img src="https://sonarcloud.io/api/project_badges/measure?project=caspel26_django-ninja-aio-crud&metric=alert_status" alt="Quality Gate Status"></a>
+  <a href="https://codecov.io/gh/caspel26/django-ninja-aio-crud/"><img src="https://codecov.io/gh/caspel26/django-ninja-aio-crud/graph/badge.svg?token=DZ5WDT3S20" alt="codecov"></a>
+  <a href="https://pypi.org/project/django-ninja-aio-crud/"><img src="https://img.shields.io/pypi/v/django-ninja-aio-crud?color=g&logo=pypi&logoColor=white" alt="PyPI - Version"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/pypi/l/django-ninja-aio-crud" alt="PyPI - License"></a>
+  <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json" alt="Ruff"></a>
+</p>
+
+<p align="center">
+  <a href="https://django-ninja-aio.com">Documentation</a> ·
+  <a href="https://pypi.org/project/django-ninja-aio-crud/">PyPI</a> ·
+  <a href="https://github.com/caspel26/ninja-aio-blog-example">Example Project</a> ·
+  <a href="https://github.com/caspel26/django-ninja-aio-crud/issues">Issues</a>
+</p>
 
 ---
 
-## ✨ Features
+## Features
 
-- Serializer (Meta-driven) first-class: dynamic schemas for existing Django models without inheriting ModelSerializer
-- Async CRUD ViewSets (create, list, retrieve, update, delete)
-- Automatic Pydantic schemas from `ModelSerializer` (read/create/update)
-- Dynamic query params (runtime schema via `pydantic.create_model`)
-- Per-method authentication (`auth`, `get_auth`, `post_auth`, etc.)
-- Async pagination (customizable)
-- M2M relation endpoints via `M2MRelationSchema` (add/remove/get + filters)
-- Reverse relation serialization
-- Hook methods (`query_params_handler`, `<related>_query_params_handler`, `custom_actions`, lifecycle hooks)
-- ORJSON renderer through `NinjaAIO`
-- Clean, minimal integration
+| | Feature | Description |
+|---|---|---|
+| **Meta-driven Serializer** | Dynamic schemas | Generate CRUD schemas for existing Django models without changing base classes |
+| **Async CRUD ViewSets** | Full operations | Create, list, retrieve, update, delete — all async |
+| **Auto Schemas** | Pydantic generation | Automatic read/create/update schemas from `ModelSerializer` |
+| **Dynamic Query Params** | Runtime schemas | Built with `pydantic.create_model` for flexible filtering |
+| **Per-method Auth** | Granular control | `auth`, `get_auth`, `post_auth`, etc. |
+| **Async Pagination** | Customizable | Fully async, pluggable pagination classes |
+| **M2M Relations** | Add/remove/list | Endpoints via `M2MRelationSchema` with filtering support |
+| **Reverse Relations** | Nested serialization | Automatic handling of reverse FK and M2M |
+| **Lifecycle Hooks** | Extensible | `before_save`, `after_save`, `custom_actions`, `on_delete`, and more |
+| **ORJSON Renderer** | Performance | Built-in fast JSON rendering via `NinjaAIO` |
 
 ---
 
-## 🚀 Quick Start (Serializer)
+## Quick Start
 
-If you already have Django models, start with the Meta-driven Serializer for instant CRUD without changing model base classes.
+### Option A: Meta-driven Serializer (existing models)
+
+Use this if you already have Django models and don't want to change their base class.
 
 ```python
 from ninja_aio.models import serializers
@@ -42,7 +61,9 @@ class BookSerializer(serializers.Serializer):
         model = models.Book
         schema_in = serializers.SchemaModelConfig(fields=["title", "published"])
         schema_out = serializers.SchemaModelConfig(fields=["id", "title", "published"])
-        schema_update = serializers.SchemaModelConfig(optionals=[("title", str), ("published", bool)])
+        schema_update = serializers.SchemaModelConfig(
+            optionals=[("title", str), ("published", bool)]
+        )
 
 api = NinjaAIO()
 
@@ -51,13 +72,11 @@ class BookViewSet(APIViewSet):
     serializer_class = BookSerializer
 ```
 
-Visit `/docs` → CRUD endpoints ready.
+### Option B: ModelSerializer (new projects)
 
----
+Define models with built-in serialization for minimal boilerplate.
 
-## 🚀 Quick Start (ModelSerializer)
-
-models.py
+**models.py**
 
 ```python
 from django.db import models
@@ -77,7 +96,7 @@ class Book(ModelSerializer):
         optionals = [("title", str), ("published", bool)]
 ```
 
-views.py
+**views.py**
 
 ```python
 from ninja_aio import NinjaAIO
@@ -89,14 +108,13 @@ api = NinjaAIO()
 @api.viewset(Book)
 class BookViewSet(APIViewSet):
     pass
-
 ```
 
-Visit `/docs` → CRUD endpoints ready.
+> Visit `/docs` — CRUD endpoints ready.
 
 ---
 
-## 🔄 Query Filtering
+## Query Filtering
 
 ```python
 @api.viewset(Book)
@@ -111,15 +129,13 @@ class BookViewSet(APIViewSet):
         return queryset
 ```
 
-Request:
-
 ```
 GET /book/?published=true&title=python
 ```
 
 ---
 
-## 🤝 Many-to-Many Example (with filters)
+## Many-to-Many Relations
 
 ```python
 from ninja_aio.schemas import M2MRelationSchema
@@ -132,7 +148,6 @@ class Tag(ModelSerializer):
 class Article(ModelSerializer):
     title = models.CharField(max_length=120)
     tags = models.ManyToManyField(Tag, related_name="articles")
-
     class ReadSerializer:
         fields = ["id", "title", "tags"]
 
@@ -151,27 +166,25 @@ class ArticleViewSet(APIViewSet):
         if n:
             queryset = queryset.filter(name__icontains=n)
         return queryset
-
 ```
 
-Endpoints:
+**Endpoints:**
 
-- `GET /article/{pk}/tag?name=dev`
-- `POST /article/{pk}/tag/` body: `{"add":[1,2],"remove":[3]}`
+```
+GET  /article/{pk}/tag?name=dev
+POST /article/{pk}/tag/    body: {"add": [1, 2], "remove": [3]}
+```
 
 ---
 
-## 🔐 Authentication (JWT example)
+## Authentication (JWT)
 
 ```python
 from ninja_aio.auth import AsyncJwtBearer
 from joserfc import jwk
-from .models import Book
-
-PUBLIC_KEY = "-----BEGIN PUBLIC KEY----- ..."
 
 class JWTAuth(AsyncJwtBearer):
-    jwt_public = jwk.RSAKey.import_key(PUBLIC_KEY)
+    jwt_public = jwk.RSAKey.import_key("-----BEGIN PUBLIC KEY----- ...")
     jwt_alg = "RS256"
     claims = {"sub": {"essential": True}}
 
@@ -182,26 +195,28 @@ class JWTAuth(AsyncJwtBearer):
 @api.viewset(Book)
 class SecureBookViewSet(APIViewSet):
     auth = [JWTAuth()]
-    get_auth = None  # list/retrieve public
+    get_auth = None  # list/retrieve remain public
 ```
 
 ---
 
-## 📑 Lifecycle Hooks (ModelSerializer)
+## Lifecycle Hooks
 
-Available on every save/delete:
+Available on every save/delete cycle:
 
-- `on_create_before_save`
-- `on_create_after_save`
-- `before_save`
-- `after_save`
-- `on_delete`
-- `custom_actions(payload)` (create/update custom field logic)
-- `post_create()` (after create commit)
+| Hook | When |
+|---|---|
+| `on_create_before_save` | Before first save |
+| `on_create_after_save` | After first save |
+| `before_save` | Before any save |
+| `after_save` | After any save |
+| `on_delete` | After deletion |
+| `custom_actions(payload)` | Create/update custom field logic |
+| `post_create()` | After create commit |
 
 ---
 
-## 🧩 Adding Custom Endpoints
+## Custom Endpoints
 
 ```python
 from ninja_aio.decorators import api_get
@@ -214,23 +229,11 @@ class BookViewSet(APIViewSet):
         return {"total": total}
 ```
 
-Or
-
-```python
-@api.viewset(Book)
-class BookViewSet(APIViewSet):
-    def views(self):
-        @self.router.get("/stats/")
-        async def stats(request):
-            total = await Book.objects.acount()
-            return {"total": total}
-```
-
 ---
 
-## 📄 Pagination
+## Pagination
 
-Default: `PageNumberPagination`. Override:
+Default: `PageNumberPagination`. Override per ViewSet:
 
 ```python
 from ninja.pagination import PageNumberPagination
@@ -246,49 +249,7 @@ class BookViewSet(APIViewSet):
 
 ---
 
-## Meta-driven Serializer (for vanilla Django models)
-
-Moved above as the primary quick start.
-
----
-
-## 🛠 Project Structure & Docs
-
-Documentation (MkDocs + Material):
-
-```
-docs/
-  getting_started/
-  tutorial/
-  api/
-    views/
-    models/
-    authentication.md
-    pagination.md
-```
-
-Browse full reference:
-
-- APIViewSet: `docs/api/views/api_view_set.md`
-- APIView: `docs/api/views/api_view.md`
-- ModelSerializer: `docs/api/models/model_serializer.md`
-- Authentication: `docs/api/authentication.md`
-- Example repository: https://github.com/caspel26/ninja-aio-blog-example
-
----
-
-## 🧪 Tests
-
-Use Django test runner + async ORM patterns. Example async pattern:
-
-```python
-obj = await Book.objects.acreate(title="T1", published=True)
-count = await Book.objects.acount()
-```
-
----
-
-## 🚫 Disable Operations
+## Disable Operations
 
 ```python
 @api.viewset(Book)
@@ -298,46 +259,33 @@ class ReadOnlyBookViewSet(APIViewSet):
 
 ---
 
-## 📌 Performance Tips
+## Performance Tips
 
-- Use `queryset_request` classmethod to prefetch
+- Use `queryset_request` classmethod to `select_related` / `prefetch_related`
 - Index frequently filtered fields
-- Keep pagination enabled
+- Keep pagination enabled for large datasets
 - Limit slices (`queryset = queryset[:1000]`) for heavy searches
 
 ---
 
-## 🤲 Contributing
+## Contributing
 
-1. Fork
-2. Create branch
-3. Add tests
-4. Run lint (`ruff check .`)
-5. Open PR
-
----
-
-## ⭐ Support
-
-Star the repo or donate:
-
-- [Buy me a coffee](https://buymeacoffee.com/caspel26)
+1. Fork the repository
+2. Create a feature branch
+3. Add tests for your changes
+4. Run lint: `ruff check .`
+5. Open a Pull Request
 
 ---
 
-## 📜 License
+## Support
+
+If you find this project useful, consider giving it a star or supporting development:
+
+<a href="https://buymeacoffee.com/caspel26"><img src="https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black" alt="Buy me a coffee"></a>
+
+---
+
+## License
 
 MIT License. See [LICENSE](LICENSE).
-
----
-
-## 🔗 Quick Links
-
-| Item    | Link                                                     |
-| ------- | -------------------------------------------------------- |
-| PyPI    | https://pypi.org/project/django-ninja-aio-crud/          |
-| Docs    | https://django-ninja-aio.com                             |
-| Issues  | https://github.com/caspel26/django-ninja-aio-crud/issues |
-| Example | https://github.com/caspel26/ninja-aio-blog-example       |
-
----
