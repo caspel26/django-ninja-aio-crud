@@ -83,6 +83,11 @@ def _fmt_date_human(date_iso: str) -> str:
         return date_iso
 
 
+def _tag_anchor(tag: str) -> str:
+    """Convert a tag like 'v1.2.3' to a URL-safe anchor ID."""
+    return re.sub(r"[^a-zA-Z0-9-]", "", tag.replace(".", "-"))
+
+
 def generate_release_table() -> str:
     tags = _get_tags()
     if not tags:
@@ -94,11 +99,50 @@ def generate_release_table() -> str:
             "</div>"
         )
 
-    cards_html: list[str] = []
+    # Build custom dropdown items
+    items: list[str] = []
+    first_tag = tags[0]
+    first_date = _fmt_date_human(_tag_date(first_tag))
+    first_label = f"{first_tag}  —  {first_date}" if first_date else first_tag
+
+    for i, tag in enumerate(tags):
+        date_fmt = _fmt_date_human(_tag_date(tag))
+        active_cls = " release-dropdown-item--active" if i == 0 else ""
+        latest_pill = (
+            '<span class="release-dropdown-latest">Latest</span>' if i == 0 else ""
+        )
+        items.append(
+            f'<button class="release-dropdown-item{active_cls}" '
+            f'data-value="{_tag_anchor(tag)}" type="button">'
+            f'<span class="release-dropdown-item-tag">{escape(tag)}</span>'
+            f"{latest_pill}"
+            f'<span class="release-dropdown-item-date">{date_fmt}</span>'
+            f"</button>"
+        )
+
+    selector = (
+        '<div class="release-selector">'
+        '<label class="release-selector-label">Select version</label>'
+        '<div class="release-dropdown" id="release-dropdown">'
+        '<button class="release-dropdown-toggle" id="release-toggle" type="button">'
+        f'<span class="release-dropdown-toggle-text">{escape(first_label)}</span>'
+        '<svg class="release-dropdown-chevron" viewBox="0 0 24 24" width="18" height="18">'
+        '<path fill="currentColor" d="M7 10l5 5 5-5z"/>'
+        "</svg>"
+        "</button>"
+        '<div class="release-dropdown-menu" id="release-menu">'
+        + "".join(items)
+        + "</div>"
+        "</div>"
+        "</div>"
+    )
+
+    # Build hidden cards (only first visible)
+    cards: list[str] = []
     for i, tag in enumerate(tags):
         prev = tags[i + 1] if i + 1 < len(tags) else None
-        date_raw = _tag_date(tag)
-        date_fmt = _fmt_date_human(date_raw)
+        anchor = _tag_anchor(tag)
+        date_fmt = _fmt_date_human(_tag_date(tag))
         notes = _get_release_notes(tag)
         notes_html = markdown(notes) if notes else ""
         diff_link = (
@@ -108,53 +152,86 @@ def generate_release_table() -> str:
         )
         gh_release_link = f"https://github.com/{REPO_SLUG}/releases/tag/{tag}"
 
-        # Determine if this is the latest release
         is_latest = i == 0
         latest_badge = (
-            '<span class="release-badge release-badge--latest">Latest</span>'
+            ' <span class="release-badge release-badge--latest">Latest</span>'
             if is_latest
             else ""
         )
+        latest_cls = " release-card--latest" if is_latest else ""
+        hidden = "" if is_latest else ' style="display:none"'
 
-        # Build notes section
         if notes_html:
-            notes_section = (
-                '<div class="release-notes-content">'
-                f"{notes_html}"
-                "</div>"
-            )
+            body = f'<div class="release-card-body">{notes_html}</div>'
         else:
-            notes_section = (
-                '<div class="release-notes-empty">'
+            body = (
+                '<div class="release-card-body">'
+                '<p class="release-notes-empty">'
                 "No release notes for this version."
-                "</div>"
+                "</p></div>"
             )
 
-        cards_html.append(
-            f'<div class="release-entry{"  release-entry--latest" if is_latest else ""}">'
-            f'<div class="release-header">'
-            f'<div class="release-version">'
-            f'<span class="release-tag">{escape(tag)}</span>'
+        cards.append(
+            f'<div class="release-card{latest_cls}" data-version="{anchor}"{hidden}>'
+            f'<div class="release-card-header">'
+            f"<h4>"
+            f'<a href="{gh_release_link}">{escape(tag)}</a>'
             f"{latest_badge}"
+            f"</h4>"
+            f'<span class="release-card-date">{date_fmt}</span>'
             f"</div>"
-            f'<div class="release-meta">'
-            f'<span class="release-date">{date_fmt}</span>'
-            f'<span class="release-links">'
-            f'<a href="{gh_release_link}" title="GitHub Release">GitHub</a>'
-            f' · <a href="{diff_link}" title="View diff">Diff</a>'
-            f"</span>"
+            f"{body}"
+            f'<div class="release-card-footer">'
+            f'<a href="{gh_release_link}">GitHub Release</a>'
+            f' · <a href="{diff_link}">Diff</a>'
             f"</div>"
-            f"</div>"
-            f"{notes_section}"
             f"</div>"
         )
 
-    html = (
-        '<div class="release-timeline">'
-        + "".join(cards_html)
-        + "</div>"
+    cards_container = (
+        '<div class="release-display">' + "\n".join(cards) + "</div>"
     )
-    return html
+
+    script = (
+        "<script>"
+        "(function(){"
+        "var dd=document.getElementById('release-dropdown'),"
+        "toggle=document.getElementById('release-toggle'),"
+        "menu=document.getElementById('release-menu'),"
+        "text=toggle.querySelector('.release-dropdown-toggle-text');"
+        "toggle.addEventListener('click',function(e){"
+        "e.stopPropagation();"
+        "dd.classList.toggle('release-dropdown--open');"
+        "if(dd.classList.contains('release-dropdown--open')){"
+        "var active=menu.querySelector('.release-dropdown-item--active');"
+        "if(active)active.scrollIntoView({block:'nearest'});"
+        "}"
+        "});"
+        "menu.addEventListener('click',function(e){"
+        "var btn=e.target.closest('.release-dropdown-item');"
+        "if(!btn)return;"
+        "var v=btn.getAttribute('data-value');"
+        "menu.querySelectorAll('.release-dropdown-item').forEach(function(b){"
+        "b.classList.remove('release-dropdown-item--active');"
+        "});"
+        "btn.classList.add('release-dropdown-item--active');"
+        "var tag=btn.querySelector('.release-dropdown-item-tag').textContent,"
+        "date=btn.querySelector('.release-dropdown-item-date').textContent;"
+        "text.textContent=date?tag+'  —  '+date:tag;"
+        "dd.classList.remove('release-dropdown--open');"
+        "document.querySelectorAll('.release-display .release-card')"
+        ".forEach(function(c){"
+        "c.style.display=c.getAttribute('data-version')===v?'':'none';"
+        "});"
+        "});"
+        "document.addEventListener('click',function(){"
+        "dd.classList.remove('release-dropdown--open');"
+        "});"
+        "})();"
+        "</script>"
+    )
+
+    return selector + cards_container + script
 
 
 def generate_full_changelog() -> str:
