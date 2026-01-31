@@ -64,4 +64,129 @@
 }
 .md-typeset .cta-buttons a.md-button {
   margin: 0.3rem;
+  border-radius: 2rem;
+  padding: 0.6rem 1.8rem;
+}
+
+/* ─── Tutorial page styling ─── */
+
+/* Tutorial hero banner */
+.md-typeset .tutorial-hero {
+  text-align: center;
+  padding: 2.5rem 1rem 1.5rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--md-default-fg-color--lightest);
+}
+.md-typeset .tutorial-hero h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 0.4rem;
+}
+.md-typeset .tutorial-hero .tutorial-subtitle {
+  font-size: 1.1rem;
+  opacity: 0.75;
+  margin-bottom: 0;
+}
+
+/* Step indicator pill */
+.md-typeset .step-indicator {
+  display: inline-block;
+  background: var(--md-primary-fg-color);
+  color: var(--md-primary-bg-color);
+  padding: 0.25rem 1rem;
+  border-radius: 2rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 0.8rem;
+}
+
+/* Learning objectives card */
+.md-typeset .learning-objectives {
+  background: var(--md-code-bg-color);
+  border-radius: 12px;
+  padding: 1.5rem 2rem;
+  margin: 1.5rem 0 2rem;
+}
+.md-typeset .learning-objectives h3 {
+  margin-top: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  opacity: 0.8;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.md-typeset .learning-objectives ul {
+  margin-bottom: 0;
+}
+.md-typeset .learning-objectives li {
+  padding: 0.15rem 0;
+}
+
+/* Prerequisites box */
+.md-typeset .prerequisites {
+  border-left: 4px solid var(--md-primary-fg-color);
+  padding: 0.8rem 1.2rem;
+  margin: 1.5rem 0;
+  background: var(--md-code-bg-color);
+  border-radius: 0 8px 8px 0;
+}
+.md-typeset .prerequisites p {
+  margin: 0.25rem 0;
+}
+
+/* Section divider with label */
+.md-typeset .section-divider {
+  text-align: center;
+  margin: 2.5rem 0 2rem;
+  position: relative;
+}
+.md-typeset .section-divider::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--md-default-fg-color--lightest);
+}
+.md-typeset .section-divider span {
+  position: relative;
+  background: var(--md-default-bg-color);
+  padding: 0 1rem;
+  font-weight: 600;
+  opacity: 0.6;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Next step CTA */
+.md-typeset .next-step {
+  text-align: center;
+  padding: 2rem 1rem;
+  margin: 2rem 0;
+  border-radius: 12px;
+  background: var(--md-code-bg-color);
+}
+.md-typeset .next-step p {
+  margin: 0.3rem 0;
+}
+.md-typeset .next-step a.md-button {
+  border-radius: 2rem;
+  margin-top: 0.8rem;
+}
+
+/* Summary checklist */
+.md-typeset .summary-checklist {
+  background: var(--md-code-bg-color);
+  border-radius: 12px;
+  padding: 1.5rem 2rem;
+  margin: 1.5rem 0;
+  border-left: 4px solid #4caf50;
+}
+.md-typeset .summary-checklist h3 {
+  margin-top: 0;
+  color: #4caf50;
 }
