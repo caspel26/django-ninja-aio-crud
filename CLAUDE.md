@@ -46,3 +46,58 @@ To run tests without coverage:
 
 - Ruff is used for linting and formatting (configured via pre-commit hooks)
 - Pre-commit hooks also check AST validity, merge conflicts, TOML/YAML syntax, trailing whitespace, and EOF newlines
+
+## Architecture Notes
+
+### Serializer System
+
+Two serializer patterns exist:
+
+- **ModelSerializer** (`ninja_aio/models/serializers.py`): Model-bound, config via inner classes (`CreateSerializer`, `ReadSerializer`, `UpdateSerializer`, `DetailSerializer`). Metaclass: `ModelSerializerMeta`.
+- **Serializer** (`ninja_aio/models/serializers.py`): Meta-driven for arbitrary Django models, config via `Meta` class with `SchemaModelConfig` objects. Metaclass: `SerializerMeta`.
+
+Both inherit from `BaseSerializer` which provides shared utilities and the core schema factory (`_generate_model_schema`).
+
+### Schema Generation Pipeline
+
+1. Field configuration gathered from inner classes / Meta
+2. `ninja.orm.create_schema()` called (wraps `pydantic.create_model`) — accepts `base_class`, `fields`, `custom_fields`, `exclude`, `depth`
+3. Validators collected and applied as a subclass of the generated schema (see Validators section)
+4. Resulting Pydantic model class used for input validation and output serialization
+
+### Validators on Serializers
+
+Pydantic `@field_validator` and `@model_validator` can be declared on serializer config classes. The framework collects `PydanticDescriptorProxy` instances and creates a subclass of the generated schema with those validators attached.
+
+**ModelSerializer** — validators on inner serializer classes:
+```python
+class MyModel(ModelSerializer):
+    class CreateSerializer:
+        fields = ["name", "email"]
+
+        @field_validator("name")
+        @classmethod
+        def validate_name(cls, v):
+            if len(v) < 3:
+                raise ValueError("Name too short")
+            return v
+```
+
+**Serializer** — validators on `{Type}Validators` inner classes:
+```python
+class MySerializer(Serializer):
+    class Meta:
+        model = MyModel
+        schema_in = SchemaModelConfig(fields=["name", "email"])
+
+    class CreateValidators:
+        @field_validator("name")
+        @classmethod
+        def validate_name(cls, v):
+            return v.strip()
+```
+
+Key methods in `BaseSerializer`:
+- `_collect_validators(source_class)` — scans class for `PydanticDescriptorProxy` instances
+- `_apply_validators(schema, validators)` — creates subclass with validators attached
+- `_get_validators(schema_type)` — maps schema type to validator source class (overridden by each serializer)
