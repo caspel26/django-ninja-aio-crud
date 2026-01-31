@@ -3,6 +3,8 @@ site_description: Async CRUD utilities for Django Ninja with auth, filtering, pa
 site_url: https://django-ninja-aio.com/
 repo_name: caspel26/django-ninja-aio-crud
 repo_url: https://github.com/caspel26/django-ninja-aio-crud
+edit_uri: edit/main/docs/
+copyright: Copyright &copy; 2024 – 2026 caspel26
 use_directory_urls: true
 
 nav:
@@ -36,6 +38,7 @@ nav:
   - Release Notes: release_notes.md
 
 theme:
+  custom_dir: overrides
   font:
     text: Roboto
     code: Roboto Mono
@@ -73,7 +76,9 @@ theme:
     - navigation.sections
     - navigation.indexes
     - navigation.expand
+    - navigation.path
     - header.autohide
+    - announce.dismiss
     - toc.follow
     - toc.integrate
     - content.code.copy

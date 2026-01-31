@@ -16,9 +16,9 @@
     ```
 
 !!! info "Requirements"
-    - **Python** 3.8+
+    - **Python** 3.10+
     - **Django** 4.1+ (for async ORM support)
-    - **django-ninja** (installed automatically)
+    - **django-ninja** >=1.3.0 (installed automatically)
 
 ---
 
