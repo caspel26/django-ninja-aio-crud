@@ -1110,7 +1110,7 @@ class SchemaModelConfig(Schema):
     fields: Optional[List[str | tuple[str, Any, Any] | tuple[str, Any]]] = None
     optionals: Optional[List[tuple[str, Any]]] = None
     exclude: Optional[List[str]] = None
-    customs: Optional[List[tuple[str, Any, Any]]] = None
+    customs: Optional[List[tuple[str, Any, Any] | tuple[str, Any]]] = None
 
 
 class Serializer(BaseSerializer, metaclass=SerializerMeta):
