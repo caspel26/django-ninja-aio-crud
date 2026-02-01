@@ -94,6 +94,9 @@ class ModelUtil:
     - Stateless wrapper; safe per-request instantiation.
     """
 
+    # Performance: Class-level cache for relation discovery (model structure is static)
+    _relation_cache: dict[tuple[type, str, str], list[str]] = {}
+
     def __init__(
         self, model: type["ModelSerializer"] | models.Model, serializer_class=None
     ):
@@ -191,6 +194,47 @@ class ModelUtil:
         list[str]
         """
         return [field.name for field in self.model._meta.get_fields()]
+
+    def get_valid_input_fields(
+        self, is_serializer: bool, serializer: "ModelSerializer | None" = None
+    ) -> set[str]:
+        """
+        Get allowlist of valid field names for input validation.
+
+        Security: Prevents field injection by returning only fields that should
+        be accepted from user input.
+
+        Parameters
+        ----------
+        is_serializer : bool
+            Whether using a ModelSerializer
+        serializer : ModelSerializer, optional
+            Serializer instance if applicable
+
+        Returns
+        -------
+        set[str]
+            Set of valid field names that can be accepted in input payloads
+        """
+        valid_fields = set(self.model_fields)
+
+        # If using a serializer, also include custom fields
+        if is_serializer and serializer:
+            # Get all custom fields defined in the serializer
+            try:
+                # Custom fields are those that are not model fields but are defined
+                # in the serializer configuration
+                for schema_type in ['create', 'update', 'read', 'detail']:
+                    try:
+                        schema_fields = serializer.get_fields(schema_type)
+                        if schema_fields:
+                            valid_fields.update(schema_fields)
+                    except (AttributeError, TypeError):
+                        continue
+            except (AttributeError, TypeError):
+                pass
+
+        return valid_fields
 
     @property
     def model_name(self) -> str:
@@ -518,6 +562,9 @@ class ModelUtil:
         """
         Discover reverse relation names for safe prefetching.
 
+        Performance: Results are cached per (model, serializer_class, is_for) tuple
+        since model structure is static.
+
         Parameters
         ----------
         is_for : Literal["read", "detail"]
@@ -528,9 +575,17 @@ class ModelUtil:
         list[str]
             Relation attribute names.
         """
+        # Check cache first (performance optimization)
+        cache_key = (self.model, str(self.serializer_class), is_for)
+        if cache_key in self._relation_cache:
+            return self._relation_cache[cache_key].copy()
+
         reverse_rels = self._get_read_optimizations(is_for).prefetch_related.copy()
         if reverse_rels:
+            # Cache and return
+            self._relation_cache[cache_key] = reverse_rels
             return reverse_rels
+
         serializable_fields = self._get_serializable_field_names(is_for)
         for f in serializable_fields:
             field_obj = getattr(self.model, f)
@@ -542,6 +597,9 @@ class ModelUtil:
                 continue
             if isinstance(field_obj, ReverseOneToOneDescriptor):
                 reverse_rels.append(field_obj.related.name)
+
+        # Cache the result
+        self._relation_cache[cache_key] = reverse_rels
         return reverse_rels
 
     def get_select_relateds(
@@ -549,6 +607,9 @@ class ModelUtil:
     ) -> list[str]:
         """
         Discover forward relation names for safe select_related.
+
+        Performance: Results are cached per (model, serializer_class, is_for) tuple
+        since model structure is static.
 
         Parameters
         ----------
@@ -560,9 +621,17 @@ class ModelUtil:
         list[str]
             Relation attribute names.
         """
+        # Check cache first (performance optimization)
+        cache_key = (self.model, str(self.serializer_class) + "_select", is_for)
+        if cache_key in self._relation_cache:
+            return self._relation_cache[cache_key].copy()
+
         select_rels = self._get_read_optimizations(is_for).select_related.copy()
         if select_rels:
+            # Cache and return
+            self._relation_cache[cache_key] = select_rels
             return select_rels
+
         serializable_fields = self._get_serializable_field_names(is_for)
         for f in serializable_fields:
             field_obj = getattr(self.model, f)
@@ -571,12 +640,17 @@ class ModelUtil:
                 continue
             if isinstance(field_obj, ForwardManyToOneDescriptor):
                 select_rels.append(f)
+
+        # Cache the result
+        self._relation_cache[cache_key] = select_rels
         return select_rels
 
-    async def _get_field(self, k: str):
+    async def _get_field(self, k: str) -> models.Field:
+        """Get Django field object for a given field name."""
         return (await agetattr(self.model, k)).field
 
-    def _decode_binary(self, payload: dict, k: str, v: Any, field_obj: models.Field):
+    def _decode_binary(self, payload: dict, k: str, v: Any, field_obj: models.Field) -> None:
+        """Decode base64-encoded binary field values in place."""
         if not isinstance(field_obj, models.BinaryField):
             return
         try:
@@ -591,7 +665,8 @@ class ModelUtil:
         k: str,
         v: Any,
         field_obj: models.Field,
-    ):
+    ) -> None:
+        """Resolve foreign key ID to model instance in place."""
         if not isinstance(field_obj, models.ForeignKey):
             return
         rel_util = ModelUtil(field_obj.related_model)
@@ -600,10 +675,11 @@ class ModelUtil:
 
     async def _bump_object_from_schema(
         self, obj: type["ModelSerializer"] | models.Model, schema: Schema
-    ):
+    ) -> dict:
+        """Convert model instance to dict using Pydantic schema."""
         return (await sync_to_async(schema.from_orm)(obj)).model_dump()
 
-    def _validate_read_params(self, request: HttpRequest, query_data: QuerySchema):
+    def _validate_read_params(self, request: HttpRequest, query_data: QuerySchema) -> None:
         """Validate required parameters for read operations."""
         if request is None:
             raise SerializeError(
@@ -667,12 +743,152 @@ class ModelUtil:
         obj = await self.get_object(request, query_data=query_data, is_for=is_for)
         return await self._bump_object_from_schema(obj, obj_schema)
 
+    def _validate_input_fields(
+        self, payload: dict, is_serializer: bool, serializer
+    ) -> None:
+        """
+        Validate non-custom payload keys against model fields.
+
+        Parameters
+        ----------
+        payload : dict
+            Input payload to validate.
+        is_serializer : bool
+            Whether using a ModelSerializer.
+        serializer : ModelSerializer | Serializer
+            Serializer instance if applicable.
+
+        Raises
+        ------
+        SerializeError
+            If invalid field names are found in payload.
+        """
+        invalid_fields = []
+        for key in payload.keys():
+            # Skip custom fields - they're validated by Pydantic schema
+            if is_serializer and serializer.is_custom(key):
+                continue
+            # Validate non-custom fields exist on the model
+            if key not in self.model_fields:
+                invalid_fields.append(key)
+
+        if invalid_fields:
+            raise SerializeError(
+                {
+                    "detail": f"Invalid field names in payload: {', '.join(sorted(invalid_fields))}",
+                    "invalid_fields": sorted(invalid_fields),
+                },
+                400,
+            )
+
+    def _collect_custom_and_optional_fields(
+        self, payload: dict, is_serializer: bool, serializer
+    ) -> tuple[dict[str, Any], list[str]]:
+        """
+        Collect custom and optional fields from payload.
+
+        Parameters
+        ----------
+        payload : dict
+            Input payload.
+        is_serializer : bool
+            Whether using a ModelSerializer.
+        serializer : ModelSerializer | Serializer
+            Serializer instance if applicable.
+
+        Returns
+        -------
+        tuple[dict[str, Any], list[str]]
+            (custom_fields_dict, optional_field_names)
+        """
+        customs: dict[str, Any] = {}
+        optionals: list[str] = []
+
+        if not is_serializer:
+            return customs, optionals
+
+        customs = {
+            k: v
+            for k, v in payload.items()
+            if serializer.is_custom(k) and k not in self.model_fields
+        }
+        optionals = [
+            k for k, v in payload.items() if serializer.is_optional(k) and v is None
+        ]
+
+        return customs, optionals
+
+    def _determine_skip_keys(
+        self, payload: dict, is_serializer: bool, serializer
+    ) -> set[str]:
+        """
+        Determine which keys to skip during model field processing.
+
+        Parameters
+        ----------
+        payload : dict
+            Input payload.
+        is_serializer : bool
+            Whether using a ModelSerializer.
+        serializer : ModelSerializer | Serializer
+            Serializer instance if applicable.
+
+        Returns
+        -------
+        set[str]
+            Set of keys to skip.
+        """
+        if not is_serializer:
+            return set()
+
+        skip_keys = {
+            k
+            for k, v in payload.items()
+            if (serializer.is_custom(k) and k not in self.model_fields)
+            or (serializer.is_optional(k) and v is None)
+        }
+        return skip_keys
+
+    async def _process_payload_fields(
+        self, request: HttpRequest, payload: dict, fields_to_process: list[tuple[str, Any]]
+    ) -> None:
+        """
+        Process payload fields: decode binary and resolve foreign keys.
+
+        Parameters
+        ----------
+        request : HttpRequest
+            HTTP request object.
+        payload : dict
+            Payload dict to modify in place.
+        fields_to_process : list[tuple[str, Any]]
+            List of (field_name, field_value) tuples to process.
+        """
+        if not fields_to_process:
+            return
+
+        # Fetch all field objects in parallel
+        field_tasks = [self._get_field(k) for k, _ in fields_to_process]
+        field_objs = await asyncio.gather(*field_tasks)
+
+        # Decode binary fields (synchronous, must be sequential)
+        for (k, v), field_obj in zip(fields_to_process, field_objs):
+            self._decode_binary(payload, k, v, field_obj)
+
+        # Resolve all FK fields in parallel
+        fk_tasks = [
+            self._resolve_fk(request, payload, k, v, field_obj)
+            for (k, v), field_obj in zip(fields_to_process, field_objs)
+        ]
+        await asyncio.gather(*fk_tasks)
+
     async def parse_input_data(self, request: HttpRequest, data: Schema):
         """
         Transform inbound schema data to a model-ready payload.
 
         Steps
         -----
+        - Validate fields against allowlist (security).
         - Strip custom fields (retain separately).
         - Drop optional fields with None (ModelSerializer only).
         - Decode BinaryField base64 values.
@@ -692,7 +908,7 @@ class ModelUtil:
         Raises
         ------
         SerializeError
-            On base64 decoding failure.
+            On base64 decoding failure or invalid field names.
         """
         payload = data.model_dump(mode="json")
 
@@ -701,36 +917,20 @@ class ModelUtil:
         )
         serializer = self.serializer if self.with_serializer else self.model
 
-        # Collect custom and optional fields (only if ModelSerializerMeta)
-        customs: dict[str, Any] = {}
-        optionals: list[str] = []
-        if is_serializer:
-            customs = {
-                k: v
-                for k, v in payload.items()
-                if serializer.is_custom(k) and k not in self.model_fields
-            }
-            optionals = [
-                k for k, v in payload.items() if serializer.is_optional(k) and v is None
-            ]
+        # Security: Validate non-custom payload keys against model fields
+        self._validate_input_fields(payload, is_serializer, serializer)
 
-        skip_keys = set()
-        if is_serializer:
-            # Keys to skip during model field processing
-            skip_keys = {
-                k
-                for k, v in payload.items()
-                if (serializer.is_custom(k) and k not in self.model_fields)
-                or (serializer.is_optional(k) and v is None)
-            }
+        # Collect custom and optional fields
+        customs, optionals = self._collect_custom_and_optional_fields(
+            payload, is_serializer, serializer
+        )
 
-        # Process payload fields
-        for k, v in payload.items():
-            if k in skip_keys:
-                continue
-            field_obj = await self._get_field(k)
-            self._decode_binary(payload, k, v, field_obj)
-            await self._resolve_fk(request, payload, k, v, field_obj)
+        # Determine which keys to skip during model field processing
+        skip_keys = self._determine_skip_keys(payload, is_serializer, serializer)
+
+        # Process payload fields - gather field objects in parallel for better performance
+        fields_to_process = [(k, v) for k, v in payload.items() if k not in skip_keys]
+        await self._process_payload_fields(request, payload, fields_to_process)
 
         # Preserve original exclusion semantics (customs if present else optionals)
         exclude_keys = customs.keys() or optionals

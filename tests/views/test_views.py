@@ -416,3 +416,124 @@ class BuildHandlerTestCase(TestCase):
         handler = factory._build_handler(view_instance, async_method)
         result = await handler(mock.MagicMock(), pk=99)
         self.assertEqual(result, "async-99")
+
+
+@tag("view", "filter_validation_helpers")
+class FilterValidationHelpersTestCase(TestCase):
+    """Tests for helper methods extracted from _validate_filter_field during cognitive complexity refactoring."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from ninja_aio import NinjaAIO
+
+        cls.api = NinjaAIO(urls_namespace="test_filter_validation")
+
+        # Create a simple APIViewSet for testing
+        class SimpleViewSet(APIViewSet):
+            model = app_models.TestModelSerializerForeignKey
+            query_params = {
+                "name": (str, None),
+                "test_model_serializer__name": (str, None),
+                "test_model_serializer__description__icontains": (str, None),
+            }
+
+        cls.view = SimpleViewSet(api=cls.api)
+
+    def test_is_lookup_suffix_valid(self):
+        """_is_lookup_suffix should return True for valid Django lookup suffixes."""
+        self.assertTrue(self.view._is_lookup_suffix("exact"))
+        self.assertTrue(self.view._is_lookup_suffix("icontains"))
+        self.assertTrue(self.view._is_lookup_suffix("gte"))
+        self.assertTrue(self.view._is_lookup_suffix("lt"))
+        self.assertTrue(self.view._is_lookup_suffix("in"))
+
+    def test_is_lookup_suffix_invalid(self):
+        """_is_lookup_suffix should return False for invalid lookup suffixes."""
+        self.assertFalse(self.view._is_lookup_suffix("name"))
+        self.assertFalse(self.view._is_lookup_suffix("invalid_lookup"))
+        self.assertFalse(self.view._is_lookup_suffix(""))
+
+    def test_get_related_model_foreign_key(self):
+        """_get_related_model should return related model for ForeignKey fields."""
+        field = app_models.TestModelSerializerForeignKey._meta.get_field(
+            "test_model_serializer"
+        )
+        related_model = self.view._get_related_model(field)
+        self.assertEqual(related_model, app_models.TestModelSerializerReverseForeignKey)
+
+    def test_get_related_model_non_relation(self):
+        """_get_related_model should return None for non-relation fields."""
+        field = app_models.TestModelSerializerForeignKey._meta.get_field("name")
+        related_model = self.view._get_related_model(field)
+        self.assertIsNone(related_model)
+
+    def test_validate_non_relation_field_at_end(self):
+        """_validate_non_relation_field should return True if field is at the end."""
+        parts = ["name"]
+        result = self.view._validate_non_relation_field(parts, 0)
+        self.assertTrue(result)
+
+    def test_validate_non_relation_field_followed_by_lookup(self):
+        """_validate_non_relation_field should return True if followed by lookup suffix."""
+        parts = ["name", "icontains"]
+        result = self.view._validate_non_relation_field(parts, 0)
+        self.assertTrue(result)
+
+    def test_validate_non_relation_field_followed_by_invalid(self):
+        """_validate_non_relation_field should return False if followed by non-lookup."""
+        parts = ["name", "invalid_part"]
+        result = self.view._validate_non_relation_field(parts, 0)
+        self.assertFalse(result)
+
+    def test_validate_filter_field_simple(self):
+        """_validate_filter_field should validate simple field names."""
+        self.assertTrue(self.view._validate_filter_field("name"))
+        self.assertTrue(self.view._validate_filter_field("description"))
+
+    def test_validate_filter_field_with_lookup(self):
+        """_validate_filter_field should validate fields with lookup suffixes."""
+        self.assertTrue(self.view._validate_filter_field("name__icontains"))
+        self.assertTrue(self.view._validate_filter_field("description__exact"))
+
+    def test_validate_filter_field_relation(self):
+        """_validate_filter_field should validate relation field paths."""
+        self.assertTrue(
+            self.view._validate_filter_field("test_model_serializer__name")
+        )
+        self.assertTrue(
+            self.view._validate_filter_field("test_model_serializer__description")
+        )
+
+    def test_validate_filter_field_relation_with_lookup(self):
+        """_validate_filter_field should validate relation paths with lookups."""
+        self.assertTrue(
+            self.view._validate_filter_field("test_model_serializer__name__icontains")
+        )
+        self.assertTrue(
+            self.view._validate_filter_field(
+                "test_model_serializer__description__startswith"
+            )
+        )
+
+    def test_validate_filter_field_empty(self):
+        """_validate_filter_field should return False for empty string."""
+        self.assertFalse(self.view._validate_filter_field(""))
+
+    def test_validate_filter_field_invalid(self):
+        """_validate_filter_field should return False for invalid field names."""
+        self.assertFalse(self.view._validate_filter_field("invalid_field"))
+        self.assertFalse(
+            self.view._validate_filter_field("test_model_serializer__invalid_field")
+        )
+
+    def test_validate_filter_field_only_lookup(self):
+        """_validate_filter_field should return True for pure lookup suffixes."""
+        # When the last part is a valid lookup and there are previous valid fields
+        self.assertTrue(self.view._validate_filter_field("name__icontains"))
+
+    def test_validate_filter_field_non_relation_in_middle(self):
+        """_validate_filter_field should handle non-relation fields in the middle correctly."""
+        # A non-relation field can only be followed by a lookup suffix
+        self.assertFalse(
+            self.view._validate_filter_field("name__description")
+        )  # name is not a relation

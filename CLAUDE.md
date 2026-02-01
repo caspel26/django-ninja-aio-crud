@@ -248,13 +248,6 @@ Brief paragraph summarizing the release. Then:
 **Key benefits:**
 - Bullet points
 
-### All Files Changed
-
-| File | Changes |
-|---|---|
-| `path/to/file` | Brief description |
-```
-
 ### Key rules
 
 - **Always overwrite `CHANGELOG.md`** — Every time a changelog is generated, overwrite the existing `CHANGELOG.md` file at the project root. Do not create a new file or append to it.
@@ -265,6 +258,5 @@ Brief paragraph summarizing the release. Then:
 - **Include code examples** for new user-facing API features
 - **Use tables** for listing tests, methods, file changes, and mappings
 - **Keep docs/styling/config sections brief** — one-liner summaries for CSS, `main.py` template changes, and `mkdocs.yml` config. Do not enumerate individual CSS classes or JS functions
-- **Always include "All Files Changed" table** at the bottom
 - **Always include "Summary" section** with key benefits as bullet points
 - **Separate sections with `---`** horizontal rules

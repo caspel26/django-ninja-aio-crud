@@ -11,6 +11,8 @@ from typing import (
 )
 import warnings
 import sys
+import threading
+from functools import lru_cache
 
 from django.conf import settings
 from ninja import Schema
@@ -102,6 +104,56 @@ class BaseSerializer:
         detail = ModelQuerySetSchema()
         queryset_request = ModelQuerySetSchema()
         extras: list[ModelQuerySetExtraSchema] = []
+
+    # Thread-local storage for tracking circular reference resolution
+    _resolution_context = threading.local()
+
+    @classmethod
+    def _get_resolution_stack(cls) -> list[str]:
+        """
+        Get the current resolution stack for detecting circular references.
+
+        Returns
+        -------
+        list[str]
+            Stack of model names currently being resolved (thread-safe).
+        """
+        if not hasattr(cls._resolution_context, 'stack'):
+            cls._resolution_context.stack = []
+        return cls._resolution_context.stack
+
+    @classmethod
+    def _is_circular_reference(cls, model: models.Model) -> bool:
+        """
+        Check if resolving this model would create a circular reference.
+
+        Security: Prevents infinite recursion and stack overflow attacks.
+
+        Parameters
+        ----------
+        model : models.Model
+            The model to check
+
+        Returns
+        -------
+        bool
+            True if the model is already being resolved (circular reference detected)
+        """
+        model_key = f"{model._meta.app_label}.{model._meta.model_name}"
+        return model_key in cls._get_resolution_stack()
+
+    @classmethod
+    def _push_resolution(cls, model: models.Model) -> None:
+        """Add a model to the resolution stack."""
+        model_key = f"{model._meta.app_label}.{model._meta.model_name}"
+        cls._get_resolution_stack().append(model_key)
+
+    @classmethod
+    def _pop_resolution(cls) -> None:
+        """Remove the most recent model from the resolution stack."""
+        stack = cls._get_resolution_stack()
+        if stack:
+            stack.pop()
 
     @classmethod
     def _collect_validators(cls, source_class) -> dict:
@@ -425,29 +477,51 @@ class BaseSerializer:
         -------
         Schema | Union[Schema, ...] | None
             Generated schema, Union of schemas, or None if cannot be resolved.
+
+        Notes
+        -----
+        Includes circular reference detection to prevent infinite recursion.
         """
-        # Auto-resolve ModelSerializer with readable fields
-        if isinstance(rel_model, ModelSerializerMeta):
-            has_readable_fields = rel_model.get_fields(
-                "read"
-            ) or rel_model.get_custom_fields("read")
-            return rel_model.generate_related_s() if has_readable_fields else None
-
-        # Resolve from explicit serializer mapping
-        rel_serializers = cls._get_relations_serializers() or {}
-        serializer_ref = rel_serializers.get(field_name)
-
-        if not serializer_ref:
+        # Security: Check for circular references to prevent infinite recursion
+        if cls._is_circular_reference(rel_model):
+            # Circular reference detected - return None to break the cycle
+            warnings.warn(
+                f"Circular reference detected for {rel_model._meta.label} "
+                f"in field '{field_name}' of {cls._get_model()._meta.label}. "
+                f"Skipping nested schema generation to prevent infinite recursion.",
+                UserWarning,
+                stacklevel=2
+            )
             return None
 
-        resolved = cls._resolve_serializer_reference(serializer_ref)
+        # Track this model in the resolution stack
+        cls._push_resolution(rel_model)
+        try:
+            # Auto-resolve ModelSerializer with readable fields
+            if isinstance(rel_model, ModelSerializerMeta):
+                has_readable_fields = rel_model.get_fields(
+                    "read"
+                ) or rel_model.get_custom_fields("read")
+                return rel_model.generate_related_s() if has_readable_fields else None
 
-        # Handle Union of serializers
-        if get_origin(resolved) is Union:
-            return cls._generate_union_schema(resolved)
+            # Resolve from explicit serializer mapping
+            rel_serializers = cls._get_relations_serializers() or {}
+            serializer_ref = rel_serializers.get(field_name)
 
-        # Handle single serializer
-        return resolved.generate_related_s()
+            if not serializer_ref:
+                return None
+
+            resolved = cls._resolve_serializer_reference(serializer_ref)
+
+            # Handle Union of serializers
+            if get_origin(resolved) is Union:
+                return cls._generate_union_schema(resolved)
+
+            # Handle single serializer
+            return resolved.generate_related_s()
+        finally:
+            # Always pop from resolution stack when done
+            cls._pop_resolution()
 
     @classmethod
     def _is_special_field(
@@ -1072,9 +1146,12 @@ class BaseSerializer:
         return non_relation_fields, customs
 
     @classmethod
+    @lru_cache(maxsize=128)
     def generate_read_s(cls, depth: int = 1) -> Schema:
         """
         Generate the read (Out) schema for list responses.
+
+        Performance: Results are cached per (class, depth) combination.
 
         Parameters
         ----------
@@ -1089,12 +1166,15 @@ class BaseSerializer:
         return cls._generate_model_schema("Out", depth)
 
     @classmethod
+    @lru_cache(maxsize=128)
     def generate_detail_s(cls, depth: int = 1) -> Schema:
         """
         Generate the detail (single-object) read schema.
 
         Falls back to the standard read schema if no detail-specific
         configuration is defined.
+
+        Performance: Results are cached per (class, depth) combination.
 
         Parameters
         ----------
@@ -1109,9 +1189,12 @@ class BaseSerializer:
         return cls._generate_model_schema("Detail", depth) or cls.generate_read_s(depth)
 
     @classmethod
+    @lru_cache(maxsize=128)
     def generate_create_s(cls) -> Schema:
         """
         Generate the create (In) schema for input validation.
+
+        Performance: Results are cached per class.
 
         Returns
         -------
@@ -1121,9 +1204,12 @@ class BaseSerializer:
         return cls._generate_model_schema("In")
 
     @classmethod
+    @lru_cache(maxsize=128)
     def generate_update_s(cls) -> Schema:
         """
         Generate the update (Patch) schema for partial updates.
+
+        Performance: Results are cached per class.
 
         Returns
         -------
@@ -1133,12 +1219,15 @@ class BaseSerializer:
         return cls._generate_model_schema("Patch")
 
     @classmethod
+    @lru_cache(maxsize=128)
     def generate_related_s(cls) -> Schema:
         """
         Generate the related (nested) schema for embedding in parent schemas.
 
         Includes only non-relational model fields and custom fields, preventing
         infinite nesting of related objects.
+
+        Performance: Results are cached per class.
 
         Returns
         -------

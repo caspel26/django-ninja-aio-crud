@@ -6,6 +6,7 @@ from ninja.pagination import paginate, AsyncPaginationBase, PageNumberPagination
 from django.http import HttpRequest
 from django.db.models import Model, QuerySet
 from django.conf import settings
+from django.core.exceptions import FieldDoesNotExist
 from pydantic import create_model
 
 from ninja_aio.schemas.helpers import ModelQuerySetSchema, QuerySchema, DecoratorsSchema
@@ -16,7 +17,7 @@ from ninja_aio.schemas import (
     M2MRelationSchema,
 )
 from ninja_aio.helpers.api import ManyToManyAPI
-from ninja_aio.types import ModelSerializerMeta, VIEW_TYPES
+from ninja_aio.types import ModelSerializerMeta, VIEW_TYPES, VALID_DJANGO_LOOKUPS
 from ninja_aio.decorators import unique_view, decorate_view, aatomic
 from ninja_aio.models import serializers
 
@@ -31,7 +32,7 @@ class API:
     auth: list | None = NOT_SET
     router: Router = None
 
-    def views(self):
+    def views(self) -> None:
         """
         Override this method to add your custom views. For example:
         @self.router.get(some_path, response=some_schema)
@@ -65,13 +66,15 @@ class API:
         """
         pass
 
-    def _add_views(self):
+    def _add_views(self) -> Router:
+        """Register views decorated with @api_register."""
         for name in dir(self.__class__):
             method = getattr(self.__class__, name)
             if hasattr(method, "_api_register"):
                 method._api_register(self)
+        return self.router
 
-    def add_views_to_route(self):
+    def add_views_to_route(self) -> Router:
         return self.api.add_router(f"{self.api_route_path}", self._add_views())
 
 
@@ -322,6 +325,98 @@ class APIViewSet(API):
             filter
         )
 
+    def _is_lookup_suffix(self, part: str) -> bool:
+        """
+        Check if a part is a valid Django lookup suffix.
+
+        Args:
+            part: The part to check
+
+        Returns:
+            bool: True if the part is a valid lookup suffix
+        """
+        return part in VALID_DJANGO_LOOKUPS
+
+    def _get_related_model(self, field):
+        """
+        Extract the related model from a field if it exists.
+
+        Args:
+            field: The Django field object
+
+        Returns:
+            Model class or None
+        """
+        if hasattr(field, 'related_model') and field.related_model:
+            return field.related_model
+        if hasattr(field, 'remote_field') and field.remote_field and hasattr(field.remote_field, 'model'):
+            return field.remote_field.model
+        return None
+
+    def _validate_non_relation_field(self, parts: list[str], i: int) -> bool:
+        """
+        Validate a non-relation field that appears before the end of the path.
+
+        Args:
+            parts: List of field path parts
+            i: Current index in parts
+
+        Returns:
+            bool: True if valid, False otherwise
+        """
+        if i >= len(parts) - 1:
+            return True
+        next_part = parts[i + 1]
+        return self._is_lookup_suffix(next_part)
+
+    def _validate_filter_field(self, field_path: str) -> bool:
+        """
+        Validate that a filter field path corresponds to valid model fields.
+
+        Security: Prevents field injection attacks by ensuring only valid model
+        fields can be used in filters.
+
+        Args:
+            field_path: The field path to validate (e.g., "name", "author__name")
+
+        Returns:
+            bool: True if the field path is valid, False otherwise
+
+        Examples:
+            "name" -> validates against direct model field
+            "author__name" -> validates author is a relation, then name on related model
+            "created_at__gte" -> validates created_at field, lookup suffix is allowed
+        """
+        if not field_path:
+            return False
+
+        parts = field_path.split('__')
+        current_model = self.model
+
+        # Iterate through the path, validating each part
+        for i, part in enumerate(parts):
+            # Check if this is the last part and might be a lookup suffix
+            is_last_part = i == len(parts) - 1
+            if is_last_part and self._is_lookup_suffix(part):
+                return True
+
+            try:
+                field = current_model._meta.get_field(part)
+            except (FieldDoesNotExist, AttributeError):
+                # Field doesn't exist on this model
+                return False
+
+            # If this is a relation field and not the last part, traverse to related model
+            related_model = self._get_related_model(field)
+            if related_model and not is_last_part:
+                current_model = related_model
+            elif not is_last_part:
+                # Non-relation field in the middle - must be followed by a lookup suffix
+                if not self._validate_non_relation_field(parts, i):
+                    return False
+
+        return True
+
     def _auth_view(self, view_type: str):
         """
         Resolve auth for a specific HTTP verb; falls back to self.auth if NOT_SET.
@@ -329,16 +424,20 @@ class APIViewSet(API):
         auth = getattr(self, f"{view_type}_auth", None)
         return auth if auth is not NOT_SET else self.auth
 
-    def get_view_auth(self):
+    def get_view_auth(self) -> list | None:
+        """Get authentication configuration for GET endpoints."""
         return self._auth_view("get")
 
-    def post_view_auth(self):
+    def post_view_auth(self) -> list | None:
+        """Get authentication configuration for POST endpoints."""
         return self._auth_view("post")
 
-    def patch_view_auth(self):
+    def patch_view_auth(self) -> list | None:
+        """Get authentication configuration for PATCH endpoints."""
         return self._auth_view("patch")
 
-    def delete_view_auth(self):
+    def delete_view_auth(self) -> list | None:
+        """Get authentication configuration for DELETE endpoints."""
         return self._auth_view("delete")
 
     def _generate_schema(self, fields: dict, name: str) -> Schema:
@@ -347,7 +446,7 @@ class APIViewSet(API):
         """
         return create_model(f"{self.model_util.model_name}{name}", **fields)
 
-    def _generate_path_schema(self):
+    def _generate_path_schema(self) -> Schema:
         """
         Schema containing only the primary key field for path resolution.
         """
