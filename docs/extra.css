@@ -55,6 +55,232 @@
   margin-bottom: 1.5rem;
 }
 
+/* Mobile responsive adjustments */
+@media screen and (max-width: 768px) {
+  /* Hero section mobile */
+  .md-typeset .hero {
+    padding: 1rem 0 0.5rem;
+  }
+
+  .md-typeset .hero img.hero-logo {
+    max-width: 90%;
+    margin-top: -1rem;
+  }
+
+  .md-typeset .hero h1 {
+    font-size: 1.8rem;
+  }
+
+  .md-typeset .hero p.subtitle {
+    font-size: 0.95rem;
+    margin-bottom: 1rem;
+    padding: 0 1rem;
+  }
+
+  /* CTA buttons mobile */
+  .md-typeset .cta-buttons {
+    margin: 1rem 0 1.5rem;
+  }
+
+  .md-typeset .cta-buttons a.md-button {
+    display: block;
+    margin: 0.5rem auto;
+    max-width: 280px;
+  }
+
+  /* Badges mobile */
+  .md-typeset .badges {
+    margin-bottom: 1.5rem;
+  }
+
+  .md-typeset .badges a {
+    margin: 0.25rem;
+  }
+
+  /* Tutorial hero mobile */
+  .md-typeset .tutorial-hero {
+    padding: 1.5rem 1rem 1rem;
+  }
+
+  .md-typeset .tutorial-hero h1 {
+    font-size: 1.6rem;
+  }
+
+  .md-typeset .tutorial-hero .tutorial-subtitle {
+    font-size: 0.95rem;
+  }
+
+  /* Grid cards mobile - single column */
+  .md-typeset .grid.cards {
+    grid-template-columns: 1fr !important;
+  }
+
+  .md-typeset .grid.cards > ul > li {
+    margin: 0.5rem 0;
+  }
+
+  /* Code blocks mobile - better overflow handling */
+  .md-typeset pre {
+    font-size: 0.75rem;
+    padding: 0.8rem;
+  }
+
+  .md-typeset code {
+    font-size: 0.8em;
+    word-wrap: break-word;
+  }
+
+  /* Tables mobile - horizontal scroll */
+  .md-typeset table {
+    display: block;
+    overflow-x: auto;
+    font-size: 0.8rem;
+  }
+
+  /* Release cards mobile */
+  .release-card {
+    padding: 1rem;
+  }
+
+  .release-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.3rem;
+  }
+
+  .release-card-body table {
+    font-size: 0.7rem;
+  }
+
+  .release-card-body table th,
+  .release-card-body table td {
+    padding: 0.3rem 0.4rem;
+  }
+
+  /* Release timeline mobile */
+  .release-entry {
+    padding: 1rem 1rem;
+  }
+
+  .release-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.3rem;
+  }
+
+  .release-tag {
+    font-size: 1rem;
+  }
+
+  .release-meta {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.3rem;
+  }
+
+  /* Learning objectives mobile */
+  .md-typeset .learning-objectives {
+    padding: 1rem 1.2rem;
+    margin: 1rem 0;
+  }
+
+  .md-typeset .learning-objectives h3 {
+    font-size: 0.9rem;
+  }
+
+  /* Next step CTA mobile */
+  .md-typeset .next-step {
+    padding: 1.5rem 1rem;
+    margin: 1.5rem 0;
+  }
+
+  /* Section divider mobile */
+  .md-typeset .section-divider {
+    margin: 2rem 0 1.5rem;
+  }
+
+  .md-typeset .section-divider span {
+    font-size: 0.75rem;
+    padding: 0 0.7rem;
+  }
+
+  /* Dropdown mobile optimization */
+  .release-dropdown-toggle {
+    font-size: 0.85rem;
+    padding: 0.6rem 0.8rem;
+  }
+
+  .release-dropdown-item {
+    font-size: 0.82rem;
+    padding: 0.5rem 0.8rem;
+  }
+
+  .release-dropdown-item-date {
+    font-size: 0.7rem;
+  }
+
+  /* Admonitions mobile */
+  .md-typeset .admonition {
+    font-size: 0.85rem;
+  }
+
+  .md-typeset .admonition-title {
+    font-size: 0.9rem;
+    padding-left: 2.5rem;
+  }
+
+  /* Better touch targets for mobile */
+  .md-typeset a.md-button {
+    min-height: 44px;
+    line-height: 44px;
+    padding: 0 1.5rem;
+  }
+
+  /* Reduce excessive spacing on mobile */
+  .md-typeset h2 {
+    margin-top: 1.5rem;
+  }
+
+  .md-typeset h3 {
+    margin-top: 1.2rem;
+  }
+}
+
+/* Extra small mobile devices */
+@media screen and (max-width: 480px) {
+  /* Further reduce logo on very small screens */
+  .md-typeset .hero img.hero-logo {
+    max-width: 95%;
+    margin-top: -0.5rem;
+  }
+
+  .md-typeset .hero h1 {
+    font-size: 1.5rem;
+  }
+
+  .md-typeset .hero p.subtitle {
+    font-size: 0.85rem;
+  }
+
+  /* Stack badges vertically on very small screens */
+  .md-typeset .badges a img {
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* Even smaller code on tiny screens */
+  .md-typeset pre {
+    font-size: 0.7rem;
+    padding: 0.6rem;
+  }
+
+  /* Buttons full width on tiny screens */
+  .md-typeset .cta-buttons a.md-button {
+    max-width: 100%;
+    margin: 0.5rem 0.5rem;
+  }
+}
+
 /* Badge row */
 .md-typeset .badges {
   text-align: center;
