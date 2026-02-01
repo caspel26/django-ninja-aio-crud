@@ -2260,6 +2260,22 @@ class ResolveSerializerReferenceEdgeCasesTestCase(TestCase):
         )
         self.assertIs(result, SerializerForCRUD)
 
+    def test_resolve_single_type_union_optimization(self):
+        """Line 335: single-type union is optimized to the unwrapped type."""
+        import typing
+
+        # Manually construct a Union with a single type arg since
+        # Union[X] normally collapses to X in Python.
+        single_union = typing.Union[SerializerForCRUD, None]
+        # Union[X, None] is Optional[X] with 2 args, so we need
+        # to synthesize a true single-element union via internal API.
+        single_union = typing._GenericAlias(typing.Union, (SerializerForCRUD,))
+
+        resolved = serializers.BaseSerializer._resolve_serializer_reference(
+            single_union
+        )
+        self.assertIs(resolved, SerializerForCRUD)
+
 
 @tag("serializers", "coverage")
 class GetSchemaOutDataEdgeCasesTestCase(TestCase):
