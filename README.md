@@ -1,8 +1,6 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/caspel26/django-ninja-aio-crud/main/docs/images/logo-full.png" alt="django-ninja-aio-crud">
+  <img src="https://raw.githubusercontent.com/caspel26/django-ninja-aio-crud/main/docs/images/logo-full2.png" alt="django-ninja-aio-crud">
 </p>
-
-<h1 align="center">django-ninja-aio-crud</h1>
 
 <p align="center">
   <strong>Async CRUD framework for Django Ninja</strong><br>
