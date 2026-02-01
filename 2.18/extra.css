@@ -85,7 +85,10 @@
   .md-typeset .cta-buttons a.md-button {
     display: block;
     margin: 0.5rem auto;
-    max-width: 280px;
+    max-width: 240px;
+    padding: 0.6rem 1.2rem;
+    min-height: auto;
+    line-height: normal;
   }
 
   /* Badges mobile */
@@ -276,8 +279,11 @@
 
   /* Buttons full width on tiny screens */
   .md-typeset .cta-buttons a.md-button {
-    max-width: 100%;
-    margin: 0.5rem 0.5rem;
+    max-width: 90%;
+    margin: 0.5rem auto;
+    padding: 0.5rem 1rem;
+    min-height: auto;
+    line-height: normal;
   }
 }
 
