@@ -1486,11 +1486,35 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#live-performance-report" class="md-nav__link">
+    <span class="md-ellipsis">
+      Live Performance Report
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#ci-integration" class="md-nav__link">
     <span class="md-ellipsis">
       CI Integration
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="CI Integration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#regression-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      Regression Detection
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1621,6 +1645,19 @@
 </table>
 <p>Both files are gitignored.</p>
 <hr />
+<h2 id="live-performance-report">Live Performance Report<a class="headerlink" href="#live-performance-report" title="Permanent link">&para;</a></h2>
+<p>The latest performance benchmarks from the <code>main</code> branch are automatically published and available as an interactive HTML report:</p>
+<div class="cta-buttons">
+<p><a class="md-button md-button--primary" href="https://caspel26.github.io/django-ninja-aio-crud/performance/performance_report.html" target="_blank">View Live Performance Report <span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m16 11.78 4.24-7.33 1.73 1-5.23 9.05-6.51-3.75L5.46 19H22v2H2V3h2v14.54L9.5 8z"/></svg></span></a></p>
+</div>
+<p>The live report includes:</p>
+<ul>
+<li><strong>Bar charts</strong> showing min/avg/median/max times for the latest run</li>
+<li><strong>Trend charts</strong> tracking median performance across multiple runs over time</li>
+<li><strong>Interactive tooltips</strong> with exact timings</li>
+<li><strong>Automatic dark mode</strong> support</li>
+</ul>
+<hr />
 <h2 id="ci-integration">CI Integration<a class="headerlink" href="#ci-integration" title="Permanent link">&para;</a></h2>
 <p>Performance benchmarks run as part of the CI pipeline via GitHub Actions on every push to <code>main</code> and on every pull request. The workflow:</p>
 <ol>
@@ -1628,12 +1665,24 @@
 <li>Installs dependencies via Flit</li>
 <li>Runs the full benchmark suite</li>
 <li>Generates the performance report</li>
+<li>Downloads the baseline from the latest <code>main</code> run</li>
+<li>Checks for regressions (fails if any benchmark regresses &gt;20%)</li>
 <li>Uploads the report as a workflow artifact</li>
+<li>Deploys the report to GitHub Pages (main branch only)</li>
 </ol>
 <p>You can download the report artifact from any workflow run in the <a href="https://github.com/caspel26/django-ninja-aio-crud/actions/workflows/performance.yml" target="_blank">Actions tab</a>.</p>
 <div class="cta-buttons">
-<p><a class="md-button md-button--primary" href="https://github.com/caspel26/django-ninja-aio-crud/actions/workflows/performance.yml" target="_blank">View latest benchmark runs <span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3m-2 16H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7h-2z"/></svg></span></a></p>
+<p><a class="md-button" href="https://github.com/caspel26/django-ninja-aio-crud/actions/workflows/performance.yml" target="_blank">View workflow runs <span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3m-2 16H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7h-2z"/></svg></span></a></p>
 </div>
+<h3 id="regression-detection">Regression Detection<a class="headerlink" href="#regression-detection" title="Permanent link">&para;</a></h3>
+<p>Pull requests are automatically checked for performance regressions:</p>
+<ul>
+<li>The latest <code>main</code> branch results are used as the baseline</li>
+<li>Each benchmark's <strong>median</strong> time is compared</li>
+<li>The build <strong>fails</strong> if any benchmark regresses by more than <strong>20%</strong></li>
+<li>New benchmarks are skipped (no baseline to compare against)</li>
+</ul>
+<p>This threshold accounts for CI runner variance while catching real performance issues.</p>
 <hr />
 <h2 id="interpreting-results">Interpreting Results<a class="headerlink" href="#interpreting-results" title="Permanent link">&para;</a></h2>
 <p>Each benchmark reports the following metrics over its configured number of iterations:</p>
