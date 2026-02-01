@@ -61,6 +61,25 @@ Both files are gitignored.
 
 ---
 
+## Live Performance Report
+
+The latest performance benchmarks from the `main` branch are automatically published and available as an interactive HTML report:
+
+<div class="cta-buttons" markdown>
+
+[View Live Performance Report :material-chart-line:](https://caspel26.github.io/django-ninja-aio-crud/performance/performance_report.html){ .md-button .md-button--primary target="_blank" }
+
+</div>
+
+The live report includes:
+
+- **Bar charts** showing min/avg/median/max times for the latest run
+- **Trend charts** tracking median performance across multiple runs over time
+- **Interactive tooltips** with exact timings
+- **Automatic dark mode** support
+
+---
+
 ## CI Integration
 
 Performance benchmarks run as part of the CI pipeline via GitHub Actions on every push to `main` and on every pull request. The workflow:
@@ -69,15 +88,29 @@ Performance benchmarks run as part of the CI pipeline via GitHub Actions on ever
 2. Installs dependencies via Flit
 3. Runs the full benchmark suite
 4. Generates the performance report
-5. Uploads the report as a workflow artifact
+5. Downloads the baseline from the latest `main` run
+6. Checks for regressions (fails if any benchmark regresses >20%)
+7. Uploads the report as a workflow artifact
+8. Deploys the report to GitHub Pages (main branch only)
 
 You can download the report artifact from any workflow run in the [Actions tab](https://github.com/caspel26/django-ninja-aio-crud/actions/workflows/performance.yml){ target="_blank" }.
 
 <div class="cta-buttons" markdown>
 
-[View latest benchmark runs :material-open-in-new:](https://github.com/caspel26/django-ninja-aio-crud/actions/workflows/performance.yml){ .md-button .md-button--primary target="_blank" }
+[View workflow runs :material-open-in-new:](https://github.com/caspel26/django-ninja-aio-crud/actions/workflows/performance.yml){ .md-button target="_blank" }
 
 </div>
+
+### Regression Detection
+
+Pull requests are automatically checked for performance regressions:
+
+- The latest `main` branch results are used as the baseline
+- Each benchmark's **median** time is compared
+- The build **fails** if any benchmark regresses by more than **20%**
+- New benchmarks are skipped (no baseline to compare against)
+
+This threshold accounts for CI runner variance while catching real performance issues.
 
 ---
 

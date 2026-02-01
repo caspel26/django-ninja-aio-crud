@@ -59,3 +59,19 @@ jobs:
           path: |
             performance_report.html
             performance_results.json
+
+      # Deploy to GitHub Pages (main branch only)
+      - name: Deploy Performance Report to GitHub Pages
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./
+          destination_dir: performance
+          keep_files: true
+          publish_branch: gh-pages
+          user_name: 'github-actions[bot]'
+          user_email: 'github-actions[bot]@users.noreply.github.com'
+          commit_message: 'Deploy performance report'
+          enable_jekyll: false
+          exclude_assets: '.git*,*.py,*.pyc,ninja_aio/**,tests/**,docs/**,.venv/**,*.toml,*.cfg,*.txt,*.sh,*.md'
