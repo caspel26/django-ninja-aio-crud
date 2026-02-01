@@ -19,7 +19,13 @@ from tests.test_app.views import (
     TestModelSerializerMatchCaseFilterAPI,
 )
 
-RESULTS_FILE = Path(__file__).resolve().parents[2] / "performance_results.json"
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+RESULTS_FILE = (PROJECT_ROOT / "performance_results.json").resolve()
+
+if not str(RESULTS_FILE).startswith(str(PROJECT_ROOT)):
+    raise RuntimeError(
+        f"Results file path escapes project root: {RESULTS_FILE}"
+    )
 DEFAULT_ITERATIONS = 100
 BULK_SIZES = [100, 500]
 

@@ -491,10 +491,20 @@ def main():
     )
     args = parser.parse_args()
 
-    data = load_results(args.input)
+    input_path = args.input.resolve()
+    output_path = args.output.resolve()
+
+    if not str(input_path).startswith(str(PROJECT_ROOT)):
+        print(f"Error: input path must be within project root ({PROJECT_ROOT})", file=sys.stderr)
+        sys.exit(1)
+    if not str(output_path).startswith(str(PROJECT_ROOT)):
+        print(f"Error: output path must be within project root ({PROJECT_ROOT})", file=sys.stderr)
+        sys.exit(1)
+
+    data = load_results(input_path)
     html_content = generate_html(data)
-    args.output.write_text(html_content)
-    print(f"Report generated: {args.output}")
+    output_path.write_text(html_content)
+    print(f"Report generated: {output_path}")
 
 
 if __name__ == "__main__":
