@@ -75,6 +75,12 @@ Automatic REST APIs with auth, filtering, pagination, and serialization.
 
     OpenAPI / Swagger UI out of the box
 
+-   :material-check-decagram:{ .lg .middle } **Schema Validators**
+
+    ---
+
+    Pydantic `@field_validator` and `@model_validator` on serializers
+
 -   :material-page-next:{ .lg .middle } **Pagination**
 
     ---
@@ -168,6 +174,14 @@ Traditional Django REST development requires separate serializer classes, manual
     Schema generation, serialization, and async CRUD utilities
 
     [:octicons-arrow-right-24: ModelSerializer](api/models/model_serializer.md) &middot; [:octicons-arrow-right-24: ModelUtil](api/models/model_util.md)
+
+-   :material-check-decagram:{ .lg .middle } **Validators**
+
+    ---
+
+    Pydantic `@field_validator` and `@model_validator` on serializers
+
+    [:octicons-arrow-right-24: Validators](api/models/validators.md)
 
 -   :material-eye:{ .lg .middle } **Views**
 
@@ -364,6 +378,103 @@ Here's a real-world example with relationships:
     ```
 
 This creates a complete blog API with 4 models with relationships, automatic nested serialization, query filtering, custom actions, and full CRUD operations for all models.
+
+---
+
+## :material-check-decagram: Schema Validators
+
+Add Pydantic `@field_validator` and `@model_validator` directly on serializer classes for input validation. The framework collects validators and attaches them to the generated Pydantic schemas automatically.
+
+=== "ModelSerializer"
+
+    Declare validators on inner serializer classes (`CreateSerializer`, `UpdateSerializer`, `ReadSerializer`, `DetailSerializer`):
+
+    ```python
+    from django.db import models
+    from pydantic import field_validator, model_validator
+    from ninja_aio.models import ModelSerializer
+
+    class Book(ModelSerializer):
+        title = models.CharField(max_length=120)
+        description = models.TextField(blank=True)
+
+        class CreateSerializer:
+            fields = ["title", "description"]
+
+            @field_validator("title")
+            @classmethod
+            def validate_title_min_length(cls, v):
+                if len(v) < 3:
+                    raise ValueError("Title must be at least 3 characters")
+                return v
+
+        class UpdateSerializer:
+            optionals = [("title", str), ("description", str)]
+
+            @field_validator("title")
+            @classmethod
+            def validate_title_not_empty(cls, v):
+                if v is not None and len(v.strip()) == 0:
+                    raise ValueError("Title cannot be blank")
+                return v
+
+        class ReadSerializer:
+            fields = ["id", "title", "description"]
+
+            @model_validator(mode="after")
+            def enrich_output(self):
+                # Transform or enrich the output schema
+                return self
+    ```
+
+=== "Serializer (Meta-driven)"
+
+    Use dedicated `{Type}Validators` inner classes (`CreateValidators`, `UpdateValidators`, `ReadValidators`, `DetailValidators`):
+
+    ```python
+    from pydantic import field_validator, model_validator
+    from ninja_aio.models import serializers
+    from . import models
+
+    class BookSerializer(serializers.Serializer):
+        class Meta:
+            model = models.Book
+            schema_in = serializers.SchemaModelConfig(fields=["title", "description"])
+            schema_out = serializers.SchemaModelConfig(fields=["id", "title", "description"])
+            schema_update = serializers.SchemaModelConfig(
+                optionals=[("title", str), ("description", str)]
+            )
+
+        class CreateValidators:
+            @field_validator("title")
+            @classmethod
+            def validate_title_min_length(cls, v):
+                if len(v) < 3:
+                    raise ValueError("Title must be at least 3 characters")
+                return v
+
+        class UpdateValidators:
+            @field_validator("title")
+            @classmethod
+            def validate_title_not_empty(cls, v):
+                if v is not None and len(v.strip()) == 0:
+                    raise ValueError("Title cannot be blank")
+                return v
+
+        class ReadValidators:
+            @model_validator(mode="after")
+            def enrich_output(self):
+                return self
+    ```
+
+**Validator class mapping:**
+
+| Schema type | ModelSerializer | Serializer (Meta-driven) |
+|---|---|---|
+| Create | `CreateSerializer` | `CreateValidators` |
+| Update | `UpdateSerializer` | `UpdateValidators` |
+| Read | `ReadSerializer` | `ReadValidators` |
+| Detail | `DetailSerializer` | `DetailValidators` |
 
 ---
 
