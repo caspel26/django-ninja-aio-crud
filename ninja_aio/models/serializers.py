@@ -928,64 +928,45 @@ class BaseSerializer:
         )
 
     @classmethod
-    def _generate_model_schema(
-        cls,
-        schema_type: type[SCHEMA_TYPES],
-        depth: int = None,
-    ) -> Schema:
-        """
-        Core schema factory bridging serializer configuration to ``ninja.orm.create_schema``.
+    def _create_out_or_detail_schema(
+        cls, schema_type: type[SCHEMA_TYPES], model, validators, depth: int = None
+    ) -> Schema | None:
+        """Create schema for Out or Detail types."""
+        fields, reverse_rels, excludes, customs, optionals = (
+            cls.get_schema_out_data(schema_type)
+        )
+        if not any([fields, reverse_rels, excludes, customs]):
+            return None
+        schema_name = "SchemaOut" if schema_type == "Out" else "DetailSchemaOut"
+        schema = create_schema(
+            model=model,
+            name=f"{model._meta.model_name}{schema_name}",
+            depth=depth,
+            fields=fields,
+            custom_fields=reverse_rels + customs + optionals,
+            exclude=excludes,
+        )
+        return cls._apply_validators(schema, validators)
 
-        Dispatches to the appropriate field/custom/exclude gathering logic based
-        on the requested schema type and delegates to Django Ninja's
-        ``create_schema`` for the actual Pydantic model construction.
+    @classmethod
+    def _create_related_schema(cls, model, validators) -> Schema | None:
+        """Create schema for Related type."""
+        fields, customs = cls.get_related_schema_data()
+        if not fields and not customs:
+            return None
+        schema = create_schema(
+            model=model,
+            name=f"{model._meta.model_name}SchemaRelated",
+            fields=fields,
+            custom_fields=customs,
+        )
+        return cls._apply_validators(schema, validators)
 
-        Parameters
-        ----------
-        schema_type : SCHEMA_TYPES
-            One of ``"In"``, ``"Patch"``, ``"Out"``, ``"Detail"``, or ``"Related"``.
-        depth : int, optional
-            Nesting depth for related model schemas (used by ``Out`` and ``Detail``).
-
-        Returns
-        -------
-        Schema | None
-            Generated Pydantic schema, or ``None`` if no fields are configured.
-        """
-        model = cls._get_model()
-        validators = cls._get_validators(schema_type)
-
-        # Handle special schema types with custom logic
-        if schema_type == "Out" or schema_type == "Detail":
-            fields, reverse_rels, excludes, customs, optionals = (
-                cls.get_schema_out_data(schema_type)
-            )
-            if not any([fields, reverse_rels, excludes, customs]):
-                return None
-            schema_name = "SchemaOut" if schema_type == "Out" else "DetailSchemaOut"
-            schema = create_schema(
-                model=model,
-                name=f"{model._meta.model_name}{schema_name}",
-                depth=depth,
-                fields=fields,
-                custom_fields=reverse_rels + customs + optionals,
-                exclude=excludes,
-            )
-            return cls._apply_validators(schema, validators)
-
-        if schema_type == "Related":
-            fields, customs = cls.get_related_schema_data()
-            if not fields and not customs:
-                return None
-            schema = create_schema(
-                model=model,
-                name=f"{model._meta.model_name}SchemaRelated",
-                fields=fields,
-                custom_fields=customs,
-            )
-            return cls._apply_validators(schema, validators)
-
-        # Handle standard In/Patch schema types
+    @classmethod
+    def _create_in_or_patch_schema(
+        cls, schema_type: type[SCHEMA_TYPES], model, validators
+    ) -> Schema | None:
+        """Create schema for In or Patch types."""
         s_type = "create" if schema_type == "In" else "update"
         fields = cls.get_fields(s_type)
         optionals = cls.get_optional_fields(s_type)
@@ -1019,6 +1000,42 @@ class BaseSerializer:
             exclude=excludes,
         )
         return cls._apply_validators(schema, validators)
+
+    @classmethod
+    def _generate_model_schema(
+        cls,
+        schema_type: type[SCHEMA_TYPES],
+        depth: int = None,
+    ) -> Schema:
+        """
+        Core schema factory bridging serializer configuration to ``ninja.orm.create_schema``.
+
+        Dispatches to the appropriate field/custom/exclude gathering logic based
+        on the requested schema type and delegates to Django Ninja's
+        ``create_schema`` for the actual Pydantic model construction.
+
+        Parameters
+        ----------
+        schema_type : SCHEMA_TYPES
+            One of ``"In"``, ``"Patch"``, ``"Out"``, ``"Detail"``, or ``"Related"``.
+        depth : int, optional
+            Nesting depth for related model schemas (used by ``Out`` and ``Detail``).
+
+        Returns
+        -------
+        Schema | None
+            Generated Pydantic schema, or ``None`` if no fields are configured.
+        """
+        model = cls._get_model()
+        validators = cls._get_validators(schema_type)
+
+        if schema_type in ("Out", "Detail"):
+            return cls._create_out_or_detail_schema(schema_type, model, validators, depth)
+
+        if schema_type == "Related":
+            return cls._create_related_schema(model, validators)
+
+        return cls._create_in_or_patch_schema(schema_type, model, validators)
 
     @classmethod
     def get_related_schema_data(cls):
