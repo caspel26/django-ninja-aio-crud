@@ -35,6 +35,7 @@ nav:
     - Renderers: api/renderers/orjson_renderer.md
   - Authentication:
       - JWT & AsyncJwtBearer: auth.md
+  - Performance Benchmarks: performance.md
   - Contributing: contributing.md
   - Release Notes: release_notes.md
 
