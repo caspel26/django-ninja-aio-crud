@@ -116,6 +116,7 @@ Both files are gitignored.
 
 - Ruff is used for linting and formatting (configured via pre-commit hooks)
 - Pre-commit hooks also check AST validity, merge conflicts, TOML/YAML syntax, trailing whitespace, and EOF newlines
+- **ALWAYS add imports at the top of the file** — Place all import statements at the beginning of each Python file, following PEP 8 conventions. The only exception is when avoiding circular imports, in which case imports may be placed inside functions or methods with a clear comment explaining why.
 
 ## Architecture Notes
 
