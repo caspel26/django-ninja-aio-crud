@@ -527,3 +527,106 @@ class ModelUtilSerializerReadOptimizationsTestCase(TestCase):
         )
         result = util.get_reverse_relations(is_for="read")
         self.assertEqual(result, ["some_rel"])
+
+@tag("model_util_helper_methods", "model_util")
+class ModelUtilHelperMethodsTestCase(TestCase):
+    """Tests for helper methods extracted during cognitive complexity refactoring."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.util_custom = ModelUtil(CustomOptionalSerializer)
+        cls.util_plain = ModelUtil(app_models.TestModelSerializer)
+
+    def test_validate_input_fields_valid_fields(self):
+        """_validate_input_fields should not raise for valid fields."""
+        payload = {"name": "test", "description": "desc"}
+        # Should not raise
+        self.util_plain._validate_input_fields(payload, False, None)
+
+    def test_validate_input_fields_invalid_fields(self):
+        """_validate_input_fields should raise SerializeError for invalid fields."""
+        payload = {"name": "test", "invalid_field": "value"}
+        with self.assertRaises(SerializeError) as cm:
+            self.util_plain._validate_input_fields(payload, False, None)
+        error_data = cm.exception.error
+        self.assertIn("invalid_fields", error_data)
+        self.assertIn("invalid_field", error_data["invalid_fields"])
+
+    def test_validate_input_fields_skips_custom_fields(self):
+        """_validate_input_fields should skip custom fields when using serializer."""
+        payload = {"name": "test", "extra": "custom"}
+        # Should not raise because 'extra' is a custom field
+        self.util_custom._validate_input_fields(
+            payload, True, CustomOptionalSerializer
+        )
+
+    def test_collect_custom_and_optional_fields_with_serializer(self):
+        """_collect_custom_and_optional_fields should collect custom and optional fields."""
+        payload = {"name": "test", "description": None, "extra": "value"}
+        customs, _ = self.util_custom._collect_custom_and_optional_fields(
+            payload, True, CustomOptionalSerializer
+        )
+        self.assertIn("extra", customs)
+        self.assertEqual(customs["extra"], "value")
+
+    def test_collect_custom_and_optional_fields_without_serializer(self):
+        """_collect_custom_and_optional_fields should return empty dicts without serializer."""
+        payload = {"name": "test"}
+        customs, optionals = self.util_plain._collect_custom_and_optional_fields(
+            payload, False, None
+        )
+        self.assertEqual(customs, {})
+        self.assertEqual(optionals, [])
+
+    def test_collect_custom_and_optional_fields_optionals(self):
+        """_collect_custom_and_optional_fields should collect optional fields with None values."""
+        # Use update serializer which has optionals
+        util_update = ModelUtil(CustomOptionalSerializer)
+        payload = {"description": None}
+        _, optionals = util_update._collect_custom_and_optional_fields(
+            payload, True, CustomOptionalSerializer
+        )
+        self.assertIn("description", optionals)
+
+    def test_determine_skip_keys_with_serializer(self):
+        """_determine_skip_keys should return keys to skip for serializer."""
+        payload = {"name": "test", "description": None, "extra": "value"}
+        skip_keys = self.util_custom._determine_skip_keys(
+            payload, True, CustomOptionalSerializer
+        )
+        # 'extra' is custom (not a model field), 'description' is optional with None
+        self.assertIn("extra", skip_keys)
+
+    def test_determine_skip_keys_without_serializer(self):
+        """_determine_skip_keys should return empty set without serializer."""
+        payload = {"name": "test"}
+        skip_keys = self.util_plain._determine_skip_keys(payload, False, None)
+        self.assertEqual(skip_keys, set())
+
+    async def test_process_payload_fields_empty_list(self):
+        """_process_payload_fields should handle empty fields list."""
+        payload = {}
+        # Should not raise
+        await self.util_plain._process_payload_fields(None, payload, [])
+
+    async def test_process_payload_fields_with_binary(self):
+        """_process_payload_fields should decode binary fields."""
+
+        class BinSerializer(ModelSerializer):
+            data = models.BinaryField()
+
+            class CreateSerializer:
+                fields = ["data"]
+
+            class Meta:
+                app_label = app_models.TestModelSerializer._meta.app_label
+
+        util = ModelUtil(BinSerializer)
+        good_bytes = b"hello"
+        b64 = base64.b64encode(good_bytes).decode()
+        payload = {"data": b64}
+        fields_to_process = [("data", b64)]
+
+        await util._process_payload_fields(None, payload, fields_to_process)
+        self.assertEqual(payload["data"], good_bytes)
+
