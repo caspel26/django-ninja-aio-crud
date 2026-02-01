@@ -776,7 +776,7 @@ class ModelUtil:
             raise SerializeError(
                 {
                     "detail": f"Invalid field names in payload: {', '.join(sorted(invalid_fields))}",
-                    "invalid_fields": list(sorted(invalid_fields)),
+                    "invalid_fields": sorted(invalid_fields),
                 },
                 400,
             )
