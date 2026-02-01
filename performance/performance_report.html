@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Performance Benchmarks — django-ninja-aio-crud</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    <style>
+        :root {
+            --md-primary: #673ab7;
+            --md-primary-light: #7e57c2;
+            --md-primary-dark: #5e35b1;
+            --md-accent: #7c4dff;
+            --md-bg: #fff;
+            --md-bg-alt: #f5f5f6;
+            --md-fg: #1a1a2e;
+            --md-fg-light: #555;
+            --md-fg-lighter: #999;
+            --md-border: rgba(0, 0, 0, 0.07);
+            --md-code-bg: #f5f5f5;
+            --md-shadow: rgba(0, 0, 0, 0.08);
+            --md-shadow-heavy: rgba(0, 0, 0, 0.12);
+            --chart-grid: rgba(0, 0, 0, 0.06);
+            --chart-text: #555;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --md-bg: #1e1e2e;
+                --md-bg-alt: #2a2a3e;
+                --md-fg: #e2e2f0;
+                --md-fg-light: #a0a0b8;
+                --md-fg-lighter: #707088;
+                --md-border: rgba(255, 255, 255, 0.08);
+                --md-code-bg: #252538;
+                --md-shadow: rgba(0, 0, 0, 0.25);
+                --md-shadow-heavy: rgba(0, 0, 0, 0.4);
+                --chart-grid: rgba(255, 255, 255, 0.08);
+                --chart-text: #a0a0b8;
+            }
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--md-bg);
+            color: var(--md-fg);
+            line-height: 1.6;
+        }
+        .header {
+            background: var(--md-primary);
+            color: #fff;
+            padding: 0.6rem 2rem;
+            font-size: 0.82rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .header a {
+            color: #fff;
+            text-decoration: none;
+            opacity: 0.9;
+        }
+        .header a:hover { opacity: 1; }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem;
+        }
+        .hero {
+            text-align: center;
+            padding: 2rem 0 1rem;
+            border-bottom: 1px solid var(--md-border);
+            margin-bottom: 2rem;
+        }
+        .hero h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--md-fg);
+            margin-bottom: 0.4rem;
+        }
+        .hero .subtitle {
+            font-size: 1rem;
+            color: var(--md-fg-light);
+            margin-bottom: 1rem;
+        }
+        .meta-pills {
+            display: flex;
+            justify-content: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+        .meta-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            background: var(--md-code-bg);
+            border: 1px solid var(--md-border);
+            border-radius: 2rem;
+            padding: 0.3rem 0.9rem;
+            font-size: 0.8rem;
+            font-family: 'Roboto Mono', monospace;
+            color: var(--md-fg-light);
+        }
+        .meta-pill strong {
+            color: var(--md-primary-light);
+            font-weight: 500;
+        }
+        .section-title {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--md-fg);
+            margin: 2.5rem 0 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--md-border);
+        }
+        .chart-section {
+            background: var(--md-bg-alt);
+            border: 1px solid var(--md-border);
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            transition: box-shadow 0.25s ease, transform 0.25s ease;
+        }
+        .chart-section:hover {
+            box-shadow: 0 6px 20px var(--md-shadow);
+            transform: translateY(-2px);
+        }
+        .chart-section h2 {
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--md-primary);
+        }
+        .chart-container {
+            position: relative;
+            height: 350px;
+            margin-bottom: 1.5rem;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.82rem;
+        }
+        th, td {
+            padding: 0.55rem 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid var(--md-border);
+        }
+        th {
+            color: var(--md-primary);
+            font-weight: 600;
+            background: var(--md-code-bg);
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        tr:hover td {
+            background: var(--md-code-bg);
+        }
+        td {
+            color: var(--md-fg-light);
+            font-family: 'Roboto Mono', monospace;
+            font-size: 0.8rem;
+        }
+        td:first-child {
+            font-family: 'Roboto', sans-serif;
+            font-weight: 500;
+            color: var(--md-fg);
+        }
+        .footer {
+            text-align: center;
+            margin-top: 3rem;
+            padding: 1.5rem 0;
+            border-top: 1px solid var(--md-border);
+            font-size: 0.78rem;
+            color: var(--md-fg-lighter);
+        }
+        .footer a {
+            color: var(--md-primary-light);
+            text-decoration: none;
+        }
+        .footer a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <a href="https://django-ninja-aio.com/">django-ninja-aio-crud</a>
+        <span>&middot;</span>
+        <span>Performance Benchmarks</span>
+    </div>
+    <div class="container">
+        <div class="hero">
+            <h1>Performance Benchmarks</h1>
+            <p class="subtitle">Automated benchmark results for django-ninja-aio-crud</p>
+            <div class="meta-pills">
+                <span class="meta-pill"><strong>Run</strong> 2026-02-01 04:12:48</span>
+                <span class="meta-pill"><strong>Python</strong> 3.14.2</span>
+                <span class="meta-pill"><strong>Runs</strong> 1</span>
+            </div>
+        </div>
+
+        <h1 class="section-title">Latest Run</h1>
+        
+        <div class="chart-section">
+            <h2>CRUDPerformanceTest</h2>
+            <div class="chart-container">
+                <canvas id="chart_0"></canvas>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Benchmark</th>
+                        <th>Iterations</th>
+                        <th>Min (ms)</th>
+                        <th>Avg (ms)</th>
+                        <th>Median (ms)</th>
+                        <th>Max (ms)</th>
+                    </tr>
+                </thead>
+                <tbody>
+            <tr>
+                <td>create</td>
+                <td>100</td>
+                <td>2.2626</td>
+                <td>2.3427</td>
+                <td>2.3200</td>
+                <td>3.5096</td>
+            </tr>
+            <tr>
+                <td>delete</td>
+                <td>100</td>
+                <td>1.7106</td>
+                <td>1.7673</td>
+                <td>1.7550</td>
+                <td>2.0091</td>
+            </tr>
+            <tr>
+                <td>list</td>
+                <td>100</td>
+                <td>16.5850</td>
+                <td>17.0644</td>
+                <td>16.8606</td>
+                <td>20.3361</td>
+            </tr>
+            <tr>
+                <td>retrieve</td>
+                <td>100</td>
+                <td>1.1373</td>
+                <td>1.1790</td>
+                <td>1.1700</td>
+                <td>1.4626</td>
+            </tr>
+            <tr>
+                <td>update</td>
+                <td>100</td>
+                <td>2.5775</td>
+                <td>2.6739</td>
+                <td>2.6452</td>
+                <td>3.3697</td>
+            </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="chart-section">
+            <h2>FilterPerformanceTest</h2>
+            <div class="chart-container">
+                <canvas id="chart_1"></canvas>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Benchmark</th>
+                        <th>Iterations</th>
+                        <th>Min (ms)</th>
+                        <th>Avg (ms)</th>
+                        <th>Median (ms)</th>
+                        <th>Max (ms)</th>
+                    </tr>
+                </thead>
+                <tbody>
+            <tr>
+                <td>boolean_filter</td>
+                <td>100</td>
+                <td>16.6888</td>
+                <td>17.2682</td>
+                <td>17.0778</td>
+                <td>21.0840</td>
+            </tr>
+            <tr>
+                <td>combined_filters</td>
+                <td>100</td>
+                <td>1.4168</td>
+                <td>1.4811</td>
+                <td>1.4736</td>
+                <td>1.7505</td>
+            </tr>
+            <tr>
+                <td>icontains_filter</td>
+                <td>100</td>
+                <td>2.8637</td>
+                <td>2.9578</td>
+                <td>2.9397</td>
+                <td>3.4471</td>
+            </tr>
+            <tr>
+                <td>match_case_filter</td>
+                <td>100</td>
+                <td>11.3477</td>
+                <td>11.7618</td>
+                <td>11.6316</td>
+                <td>14.2899</td>
+            </tr>
+            <tr>
+                <td>numeric_filter</td>
+                <td>100</td>
+                <td>1.1953</td>
+                <td>1.2583</td>
+                <td>1.2518</td>
+                <td>1.4527</td>
+            </tr>
+            <tr>
+                <td>relation_filter</td>
+                <td>100</td>
+                <td>23.7008</td>
+                <td>24.4850</td>
+                <td>24.2667</td>
+                <td>28.4788</td>
+            </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="chart-section">
+            <h2>SchemaGenerationPerformanceTest</h2>
+            <div class="chart-container">
+                <canvas id="chart_2"></canvas>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Benchmark</th>
+                        <th>Iterations</th>
+                        <th>Min (ms)</th>
+                        <th>Avg (ms)</th>
+                        <th>Median (ms)</th>
+                        <th>Max (ms)</th>
+                    </tr>
+                </thead>
+                <tbody>
+            <tr>
+                <td>meta_serializer_schema_generation</td>
+                <td>100</td>
+                <td>0.0371</td>
+                <td>0.0709</td>
+                <td>0.0391</td>
+                <td>3.0480</td>
+            </tr>
+            <tr>
+                <td>model_serializer_schema_generation</td>
+                <td>100</td>
+                <td>0.0301</td>
+                <td>0.0329</td>
+                <td>0.0312</td>
+                <td>0.0819</td>
+            </tr>
+            <tr>
+                <td>schema_with_relations</td>
+                <td>100</td>
+                <td>0.0508</td>
+                <td>0.0716</td>
+                <td>0.0530</td>
+                <td>1.7574</td>
+            </tr>
+            <tr>
+                <td>schema_with_validators</td>
+                <td>100</td>
+                <td>1.4983</td>
+                <td>1.7974</td>
+                <td>1.5878</td>
+                <td>20.1216</td>
+            </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="chart-section">
+            <h2>SerializationPerformanceTest</h2>
+            <div class="chart-container">
+                <canvas id="chart_3"></canvas>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Benchmark</th>
+                        <th>Iterations</th>
+                        <th>Min (ms)</th>
+                        <th>Avg (ms)</th>
+                        <th>Median (ms)</th>
+                        <th>Max (ms)</th>
+                    </tr>
+                </thead>
+                <tbody>
+            <tr>
+                <td>bulk_serialization_100</td>
+                <td>50</td>
+                <td>15.1081</td>
+                <td>15.7164</td>
+                <td>15.5055</td>
+                <td>20.0997</td>
+            </tr>
+            <tr>
+                <td>bulk_serialization_500</td>
+                <td>50</td>
+                <td>73.6903</td>
+                <td>79.1107</td>
+                <td>76.2575</td>
+                <td>95.7342</td>
+            </tr>
+            <tr>
+                <td>input_parsing</td>
+                <td>100</td>
+                <td>0.6788</td>
+                <td>0.7366</td>
+                <td>0.7269</td>
+                <td>0.9920</td>
+            </tr>
+            <tr>
+                <td>relation_serialization</td>
+                <td>100</td>
+                <td>0.5584</td>
+                <td>0.5983</td>
+                <td>0.5931</td>
+                <td>0.6934</td>
+            </tr>
+            <tr>
+                <td>single_object_serialization</td>
+                <td>100</td>
+                <td>0.5374</td>
+                <td>0.5803</td>
+                <td>0.5741</td>
+                <td>0.8779</td>
+            </tr>
+                </tbody>
+            </table>
+        </div>
+        
+
+        <div class="footer">
+            Generated by <a href="https://github.com/caspel26/django-ninja-aio-crud">django-ninja-aio-crud</a> performance suite
+        </div>
+    </div>
+
+    <script>
+    // Configure Chart.js defaults to match theme
+    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    Chart.defaults.color = isDark ? '#a0a0b8' : '#555';
+    Chart.defaults.borderColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+    Chart.defaults.font.family = "'Roboto', sans-serif";
+
+    
+        new Chart(document.getElementById('chart_0'), {
+            type: 'bar',
+            data: {
+                labels: ["create", "delete", "list", "retrieve", "update"],
+                datasets: [
+                    {
+                        label: 'Avg (ms)',
+                        data: [2.3427, 1.7673, 17.0644, 1.179, 2.6739],
+                        backgroundColor: 'rgba(103, 58, 183, 0.75)',
+                        borderColor: 'rgba(103, 58, 183, 1)',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'Median (ms)',
+                        data: [2.32, 1.755, 16.8606, 1.17, 2.6452],
+                        backgroundColor: 'rgba(126, 87, 194, 0.75)',
+                        borderColor: 'rgba(126, 87, 194, 1)',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'Min (ms)',
+                        data: [2.2626, 1.7106, 16.585, 1.1373, 2.5775],
+                        backgroundColor: 'rgba(186, 104, 200, 0.75)',
+                        borderColor: 'rgba(186, 104, 200, 1)',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'Max (ms)',
+                        data: [3.5096, 2.0091, 20.3361, 1.4626, 3.3697],
+                        backgroundColor: 'rgba(171, 71, 188, 0.75)',
+                        borderColor: 'rgba(171, 71, 188, 1)',
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'CRUDPerformanceTest',
+                        font: { size: 16 }
+                    },
+                    legend: { position: 'top' }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Time (ms)' }
+                    },
+                    x: {
+                        ticks: { maxRotation: 45, minRotation: 25 }
+                    }
+                }
+            }
+        });
+        
+        new Chart(document.getElementById('chart_1'), {
+            type: 'bar',
+            data: {
+                labels: ["boolean_filter", "combined_filters", "icontains_filter", "match_case_filter", "numeric_filter", "relation_filter"],
+                datasets: [
+                    {
+                        label: 'Avg (ms)',
+                        data: [17.2682, 1.4811, 2.9578, 11.7618, 1.2583, 24.485],
+                        backgroundColor: 'rgba(103, 58, 183, 0.75)',
+                        borderColor: 'rgba(103, 58, 183, 1)',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'Median (ms)',
+                        data: [17.0778, 1.4736, 2.9397, 11.6316, 1.2518, 24.2667],
+                        backgroundColor: 'rgba(126, 87, 194, 0.75)',
+                        borderColor: 'rgba(126, 87, 194, 1)',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'Min (ms)',
+                        data: [16.6888, 1.4168, 2.8637, 11.3477, 1.1953, 23.7008],
+                        backgroundColor: 'rgba(186, 104, 200, 0.75)',
+                        borderColor: 'rgba(186, 104, 200, 1)',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'Max (ms)',
+                        data: [21.084, 1.7505, 3.4471, 14.2899, 1.4527, 28.4788],
+                        backgroundColor: 'rgba(171, 71, 188, 0.75)',
+                        borderColor: 'rgba(171, 71, 188, 1)',
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'FilterPerformanceTest',
+                        font: { size: 16 }
+                    },
+                    legend: { position: 'top' }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Time (ms)' }
+                    },
+                    x: {
+                        ticks: { maxRotation: 45, minRotation: 25 }
+                    }
+                }
+            }
+        });
+        
+        new Chart(document.getElementById('chart_2'), {
+            type: 'bar',
+            data: {
+                labels: ["meta_serializer_schema_generation", "model_serializer_schema_generation", "schema_with_relations", "schema_with_validators"],
+                datasets: [
+                    {
+                        label: 'Avg (ms)',
+                        data: [0.0709, 0.0329, 0.0716, 1.7974],
+                        backgroundColor: 'rgba(103, 58, 183, 0.75)',
+                        borderColor: 'rgba(103, 58, 183, 1)',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'Median (ms)',
+                        data: [0.0391, 0.0312, 0.053, 1.5878],
+                        backgroundColor: 'rgba(126, 87, 194, 0.75)',
+                        borderColor: 'rgba(126, 87, 194, 1)',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'Min (ms)',
+                        data: [0.0371, 0.0301, 0.0508, 1.4983],
+                        backgroundColor: 'rgba(186, 104, 200, 0.75)',
+                        borderColor: 'rgba(186, 104, 200, 1)',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'Max (ms)',
+                        data: [3.048, 0.0819, 1.7574, 20.1216],
+                        backgroundColor: 'rgba(171, 71, 188, 0.75)',
+                        borderColor: 'rgba(171, 71, 188, 1)',
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'SchemaGenerationPerformanceTest',
+                        font: { size: 16 }
+                    },
+                    legend: { position: 'top' }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Time (ms)' }
+                    },
+                    x: {
+                        ticks: { maxRotation: 45, minRotation: 25 }
+                    }
+                }
+            }
+        });
+        
+        new Chart(document.getElementById('chart_3'), {
+            type: 'bar',
+            data: {
+                labels: ["bulk_serialization_100", "bulk_serialization_500", "input_parsing", "relation_serialization", "single_object_serialization"],
+                datasets: [
+                    {
+                        label: 'Avg (ms)',
+                        data: [15.7164, 79.1107, 0.7366, 0.5983, 0.5803],
+                        backgroundColor: 'rgba(103, 58, 183, 0.75)',
+                        borderColor: 'rgba(103, 58, 183, 1)',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'Median (ms)',
+                        data: [15.5055, 76.2575, 0.7269, 0.5931, 0.5741],
+                        backgroundColor: 'rgba(126, 87, 194, 0.75)',
+                        borderColor: 'rgba(126, 87, 194, 1)',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'Min (ms)',
+                        data: [15.1081, 73.6903, 0.6788, 0.5584, 0.5374],
+                        backgroundColor: 'rgba(186, 104, 200, 0.75)',
+                        borderColor: 'rgba(186, 104, 200, 1)',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'Max (ms)',
+                        data: [20.0997, 95.7342, 0.992, 0.6934, 0.8779],
+                        backgroundColor: 'rgba(171, 71, 188, 0.75)',
+                        borderColor: 'rgba(171, 71, 188, 1)',
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'SerializationPerformanceTest',
+                        font: { size: 16 }
+                    },
+                    legend: { position: 'top' }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Time (ms)' }
+                    },
+                    x: {
+                        ticks: { maxRotation: 45, minRotation: 25 }
+                    }
+                }
+            }
+        });
+        
+    
+    </script>
+</body>
+</html>
