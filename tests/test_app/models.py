@@ -486,3 +486,47 @@ class ArticleStringPK(BaseStringPKTestModel):
     class ReadSerializer:
         fields = ["id", "name", "tags_str"]
         relations_as_id = ["tags_str"]
+
+
+# ==========================================================
+#                VALIDATOR TEST MODELS
+# ==========================================================
+
+
+class TestModelWithValidators(BaseTestModelSerializer):
+    """ModelSerializer with field_validator and model_validator on inner classes."""
+
+    from pydantic import field_validator, model_validator
+
+    class CreateSerializer:
+        from pydantic import field_validator, model_validator
+
+        fields = ["name", "description"]
+
+        @field_validator("name")
+        @classmethod
+        def validate_name_min_length(cls, v):
+            if len(v) < 3:
+                raise ValueError("Name must be at least 3 characters")
+            return v
+
+    class UpdateSerializer:
+        from pydantic import field_validator
+
+        optionals = [("name", str), ("description", str)]
+
+        @field_validator("name")
+        @classmethod
+        def validate_name_not_empty(cls, v):
+            if v is not None and len(v.strip()) == 0:
+                raise ValueError("Name cannot be blank")
+            return v
+
+    class ReadSerializer:
+        from pydantic import model_validator
+
+        fields = ["id", "name", "description"]
+
+        @model_validator(mode="after")
+        def add_display_check(self):
+            return self

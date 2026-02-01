@@ -860,6 +860,10 @@ Choose the pattern that best fits your project architecture and team structure.
 
     [:octicons-arrow-right-24: Model Serializer](model_serializer.md)
 
+- :material-check-decagram: **Validators** — Field & model validators on serializers
+
+    [:octicons-arrow-right-24: Validators](validators.md)
+
 - :material-cog-sync: **Model Util** — Internal CRUD engine and query optimization
 
     [:octicons-arrow-right-24: Model Util](model_util.md)
