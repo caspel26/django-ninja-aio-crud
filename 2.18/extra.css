@@ -37,6 +37,17 @@
   font-weight: 700;
   margin-bottom: 0.5rem;
 }
+.md-typeset .hero img.hero-logo {
+  max-width: 900px;
+  width: 100%;
+  height: auto;
+  margin-bottom: 1rem;
+}
+
+/* Hide the auto-generated "Home" page title on the landing page */
+.md-content > .md-typeset > h1:first-child {
+  display: none;
+}
 .md-typeset .hero p.subtitle {
   font-size: 1.15rem;
   opacity: 0.8;
