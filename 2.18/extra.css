@@ -38,10 +38,11 @@
   margin-bottom: 0.5rem;
 }
 .md-typeset .hero img.hero-logo {
-  max-width: 900px;
-  width: 100%;
+  max-width: 600px;
+  width: auto;
   height: auto;
-  margin-bottom: 1rem;
+  object-fit: contain;
+  margin-top: -3rem;
 }
 
 /* Hide the auto-generated "Home" page title on the landing page */
