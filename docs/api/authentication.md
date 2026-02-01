@@ -54,13 +54,9 @@ from .auth import JWTAuth
 api = NinjaAIO()
 
 
+@api.viewset(model=Article)
 class ArticleViewSet(APIViewSet):
-    model = Article
-    api = api
     auth = [JWTAuth()]  # Apply to all endpoints
-
-
-ArticleViewSet().add_views_to_route()
 ```
 
 ### 3. Make Authenticated Request

@@ -431,18 +431,13 @@ from .auth import JWTAuth
 api = NinjaAIO(title="Blog API", version="1.0.0")
 
 
+@api.viewset(model=Article)
 class ArticleViewSet(APIViewSet):
-    model = Article
-    api = api
-
     # Public read, authenticated write
     get_auth = None  # List and retrieve are public
     post_auth = [JWTAuth()]  # Create requires auth
     patch_auth = [JWTAuth()]  # Update requires auth
     delete_auth = [JWTAuth()]  # Delete requires auth
-
-
-ArticleViewSet().add_views_to_route()
 ```
 
 ### Set Author Automatically
@@ -544,10 +539,8 @@ class SuperuserAuth(JWTAuth):
 from .auth import JWTAuth, AdminAuth
 
 
+@api.viewset(model=Article)
 class ArticleViewSet(APIViewSet):
-    model = Article
-    api = api
-
     # Public read
     get_auth = None
 
@@ -561,16 +554,10 @@ class ArticleViewSet(APIViewSet):
     delete_auth = [AdminAuth()]
 
 
+@api.viewset(model=User)
 class UserViewSet(APIViewSet):
-    model = User
-    api = api
-
     # Only admins can manage users
     auth = [AdminAuth()]
-
-
-ArticleViewSet().add_views_to_route()
-UserViewSet().add_views_to_route()
 ```
 
 ## :material-account-check: Ownership Validation
@@ -579,62 +566,59 @@ Ensure users can only edit their own articles:
 
 ```python
 # views.py
-class ArticleViewSet(APIViewSet):
-    model = Article
-    api = api
+from ninja_aio.decorators import api_patch, api_delete
 
+
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
     get_auth = None
     post_auth = [JWTAuth()]
     patch_auth = [JWTAuth()]
     delete_auth = [JWTAuth()]
 
-    def views(self):
-        # Override update to check ownership
-        @self.router.patch("/{pk}/")
-        async def update(request, pk: int, data: Article.generate_update_s()):
-            """Update article (owner or admin only)"""
-            try:
-                article = await Article.objects.aget(pk=pk)
-            except Article.DoesNotExist:
-                raise SerializeError({"article": "not found"}, status_code=404)
+    # Override update to check ownership
+    @api_patch("/{pk}/")
+    async def update(self, request, pk: int, data: Article.generate_update_s()):
+        """Update article (owner or admin only)"""
+        try:
+            article = await Article.objects.aget(pk=pk)
+        except Article.DoesNotExist:
+            raise SerializeError({"article": "not found"}, status_code=404)
 
-            # Check ownership (unless admin)
-            user = request.auth
-            if article.author_id != user.id and not user.is_staff:
-                raise SerializeError(
-                    {"detail": "You can only edit your own articles"},
-                    status_code=403
-                )
+        # Check ownership (unless admin)
+        user = request.auth
+        if article.author_id != user.id and not user.is_staff:
+            raise SerializeError(
+                {"detail": "You can only edit your own articles"},
+                status_code=403
+            )
 
-            # Update article
-            from ninja_aio.models import ModelUtil
-            util = ModelUtil(Article)
-            schema = Article.generate_read_s()
+        # Update article
+        from ninja_aio.models import ModelUtil
+        util = ModelUtil(Article)
+        schema = Article.generate_read_s()
 
-            return await util.update_s(request, article, data, schema)
+        return await util.update_s(request, article, data, schema)
 
-        # Override delete to check ownership
-        @self.router.delete("/{pk}/")
-        async def delete(request, pk: int):
-            """Delete article (owner or admin only)"""
-            try:
-                article = await Article.objects.aget(pk=pk)
-            except Article.DoesNotExist:
-                raise SerializeError({"article": "not found"}, status_code=404)
+    # Override delete to check ownership
+    @api_delete("/{pk}/")
+    async def delete(self, request, pk: int):
+        """Delete article (owner or admin only)"""
+        try:
+            article = await Article.objects.aget(pk=pk)
+        except Article.DoesNotExist:
+            raise SerializeError({"article": "not found"}, status_code=404)
 
-            # Check ownership (unless admin)
-            user = request.auth
-            if article.author_id != user.id and not user.is_staff:
-                raise SerializeError(
-                    {"detail": "You can only delete your own articles"},
-                    status_code=403
-                )
+        # Check ownership (unless admin)
+        user = request.auth
+        if article.author_id != user.id and not user.is_staff:
+            raise SerializeError(
+                {"detail": "You can only delete your own articles"},
+                status_code=403
+            )
 
-            await article.adelete()
-            return {"message": "Article deleted successfully"}
-
-
-ArticleViewSet().add_views_to_route()
+        await article.adelete()
+        return {"message": "Article deleted successfully"}
 ```
 
 ---

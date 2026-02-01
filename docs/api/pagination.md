@@ -82,12 +82,9 @@ from .models import Article
 api = NinjaAIO()
 
 
+@api.viewset(model=Article)
 class ArticleViewSet(APIViewSet):
-    model = Article
-    api = api
-
-
-ArticleViewSet().add_views_to_route()
+    pass
 ```
 
 **Generated endpoint:**

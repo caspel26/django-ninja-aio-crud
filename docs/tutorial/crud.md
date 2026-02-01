@@ -49,13 +49,9 @@ api = NinjaAIO(
 )
 
 
+@api.viewset(model=Article)
 class ArticleViewSet(APIViewSet):
-    model = Article
-    api = api
-
-
-# Register the ViewSet
-ArticleViewSet().add_views_to_route()
+    pass
 ```
 
 That's it! You now have a complete CRUD API with 5 endpoints.
@@ -113,31 +109,24 @@ from .models import Article, Author, Category, Tag
 api = NinjaAIO(title="Blog API", version="1.0.0")
 
 
+@api.viewset(model=Author)
 class AuthorViewSet(APIViewSet):
-    model = Author
-    api = api
+    pass
 
 
+@api.viewset(model=Category)
 class CategoryViewSet(APIViewSet):
-    model = Category
-    api = api
+    pass
 
 
+@api.viewset(model=Tag)
 class TagViewSet(APIViewSet):
-    model = Tag
-    api = api
+    pass
 
 
+@api.viewset(model=Article)
 class ArticleViewSet(APIViewSet):
-    model = Article
-    api = api
-
-
-# Register all ViewSets
-AuthorViewSet().add_views_to_route()
-CategoryViewSet().add_views_to_route()
-TagViewSet().add_views_to_route()
-ArticleViewSet().add_views_to_route()
+    pass
 ```
 
 Now you have complete CRUD APIs for all models:
@@ -154,9 +143,8 @@ Now you have complete CRUD APIs for all models:
 Let's add filtering to the Article list endpoint:
 
 ```python
+@api.viewset(model=Article)
 class ArticleViewSet(APIViewSet):
-    model = Article
-    api = api
     query_params = {
         "is_published": (bool, None),
         "author": (int, None),
@@ -187,9 +175,6 @@ class ArticleViewSet(APIViewSet):
             )
 
         return queryset
-
-
-ArticleViewSet().add_views_to_route()
 ```
 
 ### Using Query Parameters
@@ -223,96 +208,91 @@ GET /api/article/?is_published=true&page=2&page_size=20
 Add custom endpoints beyond CRUD:
 
 ```python
+from ninja_aio.decorators import api_get, api_post
+
+
+@api.viewset(model=Article)
 class ArticleViewSet(APIViewSet):
-    model = Article
-    api = api
+    # Publish an article
+    @api_post("/{pk}/publish/")
+    async def publish(self, request, pk: int):
+        article = await Article.objects.aget(pk=pk)
+        article.is_published = True
+        from django.utils import timezone
+        article.published_at = timezone.now()
+        await article.asave()
 
-    def views(self):
-        """Define custom endpoints"""
+        return {
+            "message": "Article published successfully",
+            "published_at": article.published_at
+        }
 
-        # Publish an article
-        @self.router.post("/{pk}/publish/")
-        async def publish(request, pk: int):
-            article = await Article.objects.aget(pk=pk)
-            article.is_published = True
-            from django.utils import timezone
-            article.published_at = timezone.now()
-            await article.asave()
+    # Unpublish an article
+    @api_post("/{pk}/unpublish/")
+    async def unpublish(self, request, pk: int):
+        article = await Article.objects.aget(pk=pk)
+        article.is_published = False
+        article.published_at = None
+        await article.asave()
 
-            return {
-                "message": "Article published successfully",
-                "published_at": article.published_at
-            }
+        return {"message": "Article unpublished successfully"}
 
-        # Unpublish an article
-        @self.router.post("/{pk}/unpublish/")
-        async def unpublish(request, pk: int):
-            article = await Article.objects.aget(pk=pk)
-            article.is_published = False
-            article.published_at = None
-            await article.asave()
+    # Increment view count
+    @api_post("/{pk}/view/")
+    async def increment_views(self, request, pk: int):
+        article = await Article.objects.aget(pk=pk)
+        article.views += 1
+        await article.asave(update_fields=["views"])
 
-            return {"message": "Article unpublished successfully"}
+        return {"views": article.views}
 
-        # Increment view count
-        @self.router.post("/{pk}/view/")
-        async def increment_views(request, pk: int):
-            article = await Article.objects.aget(pk=pk)
-            article.views += 1
-            await article.asave(update_fields=["views"])
+    # Get article statistics
+    @api_get("/stats/")
+    async def stats(self, request):
+        from django.db.models import Count, Avg, Sum
 
-            return {"views": article.views}
+        total = await Article.objects.acount()
+        published = await Article.objects.filter(is_published=True).acount()
 
-        # Get article statistics
-        @self.router.get("/stats/")
-        async def stats(request):
-            from django.db.models import Count, Avg, Sum
+        # Use sync_to_async for aggregate
+        from asgiref.sync import sync_to_async
 
-            total = await Article.objects.acount()
-            published = await Article.objects.filter(is_published=True).acount()
+        avg_views = await sync_to_async(
+            lambda: Article.objects.aggregate(avg=Avg("views"))
+        )()
 
-            # Use sync_to_async for aggregate
-            from asgiref.sync import sync_to_async
+        total_views = await sync_to_async(
+            lambda: Article.objects.aggregate(total=Sum("views"))
+        )()
 
-            avg_views = await sync_to_async(
-                lambda: Article.objects.aggregate(avg=Avg("views"))
-            )()
+        return {
+            "total_articles": total,
+            "published_articles": published,
+            "draft_articles": total - published,
+            "average_views": avg_views["avg"] or 0,
+            "total_views": total_views["total"] or 0,
+        }
 
-            total_views = await sync_to_async(
-                lambda: Article.objects.aggregate(total=Sum("views"))
-            )()
+    # Get popular articles
+    @api_get("/popular/")
+    async def popular(self, request, limit: int = 10):
+        articles = []
+        async for article in Article.objects.filter(
+            is_published=True
+        ).order_by("-views")[:limit]:
+            articles.append(article)
 
-            return {
-                "total_articles": total,
-                "published_articles": published,
-                "draft_articles": total - published,
-                "average_views": avg_views["avg"] or 0,
-                "total_views": total_views["total"] or 0,
-            }
+        # Serialize articles
+        from ninja_aio.models import ModelUtil
+        util = ModelUtil(Article)
+        schema = Article.generate_read_s()
 
-        # Get popular articles
-        @self.router.get("/popular/")
-        async def popular(request, limit: int = 10):
-            articles = []
-            async for article in Article.objects.filter(
-                is_published=True
-            ).order_by("-views")[:limit]:
-                articles.append(article)
+        results = []
+        for article in articles:
+            data = await util.read_s(request, article, schema)
+            results.append(data)
 
-            # Serialize articles
-            from ninja_aio.models import ModelUtil
-            util = ModelUtil(Article)
-            schema = Article.generate_read_s()
-
-            results = []
-            for article in articles:
-                data = await util.read_s(request, article, schema)
-                results.append(data)
-
-            return results
-
-
-ArticleViewSet().add_views_to_route()
+        return results
 ```
 
 ### Custom Endpoint URLs
@@ -346,49 +326,46 @@ GET /api/article/popular/?limit=20
 Access request information in your ViewSet:
 
 ```python
+from ninja_aio.decorators import api_get, api_post
+
+
+@api.viewset(model=Article)
 class ArticleViewSet(APIViewSet):
-    model = Article
-    api = api
+    @api_get("/my-articles/")
+    async def my_articles(self, request):
+        """Get articles by current user"""
+        # Access authenticated user
+        user = request.auth
 
-    def views(self):
-        @self.router.get("/my-articles/")
-        async def my_articles(request):
-            """Get articles by current user"""
-            # Access authenticated user
-            user = request.auth
+        # Get user's articles
+        articles = []
+        async for article in Article.objects.filter(author=user):
+            articles.append(article)
 
-            # Get user's articles
-            articles = []
-            async for article in Article.objects.filter(author=user):
-                articles.append(article)
+        # Serialize
+        from ninja_aio.models import ModelUtil
+        util = ModelUtil(Article)
+        schema = Article.generate_read_s()
 
-            # Serialize
-            from ninja_aio.models import ModelUtil
-            util = ModelUtil(Article)
-            schema = Article.generate_read_s()
+        results = []
+        for article in articles:
+            data = await util.read_s(request, article, schema)
+            results.append(data)
 
-            results = []
-            for article in articles:
-                data = await util.read_s(request, article, schema)
-                results.append(data)
+        return results
 
-            return results
+    @api_post("/")
+    async def create_article(self, request, data: Article.generate_create_s()):
+        """Override create to set author from request"""
+        # Set author from authenticated user
+        data.author = request.auth.id
 
-        @self.router.post("/")
-        async def create_article(request, data: Article.generate_create_s()):
-            """Override create to set author from request"""
-            # Set author from authenticated user
-            data.author = request.auth.id
+        # Use default create logic
+        from ninja_aio.models import ModelUtil
+        util = ModelUtil(Article)
+        schema = Article.generate_read_s()
 
-            # Use default create logic
-            from ninja_aio.models import ModelUtil
-            util = ModelUtil(Article)
-            schema = Article.generate_read_s()
-
-            return await util.create_s(request, data, schema)
-
-
-ArticleViewSet().add_views_to_route()
+        return await util.create_s(request, data, schema)
 ```
 
 ## :material-account-filter: Filtering by User
@@ -420,13 +397,10 @@ class Article(ModelSerializer):
         )
 
 
+@api.viewset(model=Article)
 class ArticleViewSet(APIViewSet):
-    model = Article
-    api = api
+    pass
     # queryset_request is automatically called for all operations
-
-
-ArticleViewSet().add_views_to_route()
 ```
 
 ## :material-page-next: Custom Pagination
@@ -442,13 +416,9 @@ class LargePagePagination(PageNumberPagination):
     max_page_size = 200  # Allow up to 200 items
 
 
+@api.viewset(model=Article)
 class ArticleViewSet(APIViewSet):
-    model = Article
-    api = api
     pagination_class = LargePagePagination
-
-
-ArticleViewSet().add_views_to_route()
 ```
 
 Now list endpoint uses custom pagination:
@@ -469,9 +439,8 @@ GET /api/article/?page=2&page_size=50
 Add ordering to list endpoint:
 
 ```python
+@api.viewset(model=Article)
 class ArticleViewSet(APIViewSet):
-    model = Article
-    api = api
     query_params = {
         "is_published": (bool, None),
         "ordering": (str, "-created_at"),  # Default: newest first
@@ -497,9 +466,6 @@ class ArticleViewSet(APIViewSet):
             queryset = queryset.order_by(ordering)
 
         return queryset
-
-
-ArticleViewSet().add_views_to_route()
 ```
 
 **Usage:**
@@ -532,40 +498,35 @@ Handle errors gracefully:
 
 ```python
 from ninja_aio.exceptions import SerializeError, NotFoundError
+from ninja_aio.decorators import api_post
 
 
+@api.viewset(model=Article)
 class ArticleViewSet(APIViewSet):
-    model = Article
-    api = api
+    @api_post("/{pk}/publish/")
+    async def publish(self, request, pk: int):
+        try:
+            article = await Article.objects.aget(pk=pk)
+        except Article.DoesNotExist:
+            raise NotFoundError(self.model)
 
-    def views(self):
-        @self.router.post("/{pk}/publish/")
-        async def publish(request, pk: int):
-            try:
-                article = await Article.objects.aget(pk=pk)
-            except Article.DoesNotExist:
-                raise NotFoundError(self.model)
+        # Check if already published
+        if article.is_published:
+            raise SerializeError(
+                {"article": "already published"},
+                status_code=400
+            )
 
-            # Check if already published
-            if article.is_published:
-                raise SerializeError(
-                    {"article": "already published"},
-                    status_code=400
-                )
+        # Publish
+        article.is_published = True
+        from django.utils import timezone
+        article.published_at = timezone.now()
+        await article.asave()
 
-            # Publish
-            article.is_published = True
-            from django.utils import timezone
-            article.published_at = timezone.now()
-            await article.asave()
-
-            return {
-                "message": "Article published successfully",
-                "published_at": article.published_at
-            }
-
-
-ArticleViewSet().add_views_to_route()
+        return {
+            "message": "Article published successfully",
+            "published_at": article.published_at
+        }
 ```
 
 ## :material-eye-off: Disabling Endpoints
@@ -573,18 +534,13 @@ ArticleViewSet().add_views_to_route()
 Disable specific CRUD operations:
 
 ```python
+@api.viewset(model=Category)
 class CategoryViewSet(APIViewSet):
-    model = Category
-    api = api
-
     # Disable delete (categories can't be deleted)
     disable_delete = True
 
     # Disable update (categories are immutable)
     disable_update = True
-
-
-CategoryViewSet().add_views_to_route()
 ```
 
 Now only these endpoints are available:
@@ -598,56 +554,53 @@ Now only these endpoints are available:
 Customize response format:
 
 ```python
+from ninja_aio.decorators import api_get
+
+
+@api.viewset(model=Article)
 class ArticleViewSet(APIViewSet):
-    model = Article
-    api = api
+    @api_get("/{pk}/")
+    async def retrieve(self, request, pk: int):
+        """Custom retrieve with additional data"""
+        article = await Article.objects.select_related(
+            'author', 'category'
+        ).prefetch_related('tags').aget(pk=pk)
 
-    def views(self):
-        @self.router.get("/{pk}/")
-        async def retrieve(request, pk: int):
-            """Custom retrieve with additional data"""
-            article = await Article.objects.select_related(
-                'author', 'category'
-            ).prefetch_related('tags').aget(pk=pk)
+        # Serialize article
+        from ninja_aio.models import ModelUtil
+        util = ModelUtil(Article)
+        schema = Article.generate_read_s()
+        article_data = await util.read_s(request, article, schema)
 
-            # Serialize article
-            from ninja_aio.models import ModelUtil
-            util = ModelUtil(Article)
-            schema = Article.generate_read_s()
-            article_data = await util.read_s(request, article, schema)
+        # Get related articles
+        related = []
+        async for rel_article in Article.objects.filter(
+            category=article.category,
+            is_published=True
+        ).exclude(pk=pk)[:5]:
+            rel_data = await util.read_s(request, rel_article, schema)
+            related.append(rel_data)
 
-            # Get related articles
-            related = []
-            async for rel_article in Article.objects.filter(
-                category=article.category,
-                is_published=True
-            ).exclude(pk=pk)[:5]:
-                rel_data = await util.read_s(request, rel_article, schema)
-                related.append(rel_data)
+        # Get author's other articles
+        author_articles = []
+        async for auth_article in Article.objects.filter(
+            author=article.author,
+            is_published=True
+        ).exclude(pk=pk)[:5]:
+            auth_data = await util.read_s(request, auth_article, schema)
+            author_articles.append(auth_data)
 
-            # Get author's other articles
-            author_articles = []
-            async for auth_article in Article.objects.filter(
-                author=article.author,
-                is_published=True
-            ).exclude(pk=pk)[:5]:
-                auth_data = await util.read_s(request, auth_article, schema)
-                author_articles.append(auth_data)
-
-            return {
-                "article": article_data,
-                "related_articles": related,
-                "author_articles": author_articles,
-                "meta": {
-                    "total_views": article.views,
-                    "author_article_count": await Article.objects.filter(
-                        author=article.author
-                    ).acount()
-                }
+        return {
+            "article": article_data,
+            "related_articles": related,
+            "author_articles": author_articles,
+            "meta": {
+                "total_views": article.views,
+                "author_article_count": await Article.objects.filter(
+                    author=article.author
+                ).acount()
             }
-
-
-ArticleViewSet().add_views_to_route()
+        }
 ```
 
 ---
@@ -664,6 +617,7 @@ Here's a complete ViewSet with all features:
     from ninja_aio.views import APIViewSet
     from ninja.pagination import PageNumberPagination
     from ninja_aio.exceptions import SerializeError, NotFoundError
+    from ninja_aio.decorators import api_get, api_post
     from .models import Article, Author, Category, Tag
     from django.db.models import Q
 
@@ -679,24 +633,23 @@ Here's a complete ViewSet with all features:
         max_page_size = 100
 
 
+    @api.viewset(model=Author)
     class AuthorViewSet(APIViewSet):
-        model = Author
-        api = api
+        pass
 
 
+    @api.viewset(model=Category)
     class CategoryViewSet(APIViewSet):
-        model = Category
-        api = api
+        pass
 
 
+    @api.viewset(model=Tag)
     class TagViewSet(APIViewSet):
-        model = Tag
-        api = api
+        pass
 
 
+    @api.viewset(model=Article)
     class ArticleViewSet(APIViewSet):
-        model = Article
-        api = api
         pagination_class = CustomPagination
 
         query_params = {
@@ -747,106 +700,100 @@ Here's a complete ViewSet with all features:
 
             return queryset
 
-        def views(self):
-            # Publish article
-            @self.router.post("/{pk}/publish/")
-            async def publish(request, pk: int):
-                try:
-                    article = await Article.objects.aget(pk=pk)
-                except Article.DoesNotExist:
-                    raise NotFoundError(self.model)
+        # Publish article
+        @api_post("/{pk}/publish/")
+        async def publish(self, request, pk: int):
+            try:
+                article = await Article.objects.aget(pk=pk)
+            except Article.DoesNotExist:
+                raise NotFoundError(self.model)
 
-                if article.is_published:
-                    raise SerializeError(
-                        {"article": "already published"},
-                        status_code=400
-                    )
+            if article.is_published:
+                raise SerializeError(
+                    {"article": "already published"},
+                    status_code=400
+                )
 
-                article.is_published = True
-                from django.utils import timezone
-                article.published_at = timezone.now()
-                await article.asave()
+            article.is_published = True
+            from django.utils import timezone
+            article.published_at = timezone.now()
+            await article.asave()
 
-                return {"message": "Article published", "published_at": article.published_at}
+            return {"message": "Article published", "published_at": article.published_at}
 
-            # Unpublish article
-            @self.router.post("/{pk}/unpublish/")
-            async def unpublish(request, pk: int):
-                try:
-                    article = await Article.objects.aget(pk=pk)
-                except Article.DoesNotExist:
-                    raise NotFoundError(self.model)
+        # Unpublish article
+        @api_post("/{pk}/unpublish/")
+        async def unpublish(self, request, pk: int):
+            try:
+                article = await Article.objects.aget(pk=pk)
+            except Article.DoesNotExist:
+                raise NotFoundError(self.model)
 
-                article.is_published = False
-                article.published_at = None
-                await article.asave()
+            article.is_published = False
+            article.published_at = None
+            await article.asave()
 
-                return {"message": "Article unpublished"}
+            return {"message": "Article unpublished"}
 
-            # Increment views
-            @self.router.post("/{pk}/view/")
-            async def view(request, pk: int):
-                try:
-                    article = await Article.objects.aget(pk=pk)
-                except Article.DoesNotExist:
-                    raise NotFoundError(self.model)
+        # Increment views
+        @api_post("/{pk}/view/")
+        async def view(self, request, pk: int):
+            try:
+                article = await Article.objects.aget(pk=pk)
+            except Article.DoesNotExist:
+                raise NotFoundError(self.model)
 
-                article.views += 1
-                await article.asave(update_fields=["views"])
+            article.views += 1
+            await article.asave(update_fields=["views"])
 
-                return {"views": article.views}
+            return {"views": article.views}
 
-            # Statistics
-            @self.router.get("/stats/")
-            async def stats(request):
-                from django.db.models import Count, Avg, Sum
-                from asgiref.sync import sync_to_async
+        # Statistics
+        @api_get("/stats/")
+        async def stats(self, request):
+            from django.db.models import Count, Avg, Sum
+            from asgiref.sync import sync_to_async
 
-                total = await Article.objects.acount()
-                published = await Article.objects.filter(is_published=True).acount()
+            total = await Article.objects.acount()
+            published = await Article.objects.filter(is_published=True).acount()
 
-                avg_views = await sync_to_async(
-                    lambda: Article.objects.aggregate(avg=Avg("views"))
-                )()
+            avg_views = await sync_to_async(
+                lambda: Article.objects.aggregate(avg=Avg("views"))
+            )()
 
-                total_views = await sync_to_async(
-                    lambda: Article.objects.aggregate(total=Sum("views"))
-                )()
+            total_views = await sync_to_async(
+                lambda: Article.objects.aggregate(total=Sum("views"))
+            )()
 
-                return {
-                    "total_articles": total,
-                    "published": published,
-                    "drafts": total - published,
-                    "avg_views": avg_views["avg"] or 0,
-                    "total_views": total_views["total"] or 0,
-                }
+            return {
+                "total_articles": total,
+                "published": published,
+                "drafts": total - published,
+                "avg_views": avg_views["avg"] or 0,
+                "total_views": total_views["total"] or 0,
+            }
 
-            # Popular articles
-            @self.router.get("/popular/")
-            async def popular(request, limit: int = 10):
-                articles = []
-                async for article in Article.objects.filter(
-                    is_published=True
-                ).order_by("-views")[:limit]:
-                    articles.append(article)
+        # Popular articles
+        @api_get("/popular/")
+        async def popular(self, request, limit: int = 10):
+            articles = []
+            async for article in Article.objects.filter(
+                is_published=True
+            ).order_by("-views")[:limit]:
+                articles.append(article)
 
-                from ninja_aio.models import ModelUtil
-                util = ModelUtil(Article)
-                schema = Article.generate_read_s()
+            from ninja_aio.models import ModelUtil
+            util = ModelUtil(Article)
+            schema = Article.generate_read_s()
 
-                results = []
-                for article in articles:
-                    data = await util.read_s(request, article, schema)
-                    results.append(data)
+            results = []
+            for article in articles:
+                data = await util.read_s(request, article, schema)
+                results.append(data)
 
-                return results
+            return results
 
 
-    # Register ViewSets
-    AuthorViewSet().add_views_to_route()
-    CategoryViewSet().add_views_to_route()
-    TagViewSet().add_views_to_route()
-    ArticleViewSet().add_views_to_route()
     ```
 
 ## :material-test-tube: Testing Your API

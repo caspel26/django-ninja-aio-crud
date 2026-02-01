@@ -37,13 +37,15 @@ Implement advanced filtering, searching, and pagination for your API endpoints.
 
 ```python
 # views.py
+from ninja_aio import NinjaAIO
 from ninja_aio.views import APIViewSet
 from .models import Article
 
-class ArticleViewSet(APIViewSet):
-    model = Article
-    api = api
+api = NinjaAIO()
 
+
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
     query_params = {
         "is_published": (bool, None),
         "author": (int, None),
@@ -64,9 +66,6 @@ class ArticleViewSet(APIViewSet):
             queryset = queryset.filter(category_id=filters["category"])
 
         return queryset
-
-
-ArticleViewSet().add_views_to_route()
 ```
 
 **Usage:**
@@ -767,9 +766,8 @@ class ArticlePagination(PageNumberPagination):
     max_page_size = 100
 
 
+@api.viewset(model=Article)
 class ArticleViewSet(APIViewSet):
-    model = Article
-    api = api
     pagination_class = ArticlePagination
 
     query_params = {
@@ -893,9 +891,6 @@ class ArticleViewSet(APIViewSet):
             queryset = queryset.order_by('-views')
 
         return queryset
-
-
-ArticleViewSet().add_views_to_route()
 ```
 
 ## :material-test-tube: Testing Filters
