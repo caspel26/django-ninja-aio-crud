@@ -19,17 +19,17 @@ DEFAULT_INPUT = PROJECT_ROOT / "performance_results.json"
 DEFAULT_OUTPUT = PROJECT_ROOT / "performance_report.html"
 
 COLORS = [
-    "rgba(54, 162, 235, 0.8)",
-    "rgba(255, 99, 132, 0.8)",
-    "rgba(75, 192, 192, 0.8)",
-    "rgba(255, 206, 86, 0.8)",
-    "rgba(153, 102, 255, 0.8)",
-    "rgba(255, 159, 64, 0.8)",
-    "rgba(46, 204, 113, 0.8)",
-    "rgba(231, 76, 60, 0.8)",
+    "rgba(103, 58, 183, 0.75)",   # deep purple (primary)
+    "rgba(171, 71, 188, 0.75)",   # purple accent
+    "rgba(126, 87, 194, 0.75)",   # lighter purple
+    "rgba(186, 104, 200, 0.75)",  # pink-purple
+    "rgba(94, 53, 177, 0.75)",    # darker purple
+    "rgba(149, 117, 205, 0.75)",  # soft violet
+    "rgba(206, 147, 216, 0.75)",  # lavender
+    "rgba(69, 39, 160, 0.75)",    # indigo-purple
 ]
 
-BORDER_COLORS = [c.replace("0.8", "1") for c in COLORS]
+BORDER_COLORS = [c.replace("0.75", "1") for c in COLORS]
 
 
 def load_results(path: Path) -> dict:
@@ -253,45 +253,136 @@ def generate_html(data: dict) -> str:
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Performance Report — django-ninja-aio-crud</title>
+    <title>Performance Benchmarks — django-ninja-aio-crud</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
     <style>
+        :root {{
+            --md-primary: #673ab7;
+            --md-primary-light: #7e57c2;
+            --md-primary-dark: #5e35b1;
+            --md-accent: #7c4dff;
+            --md-bg: #fff;
+            --md-bg-alt: #f5f5f6;
+            --md-fg: #1a1a2e;
+            --md-fg-light: #555;
+            --md-fg-lighter: #999;
+            --md-border: rgba(0, 0, 0, 0.07);
+            --md-code-bg: #f5f5f5;
+            --md-shadow: rgba(0, 0, 0, 0.08);
+            --md-shadow-heavy: rgba(0, 0, 0, 0.12);
+            --chart-grid: rgba(0, 0, 0, 0.06);
+            --chart-text: #555;
+        }}
+        @media (prefers-color-scheme: dark) {{
+            :root {{
+                --md-bg: #1e1e2e;
+                --md-bg-alt: #2a2a3e;
+                --md-fg: #e2e2f0;
+                --md-fg-light: #a0a0b8;
+                --md-fg-lighter: #707088;
+                --md-border: rgba(255, 255, 255, 0.08);
+                --md-code-bg: #252538;
+                --md-shadow: rgba(0, 0, 0, 0.25);
+                --md-shadow-heavy: rgba(0, 0, 0, 0.4);
+                --chart-grid: rgba(255, 255, 255, 0.08);
+                --chart-text: #a0a0b8;
+            }}
+        }}
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
         body {{
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #0f172a;
-            color: #e2e8f0;
-            padding: 2rem;
+            font-family: 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--md-bg);
+            color: var(--md-fg);
+            line-height: 1.6;
         }}
-        h1 {{
-            text-align: center;
-            margin-bottom: 0.5rem;
-            font-size: 1.8rem;
-            color: #38bdf8;
+        .header {{
+            background: var(--md-primary);
+            color: #fff;
+            padding: 0.6rem 2rem;
+            font-size: 0.82rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
         }}
-        .meta {{
+        .header a {{
+            color: #fff;
+            text-decoration: none;
+            opacity: 0.9;
+        }}
+        .header a:hover {{ opacity: 1; }}
+        .container {{
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem;
+        }}
+        .hero {{
             text-align: center;
-            color: #94a3b8;
+            padding: 2rem 0 1rem;
+            border-bottom: 1px solid var(--md-border);
             margin-bottom: 2rem;
-            font-size: 0.9rem;
+        }}
+        .hero h1 {{
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--md-fg);
+            margin-bottom: 0.4rem;
+        }}
+        .hero .subtitle {{
+            font-size: 1rem;
+            color: var(--md-fg-light);
+            margin-bottom: 1rem;
+        }}
+        .meta-pills {{
+            display: flex;
+            justify-content: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }}
+        .meta-pill {{
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            background: var(--md-code-bg);
+            border: 1px solid var(--md-border);
+            border-radius: 2rem;
+            padding: 0.3rem 0.9rem;
+            font-size: 0.8rem;
+            font-family: 'Roboto Mono', monospace;
+            color: var(--md-fg-light);
+        }}
+        .meta-pill strong {{
+            color: var(--md-primary-light);
+            font-weight: 500;
         }}
         .section-title {{
-            margin-top: 3rem;
-            margin-bottom: 1.5rem;
-            border-top: 1px solid #334155;
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--md-fg);
+            margin: 2.5rem 0 1.5rem;
             padding-top: 1.5rem;
+            border-top: 1px solid var(--md-border);
         }}
         .chart-section {{
-            background: #1e293b;
-            border-radius: 12px;
+            background: var(--md-bg-alt);
+            border: 1px solid var(--md-border);
+            border-radius: 10px;
             padding: 1.5rem;
-            margin-bottom: 2rem;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            margin-bottom: 1.5rem;
+            transition: box-shadow 0.25s ease, transform 0.25s ease;
+        }}
+        .chart-section:hover {{
+            box-shadow: 0 6px 20px var(--md-shadow);
+            transform: translateY(-2px);
         }}
         .chart-section h2 {{
             margin-bottom: 1rem;
-            font-size: 1.2rem;
-            color: #7dd3fc;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--md-primary);
         }}
         .chart-container {{
             position: relative;
@@ -301,34 +392,82 @@ def generate_html(data: dict) -> str:
         table {{
             width: 100%;
             border-collapse: collapse;
-            font-size: 0.85rem;
+            font-size: 0.82rem;
         }}
         th, td {{
-            padding: 0.5rem 0.75rem;
+            padding: 0.55rem 0.75rem;
             text-align: left;
-            border-bottom: 1px solid #334155;
+            border-bottom: 1px solid var(--md-border);
         }}
         th {{
-            color: #38bdf8;
+            color: var(--md-primary);
             font-weight: 600;
-            background: #0f172a;
+            background: var(--md-code-bg);
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
         }}
-        tr:hover td {{ background: #334155; }}
-        td {{ color: #cbd5e1; }}
+        tr:hover td {{
+            background: var(--md-code-bg);
+        }}
+        td {{
+            color: var(--md-fg-light);
+            font-family: 'Roboto Mono', monospace;
+            font-size: 0.8rem;
+        }}
+        td:first-child {{
+            font-family: 'Roboto', sans-serif;
+            font-weight: 500;
+            color: var(--md-fg);
+        }}
+        .footer {{
+            text-align: center;
+            margin-top: 3rem;
+            padding: 1.5rem 0;
+            border-top: 1px solid var(--md-border);
+            font-size: 0.78rem;
+            color: var(--md-fg-lighter);
+        }}
+        .footer a {{
+            color: var(--md-primary-light);
+            text-decoration: none;
+        }}
+        .footer a:hover {{ text-decoration: underline; }}
     </style>
 </head>
 <body>
-    <h1>Performance Report</h1>
-    <p class="meta">
-        Latest run: {html.escape(ts)} &middot; Python {html.escape(py_ver)} &middot;
-        {len(runs)} run(s) recorded
-    </p>
+    <div class="header">
+        <a href="https://django-ninja-aio.com/">django-ninja-aio-crud</a>
+        <span>&middot;</span>
+        <span>Performance Benchmarks</span>
+    </div>
+    <div class="container">
+        <div class="hero">
+            <h1>Performance Benchmarks</h1>
+            <p class="subtitle">Automated benchmark results for django-ninja-aio-crud</p>
+            <div class="meta-pills">
+                <span class="meta-pill"><strong>Run</strong> {html.escape(ts)}</span>
+                <span class="meta-pill"><strong>Python</strong> {html.escape(py_ver)}</span>
+                <span class="meta-pill"><strong>Runs</strong> {len(runs)}</span>
+            </div>
+        </div>
 
-    <h1 class="section-title">Latest Run</h1>
-    {latest_html}
-    {trend_html}
+        <h1 class="section-title">Latest Run</h1>
+        {latest_html}
+        {trend_html}
+
+        <div class="footer">
+            Generated by <a href="https://github.com/caspel26/django-ninja-aio-crud">django-ninja-aio-crud</a> performance suite
+        </div>
+    </div>
 
     <script>
+    // Configure Chart.js defaults to match theme
+    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    Chart.defaults.color = isDark ? '#a0a0b8' : '#555';
+    Chart.defaults.borderColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+    Chart.defaults.font.family = "'Roboto', sans-serif";
+
     {latest_configs}
     {trend_configs}
     </script>
