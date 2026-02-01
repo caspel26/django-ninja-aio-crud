@@ -186,6 +186,9 @@ Brief paragraph summarizing the release. Then:
 
 ### Key rules
 
+- **Always overwrite `CHANGELOG.md`** — Every time a changelog is generated, overwrite the existing `CHANGELOG.md` file at the project root. Do not create a new file or append to it.
+- **Use emojis** — Decorate section headers, sub-headers, bullet points, and table entries with contextual emojis (e.g., ✨ New Features, 🔧 Improvements, 🧪 Tests, ✅/❌ for pass/fail tests, 🎯 Summary)
+
 - **Group by category**: New Features, Improvements, Documentation, Tests, Summary
 - **Use `> path/to/file`** blockquotes to indicate which file a change belongs to
 - **Include code examples** for new user-facing API features
