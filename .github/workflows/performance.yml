@@ -1,0 +1,34 @@
+name: Performance
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  benchmarks:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.10'
+      - name: Install Flit
+        run: pip install flit
+      - name: Install Dependencies
+        run: flit install --symlink
+      - name: Run Performance Benchmarks
+        run: |
+          python -m django test tests.performance --settings=tests.test_settings --tag=performance -v2
+      - name: Generate Performance Report
+        run: python tests/performance/generate_report.py
+      - name: Upload Performance Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-report
+          path: |
+            performance_report.html
+            performance_results.json
