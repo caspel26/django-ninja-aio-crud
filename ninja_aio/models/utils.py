@@ -743,6 +743,145 @@ class ModelUtil:
         obj = await self.get_object(request, query_data=query_data, is_for=is_for)
         return await self._bump_object_from_schema(obj, obj_schema)
 
+    def _validate_input_fields(
+        self, payload: dict, is_serializer: bool, serializer
+    ) -> None:
+        """
+        Validate non-custom payload keys against model fields.
+
+        Parameters
+        ----------
+        payload : dict
+            Input payload to validate.
+        is_serializer : bool
+            Whether using a ModelSerializer.
+        serializer : ModelSerializer | Serializer
+            Serializer instance if applicable.
+
+        Raises
+        ------
+        SerializeError
+            If invalid field names are found in payload.
+        """
+        invalid_fields = []
+        for key in payload.keys():
+            # Skip custom fields - they're validated by Pydantic schema
+            if is_serializer and serializer.is_custom(key):
+                continue
+            # Validate non-custom fields exist on the model
+            if key not in self.model_fields:
+                invalid_fields.append(key)
+
+        if invalid_fields:
+            raise SerializeError(
+                {
+                    "detail": f"Invalid field names in payload: {', '.join(sorted(invalid_fields))}",
+                    "invalid_fields": list(sorted(invalid_fields)),
+                },
+                400,
+            )
+
+    def _collect_custom_and_optional_fields(
+        self, payload: dict, is_serializer: bool, serializer
+    ) -> tuple[dict[str, Any], list[str]]:
+        """
+        Collect custom and optional fields from payload.
+
+        Parameters
+        ----------
+        payload : dict
+            Input payload.
+        is_serializer : bool
+            Whether using a ModelSerializer.
+        serializer : ModelSerializer | Serializer
+            Serializer instance if applicable.
+
+        Returns
+        -------
+        tuple[dict[str, Any], list[str]]
+            (custom_fields_dict, optional_field_names)
+        """
+        customs: dict[str, Any] = {}
+        optionals: list[str] = []
+
+        if not is_serializer:
+            return customs, optionals
+
+        customs = {
+            k: v
+            for k, v in payload.items()
+            if serializer.is_custom(k) and k not in self.model_fields
+        }
+        optionals = [
+            k for k, v in payload.items() if serializer.is_optional(k) and v is None
+        ]
+
+        return customs, optionals
+
+    def _determine_skip_keys(
+        self, payload: dict, is_serializer: bool, serializer
+    ) -> set[str]:
+        """
+        Determine which keys to skip during model field processing.
+
+        Parameters
+        ----------
+        payload : dict
+            Input payload.
+        is_serializer : bool
+            Whether using a ModelSerializer.
+        serializer : ModelSerializer | Serializer
+            Serializer instance if applicable.
+
+        Returns
+        -------
+        set[str]
+            Set of keys to skip.
+        """
+        if not is_serializer:
+            return set()
+
+        skip_keys = {
+            k
+            for k, v in payload.items()
+            if (serializer.is_custom(k) and k not in self.model_fields)
+            or (serializer.is_optional(k) and v is None)
+        }
+        return skip_keys
+
+    async def _process_payload_fields(
+        self, request: HttpRequest, payload: dict, fields_to_process: list[tuple[str, Any]]
+    ) -> None:
+        """
+        Process payload fields: decode binary and resolve foreign keys.
+
+        Parameters
+        ----------
+        request : HttpRequest
+            HTTP request object.
+        payload : dict
+            Payload dict to modify in place.
+        fields_to_process : list[tuple[str, Any]]
+            List of (field_name, field_value) tuples to process.
+        """
+        if not fields_to_process:
+            return
+
+        # Fetch all field objects in parallel
+        field_tasks = [self._get_field(k) for k, _ in fields_to_process]
+        field_objs = await asyncio.gather(*field_tasks)
+
+        # Decode binary fields (synchronous, must be sequential)
+        for (k, v), field_obj in zip(fields_to_process, field_objs):
+            self._decode_binary(payload, k, v, field_obj)
+
+        # Resolve all FK fields in parallel
+        fk_tasks = [
+            self._resolve_fk(request, payload, k, v, field_obj)
+            for (k, v), field_obj in zip(fields_to_process, field_objs)
+        ]
+        await asyncio.gather(*fk_tasks)
+
     async def parse_input_data(self, request: HttpRequest, data: Schema):
         """
         Transform inbound schema data to a model-ready payload.
@@ -779,66 +918,19 @@ class ModelUtil:
         serializer = self.serializer if self.with_serializer else self.model
 
         # Security: Validate non-custom payload keys against model fields
-        # Custom fields are validated separately by the serializer schema
-        invalid_fields = []
-        for key in payload.keys():
-            # Skip custom fields if using serializer - they're validated by Pydantic schema
-            if is_serializer and serializer.is_custom(key):
-                continue
-            # Validate that non-custom fields exist on the model
-            if key not in self.model_fields:
-                invalid_fields.append(key)
+        self._validate_input_fields(payload, is_serializer, serializer)
 
-        if invalid_fields:
-            raise SerializeError(
-                {
-                    "detail": f"Invalid field names in payload: {', '.join(sorted(invalid_fields))}",
-                    "invalid_fields": list(sorted(invalid_fields)),
-                },
-                400,
-            )
+        # Collect custom and optional fields
+        customs, optionals = self._collect_custom_and_optional_fields(
+            payload, is_serializer, serializer
+        )
 
-        # Collect custom and optional fields (only if ModelSerializerMeta)
-        customs: dict[str, Any] = {}
-        optionals: list[str] = []
-        if is_serializer:
-            customs = {
-                k: v
-                for k, v in payload.items()
-                if serializer.is_custom(k) and k not in self.model_fields
-            }
-            optionals = [
-                k for k, v in payload.items() if serializer.is_optional(k) and v is None
-            ]
-
-        skip_keys = set()
-        if is_serializer:
-            # Keys to skip during model field processing
-            skip_keys = {
-                k
-                for k, v in payload.items()
-                if (serializer.is_custom(k) and k not in self.model_fields)
-                or (serializer.is_optional(k) and v is None)
-            }
+        # Determine which keys to skip during model field processing
+        skip_keys = self._determine_skip_keys(payload, is_serializer, serializer)
 
         # Process payload fields - gather field objects in parallel for better performance
         fields_to_process = [(k, v) for k, v in payload.items() if k not in skip_keys]
-
-        # Fetch all field objects in parallel
-        if fields_to_process:
-            field_tasks = [self._get_field(k) for k, _ in fields_to_process]
-            field_objs = await asyncio.gather(*field_tasks)
-
-            # Decode binary fields (synchronous, must be sequential)
-            for (k, v), field_obj in zip(fields_to_process, field_objs):
-                self._decode_binary(payload, k, v, field_obj)
-
-            # Resolve all FK fields in parallel
-            fk_tasks = [
-                self._resolve_fk(request, payload, k, v, field_obj)
-                for (k, v), field_obj in zip(fields_to_process, field_objs)
-            ]
-            await asyncio.gather(*fk_tasks)
+        await self._process_payload_fields(request, payload, fields_to_process)
 
         # Preserve original exclusion semantics (customs if present else optionals)
         exclude_keys = customs.keys() or optionals
