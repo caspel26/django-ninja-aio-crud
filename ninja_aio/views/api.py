@@ -32,7 +32,7 @@ class API:
     auth: list | None = NOT_SET
     router: Router = None
 
-    def views(self):
+    def views(self) -> None:
         """
         Override this method to add your custom views. For example:
         @self.router.get(some_path, response=some_schema)
@@ -66,13 +66,14 @@ class API:
         """
         pass
 
-    def _add_views(self):
+    def _add_views(self) -> None:
+        """Register views decorated with @api_register."""
         for name in dir(self.__class__):
             method = getattr(self.__class__, name)
             if hasattr(method, "_api_register"):
                 method._api_register(self)
 
-    def add_views_to_route(self):
+    def add_views_to_route(self) -> Router:
         return self.api.add_router(f"{self.api_route_path}", self._add_views())
 
 
@@ -387,16 +388,20 @@ class APIViewSet(API):
         auth = getattr(self, f"{view_type}_auth", None)
         return auth if auth is not NOT_SET else self.auth
 
-    def get_view_auth(self):
+    def get_view_auth(self) -> list | None:
+        """Get authentication configuration for GET endpoints."""
         return self._auth_view("get")
 
-    def post_view_auth(self):
+    def post_view_auth(self) -> list | None:
+        """Get authentication configuration for POST endpoints."""
         return self._auth_view("post")
 
-    def patch_view_auth(self):
+    def patch_view_auth(self) -> list | None:
+        """Get authentication configuration for PATCH endpoints."""
         return self._auth_view("patch")
 
-    def delete_view_auth(self):
+    def delete_view_auth(self) -> list | None:
+        """Get authentication configuration for DELETE endpoints."""
         return self._auth_view("delete")
 
     def _generate_schema(self, fields: dict, name: str) -> Schema:
@@ -405,7 +410,7 @@ class APIViewSet(API):
         """
         return create_model(f"{self.model_util.model_name}{name}", **fields)
 
-    def _generate_path_schema(self):
+    def _generate_path_schema(self) -> Schema:
         """
         Schema containing only the primary key field for path resolution.
         """

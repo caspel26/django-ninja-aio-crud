@@ -195,7 +195,9 @@ class ModelUtil:
         """
         return [field.name for field in self.model._meta.get_fields()]
 
-    def get_valid_input_fields(self, is_serializer: bool, serializer=None) -> set[str]:
+    def get_valid_input_fields(
+        self, is_serializer: bool, serializer: "ModelSerializer | None" = None
+    ) -> set[str]:
         """
         Get allowlist of valid field names for input validation.
 
@@ -643,10 +645,12 @@ class ModelUtil:
         self._relation_cache[cache_key] = select_rels
         return select_rels
 
-    async def _get_field(self, k: str):
+    async def _get_field(self, k: str) -> models.Field:
+        """Get Django field object for a given field name."""
         return (await agetattr(self.model, k)).field
 
-    def _decode_binary(self, payload: dict, k: str, v: Any, field_obj: models.Field):
+    def _decode_binary(self, payload: dict, k: str, v: Any, field_obj: models.Field) -> None:
+        """Decode base64-encoded binary field values in place."""
         if not isinstance(field_obj, models.BinaryField):
             return
         try:
@@ -661,7 +665,8 @@ class ModelUtil:
         k: str,
         v: Any,
         field_obj: models.Field,
-    ):
+    ) -> None:
+        """Resolve foreign key ID to model instance in place."""
         if not isinstance(field_obj, models.ForeignKey):
             return
         rel_util = ModelUtil(field_obj.related_model)
@@ -670,10 +675,11 @@ class ModelUtil:
 
     async def _bump_object_from_schema(
         self, obj: type["ModelSerializer"] | models.Model, schema: Schema
-    ):
+    ) -> dict:
+        """Convert model instance to dict using Pydantic schema."""
         return (await sync_to_async(schema.from_orm)(obj)).model_dump()
 
-    def _validate_read_params(self, request: HttpRequest, query_data: QuerySchema):
+    def _validate_read_params(self, request: HttpRequest, query_data: QuerySchema) -> None:
         """Validate required parameters for read operations."""
         if request is None:
             raise SerializeError(
