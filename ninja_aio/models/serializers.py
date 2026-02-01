@@ -1520,28 +1520,6 @@ class Serializer(BaseSerializer, metaclass=SerializerMeta):
         "Related": "ReadValidators",
     }
 
-    @classmethod
-    def _get_validators(cls, schema_type: type[SCHEMA_TYPES]) -> dict:
-        """
-        Collect validators from the inner validators class for the given schema type.
-
-        Looks for inner classes named ``CreateValidators``, ``ReadValidators``,
-        ``UpdateValidators``, or ``DetailValidators`` on the serializer.
-
-        Parameters
-        ----------
-        schema_type : SCHEMA_TYPES
-            One of ``"In"``, ``"Patch"``, ``"Out"``, ``"Detail"``, or ``"Related"``.
-
-        Returns
-        -------
-        dict
-            Mapping of validator names to ``PydanticDescriptorProxy`` instances.
-        """
-        class_name = cls._VALIDATORS_CLASS_MAP.get(schema_type)
-        validators_class = getattr(cls, class_name, None) if class_name else None
-        return cls._collect_validators(validators_class)
-
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         from ninja_aio.models.utils import ModelUtil
@@ -1578,6 +1556,28 @@ class Serializer(BaseSerializer, metaclass=SerializerMeta):
             Parsed payload.
         """
         return payload.model_dump() if isinstance(payload, Schema) else payload
+
+    @classmethod
+    def _get_validators(cls, schema_type: type[SCHEMA_TYPES]) -> dict:
+        """
+        Collect validators from the inner validators class for the given schema type.
+
+        Looks for inner classes named ``CreateValidators``, ``ReadValidators``,
+        ``UpdateValidators``, or ``DetailValidators`` on the serializer.
+
+        Parameters
+        ----------
+        schema_type : SCHEMA_TYPES
+            One of ``"In"``, ``"Patch"``, ``"Out"``, ``"Detail"``, or ``"Related"``.
+
+        Returns
+        -------
+        dict
+            Mapping of validator names to ``PydanticDescriptorProxy`` instances.
+        """
+        class_name = cls._VALIDATORS_CLASS_MAP.get(schema_type)
+        validators_class = getattr(cls, class_name, None) if class_name else None
+        return cls._collect_validators(validators_class)
 
     @classmethod
     def _get_relations_as_id(cls) -> list[str]:
