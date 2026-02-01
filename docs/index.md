@@ -1,6 +1,12 @@
+---
+hide:
+  - toc
+title: Home
+---
+
 <div class="hero" markdown>
 
-# Django Ninja Aio CRUD
+![django-ninja-aio-crud](images/logo-full.png){ .hero-logo }
 
 <p class="subtitle">
 Powerful async CRUD framework built on top of Django Ninja.<br>
