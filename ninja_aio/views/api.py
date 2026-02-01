@@ -6,6 +6,7 @@ from ninja.pagination import paginate, AsyncPaginationBase, PageNumberPagination
 from django.http import HttpRequest
 from django.db.models import Model, QuerySet
 from django.conf import settings
+from django.core.exceptions import FieldDoesNotExist
 from pydantic import create_model
 
 from ninja_aio.schemas.helpers import ModelQuerySetSchema, QuerySchema, DecoratorsSchema
@@ -16,7 +17,7 @@ from ninja_aio.schemas import (
     M2MRelationSchema,
 )
 from ninja_aio.helpers.api import ManyToManyAPI
-from ninja_aio.types import ModelSerializerMeta, VIEW_TYPES
+from ninja_aio.types import ModelSerializerMeta, VIEW_TYPES, VALID_DJANGO_LOOKUPS
 from ninja_aio.decorators import unique_view, decorate_view, aatomic
 from ninja_aio.models import serializers
 
@@ -321,6 +322,63 @@ class APIViewSet(API):
         return self._check_relations_filters(filter) or self._check_match_cases_filters(
             filter
         )
+
+    def _validate_filter_field(self, field_path: str) -> bool:
+        """
+        Validate that a filter field path corresponds to valid model fields.
+
+        Security: Prevents field injection attacks by ensuring only valid model
+        fields can be used in filters.
+
+        Args:
+            field_path: The field path to validate (e.g., "name", "author__name")
+
+        Returns:
+            bool: True if the field path is valid, False otherwise
+
+        Examples:
+            "name" -> validates against direct model field
+            "author__name" -> validates author is a relation, then name on related model
+            "created_at__gte" -> validates created_at field, lookup suffix is allowed
+        """
+        if not field_path:
+            return False
+
+        parts = field_path.split('__')
+        current_model = self.model
+
+        # Iterate through the path, validating each part
+        for i, part in enumerate(parts):
+            # Check if this is the last part and might be a lookup suffix
+            if i == len(parts) - 1 and part in VALID_DJANGO_LOOKUPS:
+                return True
+
+            try:
+                field = current_model._meta.get_field(part)
+
+                # If this is a relation field and not the last part, traverse to related model
+                # Check for both forward relations (remote_field.model) and reverse relations (related_model)
+                related_model = None
+                if hasattr(field, 'related_model') and field.related_model:
+                    related_model = field.related_model
+                elif hasattr(field, 'remote_field') and field.remote_field and hasattr(field.remote_field, 'model'):
+                    related_model = field.remote_field.model
+
+                if related_model and i < len(parts) - 1:
+                    current_model = related_model
+                elif i < len(parts) - 1:
+                    # Non-relation field in the middle - check if next part is a lookup suffix
+                    next_part = parts[i + 1]
+                    if next_part not in VALID_DJANGO_LOOKUPS:
+                        # Next part is not a lookup, so this is invalid
+                        return False
+                    # Next part is a lookup suffix, this is valid - continue to validate it
+
+            except (FieldDoesNotExist, AttributeError):
+                # Field doesn't exist on this model
+                return False
+
+        return True
 
     def _auth_view(self, view_type: str):
         """
