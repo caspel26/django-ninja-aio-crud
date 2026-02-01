@@ -14,6 +14,7 @@
   <a href="https://pypi.org/project/django-ninja-aio-crud/"><img src="https://img.shields.io/pypi/v/django-ninja-aio-crud?color=g&logo=pypi&logoColor=white" alt="PyPI - Version"></a>
   <a href="LICENSE"><img src="https://img.shields.io/pypi/l/django-ninja-aio-crud" alt="PyPI - License"></a>
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json" alt="Ruff"></a>
+  <a href="https://github.com/caspel26/django-ninja-aio-crud/actions/workflows/performance.yml"><img src="https://github.com/caspel26/django-ninja-aio-crud/actions/workflows/performance.yml/badge.svg" alt="Performance"></a>
 </p>
 
 <p align="center">
