@@ -20,6 +20,7 @@
 <p align="center">
   <a href="https://django-ninja-aio.com">Documentation</a> ·
   <a href="https://pypi.org/project/django-ninja-aio-crud/">PyPI</a> ·
+  <a href="https://caspel26.github.io/django-ninja-aio-crud/">Performance Benchmarks</a> ·
   <a href="https://github.com/caspel26/ninja-aio-blog-example">Example Project</a> ·
   <a href="https://github.com/caspel26/django-ninja-aio-crud/issues">Issues</a>
 </p>
@@ -356,7 +357,13 @@ class ReadOnlyBookViewSet(APIViewSet):
 
 ---
 
-## Performance Tips
+## Performance
+
+View live benchmarks tracking schema generation, serialization, and CRUD throughput:
+
+**[Live Performance Report](https://caspel26.github.io/django-ninja-aio-crud/)** — Interactive charts with historical trends
+
+### Performance Tips
 
 - Use `queryset_request` classmethod to `select_related` / `prefetch_related`
 - Index frequently filtered fields

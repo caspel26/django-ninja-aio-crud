@@ -206,6 +206,14 @@ Traditional Django REST development requires separate serializer classes, manual
 
     [:octicons-arrow-right-24: Authentication](api/authentication.md) &middot; [:octicons-arrow-right-24: Pagination](api/pagination.md)
 
+-   :material-speedometer:{ .lg .middle } **Performance Benchmarks**
+
+    ---
+
+    Live performance report with interactive charts and historical trends
+
+    [:octicons-arrow-right-24: View Live Benchmarks](https://caspel26.github.io/django-ninja-aio-crud/)
+
 </div>
 
 ---
