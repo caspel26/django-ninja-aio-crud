@@ -3,15 +3,19 @@ site_description: Async CRUD utilities for Django Ninja with auth, filtering, pa
 site_url: https://django-ninja-aio.com/
 repo_name: caspel26/django-ninja-aio-crud
 repo_url: https://github.com/caspel26/django-ninja-aio-crud
+edit_uri: edit/main/docs/
+copyright: Copyright &copy; 2024 – 2026 caspel26
 use_directory_urls: true
 
 nav:
   - Home: index.md
   - Getting Started:
     - Installation: getting_started/installation.md
-    - Quick Start: getting_started/quick_start.md
+    - Quick Start (ModelSerializer): getting_started/quick_start.md
+    - Quick Start (Serializer): getting_started/quick_start_serializer.md
   - Tutorial:
     - 'Step 1: Define Your Model': tutorial/model.md
+    - 'Alternative: Define Your Serializer': tutorial/serializer.md
     - 'Step 2: Create CRUD Views': tutorial/crud.md
     - 'Step 3: Add Authentication': tutorial/authentication.md
     - 'Step 4: Add Filtering & Pagination': tutorial/filtering.md
@@ -19,15 +23,24 @@ nav:
     - Views:
       - APIView: api/views/api_view.md
       - APIViewSet: api/views/api_view_set.md
+      - Decorators: api/views/decorators.md
+      - Mixins: api/views/mixins.md
     - Models:
       - ModelSerializer: api/models/model_serializer.md
       - ModelUtil: api/models/model_util.md
+      - Serializer (Meta-driven): api/models/serializers.md
+      - Validators: api/models/validators.md
     - Authentication: api/authentication.md
     - Pagination: api/pagination.md
+    - Renderers: api/renderers/orjson_renderer.md
+  - Authentication:
+      - JWT & AsyncJwtBearer: auth.md
+  - Performance Benchmarks: performance.md
   - Contributing: contributing.md
   - Release Notes: release_notes.md
 
 theme:
+  custom_dir: overrides
   font:
     text: Roboto
     code: Roboto Mono
@@ -64,7 +77,10 @@ theme:
     - navigation.footer
     - navigation.sections
     - navigation.indexes
+    - navigation.expand
+    - navigation.path
     - header.autohide
+    - announce.dismiss
     - toc.follow
     - toc.integrate
     - content.code.copy
@@ -90,6 +106,10 @@ extra:
       name: PyPI
   analytics:
     provider: google
+  version:
+    provider: mike
+    repo: caspel26/django-ninja-aio-crud
+    default: latest
 
 plugins:
   - macros:
@@ -143,6 +163,10 @@ markdown_extensions:
   - pymdownx.tilde
   - pymdownx.caret
   - pymdownx.mark
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - md_in_html
 
 extra_css:
   - extra.css

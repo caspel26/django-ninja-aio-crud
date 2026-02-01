@@ -1,8 +1,13 @@
-## 🚀 Quick Start
+## :material-rocket-launch: Quick Start (ModelSerializer)
+
+This guide shows how to create a CRUD API using `ModelSerializer`, which combines your Django model and serialization configuration in a single class.
+
+!!! tip "Alternative Approach"
+    If you prefer to keep your models unchanged and define serialization separately, see [Quick Start (Serializer)](quick_start_serializer.md).
 
 ### 1. Create Your Model
 
-Define your model using `ModelSerializer`:
+Define your model using `ModelSerializer` with embedded serializer configuration:
 
 ```python
 # models.py
@@ -44,12 +49,9 @@ from .models import Article
 api = NinjaAIO(title="My Blog API", version="1.0.0")
 
 
+@api.viewset(model=Article)
 class ArticleViewSet(APIViewSet):
-    model = Article
-    api = api
-
-
-ArticleViewSet().add_views_to_route()
+    pass
 ```
 
 ### 3. Configure URLs
@@ -74,7 +76,7 @@ python manage.py runserver
 
 Visit **[http://localhost:8000/api/docs](http://localhost:8000/api/docs)** to see your auto-generated API documentation!
 
-## 📸 Generated API Documentation
+## :material-camera: Generated API Documentation
 
 ### Endpoints Overview
 
@@ -90,46 +92,81 @@ Your API automatically includes:
 | `PATCH` | `/article/{id}/` | Update article |
 | `DELETE` | `/article/{id}/` | Delete article |
 
-### List Endpoint
+### :material-format-list-bulleted: List Endpoint
 
 ![List Swagger](images/index/foo-index-list-swagger.png)
 
-Features:
-- Automatic pagination
-- Query parameter filtering
-- Sorting support
+- :material-book-multiple: Automatic pagination
+- :material-filter: Query parameter filtering
+- :material-sort: Sorting support
 
-### Create Endpoint
+### :material-plus-circle: Create Endpoint
 
 ![Create Swagger](images/index/foo-index-create-swagger.png)
 
-Features:
-- Input validation
-- Custom field support
-- Relationship handling
+- :material-check-circle: Input validation
+- :material-pencil-plus: Custom field support
+- :material-link-variant: Relationship handling
 
-### Retrieve Endpoint
+### :material-eye: Retrieve Endpoint
 
 ![Retrieve Swagger](images/index/foo-index-retrieve-swagger.png)
 
-Features:
-- Nested relationship serialization
-- Optimized queries
+- :material-file-tree: Nested relationship serialization
+- :material-lightning-bolt: Optimized queries
 
-### Update Endpoint
+### :material-pencil: Update Endpoint
 
 ![Update Swagger](images/index/foo-index-update-swagger.png)
 
-Features:
-- Partial updates (PATCH)
-- Field-level validation
-- Custom actions
+- :material-file-document-edit: Partial updates (PATCH)
+- :material-shield-check: Field-level validation
+- :material-cog: Custom actions
 
-### Delete Endpoint
+### :material-delete: Delete Endpoint
 
 ![Delete Swagger](images/index/foo-index-delete-swagger.png)
 
-Features:
-- Soft delete support
-- Cascade handling
-- Custom hooks
+- :material-delete-sweep: Soft delete support
+- :material-sitemap: Cascade handling
+- :material-hook: Custom hooks
+
+---
+
+## :material-arrow-right-circle: Next Steps
+
+<div class="grid cards" markdown>
+
+-   :material-file-document-edit:{ .lg .middle } **ModelSerializer Reference**
+
+    ---
+
+    Deep dive into all ModelSerializer features
+
+    [:octicons-arrow-right-24: Learn more](../api/models/model_serializer.md)
+
+-   :material-view-grid:{ .lg .middle } **APIViewSet Features**
+
+    ---
+
+    Custom endpoints, pagination, and filtering
+
+    [:octicons-arrow-right-24: Explore](../api/views/api_view_set.md)
+
+-   :material-shield-lock:{ .lg .middle } **Authentication**
+
+    ---
+
+    Add JWT authentication to your API
+
+    [:octicons-arrow-right-24: Add auth](../api/authentication.md)
+
+-   :material-school:{ .lg .middle } **Full Tutorial**
+
+    ---
+
+    Step-by-step guide covering all features
+
+    [:octicons-arrow-right-24: Start tutorial](../tutorial/model.md)
+
+</div>

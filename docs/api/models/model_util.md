@@ -1,28 +1,53 @@
-# Model Util
+# :material-cog-sync: Model Util
 
 `ModelUtil` is an async utility class that provides high-level CRUD operations and serialization management for Django models and ModelSerializer instances.
 
-## Overview
+## :material-format-list-bulleted: Overview
 
 ModelUtil acts as a bridge between Django Ninja schemas and Django ORM, handling:
-- **Data normalization** (input/output)
-- **Relationship resolution** (FK/M2M)
-- **Binary field handling** (base64 encoding/decoding)
-- **Query optimization** (select_related/prefetch_related)
-- **Lifecycle hook invocation** (custom_actions, post_create, queryset_request)
 
-## Class Definition
+- :material-swap-horizontal: **Data normalization** — input/output
+- :material-link-variant: **Relationship resolution** — FK/M2M
+- :material-file-image: **Binary field handling** — base64 encoding/decoding
+- :material-lightning-bolt: **Query optimization** — select_related/prefetch_related
+- :material-hook: **Lifecycle hook invocation** — custom_actions, post_create, queryset_request
+
+---
+
+## :material-code-braces: Class Definition
 
 ```python
 from ninja_aio.models import ModelUtil
 
-util = ModelUtil(model)
+util = ModelUtil(model, serializer_class=None)
 ```
 
 **Parameters:**
-- `model` (`type[ModelSerializer] | models.Model`): Django model or ModelSerializer subclass
 
-## Properties
+- `model` (`type[ModelSerializer] | models.Model`): Django model or ModelSerializer subclass
+- `serializer_class` (`Serializer | None`): Optional Serializer class for plain Django models
+
+## :material-format-list-bulleted-type: Properties
+
+### `with_serializer`
+
+Indicates if a serializer_class is associated.
+
+```python
+util = ModelUtil(User, serializer_class=UserSerializer)
+print(util.with_serializer)  # True
+```
+
+### `pk_field_type`
+
+Returns the Python type corresponding to the model's primary key field.
+
+```python
+util = ModelUtil(User)
+print(util.pk_field_type)  # <class 'int'>
+```
+
+Uses the Django field's internal type and `ninja.orm.fields.TYPES` mapping. Raises `ConfigError` if the internal type is not registered.
 
 ### `model_pk_name`
 
@@ -43,9 +68,9 @@ print(util.model_fields)
 # ["id", "username", "email", "created_at", "is_active"]
 ```
 
-### `schema_out_fields`
+### `serializable_fields`
 
-Returns serializable fields (ReadSerializer fields or all model fields).
+Returns serializable fields for read operations (ReadSerializer fields or all model fields).
 
 ```python
 class User(ModelSerializer):
@@ -57,8 +82,38 @@ class User(ModelSerializer):
         fields = ["id", "username", "email"]
 
 util = ModelUtil(User)
-print(util.schema_out_fields)
+print(util.serializable_fields)
 # ["id", "username", "email"]  (password excluded)
+```
+
+### `serializable_detail_fields`
+
+Returns serializable fields for detail operations (DetailSerializer fields, or falls back to ReadSerializer fields).
+
+```python
+class Article(ModelSerializer):
+    title = models.CharField(max_length=200)
+    summary = models.TextField()
+    content = models.TextField()
+
+    class ReadSerializer:
+        fields = ["id", "title", "summary"]
+
+    class DetailSerializer:
+        fields = ["id", "title", "summary", "content"]
+
+util = ModelUtil(Article)
+print(util.serializable_fields)        # ["id", "title", "summary"]
+print(util.serializable_detail_fields) # ["id", "title", "summary", "content"]
+```
+
+### `model_name`
+
+Returns the Django internal model name.
+
+```python
+util = ModelUtil(User)
+print(util.model_name)  # "user"
 ```
 
 ### `serializer_meta`
@@ -70,98 +125,195 @@ if util.serializer_meta:
     fields = util.serializer_meta.get_fields("create")
 ```
 
-## Core Methods
+---
 
-### `get_object()`
+## :material-database-search: QuerySet Configuration on ModelSerializer
 
-Fetch single object or queryset with optimized queries.
-
-#### Signature
+You can declare query optimizations directly on your ModelSerializer via a nested QuerySet:
 
 ```python
-async def get_object(
-    request: HttpRequest,
-    pk: int | str = None,
-    filters: dict = None,
-    getters: dict = None,
-    with_qs_request: bool = True,
-) -> ModelSerializer | models.Model | QuerySet
+from ninja_aio.models import ModelSerializer
+from ninja_aio.schemas.helpers import ModelQuerySetSchema, ModelQuerySetExtraSchema
+
+class Book(ModelSerializer):
+    # ...existing fields...
+
+    class QuerySet:
+        read = ModelQuerySetSchema(
+            select_related=["author", "category"],
+            prefetch_related=["tags"],
+        )
+        detail = ModelQuerySetSchema(
+            select_related=["author", "category", "publisher"],
+            prefetch_related=["tags", "reviews"],
+        )
+        queryset_request = ModelQuerySetSchema(
+            select_related=[],
+            prefetch_related=["related_items"],
+        )
+        extras = [
+            ModelQuerySetExtraSchema(
+                scope="detail_cards",
+                select_related=["author"],
+                prefetch_related=["tags"],
+            )
+        ]
 ```
 
-#### Parameters
+- **read**: applied to list operations (`is_for="read"`).
+- **detail**: applied to retrieve operations (`is_for="detail"`). Falls back to `read` if not defined.
+- **queryset_request**: applied inside queryset_request hook.
+- **extras**: named configurations available via QueryUtil.SCOPES.
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `request` | `HttpRequest` | Required | Current HTTP request |
-| `pk` | `int \| str` | `None` | Primary key for single object |
-| `filters` | `dict` | `None` | Queryset filters (`field__lookup: value`) |
-| `getters` | `dict` | `None` | Get single object by custom fields |
-| `with_qs_request` | `bool` | `True` | Apply `queryset_request()` filtering |
+## :material-magnify: QueryUtil
 
-#### Return Value
-
-- If `pk` or `getters` provided → Single model instance
-- Otherwise → QuerySet
-
-#### Features
-
-- **Automatic query optimization:** Applies `select_related()` for ForeignKey and `prefetch_related()` for reverse relations
-- **Request-based filtering:** Respects model's `queryset_request()` method
-- **Error handling:** Raises `SerializeError` (404) if object not found
-
-#### Examples
-
-**Get single object by ID:**
+Each ModelSerializer now exposes a query_util helper:
 
 ```python
-user = await util.get_object(request, pk=1)
-# SELECT * FROM user WHERE id = 1
+util = MyModel.query_util
+qs = util.apply_queryset_optimizations(MyModel.objects.all(), util.SCOPES.READ)
 ```
 
-**Get with filters:**
+- SCOPES: includes READ, QUERYSET_REQUEST, plus any extras you've defined.
+- apply_queryset_optimizations: applies select_related/prefetch_related for a scope.
+
+## :material-file-document-edit: Query Schemas
+
+New helper schemas standardize filters and getters:
 
 ```python
-active_users = await util.get_object(
-    request,
-    filters={"is_active": True, "role": "admin"}
+from ninja_aio.schemas.helpers import (
+    QuerySchema,           # generic: filters or getters
+    ObjectQuerySchema,     # getters + select/prefetch
+    ObjectsQuerySchema,    # filters + select/prefetch
+    ModelQuerySetSchema,   # select/prefetch only
 )
-# Returns QuerySet: SELECT * FROM user WHERE is_active = TRUE AND role = 'admin'
 ```
 
-**Get by custom field:**
+---
+
+## :material-function-variant: Core Methods
+
+### `get_objects`
+
+Fetch an optimized queryset with optional filters and select/prefetch hints:
 
 ```python
-user = await util.get_object(
+from ninja_aio.models import ModelUtil
+from ninja_aio.schemas.helpers import ObjectsQuerySchema
+
+qs = await ModelUtil(Book).get_objects(
     request,
-    getters={"email": "john@example.com"}
+    query_data=ObjectsQuerySchema(
+        filters={"is_published": True},
+        select_related=["author"],
+        prefetch_related=["tags"],
+    ),
+    with_qs_request=True,  # Apply queryset_request hook
+    is_for="read",  # union with auto-discovered relations for read
 )
-# SELECT * FROM user WHERE email = 'john@example.com'
 ```
 
-**Without queryset_request filtering:**
+**Parameters:**
+
+- `request` (`HttpRequest`): Current HTTP request
+- `query_data` (`ObjectsQuerySchema | None`): Query configuration (filters, select_related, prefetch_related)
+- `with_qs_request` (`bool`): Apply queryset_request hook if available (default: True)
+- `is_for` (`Literal["read", "detail"] | None`): Purpose of the query, determines which serializable fields to use for optimization. Use `"read"` for list operations, `"detail"` for retrieve operations. If `None`, only query_data optimizations are applied. (default: None)
+
+**Returns:** Optimized `QuerySet`
+
+### `get_object`
+
+Fetch a single object by pk or getters with optimizations:
 
 ```python
-# Bypass request-based filtering (e.g., for internal operations)
-all_users = await util.get_object(request, with_qs_request=False)
+from ninja_aio.schemas.helpers import ObjectQuerySchema, QuerySchema
+
+# by pk + select/prefetch for detail view
+obj = await ModelUtil(Book).get_object(
+    request,
+    pk=42,
+    query_data=ObjectQuerySchema(select_related=["author"]),
+    with_qs_request=True,
+    is_for="detail",
+)
+
+# by getters (required if pk omitted)
+obj = await ModelUtil(Book).get_object(
+    request,
+    query_data=QuerySchema(getters={"slug": "my-book-slug"}),
+)
 ```
 
-**With relationships:**
+**Parameters:**
+
+- `request` (`HttpRequest`): Current HTTP request
+- `pk` (`int | str | None`): Primary key value (optional if getters provided)
+- `query_data` (`ObjectQuerySchema | QuerySchema | None`): Query configuration
+- `with_qs_request` (`bool`): Apply queryset_request hook if available (default: True)
+- `is_for` (`Literal["read", "detail"] | None`): Purpose of the query. Use `"detail"` for single object retrieval, `"read"` for list operations. (default: None)
+
+**Returns:** Model instance
+
+**Errors:**
+
+- `ValueError` if neither pk nor getters provided
+- `NotFoundError` if no match found
+
+### `read_s` and `list_read_s`
+
+Uniform serialization methods that accept either instances or query data:
 
 ```python
-class Article(ModelSerializer):
-    author = models.ForeignKey(User, on_delete=models.CASCADE)
-    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True)
-    tags = models.ManyToManyField(Tag, related_name="articles")
+schema = Book.generate_read_s()
+detail_schema = Book.generate_detail_s()
 
-util = ModelUtil(Article)
-article = await util.get_object(request, pk=1)
+# single instance
+data = await ModelUtil(Book).read_s(schema, request, instance=obj)
 
-# Automatically executes:
-# SELECT * FROM article
-# LEFT JOIN user ON article.author_id = user.id
-# LEFT JOIN category ON article.category_id = category.id
-# WITH prefetch for tags
+# single via getters (detail view)
+data = await ModelUtil(Book).read_s(
+    detail_schema,
+    request,
+    query_data=ObjectQuerySchema(getters={"pk": 42}),
+    is_for="detail",
+)
+
+# list from queryset
+items = await ModelUtil(Book).list_read_s(schema, request, instances=qs)
+
+# list via filters
+items = await ModelUtil(Book).list_read_s(
+    schema,
+    request,
+    query_data=ObjectsQuerySchema(filters={"is_published": True}),
+    is_for="read",
+)
 ```
+
+**Parameters (read_s):**
+
+- `schema` (`Schema`): Output schema for serialization
+- `request` (`HttpRequest`): Current HTTP request
+- `instance` (`Model | None`): Model instance to serialize (optional)
+- `query_data` (`ObjectQuerySchema | QuerySchema | None`): Query configuration for fetching (optional)
+- `is_for` (`Literal["read", "detail"] | None`): Purpose of the query. Use `"detail"` for single object views, `"read"` for list views. (default: None)
+
+**Parameters (list_read_s):**
+
+- `schema` (`Schema`): Output schema for serialization
+- `request` (`HttpRequest`): Current HTTP request
+- `instances` (`QuerySet | list[Model] | None`): Instances to serialize (optional)
+- `query_data` (`ObjectsQuerySchema | None`): Query configuration for fetching (optional)
+- `is_for` (`Literal["read", "detail"] | None`): Purpose of the query. Typically `"read"` for list views. (default: None)
+
+**Behavior:**
+
+- When `is_for` is specified, select_related and prefetch_related are merged with model-discovered relations based on the operation type
+- When `is_for="detail"` but no `QuerySet.detail` is configured, falls back to `QuerySet.read` optimizations
+- Passing `instance`/`instances` skips fetching; passing `query_data` fetches automatically
+- Either `instance`/`instances` OR `query_data` must be provided, not both
 
 ### `get_reverse_relations()`
 
@@ -193,13 +345,13 @@ print(reverse_rels)  # ["books"]
 
 #### Detected Relation Types
 
-| Django Descriptor | Example | Detected |
-|-------------------|---------|----------|
-| `ReverseManyToOneDescriptor` | `author.books` | ✓ |
-| `ReverseOneToOneDescriptor` | `user.profile` | ✓ |
-| `ManyToManyDescriptor` | `article.tags` | ✓ |
-| `ForwardManyToOneDescriptor` | `book.author` | ✗ |
-| `ForwardOneToOneDescriptor` | `profile.user` | ✗ |
+| Django Descriptor            | Example        | Detected |
+| ---------------------------- | -------------- | -------- |
+| `ReverseManyToOneDescriptor` | `author.books` | ✓        |
+| `ReverseOneToOneDescriptor`  | `user.profile` | ✓        |
+| `ManyToManyDescriptor`       | `article.tags` | ✓        |
+| `ForwardManyToOneDescriptor` | `book.author`  | ✗        |
+| `ForwardOneToOneDescriptor`  | `profile.user` | ✗        |
 
 #### Use Case
 
@@ -228,14 +380,15 @@ async def parse_input_data(
 
 #### Parameters
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `request` | `HttpRequest` | Current HTTP request |
-| `data` | `Schema` | Ninja schema instance |
+| Parameter | Type          | Description           |
+| --------- | ------------- | --------------------- |
+| `request` | `HttpRequest` | Current HTTP request  |
+| `data`    | `Schema`      | Ninja schema instance |
 
 #### Return Value
 
 `(payload, customs)` where:
+
 - `payload` (`dict`): Model-ready data with resolved relationships
 - `customs` (`dict`): Custom/synthetic fields stripped from payload
 
@@ -378,10 +531,10 @@ async def parse_output_data(
 
 #### Parameters
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `request` | `HttpRequest` | Current HTTP request |
-| `data` | `Schema` | Serialized schema instance |
+| Parameter | Type          | Description                |
+| --------- | ------------- | -------------------------- |
+| `request` | `HttpRequest` | Current HTTP request       |
+| `data`    | `Schema`      | Serialized schema instance |
 
 #### Return Value
 
@@ -514,7 +667,9 @@ print(name)  # "Blog post"
 # "Update Blog post"
 ```
 
-## CRUD Operations
+---
+
+## :material-sync: CRUD Operations
 
 ### `create_s()`
 
@@ -532,11 +687,11 @@ async def create_s(
 
 #### Parameters
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `request` | `HttpRequest` | Current HTTP request |
-| `data` | `Schema` | Input schema with creation data |
-| `obj_schema` | `Schema` | Output schema for response |
+| Parameter    | Type          | Description                     |
+| ------------ | ------------- | ------------------------------- |
+| `request`    | `HttpRequest` | Current HTTP request            |
+| `data`       | `Schema`      | Input schema with creation data |
+| `obj_schema` | `Schema`      | Output schema for response      |
 
 #### Return Value
 
@@ -628,11 +783,11 @@ async def read_s(
 
 #### Parameters
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `request` | `HttpRequest` | Current HTTP request |
-| `obj` | `ModelSerializer \| models.Model` | Model instance to serialize |
-| `obj_schema` | `Schema` | Output schema |
+| Parameter    | Type                              | Description                 |
+| ------------ | --------------------------------- | --------------------------- |
+| `request`    | `HttpRequest`                     | Current HTTP request        |
+| `obj`        | `ModelSerializer \| models.Model` | Model instance to serialize |
+| `obj_schema` | `Schema`                          | Output schema               |
 
 #### Return Value
 
@@ -699,12 +854,12 @@ async def update_s(
 
 #### Parameters
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `request` | `HttpRequest` | Current HTTP request |
-| `data` | `Schema` | Input schema with update data |
-| `pk` | `int \| str` | Primary key of object to update |
-| `obj_schema` | `Schema` | Output schema for response |
+| Parameter    | Type          | Description                     |
+| ------------ | ------------- | ------------------------------- |
+| `request`    | `HttpRequest` | Current HTTP request            |
+| `data`       | `Schema`      | Input schema with update data   |
+| `pk`         | `int \| str`  | Primary key of object to update |
+| `obj_schema` | `Schema`      | Output schema for response      |
 
 #### Return Value
 
@@ -791,10 +946,10 @@ async def delete_s(
 
 #### Parameters
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `request` | `HttpRequest` | Current HTTP request |
-| `pk` | `int \| str` | Primary key of object to delete |
+| Parameter | Type          | Description                     |
+| --------- | ------------- | ------------------------------- |
+| `request` | `HttpRequest` | Current HTTP request            |
+| `pk`      | `int \| str`  | Primary key of object to delete |
 
 #### Return Value
 
@@ -827,7 +982,9 @@ await util.delete_s(request, pk=1)
 # Logs deletion and clears cache
 ```
 
-## Error Handling
+---
+
+## :material-alert-circle: Error Handling
 
 ModelUtil raises `SerializeError` for various failure scenarios:
 
@@ -876,7 +1033,7 @@ except SerializeError as e:
     # {"author": "User with id 999 not found"}
 ```
 
-## Performance Optimization
+## :material-lightning-bolt: Performance Optimization
 
 ### Automatic Query Optimization
 
@@ -923,7 +1080,7 @@ class Article(ModelSerializer):
         )
 ```
 
-## Integration with APIViewSet
+## :material-view-grid: Integration with APIViewSet
 
 ModelUtil is automatically used by APIViewSet:
 
@@ -938,7 +1095,9 @@ class UserViewSet(APIViewSet):
     # All CRUD operations use ModelUtil methods
 ```
 
-## Complete Example
+---
+
+## :material-code-braces: Complete Example
 
 ```python
 from django.db import models
@@ -1017,9 +1176,10 @@ async def example(request: HttpRequest):
     await util.delete_s(request, created["id"])
 ```
 
-## Best Practices
+## :material-shield-star: Best Practices
 
 1. **Always use with async views:**
+
    ```python
    async def my_view(request):
        util = ModelUtil(User)
@@ -1027,6 +1187,7 @@ async def example(request: HttpRequest):
    ```
 
 2. **Reuse util instances when possible:**
+
    ```python
    # Good: One util per view
    util = ModelUtil(User)
@@ -1035,6 +1196,7 @@ async def example(request: HttpRequest):
    ```
 
 3. **Let ModelUtil handle query optimization:**
+
    ```python
    # Don't manually optimize unless necessary
    user = await util.get_object(request, pk=1)
@@ -1042,6 +1204,7 @@ async def example(request: HttpRequest):
    ```
 
 4. **Handle SerializeError appropriately:**
+
    ```python
    from ninja_aio.exceptions import SerializeError
 
@@ -1060,7 +1223,20 @@ async def example(request: HttpRequest):
        pass
    ```
 
-## See Also
+## :material-bookshelf: See Also
 
-- [Model Serializer](model_serializer.md) - Define schemas on models
-- [API ViewSet](../views/api_view_set.md) - High-level CRUD views using ModelUtil
+<div class="grid cards" markdown>
+
+-   :material-file-document-edit:{ .lg .middle } **ModelSerializer**
+
+    ---
+
+    [:octicons-arrow-right-24: Define schemas on models](model_serializer.md)
+
+-   :material-view-grid:{ .lg .middle } **APIViewSet**
+
+    ---
+
+    [:octicons-arrow-right-24: High-level CRUD views](../views/api_view_set.md)
+
+</div>

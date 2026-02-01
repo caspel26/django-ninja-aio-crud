@@ -46,3 +46,5 @@ LOGGING = {
         },
     },
 }
+
+NINJA_AIO_RAISE_SERIALIZATION_WARNINGS = False

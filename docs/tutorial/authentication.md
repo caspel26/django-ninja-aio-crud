@@ -1,22 +1,36 @@
-# Step 3: Add Authentication
+<div class="tutorial-hero" markdown>
 
-In this step, you'll learn how to secure your API with JWT authentication and implement role-based access control.
+<span class="step-indicator">Step 3 of 4</span>
 
-## What You'll Learn
+# Add Authentication
 
-- Setting up JWT authentication
-- Protecting endpoints
-- Implementing role-based access
-- Creating login/register endpoints
-- Testing authenticated requests
+<p class="tutorial-subtitle">
+Secure your API with JWT authentication and implement role-based access control.
+</p>
 
-## Prerequisites
+</div>
 
-Make sure you've completed:
-- [Step 1: Define Your Model](model.md)
-- [Step 2: Create CRUD Views](crud.md)
+<div class="learning-objectives" markdown>
 
-## Setting Up JWT Keys
+### :material-school: What You'll Learn
+
+- :material-key: Setting up JWT authentication
+- :material-shield-lock: Protecting endpoints
+- :material-account-key: Implementing role-based access
+- :material-login: Creating login/register endpoints
+- :material-test-tube: Testing authenticated requests
+
+</div>
+
+<div class="prerequisites" markdown>
+
+**Prerequisites** — Make sure you've completed [Step 1: Define Your Model](model.md) and [Step 2: Create CRUD Views](crud.md).
+
+</div>
+
+---
+
+## :material-key-variant: Setting Up JWT Keys
 
 ### Generate RSA Keys (Recommended for Production)
 
@@ -60,7 +74,9 @@ JWT_AUDIENCE = "your-api"
 !!! warning "Security"
     Never commit your private key to version control! Add `private_key.pem` to your `.gitignore`.
 
-## Create User Model
+---
+
+## :material-account: Create User Model
 
 Update your User model to work with authentication:
 
@@ -122,7 +138,9 @@ python manage.py makemigrations
 python manage.py migrate
 ```
 
-## Create Authentication Class
+---
+
+## :material-shield-check: Create Authentication Class
 
 ```python
 # auth.py
@@ -160,7 +178,7 @@ class JWTAuth(AsyncJwtBearer):
             return False
 ```
 
-## Create Token Generation Helper
+## :material-ticket-confirmation: Create Token Generation Helper
 
 ```python
 # utils.py
@@ -213,7 +231,9 @@ def create_refresh_token(user_id: int) -> str:
     return token
 ```
 
-## Create Login/Register Endpoints
+---
+
+## :material-login: Create Login/Register Endpoints
 
 ```python
 # views.py
@@ -396,7 +416,9 @@ async def refresh(request, refresh_token: str):
         )
 ```
 
-## Protect Your ViewSets
+---
+
+## :material-lock: Protect Your ViewSets
 
 Now let's add authentication to your CRUD endpoints:
 
@@ -409,18 +431,13 @@ from .auth import JWTAuth
 api = NinjaAIO(title="Blog API", version="1.0.0")
 
 
+@api.viewset(model=Article)
 class ArticleViewSet(APIViewSet):
-    model = Article
-    api = api
-
     # Public read, authenticated write
     get_auth = None  # List and retrieve are public
     post_auth = [JWTAuth()]  # Create requires auth
     patch_auth = [JWTAuth()]  # Update requires auth
     delete_auth = [JWTAuth()]  # Delete requires auth
-
-
-ArticleViewSet().add_views_to_route()
 ```
 
 ### Set Author Automatically
@@ -458,7 +475,9 @@ class Article(ModelSerializer):
         await super().custom_actions(payload)
 ```
 
-## Role-Based Access Control
+---
+
+## :material-account-key: Role-Based Access Control
 
 Create different authentication classes for different roles:
 
@@ -520,10 +539,8 @@ class SuperuserAuth(JWTAuth):
 from .auth import JWTAuth, AdminAuth
 
 
+@api.viewset(model=Article)
 class ArticleViewSet(APIViewSet):
-    model = Article
-    api = api
-
     # Public read
     get_auth = None
 
@@ -537,83 +554,76 @@ class ArticleViewSet(APIViewSet):
     delete_auth = [AdminAuth()]
 
 
+@api.viewset(model=User)
 class UserViewSet(APIViewSet):
-    model = User
-    api = api
-
     # Only admins can manage users
     auth = [AdminAuth()]
-
-
-ArticleViewSet().add_views_to_route()
-UserViewSet().add_views_to_route()
 ```
 
-## Ownership Validation
+## :material-account-check: Ownership Validation
 
 Ensure users can only edit their own articles:
 
 ```python
 # views.py
-class ArticleViewSet(APIViewSet):
-    model = Article
-    api = api
+from ninja_aio.decorators import api_patch, api_delete
 
+
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
     get_auth = None
     post_auth = [JWTAuth()]
     patch_auth = [JWTAuth()]
     delete_auth = [JWTAuth()]
 
-    def views(self):
-        # Override update to check ownership
-        @self.router.patch("/{pk}/")
-        async def update(request, pk: int, data: Article.generate_update_s()):
-            """Update article (owner or admin only)"""
-            try:
-                article = await Article.objects.aget(pk=pk)
-            except Article.DoesNotExist:
-                raise SerializeError({"article": "not found"}, status_code=404)
+    # Override update to check ownership
+    @api_patch("/{pk}/")
+    async def update(self, request, pk: int, data: Article.generate_update_s()):
+        """Update article (owner or admin only)"""
+        try:
+            article = await Article.objects.aget(pk=pk)
+        except Article.DoesNotExist:
+            raise SerializeError({"article": "not found"}, status_code=404)
 
-            # Check ownership (unless admin)
-            user = request.auth
-            if article.author_id != user.id and not user.is_staff:
-                raise SerializeError(
-                    {"detail": "You can only edit your own articles"},
-                    status_code=403
-                )
+        # Check ownership (unless admin)
+        user = request.auth
+        if article.author_id != user.id and not user.is_staff:
+            raise SerializeError(
+                {"detail": "You can only edit your own articles"},
+                status_code=403
+            )
 
-            # Update article
-            from ninja_aio.models import ModelUtil
-            util = ModelUtil(Article)
-            schema = Article.generate_read_s()
+        # Update article
+        from ninja_aio.models import ModelUtil
+        util = ModelUtil(Article)
+        schema = Article.generate_read_s()
 
-            return await util.update_s(request, article, data, schema)
+        return await util.update_s(request, article, data, schema)
 
-        # Override delete to check ownership
-        @self.router.delete("/{pk}/")
-        async def delete(request, pk: int):
-            """Delete article (owner or admin only)"""
-            try:
-                article = await Article.objects.aget(pk=pk)
-            except Article.DoesNotExist:
-                raise SerializeError({"article": "not found"}, status_code=404)
+    # Override delete to check ownership
+    @api_delete("/{pk}/")
+    async def delete(self, request, pk: int):
+        """Delete article (owner or admin only)"""
+        try:
+            article = await Article.objects.aget(pk=pk)
+        except Article.DoesNotExist:
+            raise SerializeError({"article": "not found"}, status_code=404)
 
-            # Check ownership (unless admin)
-            user = request.auth
-            if article.author_id != user.id and not user.is_staff:
-                raise SerializeError(
-                    {"detail": "You can only delete your own articles"},
-                    status_code=403
-                )
+        # Check ownership (unless admin)
+        user = request.auth
+        if article.author_id != user.id and not user.is_staff:
+            raise SerializeError(
+                {"detail": "You can only delete your own articles"},
+                status_code=403
+            )
 
-            await article.adelete()
-            return {"message": "Article deleted successfully"}
-
-
-ArticleViewSet().add_views_to_route()
+        await article.adelete()
+        return {"message": "Article deleted successfully"}
 ```
 
-## Testing Authentication
+---
+
+## :material-test-tube: Testing Authentication
 
 ### Register a User
 
@@ -679,7 +689,7 @@ curl -X POST http://localhost:8000/api/auth/refresh/ \
   -d '{"refresh_token": "YOUR_REFRESH_TOKEN"}'
 ```
 
-## Error Responses
+## :material-alert-circle: Error Responses
 
 ### Missing Token
 
@@ -740,7 +750,7 @@ curl -X DELETE http://localhost:8000/api/article/1/ \
 }
 ```
 
-## Using Swagger UI with Auth
+## :material-open-in-new: Using Swagger UI with Auth
 
 The Swagger UI at `/api/docs` has built-in authentication support:
 
@@ -749,7 +759,7 @@ The Swagger UI at `/api/docs` has built-in authentication support:
 3. Click **"Authorize"**
 4. Now all requests will include the token
 
-## Custom Claims
+## :material-tag-plus: Custom Claims
 
 Add custom claims to your tokens:
 
@@ -805,7 +815,9 @@ class JWTAuth(AsyncJwtBearer):
         return user
 ```
 
-## Best Practices
+---
+
+## :material-shield-star: Best Practices
 
 1. **Use RSA keys in production:**
    ```python
@@ -847,19 +859,37 @@ class JWTAuth(AsyncJwtBearer):
 
 8. **Implement token blacklist** for logout functionality
 
-## Next Steps
+---
 
-Now that you have authentication set up, let's customize schemas in [Step 4: Filtering & Pagination](filtering.md).
+<div class="next-step" markdown>
 
-!!! success "What You've Learned"
-    - ✅ Setting up JWT authentication
-    - ✅ Creating login/register endpoints
-    - ✅ Protecting API endpoints
-    - ✅ Implementing role-based access control
-    - ✅ Validating ownership
-    - ✅ Testing authenticated requests
+**Ready for the next step?**
 
-## See Also
+Now that you have authentication set up, let's add filtering and pagination!
 
-- [Authentication API Reference](../api/authentication.md) - Complete authentication documentation
-- [APIViewSet Auth Options](../api/views/api_view_set.md#authentication-attributes) - ViewSet authentication options
+[Step 4: Filtering & Pagination :material-arrow-right:](filtering.md){ .md-button .md-button--primary }
+
+</div>
+
+<div class="summary-checklist" markdown>
+
+### :material-check-all: What You've Learned
+
+- :material-check: Setting up JWT authentication
+- :material-check: Creating login/register endpoints
+- :material-check: Protecting API endpoints
+- :material-check: Implementing role-based access control
+- :material-check: Validating ownership
+- :material-check: Testing authenticated requests
+
+</div>
+
+<div class="grid cards" markdown>
+
+-   :material-book-open-variant:{ .lg .middle } **API Reference**
+
+    ---
+
+    [:octicons-arrow-right-24: Authentication](../api/authentication.md) &middot; [:octicons-arrow-right-24: APIViewSet Auth Options](../api/views/api_view_set.md#authentication-attributes)
+
+</div>

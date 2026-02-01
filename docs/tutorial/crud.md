@@ -1,25 +1,37 @@
-# Step 2: Create CRUD Views
+<div class="tutorial-hero" markdown>
 
-In this step, you'll learn how to create a complete REST API with CRUD operations using `APIViewSet`.
+<span class="step-indicator">Step 2 of 4</span>
 
-## What You'll Learn
+# Create CRUD Views
 
-- How to create a basic ViewSet
-- Understanding auto-generated endpoints
-- Customizing query parameters
-- Adding custom endpoints
-- Working with request context
-- Handling errors
+<p class="tutorial-subtitle">
+Build a complete REST API with automatic CRUD operations using <code>APIViewSet</code>.
+</p>
 
-## Prerequisites
+</div>
 
-Make sure you've completed:
+<div class="learning-objectives" markdown>
 
-- [Step 1: Define Your Model](model.md)
+### :material-school: What You'll Learn
 
-You should have the `Article`, `Author`, `Category`, and `Tag` models defined.
+- :material-view-grid: How to create a basic ViewSet
+- :material-auto-fix: Understanding auto-generated endpoints
+- :material-filter: Customizing query parameters
+- :material-pencil-plus: Adding custom endpoints
+- :material-web: Working with request context
+- :material-alert-circle: Handling errors
 
-## Basic ViewSet
+</div>
+
+<div class="prerequisites" markdown>
+
+**Prerequisites** — Make sure you've completed [Step 1: Define Your Model](model.md). You should have the `Article`, `Author`, `Category`, and `Tag` models defined.
+
+</div>
+
+---
+
+## :material-view-grid: Basic ViewSet
 
 Let's create a simple API for the Article model:
 
@@ -37,13 +49,9 @@ api = NinjaAIO(
 )
 
 
+@api.viewset(model=Article)
 class ArticleViewSet(APIViewSet):
-    model = Article
-    api = api
-
-
-# Register the ViewSet
-ArticleViewSet().add_views_to_route()
+    pass
 ```
 
 That's it! You now have a complete CRUD API with 5 endpoints.
@@ -86,7 +94,9 @@ python manage.py runserver
 
 Visit **http://localhost:8000/api/docs** to see the auto-generated Swagger UI documentation.
 
-## Creating Multiple ViewSets
+---
+
+## :material-view-grid-plus: Creating Multiple ViewSets
 
 Let's add APIs for all our models:
 
@@ -99,31 +109,24 @@ from .models import Article, Author, Category, Tag
 api = NinjaAIO(title="Blog API", version="1.0.0")
 
 
+@api.viewset(model=Author)
 class AuthorViewSet(APIViewSet):
-    model = Author
-    api = api
+    pass
 
 
+@api.viewset(model=Category)
 class CategoryViewSet(APIViewSet):
-    model = Category
-    api = api
+    pass
 
 
+@api.viewset(model=Tag)
 class TagViewSet(APIViewSet):
-    model = Tag
-    api = api
+    pass
 
 
+@api.viewset(model=Article)
 class ArticleViewSet(APIViewSet):
-    model = Article
-    api = api
-
-
-# Register all ViewSets
-AuthorViewSet().add_views_to_route()
-CategoryViewSet().add_views_to_route()
-TagViewSet().add_views_to_route()
-ArticleViewSet().add_views_to_route()
+    pass
 ```
 
 Now you have complete CRUD APIs for all models:
@@ -133,14 +136,15 @@ Now you have complete CRUD APIs for all models:
 - `/api/tag/`
 - `/api/article/`
 
-## Adding Query Parameters
+---
+
+## :material-filter-variant: Adding Query Parameters
 
 Let's add filtering to the Article list endpoint:
 
 ```python
+@api.viewset(model=Article)
 class ArticleViewSet(APIViewSet):
-    model = Article
-    api = api
     query_params = {
         "is_published": (bool, None),
         "author": (int, None),
@@ -171,9 +175,6 @@ class ArticleViewSet(APIViewSet):
             )
 
         return queryset
-
-
-ArticleViewSet().add_views_to_route()
 ```
 
 ### Using Query Parameters
@@ -200,101 +201,98 @@ GET /api/article/?is_published=true&author=5&category=3
 GET /api/article/?is_published=true&page=2&page_size=20
 ```
 
-## Custom Endpoints
+---
+
+## :material-pencil-plus: Custom Endpoints
 
 Add custom endpoints beyond CRUD:
 
 ```python
+from ninja_aio.decorators import api_get, api_post
+
+
+@api.viewset(model=Article)
 class ArticleViewSet(APIViewSet):
-    model = Article
-    api = api
+    # Publish an article
+    @api_post("/{pk}/publish/")
+    async def publish(self, request, pk: int):
+        article = await Article.objects.aget(pk=pk)
+        article.is_published = True
+        from django.utils import timezone
+        article.published_at = timezone.now()
+        await article.asave()
 
-    def views(self):
-        """Define custom endpoints"""
+        return {
+            "message": "Article published successfully",
+            "published_at": article.published_at
+        }
 
-        # Publish an article
-        @self.router.post("/{pk}/publish/")
-        async def publish(request, pk: int):
-            article = await Article.objects.aget(pk=pk)
-            article.is_published = True
-            from django.utils import timezone
-            article.published_at = timezone.now()
-            await article.asave()
+    # Unpublish an article
+    @api_post("/{pk}/unpublish/")
+    async def unpublish(self, request, pk: int):
+        article = await Article.objects.aget(pk=pk)
+        article.is_published = False
+        article.published_at = None
+        await article.asave()
 
-            return {
-                "message": "Article published successfully",
-                "published_at": article.published_at
-            }
+        return {"message": "Article unpublished successfully"}
 
-        # Unpublish an article
-        @self.router.post("/{pk}/unpublish/")
-        async def unpublish(request, pk: int):
-            article = await Article.objects.aget(pk=pk)
-            article.is_published = False
-            article.published_at = None
-            await article.asave()
+    # Increment view count
+    @api_post("/{pk}/view/")
+    async def increment_views(self, request, pk: int):
+        article = await Article.objects.aget(pk=pk)
+        article.views += 1
+        await article.asave(update_fields=["views"])
 
-            return {"message": "Article unpublished successfully"}
+        return {"views": article.views}
 
-        # Increment view count
-        @self.router.post("/{pk}/view/")
-        async def increment_views(request, pk: int):
-            article = await Article.objects.aget(pk=pk)
-            article.views += 1
-            await article.asave(update_fields=["views"])
+    # Get article statistics
+    @api_get("/stats/")
+    async def stats(self, request):
+        from django.db.models import Count, Avg, Sum
 
-            return {"views": article.views}
+        total = await Article.objects.acount()
+        published = await Article.objects.filter(is_published=True).acount()
 
-        # Get article statistics
-        @self.router.get("/stats/")
-        async def stats(request):
-            from django.db.models import Count, Avg, Sum
+        # Use sync_to_async for aggregate
+        from asgiref.sync import sync_to_async
 
-            total = await Article.objects.acount()
-            published = await Article.objects.filter(is_published=True).acount()
+        avg_views = await sync_to_async(
+            lambda: Article.objects.aggregate(avg=Avg("views"))
+        )()
 
-            # Use sync_to_async for aggregate
-            from asgiref.sync import sync_to_async
+        total_views = await sync_to_async(
+            lambda: Article.objects.aggregate(total=Sum("views"))
+        )()
 
-            avg_views = await sync_to_async(
-                lambda: Article.objects.aggregate(avg=Avg("views"))
-            )()
+        return {
+            "total_articles": total,
+            "published_articles": published,
+            "draft_articles": total - published,
+            "average_views": avg_views["avg"] or 0,
+            "total_views": total_views["total"] or 0,
+        }
 
-            total_views = await sync_to_async(
-                lambda: Article.objects.aggregate(total=Sum("views"))
-            )()
+    # Get popular articles
+    @api_get("/popular/")
+    async def popular(self, request, limit: int = 10):
+        articles = []
+        async for article in Article.objects.filter(
+            is_published=True
+        ).order_by("-views")[:limit]:
+            articles.append(article)
 
-            return {
-                "total_articles": total,
-                "published_articles": published,
-                "draft_articles": total - published,
-                "average_views": avg_views["avg"] or 0,
-                "total_views": total_views["total"] or 0,
-            }
+        # Serialize articles
+        from ninja_aio.models import ModelUtil
+        util = ModelUtil(Article)
+        schema = Article.generate_read_s()
 
-        # Get popular articles
-        @self.router.get("/popular/")
-        async def popular(request, limit: int = 10):
-            articles = []
-            async for article in Article.objects.filter(
-                is_published=True
-            ).order_by("-views")[:limit]:
-                articles.append(article)
+        results = []
+        for article in articles:
+            data = await util.read_s(request, article, schema)
+            results.append(data)
 
-            # Serialize articles
-            from ninja_aio.models import ModelUtil
-            util = ModelUtil(Article)
-            schema = Article.generate_read_s()
-
-            results = []
-            for article in articles:
-                data = await util.read_s(request, article, schema)
-                results.append(data)
-
-            return results
-
-
-ArticleViewSet().add_views_to_route()
+        return results
 ```
 
 ### Custom Endpoint URLs
@@ -321,57 +319,56 @@ GET /api/article/popular/
 GET /api/article/popular/?limit=20
 ```
 
-## Request Context
+---
+
+## :material-web: Request Context
 
 Access request information in your ViewSet:
 
 ```python
+from ninja_aio.decorators import api_get, api_post
+
+
+@api.viewset(model=Article)
 class ArticleViewSet(APIViewSet):
-    model = Article
-    api = api
+    @api_get("/my-articles/")
+    async def my_articles(self, request):
+        """Get articles by current user"""
+        # Access authenticated user
+        user = request.auth
 
-    def views(self):
-        @self.router.get("/my-articles/")
-        async def my_articles(request):
-            """Get articles by current user"""
-            # Access authenticated user
-            user = request.auth
+        # Get user's articles
+        articles = []
+        async for article in Article.objects.filter(author=user):
+            articles.append(article)
 
-            # Get user's articles
-            articles = []
-            async for article in Article.objects.filter(author=user):
-                articles.append(article)
+        # Serialize
+        from ninja_aio.models import ModelUtil
+        util = ModelUtil(Article)
+        schema = Article.generate_read_s()
 
-            # Serialize
-            from ninja_aio.models import ModelUtil
-            util = ModelUtil(Article)
-            schema = Article.generate_read_s()
+        results = []
+        for article in articles:
+            data = await util.read_s(request, article, schema)
+            results.append(data)
 
-            results = []
-            for article in articles:
-                data = await util.read_s(request, article, schema)
-                results.append(data)
+        return results
 
-            return results
+    @api_post("/")
+    async def create_article(self, request, data: Article.generate_create_s()):
+        """Override create to set author from request"""
+        # Set author from authenticated user
+        data.author = request.auth.id
 
-        @self.router.post("/")
-        async def create_article(request, data: Article.generate_create_s()):
-            """Override create to set author from request"""
-            # Set author from authenticated user
-            data.author = request.auth.id
+        # Use default create logic
+        from ninja_aio.models import ModelUtil
+        util = ModelUtil(Article)
+        schema = Article.generate_read_s()
 
-            # Use default create logic
-            from ninja_aio.models import ModelUtil
-            util = ModelUtil(Article)
-            schema = Article.generate_read_s()
-
-            return await util.create_s(request, data, schema)
-
-
-ArticleViewSet().add_views_to_route()
+        return await util.create_s(request, data, schema)
 ```
 
-## Filtering by User
+## :material-account-filter: Filtering by User
 
 Automatically filter queryset based on user:
 
@@ -400,16 +397,13 @@ class Article(ModelSerializer):
         )
 
 
+@api.viewset(model=Article)
 class ArticleViewSet(APIViewSet):
-    model = Article
-    api = api
+    pass
     # queryset_request is automatically called for all operations
-
-
-ArticleViewSet().add_views_to_route()
 ```
 
-## Custom Pagination
+## :material-page-next: Custom Pagination
 
 Override default pagination:
 
@@ -422,13 +416,9 @@ class LargePagePagination(PageNumberPagination):
     max_page_size = 200  # Allow up to 200 items
 
 
+@api.viewset(model=Article)
 class ArticleViewSet(APIViewSet):
-    model = Article
-    api = api
     pagination_class = LargePagePagination
-
-
-ArticleViewSet().add_views_to_route()
 ```
 
 Now list endpoint uses custom pagination:
@@ -444,14 +434,13 @@ GET /api/article/?page_size=100
 GET /api/article/?page=2&page_size=50
 ```
 
-## Ordering
+## :material-sort: Ordering
 
 Add ordering to list endpoint:
 
 ```python
+@api.viewset(model=Article)
 class ArticleViewSet(APIViewSet):
-    model = Article
-    api = api
     query_params = {
         "is_published": (bool, None),
         "ordering": (str, "-created_at"),  # Default: newest first
@@ -477,9 +466,6 @@ class ArticleViewSet(APIViewSet):
             queryset = queryset.order_by(ordering)
 
         return queryset
-
-
-ArticleViewSet().add_views_to_route()
 ```
 
 **Usage:**
@@ -504,65 +490,57 @@ GET /api/article/?ordering=-views
 GET /api/article/?ordering=-published_at
 ```
 
-## Error Handling
+---
+
+## :material-alert-circle: Error Handling
 
 Handle errors gracefully:
 
 ```python
 from ninja_aio.exceptions import SerializeError, NotFoundError
+from ninja_aio.decorators import api_post
 
 
+@api.viewset(model=Article)
 class ArticleViewSet(APIViewSet):
-    model = Article
-    api = api
+    @api_post("/{pk}/publish/")
+    async def publish(self, request, pk: int):
+        try:
+            article = await Article.objects.aget(pk=pk)
+        except Article.DoesNotExist:
+            raise NotFoundError(self.model)
 
-    def views(self):
-        @self.router.post("/{pk}/publish/")
-        async def publish(request, pk: int):
-            try:
-                article = await Article.objects.aget(pk=pk)
-            except Article.DoesNotExist:
-                raise NotFoundError(self.model)
+        # Check if already published
+        if article.is_published:
+            raise SerializeError(
+                {"article": "already published"},
+                status_code=400
+            )
 
-            # Check if already published
-            if article.is_published:
-                raise SerializeError(
-                    {"article": "already published"},
-                    status_code=400
-                )
+        # Publish
+        article.is_published = True
+        from django.utils import timezone
+        article.published_at = timezone.now()
+        await article.asave()
 
-            # Publish
-            article.is_published = True
-            from django.utils import timezone
-            article.published_at = timezone.now()
-            await article.asave()
-
-            return {
-                "message": "Article published successfully",
-                "published_at": article.published_at
-            }
-
-
-ArticleViewSet().add_views_to_route()
+        return {
+            "message": "Article published successfully",
+            "published_at": article.published_at
+        }
 ```
 
-## Disabling Endpoints
+## :material-eye-off: Disabling Endpoints
 
 Disable specific CRUD operations:
 
 ```python
+@api.viewset(model=Category)
 class CategoryViewSet(APIViewSet):
-    model = Category
-    api = api
-
     # Disable delete (categories can't be deleted)
     disable_delete = True
 
     # Disable update (categories are immutable)
     disable_update = True
-
-
-CategoryViewSet().add_views_to_route()
 ```
 
 Now only these endpoints are available:
@@ -571,160 +549,160 @@ Now only these endpoints are available:
 - `POST /api/category/` - Create
 - `GET /api/category/{id}` - Retrieve
 
-## Response Customization
+## :material-code-json: Response Customization
 
 Customize response format:
 
 ```python
+from ninja_aio.decorators import api_get
+
+
+@api.viewset(model=Article)
 class ArticleViewSet(APIViewSet):
-    model = Article
-    api = api
+    @api_get("/{pk}/")
+    async def retrieve(self, request, pk: int):
+        """Custom retrieve with additional data"""
+        article = await Article.objects.select_related(
+            'author', 'category'
+        ).prefetch_related('tags').aget(pk=pk)
 
-    def views(self):
-        @self.router.get("/{pk}/")
-        async def retrieve(request, pk: int):
-            """Custom retrieve with additional data"""
-            article = await Article.objects.select_related(
-                'author', 'category'
-            ).prefetch_related('tags').aget(pk=pk)
+        # Serialize article
+        from ninja_aio.models import ModelUtil
+        util = ModelUtil(Article)
+        schema = Article.generate_read_s()
+        article_data = await util.read_s(request, article, schema)
 
-            # Serialize article
-            from ninja_aio.models import ModelUtil
-            util = ModelUtil(Article)
-            schema = Article.generate_read_s()
-            article_data = await util.read_s(request, article, schema)
+        # Get related articles
+        related = []
+        async for rel_article in Article.objects.filter(
+            category=article.category,
+            is_published=True
+        ).exclude(pk=pk)[:5]:
+            rel_data = await util.read_s(request, rel_article, schema)
+            related.append(rel_data)
 
-            # Get related articles
-            related = []
-            async for rel_article in Article.objects.filter(
-                category=article.category,
-                is_published=True
-            ).exclude(pk=pk)[:5]:
-                rel_data = await util.read_s(request, rel_article, schema)
-                related.append(rel_data)
+        # Get author's other articles
+        author_articles = []
+        async for auth_article in Article.objects.filter(
+            author=article.author,
+            is_published=True
+        ).exclude(pk=pk)[:5]:
+            auth_data = await util.read_s(request, auth_article, schema)
+            author_articles.append(auth_data)
 
-            # Get author's other articles
-            author_articles = []
-            async for auth_article in Article.objects.filter(
-                author=article.author,
-                is_published=True
-            ).exclude(pk=pk)[:5]:
-                auth_data = await util.read_s(request, auth_article, schema)
-                author_articles.append(auth_data)
-
-            return {
-                "article": article_data,
-                "related_articles": related,
-                "author_articles": author_articles,
-                "meta": {
-                    "total_views": article.views,
-                    "author_article_count": await Article.objects.filter(
-                        author=article.author
-                    ).acount()
-                }
+        return {
+            "article": article_data,
+            "related_articles": related,
+            "author_articles": author_articles,
+            "meta": {
+                "total_views": article.views,
+                "author_article_count": await Article.objects.filter(
+                    author=article.author
+                ).acount()
             }
-
-
-ArticleViewSet().add_views_to_route()
+        }
 ```
 
-## Complete Example
+---
+
+## :material-code-braces: Complete Example
 
 Here's a complete ViewSet with all features:
 
-```python
-# views.py
-from ninja_aio import NinjaAIO
-from ninja_aio.views import APIViewSet
-from ninja.pagination import PageNumberPagination
-from ninja_aio.exceptions import SerializeError, NotFoundError
-from .models import Article, Author, Category, Tag
-from django.db.models import Q
+??? example "Full ViewSet code (click to expand)"
 
-api = NinjaAIO(
-    title="Blog API",
-    version="1.0.0",
-    description="A complete blog API"
-)
+    ```python
+    # views.py
+    from ninja_aio import NinjaAIO
+    from ninja_aio.views import APIViewSet
+    from ninja.pagination import PageNumberPagination
+    from ninja_aio.exceptions import SerializeError, NotFoundError
+    from ninja_aio.decorators import api_get, api_post
+    from .models import Article, Author, Category, Tag
+    from django.db.models import Q
 
-
-class CustomPagination(PageNumberPagination):
-    page_size = 20
-    max_page_size = 100
+    api = NinjaAIO(
+        title="Blog API",
+        version="1.0.0",
+        description="A complete blog API"
+    )
 
 
-class AuthorViewSet(APIViewSet):
-    model = Author
-    api = api
+    class CustomPagination(PageNumberPagination):
+        page_size = 20
+        max_page_size = 100
 
 
-class CategoryViewSet(APIViewSet):
-    model = Category
-    api = api
+    @api.viewset(model=Author)
+    class AuthorViewSet(APIViewSet):
+        pass
 
 
-class TagViewSet(APIViewSet):
-    model = Tag
-    api = api
+    @api.viewset(model=Category)
+    class CategoryViewSet(APIViewSet):
+        pass
 
 
-class ArticleViewSet(APIViewSet):
-    model = Article
-    api = api
-    pagination_class = CustomPagination
+    @api.viewset(model=Tag)
+    class TagViewSet(APIViewSet):
+        pass
 
-    query_params = {
-        "is_published": (bool, None),
-        "author": (int, None),
-        "category": (int, None),
-        "tag": (int, None),
-        "search": (str, None),
-        "ordering": (str, "-created_at"),
-    }
 
-    async def query_params_handler(self, queryset, filters):
-        # Published filter
-        if filters.get("is_published") is not None:
-            queryset = queryset.filter(is_published=filters["is_published"])
+    @api.viewset(model=Article)
+    class ArticleViewSet(APIViewSet):
+        pagination_class = CustomPagination
 
-        # Author filter
-        if filters.get("author"):
-            queryset = queryset.filter(author_id=filters["author"])
+        query_params = {
+            "is_published": (bool, None),
+            "author": (int, None),
+            "category": (int, None),
+            "tag": (int, None),
+            "search": (str, None),
+            "ordering": (str, "-created_at"),
+        }
 
-        # Category filter
-        if filters.get("category"):
-            queryset = queryset.filter(category_id=filters["category"])
+        async def query_params_handler(self, queryset, filters):
+            # Published filter
+            if filters.get("is_published") is not None:
+                queryset = queryset.filter(is_published=filters["is_published"])
 
-        # Tag filter
-        if filters.get("tag"):
-            queryset = queryset.filter(tags__id=filters["tag"])
+            # Author filter
+            if filters.get("author"):
+                queryset = queryset.filter(author_id=filters["author"])
 
-        # Search
-        if filters.get("search"):
-            search = filters["search"]
-            queryset = queryset.filter(
-                Q(title__icontains=search) |
-                Q(content__icontains=search) |
-                Q(excerpt__icontains=search)
-            )
+            # Category filter
+            if filters.get("category"):
+                queryset = queryset.filter(category_id=filters["category"])
 
-        # Ordering
-        ordering = filters.get("ordering", "-created_at")
-        valid_orderings = [
-            "created_at", "-created_at",
-            "title", "-title",
-            "views", "-views",
-            "published_at", "-published_at"
-        ]
-        if ordering in valid_orderings:
-            queryset = queryset.order_by(ordering)
+            # Tag filter
+            if filters.get("tag"):
+                queryset = queryset.filter(tags__id=filters["tag"])
 
-        return queryset
+            # Search
+            if filters.get("search"):
+                search = filters["search"]
+                queryset = queryset.filter(
+                    Q(title__icontains=search) |
+                    Q(content__icontains=search) |
+                    Q(excerpt__icontains=search)
+                )
 
-    def views(self):
+            # Ordering
+            ordering = filters.get("ordering", "-created_at")
+            valid_orderings = [
+                "created_at", "-created_at",
+                "title", "-title",
+                "views", "-views",
+                "published_at", "-published_at"
+            ]
+            if ordering in valid_orderings:
+                queryset = queryset.order_by(ordering)
+
+            return queryset
+
         # Publish article
-        @self.router.post("/{pk}/publish/")
-        async def publish(request, pk: int):
+        @api_post("/{pk}/publish/")
+        async def publish(self, request, pk: int):
             try:
                 article = await Article.objects.aget(pk=pk)
             except Article.DoesNotExist:
@@ -744,8 +722,8 @@ class ArticleViewSet(APIViewSet):
             return {"message": "Article published", "published_at": article.published_at}
 
         # Unpublish article
-        @self.router.post("/{pk}/unpublish/")
-        async def unpublish(request, pk: int):
+        @api_post("/{pk}/unpublish/")
+        async def unpublish(self, request, pk: int):
             try:
                 article = await Article.objects.aget(pk=pk)
             except Article.DoesNotExist:
@@ -758,8 +736,8 @@ class ArticleViewSet(APIViewSet):
             return {"message": "Article unpublished"}
 
         # Increment views
-        @self.router.post("/{pk}/view/")
-        async def view(request, pk: int):
+        @api_post("/{pk}/view/")
+        async def view(self, request, pk: int):
             try:
                 article = await Article.objects.aget(pk=pk)
             except Article.DoesNotExist:
@@ -771,8 +749,8 @@ class ArticleViewSet(APIViewSet):
             return {"views": article.views}
 
         # Statistics
-        @self.router.get("/stats/")
-        async def stats(request):
+        @api_get("/stats/")
+        async def stats(self, request):
             from django.db.models import Count, Avg, Sum
             from asgiref.sync import sync_to_async
 
@@ -796,8 +774,8 @@ class ArticleViewSet(APIViewSet):
             }
 
         # Popular articles
-        @self.router.get("/popular/")
-        async def popular(request, limit: int = 10):
+        @api_get("/popular/")
+        async def popular(self, request, limit: int = 10):
             articles = []
             async for article in Article.objects.filter(
                 is_published=True
@@ -816,14 +794,9 @@ class ArticleViewSet(APIViewSet):
             return results
 
 
-# Register ViewSets
-AuthorViewSet().add_views_to_route()
-CategoryViewSet().add_views_to_route()
-TagViewSet().add_views_to_route()
-ArticleViewSet().add_views_to_route()
-```
+    ```
 
-## Testing Your API
+## :material-test-tube: Testing Your API
 
 Test your endpoints using curl, httpie, or the Swagger UI:
 
@@ -858,14 +831,38 @@ curl http://localhost:8000/api/article/stats/
 curl http://localhost:8000/api/article/popular/?limit=5
 ```
 
-## Next Steps
+---
 
-Now that you have CRUD operations set up, let's add authentication in [Step 3: Add Authentication](authentication.md).
+<div class="next-step" markdown>
 
-!!! success "What You've Learned" - ✅ Creating ViewSets for CRUD operations - ✅ Understanding auto-generated endpoints - ✅ Adding query parameters and filtering - ✅ Creating custom endpoints - ✅ Working with pagination - ✅ Handling errors properly - ✅ Customizing responses
+**Ready for the next step?**
 
-## See Also
+Now that you have CRUD operations set up, let's add authentication!
 
-- [APIViewSet API Reference](../api/views/api_view_set.md) - Complete API documentation
-- [Pagination](../api/pagination.md) - Advanced pagination options
-- [ModelUtil](../api/models/model_util.md) - Working with models
+[Step 3: Add Authentication :material-arrow-right:](authentication.md){ .md-button .md-button--primary }
+
+</div>
+
+<div class="summary-checklist" markdown>
+
+### :material-check-all: What You've Learned
+
+- :material-check: Creating ViewSets for CRUD operations
+- :material-check: Understanding auto-generated endpoints
+- :material-check: Adding query parameters and filtering
+- :material-check: Creating custom endpoints
+- :material-check: Working with pagination
+- :material-check: Handling errors properly
+- :material-check: Customizing responses
+
+</div>
+
+<div class="grid cards" markdown>
+
+-   :material-book-open-variant:{ .lg .middle } **API Reference**
+
+    ---
+
+    [:octicons-arrow-right-24: APIViewSet](../api/views/api_view_set.md) &middot; [:octicons-arrow-right-24: Pagination](../api/pagination.md) &middot; [:octicons-arrow-right-24: ModelUtil](../api/models/model_util.md)
+
+</div>

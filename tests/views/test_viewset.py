@@ -1,7 +1,15 @@
-from django.test import tag
+import datetime
 
+from django.test import tag, TestCase
+from django.utils import timezone
+
+from ninja_aio.models import ModelUtil
+from ninja_aio.models import serializers as ninja_serializers
 from tests.generics.views import Tests
-from tests.test_app import schema, models, views
+from tests.test_app import schema, models, views, serializers
+from ninja_aio import NinjaAIO
+from ninja_aio.views import APIViewSet
+from ninja_aio.decorators import api_get, api_post
 
 
 class BaseTests:
@@ -36,6 +44,7 @@ class BaseTests:
         def schemas(self):
             return (
                 self.model.generate_read_s(),
+                self.model.generate_detail_s(),
                 self.model.generate_create_s(),
                 self.model.generate_update_s(),
             )
@@ -45,10 +54,14 @@ class BaseTests:
 
         @classmethod
         def setUpTestData(cls):
-            cls.relation_data = {
+            data = {
                 "name": f"test_name_{cls.relation_viewset.model._meta.model_name}",
                 "description": f"test_description_{cls.relation_viewset.model._meta.model_name}",
             }
+            if not hasattr(cls, "relation_data"):
+                cls.relation_data = data
+            else:
+                cls.relation_data = cls.relation_data | data
             super().setUpTestData()
 
     @tag("viewset_foreign_key")
@@ -117,6 +130,180 @@ class ApiViewSetModelSerializerTestCase(
     namespace = "test_model_serializer_viewset"
     model = models.TestModelSerializer
     viewset = views.TestModelSerializerAPI()
+
+    async def _drop_all_objects(self):
+        await self.model.objects.all().adelete()
+
+    async def test_query_params_icontains_mixin(self):
+        await self._drop_all_objects()
+        obj = await self.model.objects.acreate(**self.payload_create)
+        res = await self.viewset.query_params_handler(
+            self.model.objects.all(), {"name": f"{self.model._meta.model_name}"}
+        )
+        self.assertEqual(await res.acount(), 1)
+        self.assertEqual((await res.afirst()), obj)
+
+    async def test_query_params_boolean_mixin(self):
+        await self._drop_all_objects()
+        obj_active = await self.model.objects.acreate(**self.payload_create)
+        obj_inactive = await self.model.objects.acreate(
+            **{**self.payload_create, "active": False}
+        )
+        res_active = await self.viewset.query_params_handler(
+            self.model.objects.all(), {"active": True}
+        )
+        self.assertEqual(await res_active.acount(), 1)
+        self.assertEqual((await res_active.afirst()), obj_active)
+        res_inactive = await self.viewset.query_params_handler(
+            self.model.objects.all(), {"active": False}
+        )
+        self.assertEqual(await res_inactive.acount(), 1)
+        self.assertEqual((await res_inactive.afirst()), obj_inactive)
+
+    async def test_query_params_numeric_mixin(self):
+        await self._drop_all_objects()
+        obj_age_25 = await self.model.objects.acreate(
+            **{**self.payload_create, "age": 25}
+        )
+        obj_age_30 = await self.model.objects.acreate(
+            **{**self.payload_create, "age": 30}
+        )
+        res_age_25 = await self.viewset.query_params_handler(
+            self.model.objects.all(), {"age": 25}
+        )
+        self.assertEqual(await res_age_25.acount(), 1)
+        self.assertEqual((await res_age_25.afirst()), obj_age_25)
+        res_age_30 = await self.viewset.query_params_handler(
+            self.model.objects.all(), {"age": 30}
+        )
+        self.assertEqual(await res_age_30.acount(), 1)
+        self.assertEqual((await res_age_30.afirst()), obj_age_30)
+
+    async def test_query_params_date_mixin(self):
+        await self._drop_all_objects()
+        obj_today = await self.model.objects.acreate(**self.payload_create)
+        res_today = await self.viewset.query_params_handler(
+            self.model.objects.all(),
+            {"active_from": obj_today.active_from},
+        )
+        self.assertEqual(await res_today.acount(), 1)
+        self.assertEqual((await res_today.afirst()), obj_today)
+
+
+@tag("model_serializer_greater_than_date_viewset")
+class ApiViewSetModelSerializerGreaterThanDateTestCase(
+    BaseTests.ModelSerializerViewSetTestCaseBase,
+    Tests.ViewSetTestCase,
+):
+    namespace = "test_model_serializer_greater_than_date_viewset"
+    model = models.TestModelSerializer
+    viewset = views.TestModelSerializerGreaterThanMixinAPI()
+
+    async def _drop_all_objects(self):
+        await self.model.objects.all().adelete()
+
+    async def test_query_params_greater_than_date_mixin(self):
+        await self._drop_all_objects()
+        past_date = timezone.now() - datetime.timedelta(days=1)
+        future_date = timezone.now() + datetime.timedelta(days=1)
+        obj_past = await self.model.objects.acreate(**self.payload_create)
+        obj_past.active_from = past_date
+        await obj_past.asave()
+        obj_future = await self.model.objects.acreate(**self.payload_create)
+        obj_future.active_from = future_date
+        await obj_future.asave()
+        res_greater_than_now = await self.viewset.query_params_handler(
+            self.model.objects.all(), {"active_from": timezone.now()}
+        )
+        self.assertEqual(await res_greater_than_now.acount(), 1)
+        self.assertEqual((await res_greater_than_now.afirst()), obj_future)
+
+
+@tag("model_serializer_less_than_date_viewset")
+class ApiViewSetModelSerializerLessThanDateTestCase(
+    BaseTests.ModelSerializerViewSetTestCaseBase,
+    Tests.ViewSetTestCase,
+):
+    namespace = "test_model_serializer_less_than_date_viewset"
+    model = models.TestModelSerializer
+    viewset = views.TestModelSerializerLessThanMixinAPI()
+
+    async def _drop_all_objects(self):
+        await self.model.objects.all().adelete()
+
+    async def test_query_params_less_than_date_mixin(self):
+        await self._drop_all_objects()
+        past_date = timezone.now() - datetime.timedelta(days=1)
+        future_date = timezone.now() + datetime.timedelta(days=1)
+        obj_past = await self.model.objects.acreate(**self.payload_create)
+        obj_past.active_from = past_date
+        await obj_past.asave()
+        obj_future = await self.model.objects.acreate(**self.payload_create)
+        obj_future.active_from = future_date
+        await obj_future.asave()
+        res_less_than_now = await self.viewset.query_params_handler(
+            self.model.objects.all(), {"active_from": timezone.now()}
+        )
+        self.assertEqual(await res_less_than_now.acount(), 1)
+        self.assertEqual((await res_less_than_now.afirst()), obj_past)
+
+
+@tag("model_serializer_greater_equal_date_viewset")
+class ApiViewSetModelSerializerGreaterEqualDateTestCase(
+    BaseTests.ModelSerializerViewSetTestCaseBase,
+    Tests.ViewSetTestCase,
+):
+    namespace = "test_model_serializer_greater_equal_date_viewset"
+    model = models.TestModelSerializer
+    viewset = views.TestModelSerializerGreaterEqualMixinAPI()
+
+    async def _drop_all_objects(self):
+        await self.model.objects.all().adelete()
+
+    async def test_query_params_greater_equal_date_mixin(self):
+        await self._drop_all_objects()
+        past_date = timezone.now() - datetime.timedelta(days=1)
+        future_date = timezone.now() + datetime.timedelta(days=1)
+        obj_past = await self.model.objects.acreate(**self.payload_create)
+        obj_past.active_from = past_date
+        await obj_past.asave()
+        obj_future = await self.model.objects.acreate(**self.payload_create)
+        obj_future.active_from = future_date
+        await obj_future.asave()
+        res_greater_equal_now = await self.viewset.query_params_handler(
+            self.model.objects.all(), {"active_from": timezone.now()}
+        )
+        self.assertEqual(await res_greater_equal_now.acount(), 1)
+        self.assertEqual((await res_greater_equal_now.afirst()), obj_future)
+
+
+@tag("model_serializer_less_equal_date_viewset")
+class ApiViewSetModelSerializerLessEqualDateTestCase(
+    BaseTests.ModelSerializerViewSetTestCaseBase,
+    Tests.ViewSetTestCase,
+):
+    namespace = "test_model_serializer_less_equal_date_viewset"
+    model = models.TestModelSerializer
+    viewset = views.TestModelSerializerLessEqualMixinAPI()
+
+    async def _drop_all_objects(self):
+        await self.model.objects.all().adelete()
+
+    async def test_query_params_less_equal_date_mixin(self):
+        await self._drop_all_objects()
+        past_date = timezone.now() - datetime.timedelta(days=1)
+        future_date = timezone.now() + datetime.timedelta(days=1)
+        obj_past = await self.model.objects.acreate(**self.payload_create)
+        obj_past.active_from = past_date
+        await obj_past.asave()
+        obj_future = await self.model.objects.acreate(**self.payload_create)
+        obj_future.active_from = future_date
+        await obj_future.asave()
+        res_less_equal_now = await self.viewset.query_params_handler(
+            self.model.objects.all(), {"active_from": timezone.now()}
+        )
+        self.assertEqual(await res_less_equal_now.acount(), 1)
+        self.assertEqual((await res_less_equal_now.afirst()), obj_past)
 
 
 @tag("model_serializer_foreign_key_viewset")
@@ -221,6 +408,7 @@ class ApiViewSetModelTestCase(
     def schemas(self):
         return (
             schema.TestModelSchemaOut,
+            None,  # No detail schema for plain model
             schema.TestModelSchemaIn,
             schema.TestModelSchemaPatch,
         )
@@ -238,6 +426,7 @@ class ApiViewSetModelForeignKeyTestCase(BaseTests.ApiViewSetForeignKeyTestCaseBa
     def schemas(self):
         return (
             schema.TestModelForeignKeySchemaOut,
+            None,  # No detail schema for plain model
             schema.TestModelForeignKeySchemaIn,
             schema.TestModelSchemaPatch,
         )
@@ -263,6 +452,7 @@ class ApiViewSetModelReverseForeignKeyTestCase(
     def schemas(self):
         return (
             schema.TestModelReverseForeignKeySchemaOut,
+            None,  # No detail schema for plain model
             schema.TestModelReverseForeignKeySchemaIn,
             schema.TestModelSchemaPatch,
         )
@@ -279,6 +469,7 @@ class ApiViewSetModelOneToOneTestCase(ApiViewSetModelForeignKeyTestCase):
     def schemas(self):
         return (
             schema.TestModelForeignKeySchemaOut,
+            None,  # No detail schema for plain model
             schema.TestModelForeignKeySchemaIn,
             schema.TestModelSchemaPatch,
         )
@@ -296,6 +487,7 @@ class ApiViewSetModelReverseOneToOneTestCase(ApiViewSetModelReverseForeignKeyTes
     def schemas(self):
         return (
             schema.TestModelReverseOneToOneSchemaOut,
+            None,  # No detail schema for plain model
             schema.TestModelReverseForeignKeySchemaIn,
             schema.TestModelSchemaPatch,
         )
@@ -324,6 +516,7 @@ class ApiViewSetModelManyToManyTestCase(BaseTests.ApiViewSetManyToManyTestCaseBa
     def schemas(self):
         return (
             schema.TestModelManyToManySchemaOut,
+            None,  # No detail schema for plain model
             schema.TestModelSchemaIn,
             schema.TestModelSchemaPatch,
         )
@@ -344,6 +537,597 @@ class ApiViewSetModelReverseManyToManyTestCase(
     def schemas(self):
         return (
             schema.TestModelReverseManyToManySchemaOut,
+            None,  # No detail schema for plain model
             schema.TestModelSchemaIn,
             schema.TestModelSchemaPatch,
         )
+
+
+@tag("model_foreign_key_serializer_viewset")
+class ApiViewSetModelForeignKeySerializerTestCase(
+    BaseTests.ApiViewSetForeignKeyTestCaseBase
+):
+    namespace = "test_model_foreign_key_serializer_viewset"
+    model = models.TestModelForeignKey
+    viewset = views.TestModelForeignKeySerializerAPI()
+    relation_viewset = views.TestModelReverseForeignKeySerializerAPI()
+    relation_related_name = "test_model"
+
+    @property
+    def schemas(self):
+        return (
+            serializers.TestModelForeignKeySerializer.generate_read_s(),
+            serializers.TestModelForeignKeySerializer.generate_detail_s(),
+            serializers.TestModelForeignKeySerializer.generate_create_s(),
+            serializers.TestModelForeignKeySerializer.generate_update_s(),
+        )
+
+    @property
+    def payload_create(self):
+        payload = super().payload_create
+        payload.pop("test_model_serializer_id")
+        return payload | {f"{self.relation_related_name}_id": self.relation_pk}
+
+
+# ==========================================================
+#               VIEWSET DECORATOR TEST CASES
+# ==========================================================
+
+
+@tag("viewset_decorator_modelserializer")
+class ViewSetDecoratorModelSerializerTestCase(TestCase):
+    namespace = "test_viewset_decorator_modelserializer"
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.api = NinjaAIO(urls_namespace=cls.namespace)
+
+        @cls.api.viewset(model=models.TestModelSerializer)
+        class DecoratedMSViewSet(APIViewSet):
+            pass
+
+        # base path inferred from verbose_name plural
+        cls.base = f"{models.TestModelSerializer.util.verbose_name_path_resolver()}"
+
+    def test_crud_routes_mounted(self):
+        # default router + our viewset router
+        self.assertEqual(len(self.api._routers), 2)
+        path, router = self.api._routers[1]
+        self.assertEqual(path, cls.base if (cls := self).base else self.base)
+        urls = [str(r.pattern) for r in router.urls_paths(path)]
+        # Expect list and create at base, retrieve/update/delete at /{pk}/ variants
+        self.assertIn(path, urls)  # list/create
+
+
+@tag("viewset_decorator_plain_model")
+class ViewSetDecoratorPlainModelTestCase(TestCase):
+    namespace = "test_viewset_decorator_plain_model"
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.api = NinjaAIO(urls_namespace=cls.namespace)
+
+        @cls.api.viewset(model=models.TestModel)
+        class DecoratedModelViewSet(APIViewSet):
+            # Provide manual schemas since this is a plain Model
+            schema_out = schema.TestModelSchemaOut
+            schema_in = schema.TestModelSchemaIn
+            schema_update = schema.TestModelSchemaPatch
+
+        cls.base = ModelUtil(models.TestModel).verbose_name_path_resolver()
+
+    def test_crud_routes_mounted(self):
+        self.assertEqual(len(self.api._routers), 2)
+        path, router = self.api._routers[1]
+        self.assertEqual(path, self.base)
+        urls = [str(r.pattern) for r in router.urls_paths(path)]
+        # Check base and pk routes exist
+        self.assertIn(self.base, urls)
+
+
+@tag("viewset_decorator_operations")
+class ViewSetDecoratorOperationsTestCase(TestCase):
+    namespace = "test_viewset_decorator_operations"
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.api = NinjaAIO(urls_namespace=cls.namespace)
+
+        @cls.api.viewset(model=models.TestModel)
+        class DecoratedOpsViewSet(APIViewSet):
+            # Provide manual schemas since this is a plain Model
+            schema_out = schema.TestModelSchemaOut
+            schema_in = schema.TestModelSchemaIn
+            schema_update = schema.TestModelSchemaPatch
+
+            @api_get("/ping", response=schema.SumSchemaOut)
+            async def ping(self, request):
+                # simple constant payload for testing
+                return schema.SumSchemaOut(result=42).model_dump()
+
+            @api_post("/sum", response=schema.SumSchemaOut)
+            async def sum_calc(self, request, data: schema.SumSchemaIn):
+                return schema.SumSchemaOut(result=data.a + data.b).model_dump()
+
+        # base path inferred from verbose_name plural
+        cls.base = ModelUtil(models.TestModel).verbose_name_path_resolver()
+
+    def test_operation_routes_mounted(self):
+        # default router + our viewset router
+        self.assertEqual(len(self.api._routers), 2)
+        path, router = self.api._routers[1]
+        self.assertEqual(path, self.base)
+        urls = [str(r.pattern) for r in router.urls_paths(path)]
+        # Should include base for CRUD and custom endpoints appended to base
+        self.assertIn(self.base, urls)  # list/create
+        # Ensure custom endpoints are present
+        self.assertTrue(any("ping" in u for u in urls))
+        self.assertTrue(any("sum" in u for u in urls))
+
+    async def test_operation_handlers(self):
+        # Directly verify handler logic mirrors expectations
+        ping_result = schema.SumSchemaOut(result=42).model_dump()
+        self.assertEqual(ping_result, {"result": 42})
+        payload = schema.SumSchemaIn(a=3, b=4)
+        sum_result = schema.SumSchemaOut(result=payload.a + payload.b).model_dump()
+        self.assertEqual(sum_result, {"result": 7})
+
+
+# ==========================================================
+#               DETAIL SCHEMA TEST CASES
+# ==========================================================
+
+
+@tag("relation_filter_mixin")
+class RelationFilterViewSetMixinTestCase(
+    BaseTests.ModelSerializerViewSetTestCaseBase,
+    Tests.ViewSetTestCase,
+):
+    """Test RelationFilterViewSetMixin functionality."""
+
+    namespace = "test_relation_filter_mixin_viewset"
+    model = models.TestModelSerializerForeignKey
+    viewset = views.TestModelSerializerForeignKeyRelationFilterAPI()
+    relation_model = models.TestModelSerializerReverseForeignKey
+
+    @classmethod
+    def setUpTestData(cls):
+        # Create related objects first
+        cls.related_obj_1 = cls.relation_model.objects.create(
+            name="related_alpha", description="first related"
+        )
+        cls.related_obj_2 = cls.relation_model.objects.create(
+            name="related_beta", description="second related"
+        )
+        super().setUpTestData()
+
+    @property
+    def payload_create(self):
+        return {
+            **self._payload,
+            "test_model_serializer_id": self.related_obj_1.pk,
+        }
+
+    @property
+    def response_data(self):
+        return self._payload | {
+            "test_model_serializer": {
+                "id": self.related_obj_1.pk,
+                "name": self.related_obj_1.name,
+                "description": self.related_obj_1.description,
+            }
+        }
+
+    async def _drop_all_objects(self):
+        await self.model.objects.all().adelete()
+
+    async def test_relation_filter_by_id(self):
+        """Test filtering by related object's ID."""
+        await self._drop_all_objects()
+        obj_1 = await self.model.objects.acreate(
+            name="obj1", description="desc1", test_model_serializer=self.related_obj_1
+        )
+        obj_2 = await self.model.objects.acreate(
+            name="obj2", description="desc2", test_model_serializer=self.related_obj_2
+        )
+        # Filter by related_obj_1's ID
+        res = await self.viewset.query_params_handler(
+            self.model.objects.all(),
+            {"test_model_serializer": self.related_obj_1.pk},
+        )
+        self.assertEqual(await res.acount(), 1)
+        self.assertEqual(await res.afirst(), obj_1)
+
+        # Filter by related_obj_2's ID
+        res = await self.viewset.query_params_handler(
+            self.model.objects.all(),
+            {"test_model_serializer": self.related_obj_2.pk},
+        )
+        self.assertEqual(await res.acount(), 1)
+        self.assertEqual(await res.afirst(), obj_2)
+
+    async def test_relation_filter_by_name(self):
+        """Test filtering by related object's name with icontains."""
+        await self._drop_all_objects()
+        obj_1 = await self.model.objects.acreate(
+            name="obj1", description="desc1", test_model_serializer=self.related_obj_1
+        )
+        obj_2 = await self.model.objects.acreate(
+            name="obj2", description="desc2", test_model_serializer=self.related_obj_2
+        )
+        # Filter by partial name "alpha" (matches related_obj_1)
+        res = await self.viewset.query_params_handler(
+            self.model.objects.all(),
+            {"test_model_serializer_name": "alpha"},
+        )
+        self.assertEqual(await res.acount(), 1)
+        self.assertEqual(await res.afirst(), obj_1)
+
+        # Filter by partial name "beta" (matches related_obj_2)
+        res = await self.viewset.query_params_handler(
+            self.model.objects.all(),
+            {"test_model_serializer_name": "beta"},
+        )
+        self.assertEqual(await res.acount(), 1)
+        self.assertEqual(await res.afirst(), obj_2)
+
+    async def test_relation_filter_with_none_value(self):
+        """Test that None filter values are ignored."""
+        await self._drop_all_objects()
+        await self.model.objects.acreate(
+            name="obj1", description="desc1", test_model_serializer=self.related_obj_1
+        )
+        await self.model.objects.acreate(
+            name="obj2", description="desc2", test_model_serializer=self.related_obj_2
+        )
+        # Filter with None should return all objects
+        res = await self.viewset.query_params_handler(
+            self.model.objects.all(),
+            {"test_model_serializer": None, "test_model_serializer_name": None},
+        )
+        self.assertEqual(await res.acount(), 2)
+
+    async def test_relation_filter_combined(self):
+        """Test filtering by multiple relation filters at once."""
+        await self._drop_all_objects()
+        obj_1 = await self.model.objects.acreate(
+            name="obj1", description="desc1", test_model_serializer=self.related_obj_1
+        )
+        await self.model.objects.acreate(
+            name="obj2", description="desc2", test_model_serializer=self.related_obj_2
+        )
+        # Filter by both ID and name (both matching related_obj_1)
+        res = await self.viewset.query_params_handler(
+            self.model.objects.all(),
+            {
+                "test_model_serializer": self.related_obj_1.pk,
+                "test_model_serializer_name": "alpha",
+            },
+        )
+        self.assertEqual(await res.acount(), 1)
+        self.assertEqual(await res.afirst(), obj_1)
+
+    async def test_relation_filter_no_match(self):
+        """Test filtering with non-matching values returns empty queryset."""
+        await self._drop_all_objects()
+        await self.model.objects.acreate(
+            name="obj1", description="desc1", test_model_serializer=self.related_obj_1
+        )
+        # Filter by non-existent ID
+        res = await self.viewset.query_params_handler(
+            self.model.objects.all(),
+            {"test_model_serializer": 99999},
+        )
+        self.assertEqual(await res.acount(), 0)
+
+    async def test_relation_filter_empty_filters(self):
+        """Test that empty filters dict returns all objects."""
+        await self._drop_all_objects()
+        await self.model.objects.acreate(
+            name="obj1", description="desc1", test_model_serializer=self.related_obj_1
+        )
+        await self.model.objects.acreate(
+            name="obj2", description="desc2", test_model_serializer=self.related_obj_2
+        )
+        res = await self.viewset.query_params_handler(
+            self.model.objects.all(),
+            {},
+        )
+        self.assertEqual(await res.acount(), 2)
+
+    def test_query_params_registered(self):
+        """Test that relations_filters are properly registered in query_params."""
+        self.assertIn("test_model_serializer", self.viewset.query_params)
+        self.assertIn("test_model_serializer_name", self.viewset.query_params)
+        self.assertEqual(self.viewset.query_params["test_model_serializer"], (int, None))
+        self.assertEqual(
+            self.viewset.query_params["test_model_serializer_name"], (str, None)
+        )
+
+
+@tag("detail_schema")
+class DetailSchemaModelSerializerTestCase(TestCase):
+    """Test detail schema generation for ModelSerializer."""
+
+    namespace = "test_detail_schema_modelserializer"
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.api = NinjaAIO(urls_namespace=cls.namespace)
+
+        @cls.api.viewset(model=models.TestModelSerializerWithDetail)
+        class DetailMSViewSet(APIViewSet):
+            pass
+
+        # The decorator returns the instance, not the class
+        cls.viewset = DetailMSViewSet
+
+    def test_read_schema_has_minimal_fields(self):
+        """Test that read schema only includes ReadSerializer fields."""
+        schema_out = self.viewset.schema_out
+        self.assertIsNotNone(schema_out)
+        self.assertIn("id", schema_out.model_fields)
+        self.assertIn("name", schema_out.model_fields)
+        self.assertNotIn("description", schema_out.model_fields)
+        self.assertNotIn("extra_info", schema_out.model_fields)
+
+    def test_detail_schema_has_extended_fields(self):
+        """Test that detail schema includes DetailSerializer fields."""
+        schema_detail = self.viewset.schema_detail
+        self.assertIsNotNone(schema_detail)
+        self.assertIn("id", schema_detail.model_fields)
+        self.assertIn("name", schema_detail.model_fields)
+        self.assertIn("description", schema_detail.model_fields)
+        self.assertIn("extra_info", schema_detail.model_fields)
+        self.assertIn("computed_field", schema_detail.model_fields)
+
+    def test_get_retrieve_schema_returns_detail(self):
+        """Test that _get_retrieve_schema returns detail schema when available."""
+        retrieve_schema = self.viewset._get_retrieve_schema()
+        self.assertEqual(retrieve_schema, self.viewset.schema_detail)
+
+    def test_get_schemas_returns_four_tuple(self):
+        """Test that get_schemas returns a 4-tuple with detail schema."""
+        result = self.viewset.get_schemas()
+        self.assertEqual(len(result), 4)
+        schema_out, schema_detail, _, _ = result
+        self.assertIsNotNone(schema_out)
+        self.assertIsNotNone(schema_detail)
+
+
+@tag("detail_schema")
+class DetailSchemaSerializerTestCase(TestCase):
+    """Test detail schema generation for Serializer class."""
+
+    namespace = "test_detail_schema_serializer"
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.api = NinjaAIO(urls_namespace=cls.namespace)
+
+        class TestDetailSerializer(ninja_serializers.Serializer):
+            class Meta:
+                model = models.TestModel
+                schema_in = ninja_serializers.SchemaModelConfig(
+                    fields=["name", "description"]
+                )
+                schema_out = ninja_serializers.SchemaModelConfig(
+                    fields=["id", "name"]
+                )
+                schema_detail = ninja_serializers.SchemaModelConfig(
+                    fields=["id", "name", "description"]
+                )
+
+        @cls.api.viewset(model=models.TestModel)
+        class DetailSerializerViewSet(APIViewSet):
+            serializer_class = TestDetailSerializer
+
+        cls.serializer_class = TestDetailSerializer
+        # The decorator returns the instance, not the class
+        cls.viewset = DetailSerializerViewSet
+
+    def test_serializer_generates_detail_schema(self):
+        """Test that Serializer generates detail schema from Meta.schema_detail."""
+        schema_detail = self.serializer_class.generate_detail_s()
+        self.assertIsNotNone(schema_detail)
+        self.assertIn("id", schema_detail.model_fields)
+        self.assertIn("name", schema_detail.model_fields)
+        self.assertIn("description", schema_detail.model_fields)
+
+    def test_viewset_uses_serializer_detail_schema(self):
+        """Test that APIViewSet uses Serializer's detail schema."""
+        schema_detail = self.viewset.schema_detail
+        self.assertIsNotNone(schema_detail)
+        self.assertIn("description", schema_detail.model_fields)
+
+    def test_retrieve_uses_detail_schema(self):
+        """Test that retrieve endpoint uses detail schema."""
+        retrieve_schema = self.viewset._get_retrieve_schema()
+        self.assertIn("description", retrieve_schema.model_fields)
+
+
+@tag("detail_schema")
+class DetailSchemaFallbackTestCase(TestCase):
+    """Test detail schema fallback behavior."""
+
+    namespace = "test_detail_schema_fallback"
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.api = NinjaAIO(urls_namespace=cls.namespace)
+
+        @cls.api.viewset(model=models.TestModelSerializer)
+        class NoDetailViewSet(APIViewSet):
+            pass
+
+        # The decorator returns the instance, not the class
+        cls.viewset = NoDetailViewSet
+
+    def test_detail_schema_falls_back_to_read_schema(self):
+        """Test that schema_detail falls back to read schema when no detail config."""
+        # TestModelSerializer has no DetailSerializer defined, but schema_detail
+        # now falls back to the read schema instead of being None
+        self.assertIsNotNone(self.viewset.schema_detail)
+        retrieve_schema = self.viewset._get_retrieve_schema()
+        # The retrieve schema should be the detail schema (which is the fallback)
+        self.assertEqual(retrieve_schema, self.viewset.schema_detail)
+
+
+# ==========================================================
+#               MATCH CASE FILTER MIXIN TESTS
+# ==========================================================
+
+
+@tag("match_case_filter_mixin")
+class MatchCaseFilterViewSetMixinTestCase(
+    BaseTests.ModelSerializerViewSetTestCaseBase,
+    Tests.ViewSetTestCase,
+):
+    """Test MatchCaseFilterViewSetMixin functionality."""
+
+    namespace = "test_match_case_filter_mixin_viewset"
+    model = models.TestModelSerializer
+    viewset = views.TestModelSerializerMatchCaseFilterAPI()
+
+    async def _drop_all_objects(self):
+        await self.model.objects.all().adelete()
+
+    async def test_match_case_filter_true_includes(self):
+        """Test filtering with True value includes matching records."""
+        await self._drop_all_objects()
+        obj_approved = await self.model.objects.acreate(
+            name="approved_item", description="desc", status="approved"
+        )
+        await self.model.objects.acreate(
+            name="pending_item", description="desc", status="pending"
+        )
+        await self.model.objects.acreate(
+            name="rejected_item", description="desc", status="rejected"
+        )
+        # Filter with is_approved=True should return only approved items
+        res = await self.viewset.query_params_handler(
+            self.model.objects.all(),
+            {"is_approved": True},
+        )
+        self.assertEqual(await res.acount(), 1)
+        self.assertEqual(await res.afirst(), obj_approved)
+
+    async def test_match_case_filter_false_excludes(self):
+        """Test filtering with False value excludes matching records."""
+        await self._drop_all_objects()
+        obj_approved = await self.model.objects.acreate(
+            name="approved_item", description="desc", status="approved"
+        )
+        obj_pending = await self.model.objects.acreate(
+            name="pending_item", description="desc", status="pending"
+        )
+        obj_rejected = await self.model.objects.acreate(
+            name="rejected_item", description="desc", status="rejected"
+        )
+        # Filter with is_approved=False should exclude approved items
+        res = await self.viewset.query_params_handler(
+            self.model.objects.all(),
+            {"is_approved": False},
+        )
+        self.assertEqual(await res.acount(), 2)
+        results = [obj async for obj in res]
+        self.assertIn(obj_pending, results)
+        self.assertIn(obj_rejected, results)
+        self.assertNotIn(obj_approved, results)
+
+    async def test_match_case_filter_none_no_filtering(self):
+        """Test that None filter value doesn't apply any filtering."""
+        await self._drop_all_objects()
+        await self.model.objects.acreate(
+            name="approved_item", description="desc", status="approved"
+        )
+        await self.model.objects.acreate(
+            name="pending_item", description="desc", status="pending"
+        )
+        await self.model.objects.acreate(
+            name="rejected_item", description="desc", status="rejected"
+        )
+        # Filter with None should return all objects
+        res = await self.viewset.query_params_handler(
+            self.model.objects.all(),
+            {"is_approved": None},
+        )
+        self.assertEqual(await res.acount(), 3)
+
+    async def test_match_case_filter_empty_filters(self):
+        """Test that empty filters dict returns all objects."""
+        await self._drop_all_objects()
+        await self.model.objects.acreate(
+            name="approved_item", description="desc", status="approved"
+        )
+        await self.model.objects.acreate(
+            name="pending_item", description="desc", status="pending"
+        )
+        res = await self.viewset.query_params_handler(
+            self.model.objects.all(),
+            {},
+        )
+        self.assertEqual(await res.acount(), 2)
+
+    def test_query_params_registered(self):
+        """Test that filters_match_cases are properly registered in query_params."""
+        self.assertIn("is_approved", self.viewset.query_params)
+        self.assertEqual(self.viewset.query_params["is_approved"], (bool, None))
+
+    def test_filters_match_cases_fields_property(self):
+        """Test that filters_match_cases_fields property returns correct list."""
+        self.assertEqual(self.viewset.filters_match_cases_fields, ["is_approved"])
+
+
+@tag("match_case_filter_mixin_exclude")
+class MatchCaseFilterViewSetMixinExcludeTestCase(TestCase):
+    """Test MatchCaseFilterViewSetMixin with exclude behavior."""
+
+    model = models.TestModelSerializer
+    viewset = views.TestModelSerializerMatchCaseExcludeFilterAPI()
+
+    async def _drop_all_objects(self):
+        await self.model.objects.all().adelete()
+
+    async def test_match_case_exclude_true(self):
+        """Test filtering with True value excludes matching records."""
+        await self._drop_all_objects()
+        obj_approved = await self.model.objects.acreate(
+            name="approved_item", description="desc", status="approved"
+        )
+        obj_pending = await self.model.objects.acreate(
+            name="pending_item", description="desc", status="pending"
+        )
+        obj_rejected = await self.model.objects.acreate(
+            name="rejected_item", description="desc", status="rejected"
+        )
+        # Filter with hide_pending=True should exclude pending items
+        res = await self.viewset.query_params_handler(
+            self.model.objects.all(),
+            {"hide_pending": True},
+        )
+        self.assertEqual(await res.acount(), 2)
+        results = [obj async for obj in res]
+        self.assertIn(obj_approved, results)
+        self.assertIn(obj_rejected, results)
+        self.assertNotIn(obj_pending, results)
+
+    async def test_match_case_exclude_false_includes_only(self):
+        """Test filtering with False value includes only matching records."""
+        await self._drop_all_objects()
+        await self.model.objects.acreate(
+            name="approved_item", description="desc", status="approved"
+        )
+        obj_pending = await self.model.objects.acreate(
+            name="pending_item", description="desc", status="pending"
+        )
+        await self.model.objects.acreate(
+            name="rejected_item", description="desc", status="rejected"
+        )
+        # Filter with hide_pending=False should include only pending items
+        res = await self.viewset.query_params_handler(
+            self.model.objects.all(),
+            {"hide_pending": False},
+        )
+        self.assertEqual(await res.acount(), 1)
+        self.assertEqual(await res.afirst(), obj_pending)

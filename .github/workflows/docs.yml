@@ -1,10 +1,74 @@
 name: Deploy Docs
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
+    inputs:
+      docs_version:
+        description: 'Docs version to deploy (e.g. v1.0.0)'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - stable
+          - "1.0"
+          - "2.0"
+          - "2.2"
+          - "2.3"
+          - "2.4"
+          - "2.5"
+          - "2.6"
+          - "2.6.1"
+          - "2.7.0"
+          - "2.8"
+          - "2.9"
+          - "2.10"
+          - "2.11"
+          - "2.12"
+          - "2.13"
+          - "2.14"
+          - "2.15"
+          - "2.16"
+          - "2.17"
+          - "2.18"
+      make_latest:
+        description: 'Set as "latest" and default?'
+        type: boolean
+        default: false
+
+      delete_version:
+        description: 'Docs version to delete'
+        required: false
+        default: ''
+        type: choice
+        options:
+          - ''
+          - dev
+          - stable
+          - "1.0"
+          - "2.0"
+          - "2.2"
+          - "2.3"
+          - "2.4"
+          - "2.5"
+          - "2.6"
+          - "2.6.1"
+          - "2.7.0"
+          - "2.8"
+          - "2.9"
+          - "2.10"
+          - "2.11"
+          - "2.12"
+          - "2.13"
+          - "2.14"
+          - "2.15"
+          - "2.16"
+          - "2.17"
+          - "2.18"
+      delete_confirm:
+        description: 'Confirm deletion of the selected version'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -12,17 +76,102 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v6
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.13"
 
-      - name: Install MkDocs and theme
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Install MkDocs Mike and theme
         run: pip install -r docs/requirements.txt
 
+      - name: Compute VERSION and MAKE_LATEST
+        id: vars
+        env:
+          INPUT_VERSION: ${{ inputs.docs_version }}
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "$INPUT_VERSION" ]; then
+            VERSION="$INPUT_VERSION"
+          else
+            VERSION="dev"
+          fi
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            MAKE_LATEST="${{ inputs.make_latest }}"
+          else
+            MAKE_LATEST="true"
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "make_latest=$MAKE_LATEST" >> "$GITHUB_OUTPUT"
+
       - name: Deploy to GitHub Pages
-        run: git fetch --all --tags  && git pull && mkdocs gh-deploy
+        env:
+          VERSION: ${{ steps.vars.outputs.version }}
+          MAKE_LATEST: ${{ steps.vars.outputs.make_latest }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git fetch --all --tags
+          git fetch origin gh-pages --depth=1 || true
+          
+          if git worktree list | grep -q " gh-pages "; then
+            git worktree remove gh-pages --force
+          fi
+          git worktree add gh-pages gh-pages 2>/dev/null || git worktree add gh-pages origin/gh-pages
+
+          if [ "$MAKE_LATEST" = "true" ]; then
+            echo "Deploying $VERSION as latest and default"
+            mike deploy --push --update-aliases "$VERSION" latest --ignore-remote-status
+            mike set-default --push latest
+          else
+            echo "Deploying $VERSION (non-latest)"
+            mike deploy --push "$VERSION" --ignore-remote-status
+          fi
+
+          git worktree remove gh-pages --force
+
+      - name: Delete version (safe)
+        if: github.event_name == 'workflow_dispatch' && inputs.delete_version != '' && inputs.delete_confirm == true
+        env:
+          DELETE_VERSION: ${{ inputs.delete_version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Requested delete: $DELETE_VERSION"
+
+          # Protect aliases and default
+          if [ "$DELETE_VERSION" = "latest" ] || [ "$DELETE_VERSION" = "stable" ]; then
+            echo "Refusing to delete protected alias: $DELETE_VERSION"
+            exit 1
+          fi
+
+          # Load current default; fail if attempting to delete it
+          CURRENT_DEFAULT="$(mike default || true)"
+          if [ -n "$CURRENT_DEFAULT" ] && [ "$DELETE_VERSION" = "$CURRENT_DEFAULT" ]; then
+            echo "Refusing to delete current default docs version: $DELETE_VERSION"
+            exit 1
+          fi
+
+          # Ensure version exists before deleting
+          if ! mike list | awk '{print $1}' | grep -Fxq "$DELETE_VERSION"; then
+            echo "Version '$DELETE_VERSION' not found. Nothing to delete."
+            exit 0
+          fi
+
+          echo "Deleting version: $DELETE_VERSION"
+          mike delete "$DELETE_VERSION" --push
+          echo "Version '$DELETE_VERSION' deleted successfully"
+
+      - name: List versions
+        run: mike list

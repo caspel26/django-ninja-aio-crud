@@ -1,6 +1,7 @@
 import base64
 from ipaddress import IPv4Address, IPv6Address
 
+from django.http import HttpResponse, StreamingHttpResponse
 from django.test import TestCase, tag
 import orjson
 from ninja_aio.renders import ORJSONRenderer
@@ -48,3 +49,50 @@ class ORJSONRendererParserTestCase(TestCase):
             [base64.b64encode(b"a").decode(), base64.b64encode(b"b").decode()],
         )
         self.assertEqual(decoded["plain"], "value")
+
+    def test_renderer_non_dict_data(self):
+        """Test that renderer handles non-dict data (covers lines 23-24)."""
+        # When data is not a dict, it triggers the AttributeError branch
+        # and falls back to self.dumps(data)
+        non_dict_data = "plain string"
+        rendered = self.renderer.render(DummyRequest(), non_dict_data, response_status=200)
+        decoded = orjson.loads(rendered)
+        self.assertEqual(decoded, "plain string")
+
+    def test_renderer_list_data(self):
+        """Test that renderer handles list data directly."""
+        # A list doesn't have .items() method
+        list_data = [1, 2, 3]
+        rendered = self.renderer.render(DummyRequest(), list_data, response_status=200)
+        decoded = orjson.loads(rendered)
+        self.assertEqual(decoded, [1, 2, 3])
+
+    def test_renderer_primitive_data(self):
+        """Test that renderer handles primitive data."""
+        # An integer doesn't have .items() method
+        int_data = 42
+        rendered = self.renderer.render(DummyRequest(), int_data, response_status=200)
+        decoded = orjson.loads(rendered)
+        self.assertEqual(decoded, 42)
+
+    def test_renderer_http_response_passthrough(self):
+        """Test that renderer returns HttpResponse as-is without serialization."""
+        response = HttpResponse(
+            b"-----BEGIN PUBLIC KEY-----\ntest\n-----END PUBLIC KEY-----",
+            content_type="application/x-pem-file",
+            status=200,
+        )
+        rendered = self.renderer.render(DummyRequest(), response, response_status=200)
+        self.assertIs(rendered, response)
+        self.assertEqual(rendered.content, b"-----BEGIN PUBLIC KEY-----\ntest\n-----END PUBLIC KEY-----")
+        self.assertEqual(rendered["Content-Type"], "application/x-pem-file")
+
+    def test_renderer_streaming_http_response_passthrough(self):
+        """Test that renderer returns StreamingHttpResponse as-is."""
+        response = StreamingHttpResponse(
+            iter([b"chunk1", b"chunk2"]),
+            content_type="application/octet-stream",
+        )
+        rendered = self.renderer.render(DummyRequest(), response, response_status=200)
+        self.assertIs(rendered, response)
+        self.assertEqual(rendered["Content-Type"], "application/octet-stream")

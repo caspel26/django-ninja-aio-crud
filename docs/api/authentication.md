@@ -1,18 +1,21 @@
-# Authentication
+# :material-shield-lock: Authentication
 
 Django Ninja Aio CRUD provides built-in async JWT authentication support with flexible configuration and easy integration with your API endpoints.
 
-## Overview
+## :material-format-list-bulleted: Overview
 
 Authentication in Django Ninja Aio CRUD:
-- **Fully Async** - No blocking operations
-- **JWT-Based** - Industry-standard JSON Web Tokens
-- **Type-Safe** - Proper type hints and validation
-- **Flexible** - Per-endpoint or global authentication
-- **Customizable** - Override default behavior
-- **RSA/HMAC Support** - Multiple signing algorithms
 
-## Quick Start
+- :material-lightning-bolt: **Fully Async** — No blocking operations
+- :material-key: **JWT-Based** — Industry-standard JSON Web Tokens
+- :material-shield-check: **Type-Safe** — Proper type hints and validation
+- :material-tune: **Flexible** — Per-endpoint or global authentication
+- :material-cog: **Customizable** — Override default behavior
+- :material-lock: **RSA/HMAC Support** — Multiple signing algorithms
+
+---
+
+## :material-rocket-launch: Quick Start
 
 ### 1. Create Authentication Class
 
@@ -51,13 +54,9 @@ from .auth import JWTAuth
 api = NinjaAIO()
 
 
+@api.viewset(model=Article)
 class ArticleViewSet(APIViewSet):
-    model = Article
-    api = api
     auth = [JWTAuth()]  # Apply to all endpoints
-
-
-ArticleViewSet().add_views_to_route()
 ```
 
 ### 3. Make Authenticated Request
@@ -67,7 +66,9 @@ curl -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIs..." \
      http://localhost:8000/api/article/
 ```
 
-## AsyncJwtBearer
+---
+
+## :material-key-variant: AsyncJwtBearer
 
 Base class for JWT authentication.
 
@@ -87,7 +88,7 @@ class MyAuth(AsyncJwtBearer):
         pass
 ```
 
-### Required Attributes
+### :material-cog: Required Attributes
 
 #### `jwt_public`
 
@@ -201,7 +202,7 @@ class JWTAuth(AsyncJwtBearer):
     }
 ```
 
-### Required Methods
+### :material-function: Required Methods
 
 #### `auth_handler()`
 
@@ -301,7 +302,9 @@ async def auth_handler(self, request):
     return user
 ```
 
-## Authentication Levels
+---
+
+## :material-layers: Authentication Levels
 
 ### Global Authentication
 
@@ -399,7 +402,9 @@ class ArticleViewSet(APIViewSet):
     delete_auth = [AdminAuth()]  # Only admin can delete
 ```
 
-## Advanced Usage
+---
+
+## :material-cog-outline: Advanced Usage
 
 ### Role-Based Access Control (RBAC)
 
@@ -614,189 +619,14 @@ Support both JWT and API Key:
 class ArticleViewSet(APIViewSet):
     model = Article
     api = api
-    auth = [JWTAuth() | APIKeyAuth()]  # Either JWT or API Key
+    auth = [JWTAuth(), APIKeyAuth()]  # Either JWT or API Key
 ```
 
 Django Ninja will try both methods; if either succeeds, the request is authenticated.
 
-## Token Validation
+---
 
-### Expiration Validation
-
-JWT tokens include `exp` claim (expiration timestamp):
-
-```python
-# Token payload
-{
-  "sub": "123",
-  "exp": 1704067200,  # Unix timestamp
-  "iat": 1704063600
-}
-```
-
-AsyncJwtBearer automatically validates expiration:
-
-```python
-class JWTAuth(AsyncJwtBearer):
-    jwt_public = jwk.RSAKey.import_key(PUBLIC_KEY)
-    # Expiration checked automatically
-```
-
-**Error Response:**
-
-```json
-{
-  "detail": "Token has expired"
-}
-```
-
-### Not Before Validation
-
-Use `nbf` claim for tokens that become valid in the future:
-
-```python
-# Token payload
-{
-  "sub": "123",
-  "nbf": 1704063600,  # Not valid before this time
-  "exp": 1704067200
-}
-```
-
-Automatically validated by AsyncJwtBearer.
-
-### Custom Validation
-
-```python
-class StrictAuth(AsyncJwtBearer):
-    jwt_public = jwk.RSAKey.import_key(PUBLIC_KEY)
-
-    async def auth_handler(self, request):
-        # Check token type
-        token_type = self.dcd.claims.get("typ")
-        if token_type != "access":
-            return False
-
-        # Check IP whitelist
-        allowed_ips = self.dcd.claims.get("allowed_ips", [])
-        client_ip = request.META.get('REMOTE_ADDR')
-        if allowed_ips and client_ip not in allowed_ips:
-            return False
-
-        # Continue with normal auth
-        user_id = self.dcd.claims.get("sub")
-        return await User.objects.aget(id=user_id)
-```
-
-## Testing Authentication
-
-### Unit Tests
-
-```python
-import pytest
-from ninja.testing import TestAsyncClient
-from myapp.views import api
-from myapp.auth import JWTAuth
-import jwt
-from datetime import datetime, timedelta
-
-
-def create_token(user_id: int, **claims) -> str:
-    payload = {
-        "sub": str(user_id),
-        "exp": datetime.utcnow() + timedelta(hours=1),
-        "iat": datetime.utcnow(),
-        **claims
-    }
-    return jwt.encode(payload, PRIVATE_KEY, algorithm="RS256")
-
-
-@pytest.mark.asyncio
-async def test_authenticated_request():
-    client = TestAsyncClient(api)
-
-    # Create user
-    user = await User.objects.acreate(username="testuser")
-
-    # Create token
-    token = create_token(user.id)
-
-    # Make authenticated request
-    response = await client.get(
-        "/article/",
-        headers={"Authorization": f"Bearer {token}"}
-    )
-
-    assert response.status_code == 200
-
-
-@pytest.mark.asyncio
-async def test_missing_token():
-    client = TestAsyncClient(api)
-
-    response = await client.get("/article/")
-    assert response.status_code == 401
-    assert "detail" in response.json()
-
-
-@pytest.mark.asyncio
-async def test_expired_token():
-    client = TestAsyncClient(api)
-
-    # Create expired token
-    payload = {
-        "sub": "123",
-        "exp": datetime.utcnow() - timedelta(hours=1),  # Expired
-        "iat": datetime.utcnow() - timedelta(hours=2)
-    }
-    token = jwt.encode(payload, PRIVATE_KEY, algorithm="RS256")
-
-    response = await client.get(
-        "/article/",
-        headers={"Authorization": f"Bearer {token}"}
-    )
-
-    assert response.status_code == 401
-
-
-@pytest.mark.asyncio
-async def test_invalid_signature():
-    client = TestAsyncClient(api)
-
-    # Create token with wrong key
-    payload = {"sub": "123", "exp": datetime.utcnow() + timedelta(hours=1)}
-    token = jwt.encode(payload, "wrong-secret", algorithm="HS256")
-
-    response = await client.get(
-        "/article/",
-        headers={"Authorization": f"Bearer {token}"}
-    )
-
-    assert response.status_code == 401
-```
-
-### Mock Authentication
-
-For testing without real tokens:
-
-```python
-from unittest.mock import AsyncMock, patch
-
-
-@pytest.mark.asyncio
-@patch('myapp.auth.JWTAuth.auth_handler')
-async def test_with_mock_auth(mock_auth):
-    # Mock auth to return test user
-    user = await User.objects.acreate(username="testuser")
-    mock_auth.return_value = user
-
-    client = TestAsyncClient(api)
-    response = await client.get("/article/")
-
-    assert response.status_code == 200
-```
-
-## Best Practices
+## :material-shield-star: Best Practices
 
 1. **Use RSA (asymmetric) keys for production:**
    ```python
@@ -862,7 +692,9 @@ async def test_with_mock_auth(mock_auth):
        pass
    ```
 
-## Integration Examples
+---
+
+## :material-puzzle: Integration Examples
 
 ### With Auth0
 
@@ -956,10 +788,26 @@ class FirebaseAuth(HttpBearer):
             return None
 ```
 
-## See Also
+## :material-bookshelf: See Also
 
-- [API ViewSet](views/api_view_set.md) - Applying auth to ViewSets
-- [Tutorial: Authentication](../tutorial/authentication.md) - Step-by-step guide
-- [Model Serializer](models/model_serializer.md) - Filtering by authenticated user
+<div class="grid cards" markdown>
 
----
+-   :material-view-grid:{ .lg .middle } **APIViewSet**
+
+    ---
+
+    [:octicons-arrow-right-24: Applying auth to ViewSets](views/api_view_set.md)
+
+-   :material-school:{ .lg .middle } **Tutorial**
+
+    ---
+
+    [:octicons-arrow-right-24: Step-by-step auth guide](../tutorial/authentication.md)
+
+-   :material-database:{ .lg .middle } **ModelSerializer**
+
+    ---
+
+    [:octicons-arrow-right-24: Filtering by user](models/model_serializer.md)
+
+</div>

@@ -3,9 +3,34 @@ import subprocess
 import re
 from datetime import datetime
 from html import escape
+import json
+import urllib.request
+import os
+from markdown import markdown
+import ssl
 
 SEMVER_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$")
+
+_MD_EXTENSIONS = [
+    "tables",
+    "fenced_code",
+    "codehilite",
+    "toc",
+    "nl2br",
+    "sane_lists",
+]
+_MD_EXTENSION_CONFIGS = {
+    "codehilite": {"css_class": "highlight", "guess_lang": True},
+}
+
+
+def _render_md(text: str) -> str:
+    """Render Markdown text to HTML with GitHub-flavoured extensions."""
+    if not text:
+        return ""
+    return markdown(text, extensions=_MD_EXTENSIONS, extension_configs=_MD_EXTENSION_CONFIGS)
 REPO_SLUG = "caspel26/django-ninja-aio-crud"
+_RELEASES_CACHE = None
 
 
 def _run(cmd: list[str]) -> str:
@@ -13,6 +38,37 @@ def _run(cmd: list[str]) -> str:
         return subprocess.check_output(cmd, stderr=subprocess.DEVNULL).decode().strip()
     except Exception:
         return ""
+
+
+def _fetch_all_releases() -> dict[str, str]:
+    """
+    Fetch all GitHub releases once and return a dict {tag_name: body}.
+    """
+    url = f"https://api.github.com/repos/{REPO_SLUG}/releases"
+    req = urllib.request.Request(url)
+
+    token = os.environ.get("GITHUB_TOKEN")
+    ssl_context = ssl._create_unverified_context()
+    if token:
+        req.add_header("Authorization", f"Bearer {token}")
+
+    try:
+        with urllib.request.urlopen(req, context=ssl_context) as response:
+            data = json.loads(response.read().decode())
+            return {
+                release["tag_name"]: release.get("body", "").strip() for release in data
+            }
+    except Exception as e:
+        print("Failed to fetch GitHub releases:", e)
+        return {}
+
+
+def _get_release_notes(tag: str) -> str:
+    global _RELEASES_CACHE
+    if _RELEASES_CACHE is None:
+        _RELEASES_CACHE = _fetch_all_releases()
+    return _RELEASES_CACHE.get(tag, "")
+
 
 
 def _get_tags() -> list[str]:
@@ -35,187 +91,223 @@ def _tag_date(tag: str) -> str:
     return lines[-1] if lines else ""
 
 
-_CONV_PREFIX = re.compile(
-    r"^(feat|fix|docs|refactor|perf|test|build|ci|chore)(\([^)]*\))?:\s*"
-)
+def _fmt_date_human(date_iso: str) -> str:
+    """Format date as 'Jan 15, 2025' style."""
+    if not date_iso:
+        return ""
+    try:
+        dt = datetime.fromisoformat(date_iso.replace("Z", "+00:00")).date()
+        return dt.strftime("%b %d, %Y")
+    except Exception:
+        return date_iso
 
 
-def _commit_messages(tag: str, previous: str | None) -> list[str]:
-    rev_range = f"{previous}..{tag}" if previous else tag
-    log = _run(["git", "log", rev_range, "--pretty=%s", "--no-merges"])
-    return [string.strip() for string in log.splitlines() if string.strip()]
-
-
-def _classify(msgs: list[str]):
-    feat, fix, other = [], [], []
-    for m in msgs:
-        prefix = _CONV_PREFIX.match(m)
-        clean = _CONV_PREFIX.sub("", m)
-        if not prefix:
-            other.append(clean)
-        else:
-            kind = prefix.group(1)
-            if kind == "feat":
-                feat.append(clean)
-            elif kind == "fix":
-                fix.append(clean)
-            else:
-                other.append(clean)
-    return feat, fix, other
-
-
-def _normalize_version(tag: str) -> str:
-    return tag
-
-
-def _fmt_date_iso(date_iso: str) -> str:
-    return (
-        datetime.fromisoformat(date_iso.replace("Z", "+00:00")).date().isoformat()
-        if date_iso
-        else ""
-    )
+def _tag_anchor(tag: str) -> str:
+    """Convert a tag like 'v1.2.3' to a URL-safe anchor ID."""
+    return re.sub(r"[^a-zA-Z0-9-]", "", tag.replace(".", "-"))
 
 
 def generate_release_table() -> str:
     tags = _get_tags()
     if not tags:
-        return '<div style="font-style:italic;">No git tags found. Create one with <code>git tag -a v0.1.0 -m "Release v0.1.0" && git push --tags</code>.</div>'
-
-    EMOJI = {"feat": "✨", "fix": "🐛", "other": "📦"}
-
-    def badge(label: str, count: int, color: str):
-        if count == 0:
-            return ""
         return (
-            f'<img alt="{label}" '
-            f'src="https://img.shields.io/badge/{label}-{count}-{color}?style=flat" '
-            f'style="margin-right:6px;vertical-align:middle;height:20px;" />'
+            '<div class="admonition info">'
+            '<p class="admonition-title">No Releases Yet</p>'
+            "<p>No git tags found. Create one with:</p>"
+            "<pre><code>git tag -a v0.1.0 -m &quot;Release v0.1.0&quot; &amp;&amp; git push --tags</code></pre>"
+            "</div>"
         )
 
-    def li(items):
-        return "".join(f"<li>{escape(i)}</li>" for i in items) or "<li>None</li>"
+    # Build custom dropdown items
+    items: list[str] = []
+    first_tag = tags[0]
+    first_date = _fmt_date_human(_tag_date(first_tag))
+    first_label = f"{first_tag}  —  {first_date}" if first_date else first_tag
 
-    rows_html: list[str] = []
+    for i, tag in enumerate(tags):
+        date_fmt = _fmt_date_human(_tag_date(tag))
+        active_cls = " release-dropdown-item--active" if i == 0 else ""
+        latest_pill = (
+            '<span class="release-dropdown-latest">Latest</span>' if i == 0 else ""
+        )
+        items.append(
+            f'<button class="release-dropdown-item{active_cls}" '
+            f'data-value="{_tag_anchor(tag)}" type="button">'
+            f'<span class="release-dropdown-item-tag">{escape(tag)}</span>'
+            f"{latest_pill}"
+            f'<span class="release-dropdown-item-date">{date_fmt}</span>'
+            f"</button>"
+        )
+
+    selector = (
+        '<div class="release-selector">'
+        '<label class="release-selector-label">Select version</label>'
+        '<div class="release-dropdown" id="release-dropdown">'
+        '<button class="release-dropdown-toggle" id="release-toggle" type="button">'
+        f'<span class="release-dropdown-toggle-text">{escape(first_label)}</span>'
+        '<svg class="release-dropdown-chevron" viewBox="0 0 24 24" width="18" height="18">'
+        '<path fill="currentColor" d="M7 10l5 5 5-5z"/>'
+        "</svg>"
+        "</button>"
+        '<div class="release-dropdown-menu" id="release-menu">'
+        + "".join(items)
+        + "</div>"
+        "</div>"
+        "</div>"
+    )
+
+    # Build hidden cards (only first visible)
+    cards: list[str] = []
     for i, tag in enumerate(tags):
         prev = tags[i + 1] if i + 1 < len(tags) else None
-        date_fmt = _fmt_date_iso(_tag_date(tag))
-        msgs = _commit_messages(tag, prev)
-        feat, fix, other = _classify(msgs)
-        version_dir = _normalize_version(tag)
-        doc_link = f"/{version_dir}/"
+        anchor = _tag_anchor(tag)
+        date_fmt = _fmt_date_human(_tag_date(tag))
+        notes = _get_release_notes(tag)
+        notes_html = _render_md(notes)
         diff_link = (
             f"https://github.com/{REPO_SLUG}/compare/{prev}...{tag}"
             if prev
             else f"https://github.com/{REPO_SLUG}/tree/{tag}"
         )
-        summary_badges = (
-            badge("feat", len(feat), "brightgreen")
-            + badge("fix", len(fix), "orange")
-            + badge("other", len(other), "blue")
-        ) or "<span style='opacity:.6;'>-</span>"
+        gh_release_link = f"https://github.com/{REPO_SLUG}/releases/tag/{tag}"
 
-        details_html = (
-            "<details style='margin-top:.45rem;font-size:.7rem;'>"
-            "<summary style='cursor:pointer;'>Details</summary>"
-            "<div style='display:grid;grid-template-columns:auto 1fr;row-gap:.25rem;column-gap:.5rem;"
-            "margin:.45rem 0 .2rem;'>"
-            f"<div><strong>Features {EMOJI['feat']}</strong></div><ul style='margin:0;padding-left:1rem;'>{li(feat)}</ul>"
-            f"<div><strong>Fixes {EMOJI['fix']}</strong></div><ul style='margin:0;padding-left:1rem;'>{li(fix)}</ul>"
-            f"<div><strong>Other {EMOJI['other']}</strong></div><ul style='margin:0;padding-left:1rem;'>{li(other)}</ul>"
-            "</div></details>"
+        is_latest = i == 0
+        latest_badge = (
+            ' <span class="release-badge release-badge--latest">Latest</span>'
+            if is_latest
+            else ""
+        )
+        latest_cls = " release-card--latest" if is_latest else ""
+        hidden = "" if is_latest else ' style="display:none"'
+
+        if notes_html:
+            body = f'<div class="release-card-body">{notes_html}</div>'
+        else:
+            body = (
+                '<div class="release-card-body">'
+                '<p class="release-notes-empty">'
+                "No release notes for this version."
+                "</p></div>"
+            )
+
+        cards.append(
+            f'<div class="release-card{latest_cls}" data-version="{anchor}"{hidden}>'
+            f'<div class="release-card-header">'
+            f"<h4>"
+            f'<a href="{gh_release_link}">{escape(tag)}</a>'
+            f"{latest_badge}"
+            f"</h4>"
+            f'<span class="release-card-date">{date_fmt}</span>'
+            f"</div>"
+            f"{body}"
+            f'<div class="release-card-footer">'
+            f'<a href="{gh_release_link}">GitHub Release</a>'
+            f' · <a href="{diff_link}">Diff</a>'
+            f"</div>"
+            f"</div>"
         )
 
-        rows_html.append(
-            "<tr>"
-            f"<td style='padding:.75rem 1rem;vertical-align:top;font-size:.85rem;'>"
-            f"<a href='{doc_link}'><strong>{escape(tag)}</strong></a>"
-            f"<br/><small><a href='{diff_link}'>diff</a></small>"
-            "</td>"
-            f"<td style='padding:.75rem 1rem;vertical-align:top;font-size:.8rem;'>{date_fmt}</td>"
-            f"<td style='padding:.75rem 1rem;vertical-align:top;font-size:.75rem;line-height:1.25;'>"
-            f"{summary_badges}{details_html}"
-            "</td>"
-            "</tr>"
-        )
-
-    html = (
-        "<div style='width:100%;overflow-x:auto;'>"
-        "<table style='width:100%;min-width:900px;border-collapse:collapse;table-layout:auto;font-size:.8rem;'>"
-        "<thead style='background:transparent;'>"
-        "<tr>"
-        "<th style='text-align:left;padding:.75rem 1rem;border-bottom:2px solid #ccc;width:15%;font-size:.85rem;'>Version</th>"
-        "<th style='text-align:left;padding:.75rem 1rem;border-bottom:2px solid #ccc;width:15%;font-size:.85rem;'>Date</th>"
-        "<th style='text-align:left;padding:.75rem 1rem;border-bottom:2px solid #ccc;width:70%;font-size:.85rem;'>Summary</th>"
-        "</tr>"
-        "</thead>"
-        "<tbody>" + "".join(rows_html) + "</tbody></table></div>"
+    cards_container = (
+        '<div class="release-display">' + "\n".join(cards) + "</div>"
     )
-    return html
+
+    script = (
+        "<script>"
+        "(function(){"
+        "var dd=document.getElementById('release-dropdown'),"
+        "toggle=document.getElementById('release-toggle'),"
+        "menu=document.getElementById('release-menu'),"
+        "text=toggle.querySelector('.release-dropdown-toggle-text');"
+        "toggle.addEventListener('click',function(e){"
+        "e.stopPropagation();"
+        "dd.classList.toggle('release-dropdown--open');"
+        "if(dd.classList.contains('release-dropdown--open')){"
+        "var active=menu.querySelector('.release-dropdown-item--active');"
+        "if(active)active.scrollIntoView({block:'nearest'});"
+        "}"
+        "});"
+        "menu.addEventListener('click',function(e){"
+        "var btn=e.target.closest('.release-dropdown-item');"
+        "if(!btn)return;"
+        "var v=btn.getAttribute('data-value');"
+        "menu.querySelectorAll('.release-dropdown-item').forEach(function(b){"
+        "b.classList.remove('release-dropdown-item--active');"
+        "});"
+        "btn.classList.add('release-dropdown-item--active');"
+        "var tag=btn.querySelector('.release-dropdown-item-tag').textContent,"
+        "date=btn.querySelector('.release-dropdown-item-date').textContent;"
+        "text.textContent=date?tag+'  —  '+date:tag;"
+        "dd.classList.remove('release-dropdown--open');"
+        "document.querySelectorAll('.release-display .release-card')"
+        ".forEach(function(c){"
+        "c.style.display=c.getAttribute('data-version')===v?'':'none';"
+        "});"
+        "});"
+        "document.addEventListener('click',function(){"
+        "dd.classList.remove('release-dropdown--open');"
+        "});"
+        "})();"
+        "</script>"
+    )
+
+    return selector + cards_container + script
 
 
 def generate_full_changelog() -> str:
-    # NEWEST → OLDEST (removed reversal)
+    # NEWEST -> OLDEST (removed reversal)
     tags = _get_tags()
     if not tags:
         return "No versions yet."
     out: list[str] = []
-    for i, tag in enumerate(tags):
-        prev = tags[i + 1] if i + 1 < len(tags) else None
-        feat, fix, other = _classify(_commit_messages(tag, prev))
-        date_fmt = _fmt_date_iso(_tag_date(tag))
-        out.append(f"### {tag} ({date_fmt})\n")
-
-        def block(title: str, items: list[str]):
-            if not items:
-                return f"*No {title.lower()}*\n"
-            return "".join(f"- {escape(i)}\n" for i in items)
-
-        if feat:
-            out.append("#### Features\n" + block("Features", feat) + "\n")
-        if fix:
-            out.append("#### Fixes\n" + block("Fixes", fix) + "\n")
-        rem_other = [m for m in other if not _CONV_PREFIX.match(m)]
-        if rem_other:
-            out.append("#### Other\n" + block("Other", rem_other) + "\n")
+    for tag in tags:
+        notes = _get_release_notes(tag)
+        date_fmt = _fmt_date_human(_tag_date(tag))
+        out.append(f"## {tag} ({date_fmt})\n")
+        out.append(notes or "_No release notes for this release._")
+        out.append("\n---\n")
     return "\n".join(out)
 
 
 def generate_release_cards() -> str:
-    # Optional alternative: card layout
     tags = _get_tags()
     if not tags:
-        return "<p>No versions yet.</p>"
-    parts = [
-        '<div class="release-cards" style="display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));">'
-    ]
+        return (
+            '<div class="admonition info">'
+            '<p class="admonition-title">No Releases Yet</p>'
+            "<p>No versions have been tagged yet.</p>"
+            "</div>"
+        )
+    parts = ['<div class="release-grid">']
     for i, tag in enumerate(tags):
         prev = tags[i + 1] if i + 1 < len(tags) else None
-        feat, fix, other = _classify(_commit_messages(tag, prev))
-        date_fmt = _fmt_date_iso(_tag_date(tag))
+        notes = _get_release_notes(tag)
+        notes_html = _render_md(notes) or "<p>No release notes.</p>"
+        date_fmt = _fmt_date_human(_tag_date(tag))
         diff_link = (
             f"https://github.com/{REPO_SLUG}/compare/{prev}...{tag}"
             if prev
             else f"https://github.com/{REPO_SLUG}/tree/{tag}"
         )
-        version_dir = _normalize_version(tag)
+        gh_release_link = f"https://github.com/{REPO_SLUG}/releases/tag/{tag}"
+        is_latest = i == 0
+        latest_cls = " release-card--latest" if is_latest else ""
+        latest_badge = (
+            '<span class="release-badge release-badge--latest">Latest</span>'
+            if is_latest
+            else ""
+        )
         parts.append(
-            f"""
-<div class="release-card" style="border:1px solid #ddd;border-radius:6px;padding:0.75rem;">
-  <h4 style="margin:0 0 .25rem;"><a href="/{version_dir}/">{escape(tag)}</a></h4>
-  <div style="font-size:.8rem;color:#666;margin-bottom:.5rem;">{date_fmt} · <a href="{diff_link}">diff</a></div>
-  <ul style="margin:0 0 .5rem;padding-left:1.2rem;font-size:.85rem;">
-    <li><strong>feat:</strong> {len(feat)}</li>
-    <li><strong>fix:</strong> {len(fix)}</li>
-    <li><strong>other:</strong> {len(other)}</li>
-  </ul>
-  <details style="font-size:.75rem;">
-    <summary>Details</summary>
-    <ul style="padding-left:1rem;margin:.25rem 0;">
-      {"".join(f"<li>{escape(m)}</li>" for m in (feat + fix + other)) or "<li>None</li>"}
-    </ul>
-  </details>
-</div>
-""".strip()
+            f'<div class="release-card{latest_cls}">'
+            f'<div class="release-card-header">'
+            f'<h4><a href="{gh_release_link}">{escape(tag)}</a>{latest_badge}</h4>'
+            f'<span class="release-card-date">{date_fmt}</span>'
+            f"</div>"
+            f'<div class="release-card-body">{notes_html}</div>'
+            f'<div class="release-card-footer">'
+            f'<a href="{gh_release_link}">Release</a>'
+            f' · <a href="{diff_link}">Diff</a>'
+            f"</div>"
+            f"</div>"
         )
     parts.append("</div>")
     return "\n".join(parts)

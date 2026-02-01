@@ -1,119 +1,467 @@
 from django.test import TestCase, tag
 from asgiref.sync import async_to_sync
 from ninja_aio import NinjaAIO
-from ninja_aio.models import ModelUtil
+from ninja_aio.helpers.api import ManyToManyAPI
+from ninja_aio.models import ModelUtil, serializers
 from ninja_aio.schemas import M2MRelationSchema
+from ninja_aio.views import APIViewSet
 from tests.generics.request import Request
 from tests.test_app import models
 from tests.generics.views import GenericAPIViewSet
 
-RELATED_NAME = "test_model_serializers"
+
+# Serializer for plain Django model M2M tests
+class TestModelReverseManyToManySerializer(serializers.Serializer):
+    class Meta:
+        model = models.TestModelReverseManyToMany
+        schema_out = serializers.SchemaModelConfig(fields=["id", "name", "description"])
 
 
 class TestM2MViewSet(GenericAPIViewSet):
+    """ViewSet using ModelSerializer for M2M relations."""
+
     model = models.TestModelSerializerManyToMany
     m2m_relations = [
         M2MRelationSchema(
             model=models.TestModelSerializerReverseManyToMany,
-            related_name=RELATED_NAME,
+            related_name="test_model_serializers",
             filters={"name": (str, "")},
+            append_slash=True,
         )
     ]
 
-    async def test_model_serializers_query_params_handler(self, queryset, filters):
+    def test_model_serializers_query_params_handler(self, queryset, filters):
         name_filter = filters.get("name")
         if name_filter:
             queryset = queryset.filter(name=name_filter)
         return queryset
 
 
-@tag("many_to_many_api")
-class ManyToManyAPITestCase(TestCase):
-    @classmethod
-    def setUpTestData(cls):
-        cls.api = NinjaAIO(urls_namespace="m2m_test")
-        cls.viewset = TestM2MViewSet()
-        cls.viewset.api = cls.api
-        cls.rel_util = ModelUtil(models.TestModelSerializerReverseManyToMany)
-        cls.viewset.add_views_to_route()
-        cls.request = Request(cls.viewset.path)
-        # Create base object
-        create_view = cls.viewset.create_view()
-        status, content = async_to_sync(create_view)(
-            cls.request.post(), cls.viewset.schema_in(name="base", description="base")
+class TestM2MWithSerializerClassViewSet(GenericAPIViewSet):
+    """ViewSet using a plain Django model with serializer_class for M2M relations."""
+
+    model = models.TestModelManyToMany
+    m2m_relations = [
+        M2MRelationSchema(
+            model=models.TestModelReverseManyToMany,
+            related_name="test_models",
+            serializer_class=TestModelReverseManyToManySerializer,
+            filters={"name": (str, "")},
+            append_slash=True,
         )
-        cls.base_pk = content[cls.viewset.model_util.model_pk_name]
-        cls.pk_att = cls.viewset.model_util.model_pk_name
-        # Create related objects
-        cls.related_objs = []
-        for nm in ["a", "target", "other"]:
-            obj = models.TestModelSerializerReverseManyToMany.objects.create(
-                name=nm, description=nm
+    ]
+
+    def test_models_query_params_handler(self, queryset, filters):
+        name_filter = filters.get("name")
+        if name_filter:
+            queryset = queryset.filter(name=name_filter)
+        return queryset
+
+
+class Tests:
+    class BaseManyToManyAPITestCase(TestCase):
+        """Base test case for M2M API tests with shared setup and utilities."""
+
+        # Subclasses must define these
+        viewset_class = None
+        related_model = None
+        related_name = None
+        api_namespace = None
+        related_names = ["a", "target", "other"]
+        serializer_class = None
+
+        @classmethod
+        def setUpTestData(cls):
+            cls.api = NinjaAIO(urls_namespace=cls.api_namespace)
+            cls.viewset = cls.viewset_class(api=cls.api)
+            cls.rel_util = ModelUtil(
+                cls.related_model, serializer_class=cls.serializer_class
             )
-            cls.related_objs.append(obj)
-        cls.related_pks = [o.pk for o in cls.related_objs]
-        cls.path_schema = cls.viewset.path_schema(**{cls.pk_att: cls.base_pk})
-        cls.manage_view = cls._get_related_views(manage_view=True)
-        cls.get_view = cls._get_related_views()
+            cls.viewset.add_views_to_route()
+            cls.request = Request(cls.viewset.path)
+            cls.pk_att = cls.viewset.model_util.model_pk_name
+            # Create base object
+            cls.base_pk = cls._create_base_object()
+            # Create related objects
+            cls.related_objs = [
+                cls.related_model.objects.create(name=nm, description=nm)
+                for nm in cls.related_names
+            ]
+            cls.related_pks = [o.pk for o in cls.related_objs]
+            cls.path_schema = cls.viewset.path_schema(**{cls.pk_att: cls.base_pk})
+            cls.get_view, cls.manage_view = cls._get_related_views()
+
+        @classmethod
+        def _create_base_object(cls):
+            """Create base object. Override for different creation methods."""
+            create_view = cls.viewset.create_view()
+            _, content = async_to_sync(create_view)(
+                cls.request.post(),
+                cls.viewset.schema_in(name="base", description="base"),
+            )
+            return content[cls.viewset.model_util.model_pk_name]
+
+        @classmethod
+        def _get_related_views(cls):
+            path = f"{cls.viewset.path_retrieve}/{cls.rel_util.verbose_name_path_resolver()}/"
+            get_view, manage_view = cls.viewset.m2m_api.router.path_operations.get(
+                path
+            ).operations
+            return get_view.view_func, manage_view.view_func
+
+        def _manage_data(self, add=None, remove=None):
+            action_schema = self.viewset.m2m_api.views_action_map[(True, True)][1]
+            return action_schema(add=add or [], remove=remove or [])
+
+        async def _add_related(self, pks=None):
+            """Helper to add related objects."""
+            pks = pks or self.related_pks[:2]
+            data = self._manage_data(add=pks)
+            return await self.manage_view(self.request.post(), self.path_schema, data)
+
+        async def test_add_related(self):
+            """Test adding related objects."""
+            content = await self._add_related()
+            self.assertEqual(content["results"]["count"], 2)
+            self.assertEqual(content["errors"]["count"], 0)
+
+        async def test_get_related(self):
+            """Test retrieving related objects."""
+            await self._add_related()
+            content = await self.get_view(
+                request=self.request.get(), pk=self.path_schema
+            )
+            self.assertEqual(set(content.keys()), {"items", "count"})
+            self.assertEqual(content["count"], 2)
+            # Verify schema fields are present
+            for item in content["items"]:
+                self.assertIn("id", item)
+                self.assertIn("name", item)
+                self.assertIn("description", item)
+
+        async def test_get_related_with_filters(self):
+            """Test filtered retrieval of related objects."""
+            await self._add_related()
+            filters_schema = self.viewset.m2m_api.relations_filters_schemas[
+                self.related_name
+            ]
+            filters = filters_schema(name=self.related_names[1])
+            content = await self.get_view(
+                request=self.request.get(), pk=self.path_schema, filters=filters
+            )
+            self.assertEqual(content["count"], 1)
+            self.assertEqual(content["items"][0]["name"], self.related_names[1])
+
+        async def test_remove_related(self):
+            """Test removing related objects."""
+            await self._add_related()
+            # Remove one
+            data = self._manage_data(remove=[self.related_pks[0]])
+            content = await self.manage_view(
+                self.request.post(), self.path_schema, data
+            )
+            self.assertEqual(content["results"]["count"], 1)
+            self.assertEqual(content["errors"]["count"], 0)
+            # Removing again same pk should yield error
+            data2 = self._manage_data(remove=[self.related_pks[0]])
+            content2 = await self.manage_view(
+                self.request.post(), self.path_schema, data2
+            )
+            self.assertEqual(content2["results"]["count"], 0)
+            self.assertEqual(content2["errors"]["count"], 1)
+
+        async def test_add_existing_error(self):
+            """Test that adding already related objects yields errors."""
+            await self._add_related()
+            data = self._manage_data(add=self.related_pks[:1])
+            content = await self.manage_view(
+                self.request.post(), self.path_schema, data
+            )
+            self.assertEqual(content["results"]["count"], 0)
+            self.assertEqual(content["errors"]["count"], 1)
+
+
+@tag("many_to_many_api")
+class ManyToManyAPITestCase(Tests.BaseManyToManyAPITestCase):
+    """Test M2M API with ModelSerializer."""
+
+    viewset_class = TestM2MViewSet
+    related_model = models.TestModelSerializerReverseManyToMany
+    related_name = "test_model_serializers"
+    api_namespace = "m2m_test"
+    related_names = ["a", "target", "other"]
+
+    async def test_get_related_names(self):
+        """Test that names are correctly retrieved for ModelSerializer."""
+        await self._add_related()
+        content = await self.get_view(request=self.request.get(), pk=self.path_schema)
+        names = {item["name"] for item in content["items"]}
+        self.assertEqual(names, {"a", "target"})
+
+
+@tag("many_to_many_api", "serializer_class")
+class M2MRelationSchemaSerializerClassTestCase(Tests.BaseManyToManyAPITestCase):
+    """Test M2M API with plain Django model and serializer_class."""
+
+    viewset_class = TestM2MWithSerializerClassViewSet
+    related_model = models.TestModelReverseManyToMany
+    related_name = "test_models"
+    api_namespace = "m2m_serializer_class_test"
+    related_names = ["alpha", "beta", "gamma"]
+    serializer_class = TestModelReverseManyToManySerializer
 
     @classmethod
-    def _get_related_views(cls, manage_view: bool = False):
-        path = (
-            f"{cls.viewset.path_retrieve}{cls.rel_util.verbose_name_path_resolver()}/"
-            if manage_view
-            else f"{cls.viewset.path_retrieve}{cls.rel_util.verbose_name_path_resolver()}"
+    def _create_base_object(cls):
+        """Create base object directly for plain Django model."""
+        base_obj = models.TestModelManyToMany.objects.create(
+            name="base", description="base"
         )
-        return (
-            cls.viewset.m2m_api.router.path_operations.get(path).operations[0].view_func
+        return base_obj.pk
+
+
+@tag("many_to_many_api", "serializer_class", "validation")
+class M2MRelationSchemaValidationTestCase(TestCase):
+    """Test cases for M2MRelationSchema validation logic."""
+
+    def test_serializer_class_with_plain_model_succeeds(self):
+        """Test that serializer_class is accepted for plain Django models."""
+        schema = M2MRelationSchema(
+            model=models.TestModelReverseManyToMany,
+            related_name="test_models",
+            serializer_class=TestModelReverseManyToManySerializer,
+        )
+        self.assertIsNotNone(schema.related_schema)
+        self.assertEqual(schema.serializer_class, TestModelReverseManyToManySerializer)
+
+    def test_model_serializer_auto_generates_related_schema(self):
+        """Test that ModelSerializer auto-generates related_schema."""
+        schema = M2MRelationSchema(
+            model=models.TestModelSerializerReverseManyToMany,
+            related_name="test_model_serializers",
+        )
+        self.assertIsNotNone(schema.related_schema)
+        self.assertIsNone(schema.serializer_class)
+
+    def test_serializer_class_with_model_serializer_raises_error(self):
+        """Test that providing serializer_class with ModelSerializer raises ValueError."""
+        with self.assertRaises(ValueError) as context:
+            M2MRelationSchema(
+                model=models.TestModelSerializerReverseManyToMany,
+                related_name="test_model_serializers",
+                serializer_class=TestModelReverseManyToManySerializer,
+            )
+        self.assertIn(
+            "Cannot provide serializer_class when model is a ModelSerializerMeta",
+            str(context.exception),
         )
 
-    def _manage_data(self, add=None, remove=None):
-        action_schema = self.viewset.m2m_api.views_action_map[(True, True)][1]
-        return action_schema(add=add or [], remove=remove or [])
+    def test_plain_model_without_serializer_class_or_related_schema_raises_error(self):
+        """Test that plain Django model without serializer_class or related_schema raises ValueError."""
+        with self.assertRaises(ValueError) as context:
+            M2MRelationSchema(
+                model=models.TestModelReverseManyToMany,
+                related_name="test_models",
+            )
+        self.assertIn(
+            "related_schema must be provided if model is not a ModelSerializer",
+            str(context.exception),
+        )
 
-    async def test_add_related(self):
-        data = self._manage_data(add=self.related_pks[:2])
-        content = await self.manage_view(self.request.post(), self.path_schema, data)
-        self.assertEqual(content["results"]["count"], 2)
-        self.assertEqual(content["errors"]["count"], 0)
+    def test_explicit_related_schema_takes_precedence(self):
+        """Test that explicit related_schema is used even when serializer_class is provided."""
+        from ninja import Schema
 
-    # async def test_get_related(self):
-    #     # Ensure some are added first
-    #     await self.test_add_related()
-    #     content = await self.get_view(self.request.get())
-    #     print(content)
-    #     self.assertEqual(set(content.keys()), {"items", "count"})
-    #     self.assertEqual(content["count"], 2)
-    #     names = {item["name"] for item in content["items"]}
-    #     self.assertEqual(names, {"a", "target"})
+        class CustomSchema(Schema):
+            id: int
+            custom_field: str = "custom"
 
-    # async def test_get_related_with_filters(self):
-    #     await self.test_add_related()
-    #     filters_schema = self.viewset.m2m_api.relations_filters_schemas[
-    #         "test_model_serializers"
-    #     ]
-    #     filters = filters_schema(name="target")
-    #     content = await self.get_view(self.request.get(), self.path_schema, filters)
-    #     self.assertEqual(content["count"], 1)
-    #     self.assertEqual(content["items"][0]["name"], "target")
+        schema = M2MRelationSchema(
+            model=models.TestModelReverseManyToMany,
+            related_name="test_models",
+            related_schema=CustomSchema,
+            serializer_class=TestModelReverseManyToManySerializer,
+        )
+        self.assertEqual(schema.related_schema, CustomSchema)
 
-    async def test_remove_related(self):
-        await self.test_add_related()
-        # Remove one
-        data = self._manage_data(remove=[self.related_pks[0]])
-        content = await self.manage_view(self.request.post(), self.path_schema, data)
-        self.assertEqual(content["results"]["count"], 1)
-        self.assertEqual(content["errors"]["count"], 0)
-        # Removing again same pk should yield error
-        data2 = self._manage_data(remove=[self.related_pks[0]])
-        content2 = await self.manage_view(self.request.post(), self.path_schema, data2)
-        self.assertEqual(content2["results"]["count"], 0)
-        self.assertEqual(content2["errors"]["count"], 1)
 
-    async def test_add_existing_error(self):
-        await self.test_add_related()
-        # Add again -> errors
-        data = self._manage_data(add=self.related_pks[:1])
-        content = await self.manage_view(self.request.post(), self.path_schema, data)
-        self.assertEqual(content["results"]["count"], 0)
-        self.assertEqual(content["errors"]["count"], 1)
+# Decorator tracking for tests
+_decorator_calls = {"get": 0, "post": 0}
+
+
+def track_get_decorator(func):
+    """Decorator that tracks GET endpoint calls."""
+    from functools import wraps
+
+    @wraps(func)
+    async def wrapper(*args, **kwargs):
+        _decorator_calls["get"] += 1
+        return await func(*args, **kwargs)
+
+    return wrapper
+
+
+def track_post_decorator(func):
+    """Decorator that tracks POST endpoint calls."""
+    from functools import wraps
+
+    @wraps(func)
+    async def wrapper(*args, **kwargs):
+        _decorator_calls["post"] += 1
+        return await func(*args, **kwargs)
+
+    return wrapper
+
+
+class TestM2MWithDecoratorsViewSet(GenericAPIViewSet):
+    """ViewSet using M2M relations with custom decorators."""
+
+    model = models.TestModelSerializerManyToMany
+    m2m_relations = [
+        M2MRelationSchema(
+            model=models.TestModelSerializerReverseManyToMany,
+            related_name="test_model_serializers",
+            filters={"name": (str, "")},
+            get_decorators=[track_get_decorator],
+            post_decorators=[track_post_decorator],
+            append_slash=True,
+        )
+    ]
+
+    def test_model_serializers_query_params_handler(self, queryset, filters):
+        name_filter = filters.get("name")
+        if name_filter:
+            queryset = queryset.filter(name=name_filter)
+        return queryset
+
+
+@tag("many_to_many_api", "decorators")
+class M2MRelationSchemaDecoratorsTestCase(Tests.BaseManyToManyAPITestCase):
+    """Test M2M API with custom decorators applied to GET and POST endpoints."""
+
+    viewset_class = TestM2MWithDecoratorsViewSet
+    related_model = models.TestModelSerializerReverseManyToMany
+    related_name = "test_model_serializers"
+    api_namespace = "m2m_decorators_test"
+    related_names = ["dec_a", "dec_b", "dec_c"]
+
+    def setUp(self):
+        super().setUp()
+        # Reset decorator call counts before each test
+        _decorator_calls["get"] = 0
+        _decorator_calls["post"] = 0
+
+    async def test_get_decorator_is_applied(self):
+        """Test that get_decorators are applied to the GET endpoint."""
+        # First add some related objects
+        await self._add_related()
+        initial_get_count = _decorator_calls["get"]
+
+        # Call the GET endpoint
+        await self.get_view(request=self.request.get(), pk=self.path_schema)
+
+        # Verify the get decorator was called
+        self.assertEqual(
+            _decorator_calls["get"],
+            initial_get_count + 1,
+            "GET decorator should have been called once",
+        )
+
+    async def test_post_decorator_is_applied(self):
+        """Test that post_decorators are applied to the POST endpoint."""
+        initial_post_count = _decorator_calls["post"]
+
+        # Call the POST endpoint to add related objects
+        await self._add_related()
+
+        # Verify the post decorator was called
+        self.assertEqual(
+            _decorator_calls["post"],
+            initial_post_count + 1,
+            "POST decorator should have been called once",
+        )
+
+    async def test_decorators_independent(self):
+        """Test that GET and POST decorators are applied independently."""
+        # Reset counts
+        _decorator_calls["get"] = 0
+        _decorator_calls["post"] = 0
+
+        # Call POST endpoint
+        await self._add_related()
+        self.assertEqual(_decorator_calls["post"], 1)
+        self.assertEqual(_decorator_calls["get"], 0)
+
+        # Call GET endpoint
+        await self.get_view(request=self.request.get(), pk=self.path_schema)
+        self.assertEqual(_decorator_calls["post"], 1)  # Still 1
+        self.assertEqual(_decorator_calls["get"], 1)
+
+
+@tag("many_to_many_api", "decorators", "schema")
+class M2MRelationSchemaDecoratorsFieldTestCase(TestCase):
+    """Test cases for M2MRelationSchema decorator fields."""
+
+    def test_decorators_default_to_empty_list(self):
+        """Test that decorators default to empty lists."""
+        schema = M2MRelationSchema(
+            model=models.TestModelSerializerReverseManyToMany,
+            related_name="test_model_serializers",
+        )
+        self.assertEqual(schema.get_decorators, [])
+        self.assertEqual(schema.post_decorators, [])
+
+    def test_decorators_accept_list_of_callables(self):
+        """Test that decorators accept a list of callables."""
+
+        def custom_decorator(func):
+            return func
+
+        schema = M2MRelationSchema(
+            model=models.TestModelSerializerReverseManyToMany,
+            related_name="test_model_serializers",
+            get_decorators=[custom_decorator],
+            post_decorators=[custom_decorator, custom_decorator],
+        )
+        self.assertEqual(len(schema.get_decorators), 1)
+        self.assertEqual(len(schema.post_decorators), 2)
+        self.assertEqual(schema.get_decorators[0], custom_decorator)
+
+    def test_decorators_can_be_none(self):
+        """Test that decorators can explicitly be set to None."""
+        schema = M2MRelationSchema(
+            model=models.TestModelSerializerReverseManyToMany,
+            related_name="test_model_serializers",
+            get_decorators=None,
+            post_decorators=None,
+        )
+        # None values should be accepted
+        self.assertIsNone(schema.get_decorators)
+        self.assertIsNone(schema.post_decorators)
+
+
+@tag("m2m", "coverage")
+class GetApiPathNoSlashTestCase(TestCase):
+    """Cover _get_api_path with append_slash=False (line 348 of helpers/api.py)."""
+
+    def test_get_api_path_without_trailing_slash(self):
+        """Line 348: path.rstrip('/') when append_slash=False."""
+        api = NinjaAIO(urls_namespace="test_m2m_no_slash")
+
+        class M2MViewSet(APIViewSet):
+            model = models.TestModelSerializerManyToMany
+
+        vs = M2MViewSet(api=api)
+        m2m_api = ManyToManyAPI(
+            relations=[
+                M2MRelationSchema(
+                    model=models.TestModelSerializerReverseManyToMany,
+                    related_name="test_model_serializers",
+                )
+            ],
+            view_set=vs,
+        )
+        path = m2m_api._get_api_path("relations", append_slash=False)
+        self.assertFalse(path.endswith("/"))
+
+        path_with_slash = m2m_api._get_api_path("relations", append_slash=True)
+        self.assertTrue(path_with_slash.endswith("/"))

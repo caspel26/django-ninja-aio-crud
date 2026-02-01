@@ -13,6 +13,7 @@ from tests.generics.request import Request
 from ninja_aio import NinjaAIO
 from ninja_aio.views import APIViewSet, APIView
 from ninja_aio.models import ModelSerializer, ModelUtil
+from ninja.orm.factory import create_schema
 
 
 class GenericAdditionalView:
@@ -176,13 +177,29 @@ class Tests:
             )
             return paths, path_names
 
+        async def _parse_output_data(self, data):
+            new_data = data.copy()
+            for k, v in data.items():
+                if isinstance(v, ModelSerializer):
+                    new_data[k] = await ModelUtil(v.__class__).read_s(
+                        v.__class__.generate_related_s(), self.get_request, v
+                    )
+                elif isinstance(v, models.Model):
+                    new_data[k] = await ModelUtil(v.__class__).read_s(
+                        create_schema(v.__class__), self.get_request, v
+                    )
+            return new_data
+
         async def _create_view(self):
             view = self.viewset.create_view()
             status, content = await view(self.post_request, self.create_data)
             self.assertEqual(status, 201)
             self.assertIn(self.pk_att, content)
+
             self.assertEqual(
-                self.create_response_data | {self.pk_att: content[self.pk_att]}, content
+                await self._parse_output_data(self.create_response_data)
+                | {self.pk_att: content[self.pk_att]},
+                content,
             )
             return content
 
@@ -213,7 +230,7 @@ class Tests:
 
         def test_get_schemas(self):
             schemas = self.viewset.get_schemas()
-            self.assertEqual(len(schemas), 3)
+            self.assertEqual(len(schemas), 4)
             self.assertEqual(schemas, self.schemas)
 
         async def test_create(self):
@@ -230,13 +247,13 @@ class Tests:
             self.assertEqual(obj_count, count)
             item = items[0]
             item.pop(self.pk_att)
-            self.assertEqual(self.response_data, item)
+            self.assertEqual(await self._parse_output_data(self.response_data), item)
 
         async def test_retrieve(self):
             view = self.viewset.retrieve_view()
             content = await view(self.get_request, self._path_schema(1))
             content.pop(self.pk_att)
-            self.assertEqual(self.response_data, content)
+            self.assertEqual(await self._parse_output_data(self.response_data), content)
 
         async def test_retrieve_object_not_found(self):
             with self.assertRaises(NotFoundError) as exc:
@@ -255,7 +272,10 @@ class Tests:
                 self.patch_request, self.update_data, self._path_schema(1)
             )
             content.pop(self.pk_att)
-            self.assertEqual(self.response_data | self.payload_update, content)
+            self.assertEqual(
+                await self._parse_output_data(self.response_data | self.payload_update),
+                content,
+            )
 
         async def test_delete(self):
             view = self.viewset.delete_view()
@@ -294,11 +314,9 @@ class Tests:
                 cls.relation_request, cls.relation_pk
             )
             cls.relation_read_s = async_to_sync(cls.relation_util.read_s)(
-                cls.relation_request, cls.relation_obj, cls.relation_viewset.schema_out
+                cls.relation_viewset.schema_out, cls.relation_request, cls.relation_obj
             )
-            cls.relation_schema_data = cls.relation_viewset.schema_out(
-                **cls.relation_read_s
-            ).model_dump()
+            cls.relation_schema_data = cls.relation_read_s
             cls.obj_content = async_to_sync(cls()._create_view)()
 
         @classmethod

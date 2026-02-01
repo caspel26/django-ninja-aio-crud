@@ -293,3 +293,5 @@ docker_script.sh
 migrations
 django-test/*
 test_api
+performance_results.json
+performance_report.html

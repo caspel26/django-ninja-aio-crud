@@ -1,28 +1,66 @@
-## 🤝 Contributing
+## :material-handshake: Contributing
 
-We welcome contributions. Ways to help:
+We welcome contributions! Here's how you can help:
 
-1. **Report Bugs** – Open an issue on [GitHub](https://github.com/caspel26/django-ninja-aio-crud/issues).
-2. **Suggest Features** – Share ideas in issues or discussions.
-3. **Submit PRs** – Improve code, tests, or docs.
-4. **Improve Docs** – Clarify, expand, or add examples.
-5. **Add Tests** – Increase coverage and reliability.
-6. **Review PRs** – Provide constructive feedback.
+<div class="grid cards" markdown>
 
-### ⭐ Support the Project
+-   :material-bug:{ .lg .middle } **Report Bugs**
+
+    ---
+
+    Open an issue on [GitHub](https://github.com/caspel26/django-ninja-aio-crud/issues)
+
+-   :material-lightbulb:{ .lg .middle } **Suggest Features**
+
+    ---
+
+    Share ideas in issues or discussions
+
+-   :material-source-pull:{ .lg .middle } **Submit PRs**
+
+    ---
+
+    Improve code, tests, or docs
+
+-   :material-file-document-edit:{ .lg .middle } **Improve Docs**
+
+    ---
+
+    Clarify, expand, or add examples
+
+-   :material-test-tube:{ .lg .middle } **Add Tests**
+
+    ---
+
+    Increase coverage and reliability
+
+-   :material-comment-check:{ .lg .middle } **Review PRs**
+
+    ---
+
+    Provide constructive feedback
+
+</div>
+
+### :material-star: Support the Project
+
 If this project helps you, please give it a GitHub star to show support.
 
-### ☕ Buy Me a Coffee
+### :material-coffee: Buy Me a Coffee
+
 Optional tip: [Buy Me a Coffee](https://buymeacoffee.com/caspel26).
 
-### Pull Request Guidelines
-- Keep PRs focused and small.
-- Follow existing code style.
-- Add or update tests when relevant.
-- Update docs for user-facing changes.
-- Link related issue in the PR description.
+### :material-source-pull: Pull Request Guidelines
 
-### Development Setup
+!!! info "PR Checklist"
+    - Keep PRs focused and small
+    - Follow existing code style
+    - Add or update tests when relevant
+    - Update docs for user-facing changes
+    - Link related issue in the PR description
+
+### :material-wrench: Development Setup
+
 ```bash
 git clone https://github.com/caspel26/django-ninja-aio-crud.git
 cd django-ninja-aio-crud
@@ -31,11 +69,12 @@ source .venv/bin/activate
 pip install -r requirements.dev.txt
 ```
 
-### Issue Reports
-Include:
-- Python/Django versions
-- Steps to reproduce
-- Expected vs actual behavior
-- Tracebacks or logs (if any)
+### :material-bug: Issue Reports
+
+!!! warning "Please include"
+    - Python/Django versions
+    - Steps to reproduce
+    - Expected vs actual behavior
+    - Tracebacks or logs (if any)
 
 Thank you for helping improve the project.

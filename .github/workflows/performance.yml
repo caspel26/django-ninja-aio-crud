@@ -1,0 +1,80 @@
+name: Performance
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: write
+
+jobs:
+  benchmarks:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+      - name: Install Flit
+        run: pip install flit
+      - name: Install Dependencies
+        run: flit install --symlink
+      - name: Run Performance Benchmarks
+        run: |
+          python -m django test tests.performance --settings=tests.test_settings --tag=performance -v2
+      - name: Generate Performance Report
+        run: python tests/performance/generate_report.py
+
+      # Download baseline from the latest main branch run
+      - name: Download Baseline Performance Results
+        if: github.event_name == 'pull_request' || github.ref != 'refs/heads/main'
+        uses: dawidd6/action-download-artifact@v6
+        continue-on-error: true
+        with:
+          workflow: performance.yml
+          branch: main
+          name: performance-report
+          path: baseline/
+          if_no_artifact_found: warn
+
+      # Check for regressions
+      - name: Check Performance Regression
+        if: github.event_name == 'pull_request' || github.ref != 'refs/heads/main'
+        run: |
+          if [ -f baseline/performance_results.json ]; then
+            python tests/performance/check_regression.py \
+              --baseline baseline/performance_results.json \
+              --current performance_results.json \
+              --threshold 20
+          else
+            echo "⚠️  No baseline found, skipping regression check"
+            echo "This is expected for the first benchmark run on main branch"
+          fi
+
+      - name: Upload Performance Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-report
+          path: |
+            performance_report.html
+            performance_results.json
+
+      # Deploy to GitHub Pages (main branch only)
+      - name: Deploy Performance Report to GitHub Pages
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./
+          destination_dir: performance
+          keep_files: true
+          publish_branch: gh-pages
+          user_name: 'github-actions[bot]'
+          user_email: 'github-actions[bot]@users.noreply.github.com'
+          commit_message: 'Deploy performance report'
+          enable_jekyll: false
+          exclude_assets: '.git*,*.py,*.pyc,ninja_aio/**,tests/**,docs/**,.venv/**,*.toml,*.cfg,*.txt,*.sh,*.md'

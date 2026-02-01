@@ -1,25 +1,27 @@
-# Model Serializer
+# :material-file-document-edit: Model Serializer
 
 `ModelSerializer` is a powerful abstract mixin for Django models that centralizes schema generation and serialization configuration directly on the model class.
 
-## Overview
+## :material-format-list-bulleted: Overview
 
 **Goals:**
 
-- Eliminate duplication between Model and separate serializer classes
-- Provide clear extension points (sync + async hooks, custom synthetic fields)
-- Auto-generate Ninja schemas from model metadata
-- Support nested serialization for relationships
+- :material-content-copy: Eliminate duplication between Model and separate serializer classes
+- :material-hook: Provide clear extension points (sync + async hooks, custom synthetic fields)
+- :material-auto-fix: Auto-generate Ninja schemas from model metadata
+- :material-link-variant: Support nested serialization for relationships
 
 **Key Features:**
 
-- Declarative schema configuration via inner classes
-- Automatic CRUD schema generation
-- Nested relationship handling
-- Sync and async lifecycle hooks
-- Custom field support (computed/synthetic fields)
+- :material-playlist-plus: Declarative schema configuration via inner classes
+- :material-sync: Automatic CRUD schema generation
+- :material-file-tree: Nested relationship handling
+- :material-hook: Sync and async lifecycle hooks
+- :material-pencil-plus: Custom field support (computed/synthetic fields)
 
-## Quick Start
+---
+
+## :material-rocket-launch: Quick Start
 
 ```python
 from django.db import models
@@ -39,7 +41,9 @@ class User(ModelSerializer):
         return self.username
 ```
 
-## Inner Configuration Classes
+---
+
+## :material-playlist-plus: Inner Configuration Classes
 
 ### CreateSerializer
 
@@ -49,7 +53,7 @@ Describes how to build a create (input) schema for a model.
 
 | Attribute   | Type                     | Description                                                                                                                       |
 | ----------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
-| `fields`    | `list[str]`              | REQUIRED model field names for creation                                                                                           |
+| `fields`    | `list[str \| tuple]`     | REQUIRED model field names for creation. Can also include inline custom tuples (see below)                                        |
 | `optionals` | `list[tuple[str, type]]` | Optional model fields: `(field_name, python_type)`                                                                                |
 | `customs`   | `list[tuple]`            | Synthetic inputs. Tuple forms: `(name, type)` = required (no default); `(name, type, default)` = optional (literal or callable)   |
 | `excludes`  | `list[str]`              | Field names rejected on create                                                                                                    |
@@ -75,6 +79,23 @@ class User(ModelSerializer):
         excludes = ["id", "created_at"]
 ```
 
+**Inline Custom Fields:**
+
+You can also define custom fields directly in the `fields` list as tuples:
+
+```python
+class User(ModelSerializer):
+    class CreateSerializer:
+        fields = [
+            "username",
+            "email",
+            ("password_confirm", str),          # 2-tuple: required
+            ("send_welcome", bool, True),       # 3-tuple: optional with default
+        ]
+```
+
+This is equivalent to using the separate `customs` list but keeps field definitions together.
+
 **Resolution Order for `customs`:**
 
 1. Payload value (if provided)
@@ -98,12 +119,14 @@ class UserIn(ModelSchema):
 
 Describes how to build a read (output) schema for a model.
 
-**Attributes:**
-| Attribute   | Type                     | Description                                                                                                                                                                                                                                       |
-| ----------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `fields`    | `list[str]`              | REQUIRED model field / related names explicitly included in the read (output) schema.                                                                                                                                                             |
-| `excludes`  | `list[str]`              | Field / related names to always omit (takes precedence over `fields` and `optionals`). Use for sensitive or noisy data (e.g., passwords, internal flags).                                                                                          |
-| `customs`   | `list[tuple]`            | Computed / synthetic output values. Tuples:<br>`(name, type)` = required resolvable attribute (object attribute or property) else serialization error.<br>`(name, type, default)` = optional; default may be callable (`lambda obj: ...`) or literal. |
+**Attributes**
+
+| Attribute        | Type                 | Description |
+|------------------|----------------------|-------------|
+| `fields`         | `list[str \| tuple]` | **REQUIRED.** Model fields / related names explicitly included in the read (output) schema. Can also include inline custom tuples. |
+| `excludes`       | `list[str]`          | Fields / related names to always omit (takes precedence over `fields` and `optionals`). Use for sensitive or noisy data (e.g., passwords, internal flags). |
+| `customs`        | `list[tuple]`        | Computed / synthetic output values. Tuple formats:<br>• `(name, type)` = required resolvable attribute (object attribute or property). Serialization error if not resolvable.<br>• `(name, type, default)` = optional; default may be a callable (`lambda obj: ...`) or a literal value. |
+| `relations_as_id`| `list[str]`          | Relation fields to serialize as IDs instead of nested objects. Works with forward FK, forward O2O, reverse FK, reverse O2O, and M2M relations. |
 
 **Example:**
 
@@ -144,6 +167,92 @@ class User(ModelSerializer):
 }
 ```
 
+### DetailSerializer
+
+Describes how to build a detail (single object) output schema. Use this when you want the retrieve endpoint to return more fields than the list endpoint.
+
+**Fallback Behavior:** `DetailSerializer` supports **per-field-type fallback** to `ReadSerializer`. Each attribute (`fields`, `customs`, `optionals`, `excludes`) is checked independently:
+
+- If `DetailSerializer.fields` is empty → uses `ReadSerializer.fields`
+- If `DetailSerializer.customs` is empty → uses `ReadSerializer.customs`
+- If `DetailSerializer.optionals` is empty → uses `ReadSerializer.optionals`
+- If `DetailSerializer.excludes` is empty → uses `ReadSerializer.excludes`
+
+This allows partial overrides: define only `DetailSerializer.fields` while inheriting `customs` from `ReadSerializer`.
+
+**Attributes:**
+
+| Attribute   | Type                     | Description                                                                   |
+| ----------- | ------------------------ | ----------------------------------------------------------------------------- |
+| `fields`    | `list[str \| tuple]`     | Model fields to include in detail view. Can include inline custom tuples. Falls back to ReadSerializer.fields if empty |
+| `excludes`  | `list[str]`              | Fields to exclude from detail view (falls back to ReadSerializer.excludes if empty) |
+| `customs`   | `list[tuple]`            | Computed fields: `(name, type)` required; `(name, type, default)` optional (falls back to ReadSerializer.customs if empty) |
+| `optionals` | `list[tuple[str, type]]` | Optional output fields (falls back to ReadSerializer.optionals if empty) |
+
+**Example:**
+
+```python
+class Article(ModelSerializer):
+    title = models.CharField(max_length=200)
+    summary = models.TextField()
+    content = models.TextField()
+    author = models.ForeignKey(User, on_delete=models.CASCADE)
+    tags = models.ManyToManyField(Tag)
+    view_count = models.IntegerField(default=0)
+
+    class ReadSerializer:
+        # List view: minimal fields for performance
+        fields = ["id", "title", "summary", "author"]
+        customs = [
+            ("word_count", int, lambda obj: len(obj.content.split())),
+        ]
+
+    class DetailSerializer:
+        # Detail view: all fields including expensive relations
+        # customs inherited from ReadSerializer (word_count)
+        fields = ["id", "title", "summary", "content", "author", "tags", "view_count"]
+```
+
+**Generated Output (List):**
+
+```json
+[
+  {"id": 1, "title": "Getting Started", "summary": "...", "author": {...}, "word_count": 500},
+  {"id": 2, "title": "Advanced Topics", "summary": "...", "author": {...}, "word_count": 1200}
+]
+```
+
+**Generated Output (Detail):**
+
+```json
+{
+  "id": 1,
+  "title": "Getting Started",
+  "summary": "...",
+  "content": "Full article content here...",
+  "author": {...},
+  "tags": [{"id": 1, "name": "python"}, {"id": 2, "name": "django"}],
+  "view_count": 1234,
+  "word_count": 500
+}
+```
+
+**Example with Custom Override:**
+
+```python
+class Article(ModelSerializer):
+    # ... fields ...
+
+    class ReadSerializer:
+        fields = ["id", "title", "summary"]
+        customs = [("word_count", int, lambda obj: len(obj.content.split()))]
+
+    class DetailSerializer:
+        fields = ["id", "title", "summary", "content"]
+        # Override customs - reading_time instead of word_count
+        customs = [("reading_time", int, lambda obj: len(obj.content.split()) // 200)]
+```
+
 ### UpdateSerializer
 
 Describes how to build an update (partial/full) input schema.
@@ -152,7 +261,7 @@ Describes how to build an update (partial/full) input schema.
 
 | Attribute   | Type                     | Description                                                                   |
 | ----------- | ------------------------ | ----------------------------------------------------------------------------- |
-| `fields`    | `list[str]`              | REQUIRED fields for update (rarely used)                                      |
+| `fields`    | `list[str \| tuple]`     | REQUIRED fields for update (rarely used). Can include inline custom tuples    |
 | `optionals` | `list[tuple[str, type]]` | Updatable optional fields (typical for PATCH)                                 |
 | `customs`   | `list[tuple]`            | Instruction fields: `(name, type)` required; `(name, type, default)` optional |
 | `excludes`  | `list[str]`              | Immutable fields that cannot be updated                                       |
@@ -189,18 +298,21 @@ class User(ModelSerializer):
 }
 ```
 
-## Schema Generation
+---
+
+## :material-auto-fix: Schema Generation
 
 ### Auto-Generated Schemas
 
-ModelSerializer automatically generates four schema types:
+ModelSerializer automatically generates five schema types:
 
-| Method                     | Schema Type        | Purpose                        |
-| -------------------------- | ------------------ | ------------------------------ |
-| `generate_create_s()`      | Input ("In")       | POST endpoint payload          |
-| `generate_update_s()`      | Input ("Patch")    | PATCH/PUT endpoint payload     |
-| `generate_read_s(depth=1)` | Output ("Out")     | Response with nested relations |
-| `generate_related_s()`     | Output ("Related") | Compact nested representation  |
+| Method                       | Schema Type        | Purpose                              |
+| ---------------------------- | ------------------ | ------------------------------------ |
+| `generate_create_s()`        | Input ("In")       | POST endpoint payload                |
+| `generate_update_s()`        | Input ("Patch")    | PATCH/PUT endpoint payload           |
+| `generate_read_s(depth=1)`   | Output ("Out")     | List response with nested relations  |
+| `generate_detail_s(depth=1)` | Output ("Detail")  | Single object response (retrieve)    |
+| `generate_related_s()`       | Output ("Related") | Compact nested representation        |
 
 **Example:**
 
@@ -218,6 +330,7 @@ class User(ModelSerializer):
 # Auto-generate schemas
 UserCreateSchema = User.generate_create_s()
 UserReadSchema = User.generate_read_s()
+UserDetailSchema = User.generate_detail_s()  # Falls back to read schema if DetailSerializer not defined
 UserUpdateSchema = User.generate_update_s()
 UserRelatedSchema = User.generate_related_s()
 ```
@@ -316,7 +429,162 @@ class Book(ModelSerializer):
 }
 ```
 
-## Async Extension Points
+#### Relations as ID
+
+Use `relations_as_id` to serialize relation fields as IDs instead of nested objects. This is useful for:
+
+- Reducing response payload size
+- Avoiding circular serialization
+- Performance optimization when nested data isn't needed
+- API designs where clients fetch related data separately
+
+**Supported Relations:**
+
+| Relation Type      | Output Type       | Example Value        |
+|--------------------|-------------------|----------------------|
+| Forward FK         | `PK_TYPE \| None` | `5` or `null`        |
+| Forward O2O        | `PK_TYPE \| None` | `3` or `null`        |
+| Reverse FK         | `list[PK_TYPE]`   | `[1, 2, 3]`          |
+| Reverse O2O        | `PK_TYPE \| None` | `7` or `null`        |
+| M2M (forward)      | `list[PK_TYPE]`   | `[1, 2]`             |
+| M2M (reverse)      | `list[PK_TYPE]`   | `[4, 5, 6]`          |
+
+**Note:** `PK_TYPE` is automatically detected from the related model's primary key field. Supported types include `int` (default), `UUID`, `str`, and any other Django primary key type.
+
+**Example:**
+
+```python
+class Author(ModelSerializer):
+    name = models.CharField(max_length=200)
+
+    class ReadSerializer:
+        fields = ["id", "name", "books"]
+        relations_as_id = ["books"]  # Serialize as list of IDs
+
+class Book(ModelSerializer):
+    title = models.CharField(max_length=200)
+    author = models.ForeignKey(Author, on_delete=models.CASCADE, related_name="books")
+
+    class ReadSerializer:
+        fields = ["id", "title", "author"]
+        relations_as_id = ["author"]  # Serialize as ID
+```
+
+**Output (Author):**
+
+```json
+{
+  "id": 1,
+  "name": "J.K. Rowling",
+  "books": [1, 2, 3]
+}
+```
+
+**Output (Book):**
+
+```json
+{
+  "id": 1,
+  "title": "Harry Potter",
+  "author": 1
+}
+```
+
+**M2M Example:**
+
+```python
+class Tag(ModelSerializer):
+    name = models.CharField(max_length=50)
+
+    class ReadSerializer:
+        fields = ["id", "name", "articles"]
+        relations_as_id = ["articles"]  # Reverse M2M as IDs
+
+class Article(ModelSerializer):
+    title = models.CharField(max_length=200)
+    tags = models.ManyToManyField(Tag, related_name="articles")
+
+    class ReadSerializer:
+        fields = ["id", "title", "tags"]
+        relations_as_id = ["tags"]  # Forward M2M as IDs
+```
+
+**Output (Article):**
+
+```json
+{
+  "id": 1,
+  "title": "Getting Started with Django",
+  "tags": [1, 2, 5]
+}
+```
+
+**UUID Primary Key Example:**
+
+When models use UUID primary keys, the output type is automatically `UUID`:
+
+```python
+import uuid
+from django.db import models
+from ninja_aio.models import ModelSerializer
+
+class Author(ModelSerializer):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=200)
+
+    class ReadSerializer:
+        fields = ["id", "name", "books"]
+        relations_as_id = ["books"]
+
+class Book(ModelSerializer):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    title = models.CharField(max_length=200)
+    author = models.ForeignKey(Author, on_delete=models.CASCADE, related_name="books")
+
+    class ReadSerializer:
+        fields = ["id", "title", "author"]
+        relations_as_id = ["author"]
+```
+
+**Output (Author with UUID):**
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "name": "J.K. Rowling",
+  "books": [
+    "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+    "6ba7b811-9dad-11d1-80b4-00c04fd430c8"
+  ]
+}
+```
+
+**Output (Book with UUID):**
+
+```json
+{
+  "id": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+  "title": "Harry Potter",
+  "author": "550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+**Query Optimization Note:** When using `relations_as_id`, you should still use `select_related()` for forward relations and `prefetch_related()` for reverse/M2M relations to avoid N+1 queries:
+
+```python
+class Article(ModelSerializer):
+    # ...
+
+    class QuerySet:
+        read = ModelQuerySetSchema(
+            select_related=["author"],       # For forward FK
+            prefetch_related=["tags"],        # For M2M
+        )
+```
+
+---
+
+## :material-lightning-bolt: Async Extension Points
 
 ### `queryset_request(request)`
 
@@ -391,7 +659,9 @@ class User(ModelSerializer):
             await send_email(self.email, "Welcome!")
 ```
 
-## Sync Lifecycle Hooks
+---
+
+## :material-hook: Sync Lifecycle Hooks
 
 ### Save Hooks
 
@@ -454,7 +724,9 @@ class User(ModelSerializer):
         )
 ```
 
-## Utility Methods
+---
+
+## :material-wrench: Utility Methods
 
 ### `has_changed(field)`
 
@@ -485,7 +757,9 @@ class BlogPost(ModelSerializer):
 path = BlogPost.verbose_name_path_resolver()
 ```
 
-## ModelUtil
+---
+
+## :material-cog-sync: ModelUtil
 
 Helper class for async CRUD operations with ModelSerializer.
 
@@ -665,7 +939,9 @@ except SerializeError as e:
     pass
 ```
 
-## Complete Example
+---
+
+## :material-code-braces: Complete Example
 
 ```python
 from django.db import models
@@ -777,7 +1053,9 @@ class Tag(ModelSerializer):
         fields = ["id", "name"]
 ```
 
-## Custom Fields Normalization
+---
+
+## :material-pencil-plus: Custom Fields Normalization
 
 Custom tuples are normalized by `ModelSerializer.get_custom_fields()` to `(name, python_type, default)`.
 
@@ -812,7 +1090,7 @@ At runtime:
 
 Required customs (Ellipsis) must be provided in input (create/update) or resolvable (read) or an error is raised.
 
-## Error Cases
+## :material-alert-circle: Error Cases
 
 | Situation                                    | Result              |
 | -------------------------------------------- | ------------------- |
@@ -820,7 +1098,7 @@ Required customs (Ellipsis) must be provided in input (create/update) or resolva
 | Missing required custom (2‑tuple) in payload | Validation error    |
 | Unresolvable required read custom            | Serialization error |
 
-## Best Practices
+## :material-shield-star: Best Practices
 
 1. **Always exclude sensitive fields:**
 
@@ -859,8 +1137,32 @@ Required customs (Ellipsis) must be provided in input (create/update) or resolva
        await send_welcome_email(self.email)
    ```
 
-## See Also
+## :material-bookshelf: See Also
 
-- [Model Util](model_util.md) - Deep dive into ModelUtil
-- [API ViewSet](../views/api_view_set.md) - Using ModelSerializer with ViewSets
-- [Authentication](../authentication.md) - Securing endpoints
+<div class="grid cards" markdown>
+
+-   :material-cog-sync:{ .lg .middle } **ModelUtil**
+
+    ---
+
+    [:octicons-arrow-right-24: Deep dive](model_util.md)
+
+-   :material-check-decagram:{ .lg .middle } **Validators**
+
+    ---
+
+    [:octicons-arrow-right-24: Field & model validators](validators.md)
+
+-   :material-view-grid:{ .lg .middle } **APIViewSet**
+
+    ---
+
+    [:octicons-arrow-right-24: Using with ViewSets](../views/api_view_set.md)
+
+-   :material-shield-lock:{ .lg .middle } **Authentication**
+
+    ---
+
+    [:octicons-arrow-right-24: Securing endpoints](../authentication.md)
+
+</div>
