@@ -73,7 +73,11 @@ Performance benchmarks run as part of the CI pipeline via GitHub Actions on ever
 
 You can download the report artifact from any workflow run in the [Actions tab](https://github.com/caspel26/django-ninja-aio-crud/actions/workflows/performance.yml){ target="_blank" }.
 
+<div class="cta-buttons" markdown>
+
 [View latest benchmark runs :material-open-in-new:](https://github.com/caspel26/django-ninja-aio-crud/actions/workflows/performance.yml){ .md-button .md-button--primary target="_blank" }
+
+</div>
 
 ---
 
