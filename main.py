@@ -10,6 +10,25 @@ from markdown import markdown
 import ssl
 
 SEMVER_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$")
+
+_MD_EXTENSIONS = [
+    "tables",
+    "fenced_code",
+    "codehilite",
+    "toc",
+    "nl2br",
+    "sane_lists",
+]
+_MD_EXTENSION_CONFIGS = {
+    "codehilite": {"css_class": "highlight", "guess_lang": True},
+}
+
+
+def _render_md(text: str) -> str:
+    """Render Markdown text to HTML with GitHub-flavoured extensions."""
+    if not text:
+        return ""
+    return markdown(text, extensions=_MD_EXTENSIONS, extension_configs=_MD_EXTENSION_CONFIGS)
 REPO_SLUG = "caspel26/django-ninja-aio-crud"
 _RELEASES_CACHE = None
 
@@ -144,7 +163,7 @@ def generate_release_table() -> str:
         anchor = _tag_anchor(tag)
         date_fmt = _fmt_date_human(_tag_date(tag))
         notes = _get_release_notes(tag)
-        notes_html = markdown(notes) if notes else ""
+        notes_html = _render_md(notes)
         diff_link = (
             f"https://github.com/{REPO_SLUG}/compare/{prev}...{tag}"
             if prev
@@ -262,7 +281,7 @@ def generate_release_cards() -> str:
     for i, tag in enumerate(tags):
         prev = tags[i + 1] if i + 1 < len(tags) else None
         notes = _get_release_notes(tag)
-        notes_html = markdown(notes) if notes else "<p>No release notes.</p>"
+        notes_html = _render_md(notes) or "<p>No release notes.</p>"
         date_fmt = _fmt_date_human(_tag_date(tag))
         diff_link = (
             f"https://github.com/{REPO_SLUG}/compare/{prev}...{tag}"
