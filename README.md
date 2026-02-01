@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/caspel26/django-ninja-aio-crud/main/docs/images/logo-full2.png" alt="django-ninja-aio-crud">
+  <img src="https://raw.githubusercontent.com/caspel26/django-ninja-aio-crud/main/docs/images/logo-full.png" alt="django-ninja-aio-crud">
 </p>
 
 <p align="center">
