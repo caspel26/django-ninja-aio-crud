@@ -325,6 +325,50 @@ class APIViewSet(API):
             filter
         )
 
+    def _is_lookup_suffix(self, part: str) -> bool:
+        """
+        Check if a part is a valid Django lookup suffix.
+
+        Args:
+            part: The part to check
+
+        Returns:
+            bool: True if the part is a valid lookup suffix
+        """
+        return part in VALID_DJANGO_LOOKUPS
+
+    def _get_related_model(self, field):
+        """
+        Extract the related model from a field if it exists.
+
+        Args:
+            field: The Django field object
+
+        Returns:
+            Model class or None
+        """
+        if hasattr(field, 'related_model') and field.related_model:
+            return field.related_model
+        if hasattr(field, 'remote_field') and field.remote_field and hasattr(field.remote_field, 'model'):
+            return field.remote_field.model
+        return None
+
+    def _validate_non_relation_field(self, parts: list[str], i: int) -> bool:
+        """
+        Validate a non-relation field that appears before the end of the path.
+
+        Args:
+            parts: List of field path parts
+            i: Current index in parts
+
+        Returns:
+            bool: True if valid, False otherwise
+        """
+        if i >= len(parts) - 1:
+            return True
+        next_part = parts[i + 1]
+        return self._is_lookup_suffix(next_part)
+
     def _validate_filter_field(self, field_path: str) -> bool:
         """
         Validate that a filter field path corresponds to valid model fields.
@@ -352,33 +396,24 @@ class APIViewSet(API):
         # Iterate through the path, validating each part
         for i, part in enumerate(parts):
             # Check if this is the last part and might be a lookup suffix
-            if i == len(parts) - 1 and part in VALID_DJANGO_LOOKUPS:
+            is_last_part = i == len(parts) - 1
+            if is_last_part and self._is_lookup_suffix(part):
                 return True
 
             try:
                 field = current_model._meta.get_field(part)
-
-                # If this is a relation field and not the last part, traverse to related model
-                # Check for both forward relations (remote_field.model) and reverse relations (related_model)
-                related_model = None
-                if hasattr(field, 'related_model') and field.related_model:
-                    related_model = field.related_model
-                elif hasattr(field, 'remote_field') and field.remote_field and hasattr(field.remote_field, 'model'):
-                    related_model = field.remote_field.model
-
-                if related_model and i < len(parts) - 1:
-                    current_model = related_model
-                elif i < len(parts) - 1:
-                    # Non-relation field in the middle - check if next part is a lookup suffix
-                    next_part = parts[i + 1]
-                    if next_part not in VALID_DJANGO_LOOKUPS:
-                        # Next part is not a lookup, so this is invalid
-                        return False
-                    # Next part is a lookup suffix, this is valid - continue to validate it
-
             except (FieldDoesNotExist, AttributeError):
                 # Field doesn't exist on this model
                 return False
+
+            # If this is a relation field and not the last part, traverse to related model
+            related_model = self._get_related_model(field)
+            if related_model and not is_last_part:
+                current_model = related_model
+            elif not is_last_part:
+                # Non-relation field in the middle - must be followed by a lookup suffix
+                if not self._validate_non_relation_field(parts, i):
+                    return False
 
         return True
 
