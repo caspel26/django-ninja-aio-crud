@@ -42,6 +42,36 @@ To run tests without coverage:
 . ./.venv/bin/activate && python -m django test --settings=tests.test_settings
 ```
 
+## Test-Driven Development Protocol
+
+**CRITICAL:** After implementing any code change, you MUST follow this protocol:
+
+1. **Run all tests** to verify nothing broke:
+   ```sh
+   . ./.venv/bin/activate && python -m django test --settings=tests.test_settings
+   ```
+
+2. **Check coverage** to identify uncovered lines:
+   ```sh
+   . ./.venv/bin/activate && coverage run -m django test --settings=tests.test_settings && coverage report
+   ```
+
+3. **If new uncovered lines exist:**
+   - Write tests following the existing test structure in `tests/`
+   - Match the naming conventions and organization patterns
+   - Ensure new tests follow the same patterns as existing tests in the same module
+
+4. **Run tests again** to verify new tests pass and coverage is maintained
+
+This protocol applies to ALL code changes, including:
+- New features
+- Bug fixes
+- Refactoring
+- Performance optimizations
+- Security fixes
+
+**Do not consider a task complete until all tests pass and coverage is maintained or improved.**
+
 ## Running Performance Tests
 
 Performance benchmarks live in `tests/performance/` and measure schema generation, serialization, CRUD endpoints, and filter processing.
