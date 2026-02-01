@@ -42,6 +42,46 @@ To run tests without coverage:
 . ./.venv/bin/activate && python -m django test --settings=tests.test_settings
 ```
 
+## Running Performance Tests
+
+Performance benchmarks live in `tests/performance/` and measure schema generation, serialization, CRUD endpoints, and filter processing.
+
+Run benchmarks and generate the HTML report in one step:
+
+```sh
+. ./.venv/bin/activate && ./run-performance.sh
+```
+
+This executes all 19 benchmarks, appends results to `performance_results.json`, and generates an interactive `performance_report.html` with Chart.js charts.
+
+To run only the tests (no report):
+
+```sh
+. ./.venv/bin/activate && python -m django test tests.performance --settings=tests.test_settings --tag=performance -v2
+```
+
+To regenerate the HTML report from existing results:
+
+```sh
+python tests/performance/generate_report.py
+# or with custom paths:
+python tests/performance/generate_report.py --input path/to/results.json --output path/to/report.html
+```
+
+### Output files
+
+- `performance_results.json` — Machine-readable results. Each run appends an entry with timestamp, Python version, and per-benchmark stats (iterations, min/max/avg/median in ms). Accumulates across runs for trend comparison.
+- `performance_report.html` — Interactive HTML report (Chart.js via CDN, zero dependencies). Shows bar charts for the latest run and line charts for median trends across multiple runs. Open directly in a browser.
+
+Both files are gitignored.
+
+### Benchmark categories
+
+- **SchemaGenerationPerformanceTest** — ModelSerializer and Meta-driven Serializer schema creation, including relations and validators
+- **SerializationPerformanceTest** — Single/bulk object serialization, input parsing, relation serialization
+- **CRUDPerformanceTest** — Create, list, retrieve, update, delete endpoint throughput
+- **FilterPerformanceTest** — icontains, boolean, numeric, relation, match-case, and combined filter performance
+
 ## Code Style
 
 - Ruff is used for linting and formatting (configured via pre-commit hooks)
