@@ -66,12 +66,13 @@ class API:
         """
         pass
 
-    def _add_views(self) -> None:
+    def _add_views(self) -> Router:
         """Register views decorated with @api_register."""
         for name in dir(self.__class__):
             method = getattr(self.__class__, name)
             if hasattr(method, "_api_register"):
                 method._api_register(self)
+        return self.router
 
     def add_views_to_route(self) -> Router:
         return self.api.add_router(f"{self.api_route_path}", self._add_views())
