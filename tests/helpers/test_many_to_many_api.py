@@ -1,8 +1,10 @@
 from django.test import TestCase, tag
 from asgiref.sync import async_to_sync
 from ninja_aio import NinjaAIO
+from ninja_aio.helpers.api import ManyToManyAPI
 from ninja_aio.models import ModelUtil, serializers
 from ninja_aio.schemas import M2MRelationSchema
+from ninja_aio.views import APIViewSet
 from tests.generics.request import Request
 from tests.test_app import models
 from tests.generics.views import GenericAPIViewSet
@@ -435,3 +437,31 @@ class M2MRelationSchemaDecoratorsFieldTestCase(TestCase):
         # None values should be accepted
         self.assertIsNone(schema.get_decorators)
         self.assertIsNone(schema.post_decorators)
+
+
+@tag("m2m", "coverage")
+class GetApiPathNoSlashTestCase(TestCase):
+    """Cover _get_api_path with append_slash=False (line 348 of helpers/api.py)."""
+
+    def test_get_api_path_without_trailing_slash(self):
+        """Line 348: path.rstrip('/') when append_slash=False."""
+        api = NinjaAIO(urls_namespace="test_m2m_no_slash")
+
+        class M2MViewSet(APIViewSet):
+            model = models.TestModelSerializerManyToMany
+
+        vs = M2MViewSet(api=api)
+        m2m_api = ManyToManyAPI(
+            relations=[
+                M2MRelationSchema(
+                    model=models.TestModelSerializerReverseManyToMany,
+                    related_name="test_model_serializers",
+                )
+            ],
+            view_set=vs,
+        )
+        path = m2m_api._get_api_path("relations", append_slash=False)
+        self.assertFalse(path.endswith("/"))
+
+        path_with_slash = m2m_api._get_api_path("relations", append_slash=True)
+        self.assertTrue(path_with_slash.endswith("/"))

@@ -1,9 +1,14 @@
 import warnings
 from typing import Union
+from unittest import mock
+
+from asgiref.sync import async_to_sync
+from django.db import models
 from django.test import TestCase, tag
 
 from tests.test_app.models import TestModelForeignKey, TestModelReverseForeignKey
-from ninja_aio.models import serializers
+from tests.test_app import models as app_models
+from ninja_aio.models import ModelSerializer, serializers
 
 
 class TestModelForeignKeySerializer(serializers.Serializer):
@@ -2154,3 +2159,293 @@ class ValidatorsOnSerializersTestCase(TestCase):
 
         result = serializers.BaseSerializer._apply_validators(MySchema, {})
         self.assertIs(result, MySchema)
+
+
+# ====================================================================
+#  Helper models / serializers for coverage gap tests
+# ====================================================================
+
+
+class EmptyReadModelSerializer(ModelSerializer):
+    """ModelSerializer with NO readable fields – forces edge-case paths."""
+
+    name = models.CharField(max_length=50)
+
+    class ReadSerializer:
+        fields = []
+
+    class CreateSerializer:
+        fields = ["name"]
+
+    class Meta:
+        app_label = "test_app"
+
+
+class OnlyRelationFieldsSerializer(serializers.Serializer):
+    """Serializer whose read fields are ALL relation fields (no plain fields)."""
+
+    class Meta:
+        model = TestModelForeignKey
+        schema_out = serializers.SchemaModelConfig(
+            fields=["test_model"]  # only FK, no plain fields
+        )
+
+
+class SerializerForCRUD(serializers.Serializer):
+    """Serializer with full schema config for testing CRUD utility methods."""
+
+    class Meta:
+        model = app_models.TestModel
+        schema_in = serializers.SchemaModelConfig(fields=["name", "description"])
+        schema_out = serializers.SchemaModelConfig(
+            fields=["id", "name", "description"]
+        )
+        schema_update = serializers.SchemaModelConfig(
+            optionals=[("name", str), ("description", str)]
+        )
+
+
+class ReverseRelNonModelSerializerSerializer(serializers.Serializer):
+    """Serializer with a reverse relation on a non-ModelSerializer model."""
+
+    class Meta:
+        model = TestModelReverseForeignKey
+        schema_out = serializers.SchemaModelConfig(
+            fields=["id", "name", "test_model_foreign_keys"]
+        )
+
+
+# ====================================================================
+#  Coverage gap tests – serializers.py
+# ====================================================================
+
+
+@tag("serializers", "coverage")
+class BaseSerializerDefaultMethodsTestCase(TestCase):
+    """Cover BaseSerializer._get_validators and _get_relations_as_id defaults."""
+
+    def test_base_get_validators_returns_empty_dict(self):
+        """Line 175: BaseSerializer._get_validators returns {}."""
+        result = serializers.BaseSerializer._get_validators("In")
+        self.assertEqual(result, {})
+
+    def test_base_get_relations_as_id_returns_empty_list(self):
+        """Line 378: BaseSerializer._get_relations_as_id returns []."""
+        result = serializers.BaseSerializer._get_relations_as_id()
+        self.assertEqual(result, [])
+
+
+@tag("serializers", "coverage")
+class ResolveSerializerReferenceEdgeCasesTestCase(TestCase):
+    """Cover edge cases in _resolve_serializer_reference / _resolve_string_reference."""
+
+    def setUp(self):
+        warnings.simplefilter("ignore", UserWarning)
+
+    def test_resolve_module_not_in_sys_modules(self):
+        """Line 271: module is None in _resolve_string_reference."""
+        original_module = serializers.BaseSerializer.__module__
+        try:
+            serializers.BaseSerializer.__module__ = "nonexistent.fake.module"
+            with self.assertRaises(ValueError) as cm:
+                serializers.BaseSerializer._resolve_string_reference("SomeName")
+            self.assertIn("not found in sys.modules", str(cm.exception))
+        finally:
+            serializers.BaseSerializer.__module__ = original_module
+
+    def test_resolve_direct_class_returned_as_is(self):
+        """Line 348: direct class reference returned as-is."""
+        result = serializers.BaseSerializer._resolve_serializer_reference(
+            SerializerForCRUD
+        )
+        self.assertIs(result, SerializerForCRUD)
+
+
+@tag("serializers", "coverage")
+class GetSchemaOutDataEdgeCasesTestCase(TestCase):
+    """Cover get_schema_out_data edge cases."""
+
+    def setUp(self):
+        warnings.simplefilter("ignore", UserWarning)
+
+    def test_invalid_schema_type_raises_value_error(self):
+        """Line 890: ValueError for invalid schema_type in get_schema_out_data."""
+        with self.assertRaises(ValueError) as cm:
+            serializers.BaseSerializer.get_schema_out_data("In")
+        self.assertIn("only supports 'Out' or 'Detail'", str(cm.exception))
+
+
+@tag("serializers", "coverage")
+class GenerateModelSchemaEdgeCasesTestCase(TestCase):
+    """Cover _generate_model_schema returning None for empty configs."""
+
+    def setUp(self):
+        warnings.simplefilter("ignore", UserWarning)
+
+    def test_out_schema_no_fields_returns_none(self):
+        """Line 964: Out schema with no fields returns None."""
+        schema = EmptyReadModelSerializer._generate_model_schema("Out")
+        self.assertIsNone(schema)
+
+    def test_related_schema_no_fields_returns_none(self):
+        """Line 979: Related schema with no fields/customs returns None."""
+        schema = EmptyReadModelSerializer._generate_model_schema("Related")
+        self.assertIsNone(schema)
+
+
+@tag("serializers", "coverage")
+class GetRelatedSchemaDataEdgeCasesTestCase(TestCase):
+    """Cover get_related_schema_data returning (None, None) for relation-only fields."""
+
+    def setUp(self):
+        warnings.simplefilter("ignore", UserWarning)
+
+    def test_only_relation_fields_returns_none_none(self):
+        """Line 1053: get_related_schema_data returns (None, None) when only FK fields."""
+        fields, customs = OnlyRelationFieldsSerializer.get_related_schema_data()
+        self.assertIsNone(fields)
+        self.assertIsNone(customs)
+
+
+@tag("serializers", "coverage")
+class QuerysetRequestNotImplementedTestCase(TestCase):
+    """Cover BaseSerializer.queryset_request raising NotImplementedError."""
+
+    def test_base_queryset_request_raises_not_implemented(self):
+        """Line 1146: queryset_request raises NotImplementedError."""
+        with self.assertRaises(NotImplementedError):
+            async_to_sync(serializers.BaseSerializer.queryset_request)(mock.MagicMock())
+
+
+@tag("serializers", "coverage")
+class ModelSerializerGetFieldsEdgeCasesTestCase(TestCase):
+    """Cover ModelSerializer._get_fields with unknown s_type."""
+
+    def test_unknown_s_type_returns_empty_list(self):
+        """Line 1329: _get_fields with unknown s_type returns []."""
+        result = app_models.TestModelSerializer._get_fields("nonexistent", "fields")
+        self.assertEqual(result, [])
+
+
+@tag("serializers", "coverage")
+class SerializerGetSchemaMetaEdgeCasesTestCase(TestCase):
+    """Cover Serializer._get_schema_meta default case and _get_fields unknown s_type."""
+
+    def setUp(self):
+        warnings.simplefilter("ignore", UserWarning)
+
+    def test_get_schema_meta_unknown_type_returns_none(self):
+        """Lines 1663-1664: _get_schema_meta with unknown type returns None."""
+        result = SerializerForCRUD._get_schema_meta("nonexistent")
+        self.assertIsNone(result)
+
+    def test_get_fields_unknown_s_type_returns_empty_list(self):
+        """Line 1709: _get_fields with unknown s_type returns []."""
+        result = SerializerForCRUD._get_fields("nonexistent", "fields")
+        self.assertEqual(result, [])
+
+
+@tag("serializers", "coverage")
+class SerializerCRUDMethodsTestCase(TestCase):
+    """Cover Serializer.update, model_dump, models_dump, and on_delete."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.obj = app_models.TestModel.objects.create(
+            name="Original", description="Original desc"
+        )
+
+    def setUp(self):
+        warnings.simplefilter("ignore", UserWarning)
+        self.serializer = SerializerForCRUD()
+
+    async def test_serializer_update(self):
+        """Lines 1796-1798: Serializer.update sets attrs and saves."""
+        instance = await app_models.TestModel.objects.aget(pk=self.obj.pk)
+        updated = await self.serializer.update(
+            instance, {"name": "Updated", "description": "Updated desc"}
+        )
+        self.assertEqual(updated.name, "Updated")
+        self.assertEqual(updated.description, "Updated desc")
+
+    async def test_serializer_model_dump(self):
+        """Lines 1814-1819: Serializer.model_dump serializes instance."""
+        instance = await app_models.TestModel.objects.aget(pk=self.obj.pk)
+        data = await self.serializer.model_dump(instance)
+        self.assertIn("id", data)
+        self.assertIn("name", data)
+
+    async def test_serializer_models_dump(self):
+        """Line 1837: Serializer.models_dump serializes queryset."""
+        qs = app_models.TestModel.objects.filter(pk=self.obj.pk)
+        data = await self.serializer.models_dump(qs)
+        self.assertIsInstance(data, list)
+        self.assertEqual(len(data), 1)
+
+    def test_serializer_on_delete_is_noop(self):
+        """Line 1869: on_delete is a no-op pass."""
+        self.assertIsNone(self.serializer.on_delete(self.obj))
+
+
+@tag("serializers", "coverage")
+class WarnMissingRelationSerializerTestCase(TestCase):
+    """Cover _warn_missing_relation_serializer warning (line 816)."""
+
+    @mock.patch(
+        "ninja_aio.models.serializers.settings",
+    )
+    def test_warning_emitted_for_non_model_serializer_reverse_rel(self, mock_settings):
+        """Line 816: Warning emitted for reverse relation on non-ModelSerializer model."""
+        mock_settings.NINJA_AIO_RAISE_SERIALIZATION_WARNINGS = True
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            serializers.BaseSerializer._warn_missing_relation_serializer(
+                "test_model_foreign_keys", TestModelReverseForeignKey
+            )
+            user_warnings = [x for x in w if issubclass(x.category, UserWarning)]
+            matching = [
+                x for x in user_warnings
+                if "reverse relation" in str(x.message)
+                and "relations_serializers" in str(x.message)
+            ]
+            self.assertTrue(
+                len(matching) > 0,
+                f"Expected warning about reverse relation, got: "
+                f"{[str(x.message) for x in user_warnings]}",
+            )
+
+
+@tag("serializers", "coverage")
+class BuildSchemaReverseRelNoneTestCase(TestCase):
+    """Cover _build_schema_reverse_rel returning None when schema can't be resolved."""
+
+    def setUp(self):
+        warnings.simplefilter("ignore", UserWarning)
+
+    def test_reverse_rel_returns_none_when_no_schema(self):
+        """Line 702: _build_schema_reverse_rel returns None when no schema resolvable."""
+        descriptor = getattr(
+            TestModelReverseForeignKey, "test_model_foreign_keys"
+        )
+        result = serializers.BaseSerializer._build_schema_reverse_rel(
+            "test_model_foreign_keys", descriptor, []
+        )
+        self.assertIsNone(result)
+
+
+@tag("serializers", "coverage")
+class BuildSchemaForwardRelNoReadFieldsTestCase(TestCase):
+    """Cover _build_schema_forward_rel returning None for empty ModelSerializer."""
+
+    def setUp(self):
+        warnings.simplefilter("ignore", UserWarning)
+
+    def test_forward_rel_skip_empty_model_serializer(self):
+        """Line 743: forward rel returns None when related ModelSerializer has no readable fields."""
+        mock_descriptor = mock.MagicMock()
+        mock_descriptor.field.related_model = EmptyReadModelSerializer
+
+        result = serializers.BaseSerializer._build_schema_forward_rel(
+            "some_fk", mock_descriptor, []
+        )
+        self.assertIsNone(result)

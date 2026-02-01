@@ -1,10 +1,14 @@
+from unittest import mock
+
 from ninja_aio import NinjaAIO
 from django.test import TestCase, tag
 from ninja_aio.decorators import api_get, api_post
 from ninja_aio.factory.operations import ApiMethodFactory
+from ninja_aio.views import APIView, APIViewSet
 
 from ninja_aio.decorators.views import unique_view
 from tests.test_app import schema
+from tests.test_app import models as app_models
 from tests.generics.request import Request
 from tests.generics.views import GenericAPIView
 
@@ -299,3 +303,116 @@ class ApiMethodFactoryDecoratorsTestCase(TestCase):
         """Test that custom decorators are applied to handlers."""
         # The decorator should have been called during view registration
         self.assertTrue(self.decorator_called)
+
+
+# ====================================================================
+#  Coverage gap tests – views/api.py, views/mixins.py, factory
+# ====================================================================
+
+
+@tag("view", "coverage")
+class APIViewViewsPassTestCase(TestCase):
+    """Cover APIView.views() pass (line 66)."""
+
+    def test_api_view_views_returns_none(self):
+        """Line 66: Default APIView.views() is a no-op."""
+
+        class MinimalView(APIView):
+            router_tag = "minimal"
+            api_route_path = "minimal/"
+
+        api = NinjaAIO(urls_namespace="test_minimal_view")
+        view = MinimalView(api=api)
+        result = view.views()
+        self.assertIsNone(result)
+
+
+@tag("view", "coverage")
+class APIViewSetDisableAllTestCase(TestCase):
+    """Cover APIViewSet._add_views with 'all' in disable (line 574)."""
+
+    def test_disable_all_skips_crud_views(self):
+        """Line 574: 'all' in disable skips CRUD, but still returns router."""
+        api = NinjaAIO(urls_namespace="test_disable_all")
+
+        class DisableAllViewSet(APIViewSet):
+            model = app_models.TestModelSerializer
+            disable = ["all"]
+
+        vs = DisableAllViewSet(api=api)
+        vs.add_views_to_route()
+
+        self.assertIsNotNone(vs.router)
+        route_names = [
+            route.name
+            for route in vs.router.path_operations.values()
+            for route in [route]
+        ]
+        for crud_op in ["create", "list", "retrieve", "update", "delete"]:
+            for name in route_names:
+                self.assertNotIn(
+                    crud_op,
+                    name,
+                    f"Expected no {crud_op} route when disable=['all']",
+                )
+
+
+@tag("view", "coverage")
+class RelationsFiltersFieldsTestCase(TestCase):
+    """Cover RelationFilterViewSetMixin.relations_filters_fields property (line 334)."""
+
+    def test_relations_filters_fields_returns_query_params(self):
+        """Line 334: relations_filters_fields returns list of query_param strings."""
+        from ninja_aio.views.mixins import (
+            RelationFilterViewSetMixin,
+            RelationFilterSchema,
+        )
+
+        class FilteredViewSet(RelationFilterViewSetMixin):
+            model = app_models.TestModelSerializer
+            relations_filters = [
+                RelationFilterSchema(
+                    query_param="author_id",
+                    query_filter="author__id",
+                    filter_type=(int, None),
+                ),
+                RelationFilterSchema(
+                    query_param="category_slug",
+                    query_filter="category__slug",
+                    filter_type=(str, None),
+                ),
+            ]
+
+        api = NinjaAIO(urls_namespace="test_relation_filters_fields")
+        vs = FilteredViewSet(api=api)
+        result = vs.relations_filters_fields
+        self.assertEqual(result, ["author_id", "category_slug"])
+
+
+@tag("view", "coverage")
+class BuildHandlerTestCase(TestCase):
+    """Cover _build_handler async and sync handler wrappers (lines 147, 151)."""
+
+    def test_sync_handler_invocation(self):
+        """Line 151: sync clean_handler calls original synchronously."""
+        factory = ApiMethodFactory.__new__(ApiMethodFactory)
+
+        def sync_method(self_arg, request, pk):
+            return f"sync-{pk}"
+
+        view_instance = mock.MagicMock()
+        handler = factory._build_handler(view_instance, sync_method)
+        result = handler(mock.MagicMock(), pk=42)
+        self.assertEqual(result, "sync-42")
+
+    async def test_async_handler_invocation(self):
+        """Line 147: async clean_handler awaits original."""
+        factory = ApiMethodFactory.__new__(ApiMethodFactory)
+
+        async def async_method(self_arg, request, pk):
+            return f"async-{pk}"
+
+        view_instance = mock.MagicMock()
+        handler = factory._build_handler(view_instance, async_method)
+        result = await handler(mock.MagicMock(), pk=99)
+        self.assertEqual(result, "async-99")

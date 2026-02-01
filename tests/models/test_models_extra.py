@@ -1,5 +1,8 @@
+import warnings
+
 from django.test import TestCase, tag
 from ninja_aio.models import ModelUtil, ModelSerializer
+from ninja_aio.models import serializers
 from ninja_aio.exceptions import SerializeError
 from tests.test_app import models as app_models
 from ninja_aio.schemas.helpers import QuerySchema, ModelQuerySetSchema
@@ -469,3 +472,58 @@ class ModelUtilOptimizationFallbackTestCase(TestCase):
             sel_args = m_sel.call_args[0][1:]
             # Should include 'related' from read config fallback
             self.assertIn("related", sel_args)
+
+
+# ====================================================================
+#  Coverage gap tests – models/utils.py
+# ====================================================================
+
+
+class SerializerWithQuerySet(serializers.Serializer):
+    """Serializer with a QuerySet providing prefetch_related for early return test."""
+
+    class Meta:
+        model = app_models.TestModel
+        schema_out = serializers.SchemaModelConfig(fields=["id", "name"])
+
+    class QuerySet:
+        read = ModelQuerySetSchema(prefetch_related=["some_rel"])
+
+
+class SerializerWithDetailQuerySet(serializers.Serializer):
+    """Serializer with only read QuerySet to test detail->read fallback."""
+
+    class Meta:
+        model = app_models.TestModel
+        schema_out = serializers.SchemaModelConfig(fields=["id", "name"])
+        schema_detail = serializers.SchemaModelConfig(
+            fields=["id", "name", "description"]
+        )
+
+    class QuerySet:
+        read = ModelQuerySetSchema(select_related=["fk_field"])
+
+
+@tag("model_util", "coverage")
+class ModelUtilSerializerReadOptimizationsTestCase(TestCase):
+    """Cover _get_read_optimizations detail fallback and prefetch_related early return
+    for Serializer-based (non-ModelSerializer) models."""
+
+    def setUp(self):
+        warnings.simplefilter("ignore", UserWarning)
+
+    def test_serializer_detail_falls_back_to_read(self):
+        """Line 511: detail falls back to read QuerySet config for Serializer."""
+        util = ModelUtil(
+            app_models.TestModel, serializer_class=SerializerWithDetailQuerySet
+        )
+        result = util._get_read_optimizations(is_for="detail")
+        self.assertEqual(result.select_related, ["fk_field"])
+
+    def test_get_reverse_relations_returns_early_with_prefetch(self):
+        """Line 533: get_reverse_relations returns early when prefetch_related is set."""
+        util = ModelUtil(
+            app_models.TestModel, serializer_class=SerializerWithQuerySet
+        )
+        result = util.get_reverse_relations(is_for="read")
+        self.assertEqual(result, ["some_rel"])
