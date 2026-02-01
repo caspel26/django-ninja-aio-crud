@@ -365,14 +365,6 @@ Added comprehensive tests for all new functionality:
 
 Added comprehensive performance benchmarking infrastructure for monitoring framework performance during development.
 
-**New files:**
-- `tests/performance/__init__.py` - Performance test package
-- `tests/performance/test_performance.py` - 482 lines, 19 benchmarks
-- `tests/performance/generate_report.py` - 511 lines, interactive HTML report generator
-- `tests/performance/check_regression.py` - 172 lines, regression detection
-- `run-performance.sh` - Shell script to run benchmarks
-- `.github/workflows/performance.yml` - CI workflow for automated benchmarking
-
 **Benchmark categories:**
 - Schema generation (4 tests)
 - Serialization (4 tests)
