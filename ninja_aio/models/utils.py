@@ -192,6 +192,45 @@ class ModelUtil:
         """
         return [field.name for field in self.model._meta.get_fields()]
 
+    def get_valid_input_fields(self, is_serializer: bool, serializer=None) -> set[str]:
+        """
+        Get allowlist of valid field names for input validation.
+
+        Security: Prevents field injection by returning only fields that should
+        be accepted from user input.
+
+        Parameters
+        ----------
+        is_serializer : bool
+            Whether using a ModelSerializer
+        serializer : ModelSerializer, optional
+            Serializer instance if applicable
+
+        Returns
+        -------
+        set[str]
+            Set of valid field names that can be accepted in input payloads
+        """
+        valid_fields = set(self.model_fields)
+
+        # If using a serializer, also include custom fields
+        if is_serializer and serializer:
+            # Get all custom fields defined in the serializer
+            try:
+                # Custom fields are those that are not model fields but are defined
+                # in the serializer configuration
+                for schema_type in ['create', 'update', 'read', 'detail']:
+                    try:
+                        schema_fields = serializer.get_fields(schema_type)
+                        if schema_fields:
+                            valid_fields.update(schema_fields)
+                    except (AttributeError, TypeError):
+                        continue
+            except (AttributeError, TypeError):
+                pass
+
+        return valid_fields
+
     @property
     def model_name(self) -> str:
         """
@@ -673,6 +712,7 @@ class ModelUtil:
 
         Steps
         -----
+        - Validate fields against allowlist (security).
         - Strip custom fields (retain separately).
         - Drop optional fields with None (ModelSerializer only).
         - Decode BinaryField base64 values.
@@ -692,7 +732,7 @@ class ModelUtil:
         Raises
         ------
         SerializeError
-            On base64 decoding failure.
+            On base64 decoding failure or invalid field names.
         """
         payload = data.model_dump(mode="json")
 
@@ -700,6 +740,26 @@ class ModelUtil:
             isinstance(self.model, ModelSerializerMeta) or self.with_serializer
         )
         serializer = self.serializer if self.with_serializer else self.model
+
+        # Security: Validate non-custom payload keys against model fields
+        # Custom fields are validated separately by the serializer schema
+        invalid_fields = []
+        for key in payload.keys():
+            # Skip custom fields if using serializer - they're validated by Pydantic schema
+            if is_serializer and serializer.is_custom(key):
+                continue
+            # Validate that non-custom fields exist on the model
+            if key not in self.model_fields:
+                invalid_fields.append(key)
+
+        if invalid_fields:
+            raise SerializeError(
+                {
+                    "detail": f"Invalid field names in payload: {', '.join(sorted(invalid_fields))}",
+                    "invalid_fields": list(sorted(invalid_fields)),
+                },
+                400,
+            )
 
         # Collect custom and optional fields (only if ModelSerializerMeta)
         customs: dict[str, Any] = {}
