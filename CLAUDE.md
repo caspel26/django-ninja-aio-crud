@@ -101,3 +101,96 @@ Key methods in `BaseSerializer`:
 - `_collect_validators(source_class)` — scans class for `PydanticDescriptorProxy` instances
 - `_apply_validators(schema, validators)` — creates subclass with validators attached
 - `_get_validators(schema_type)` — maps schema type to validator source class (overridden by each serializer)
+
+## Writing Release Notes / Changelogs
+
+When asked to write a changelog or release notes, generate a diff first and then produce a comprehensive `CHANGELOG.md` entry following the structure below. The changelog is kept in `CHANGELOG.md` at the project root.
+
+### How to generate the diff
+
+```sh
+# Diff between the current branch and main (for a feature branch)
+git diff main...HEAD > diff.txt
+
+# Or diff between two tags
+git diff v2.17.0..v2.18.0 > diff.txt
+
+# Or diff of all uncommitted changes (staged + unstaged)
+git diff HEAD > diff.txt
+```
+
+### Changelog structure and style guide
+
+Each release entry follows this format:
+
+```markdown
+## [vX.Y.Z] - YYYY-MM-DD
+
+---
+
+### New Features
+
+#### Feature Name
+> `path/to/file.py`
+
+Description of the feature. Include code examples when the feature introduces new API surface.
+
+---
+
+### Improvements
+
+#### Improvement Name
+> `path/to/file.py`
+
+Description of what changed and why.
+
+---
+
+### Documentation
+
+Brief summary of documentation changes. Do NOT list every CSS class or inline style change. Keep `main.py`, `extra.css`, and `mkdocs.yml` changes to one-line summaries unless they introduce user-facing functionality.
+
+---
+
+### Tests
+
+#### `TestClassName` — N tests
+
+**Category:**
+
+| Test | Verifies |
+|---|---|
+| `test_name` | What it verifies |
+
+**New test fixtures:**
+
+| File | Addition |
+|---|---|
+| `tests/test_app/models.py` | `ModelName` — brief description |
+
+---
+
+### Summary
+
+Brief paragraph summarizing the release. Then:
+
+**Key benefits:**
+- Bullet points
+
+### All Files Changed
+
+| File | Changes |
+|---|---|
+| `path/to/file` | Brief description |
+```
+
+### Key rules
+
+- **Group by category**: New Features, Improvements, Documentation, Tests, Summary
+- **Use `> path/to/file`** blockquotes to indicate which file a change belongs to
+- **Include code examples** for new user-facing API features
+- **Use tables** for listing tests, methods, file changes, and mappings
+- **Keep docs/styling/config sections brief** — one-liner summaries for CSS, `main.py` template changes, and `mkdocs.yml` config. Do not enumerate individual CSS classes or JS functions
+- **Always include "All Files Changed" table** at the bottom
+- **Always include "Summary" section** with key benefits as bullet points
+- **Separate sections with `---`** horizontal rules
