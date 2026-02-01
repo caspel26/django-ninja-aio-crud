@@ -56,7 +56,9 @@ class IcontainsFilterViewSetMixin(APIViewSet):
             **{
                 f"{key}__icontains": value
                 for key, value in filters.items()
-                if isinstance(value, str) and not self._is_special_filter(key)
+                if isinstance(value, str)
+                and not self._is_special_filter(key)
+                and self._validate_filter_field(key)
             }
         )
 
@@ -98,7 +100,9 @@ class BooleanFilterViewSetMixin(APIViewSet):
             **{
                 key: value
                 for key, value in filters.items()
-                if isinstance(value, bool) and not self._is_special_filter(key)
+                if isinstance(value, bool)
+                and not self._is_special_filter(key)
+                and self._validate_filter_field(key)
             }
         )
 
@@ -140,7 +144,9 @@ class NumericFilterViewSetMixin(APIViewSet):
             **{
                 key: value
                 for key, value in filters.items()
-                if isinstance(value, (int, float)) and not self._is_special_filter(key)
+                if isinstance(value, (int, float))
+                and not self._is_special_filter(key)
+                and self._validate_filter_field(key)
             }
         )
 
@@ -182,7 +188,9 @@ class DateFilterViewSetMixin(APIViewSet):
             **{
                 f"{key}{self._compare_attr}": value
                 for key, value in filters.items()
-                if hasattr(value, "isoformat") and not self._is_special_filter(key)
+                if hasattr(value, "isoformat")
+                and not self._is_special_filter(key)
+                and self._validate_filter_field(key)
             }
         )
 
@@ -341,7 +349,8 @@ class RelationFilterViewSetMixin(APIViewSet):
         rel_filters = {}
         for rel_filter in self.relations_filters:
             value = filters.get(rel_filter.query_param)
-            if value is not None:
+            # Validate the configured query_filter path for security
+            if value is not None and self._validate_filter_field(rel_filter.query_filter):
                 rel_filters[rel_filter.query_filter] = value
         return base_qs.filter(**rel_filters) if rel_filters else base_qs
 
@@ -406,8 +415,15 @@ class MatchCaseFilterViewSetMixin(APIViewSet):
                     filter_match.cases.true if value else filter_match.cases.false
                 )
                 lookup = case_filter.query_filter
-                if case_filter.include:
-                    base_qs = base_qs.filter(**lookup)
-                else:
-                    base_qs = base_qs.exclude(**lookup)
+                # Validate all filter fields in the lookup dictionary for security
+                validated_lookup = {
+                    k: v
+                    for k, v in lookup.items()
+                    if self._validate_filter_field(k)
+                }
+                if validated_lookup:
+                    if case_filter.include:
+                        base_qs = base_qs.filter(**validated_lookup)
+                    else:
+                        base_qs = base_qs.exclude(**validated_lookup)
         return base_qs
