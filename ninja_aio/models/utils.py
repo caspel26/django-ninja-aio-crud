@@ -94,6 +94,9 @@ class ModelUtil:
     - Stateless wrapper; safe per-request instantiation.
     """
 
+    # Performance: Class-level cache for relation discovery (model structure is static)
+    _relation_cache: dict[tuple[type, str, str], list[str]] = {}
+
     def __init__(
         self, model: type["ModelSerializer"] | models.Model, serializer_class=None
     ):
@@ -557,6 +560,9 @@ class ModelUtil:
         """
         Discover reverse relation names for safe prefetching.
 
+        Performance: Results are cached per (model, serializer_class, is_for) tuple
+        since model structure is static.
+
         Parameters
         ----------
         is_for : Literal["read", "detail"]
@@ -567,9 +573,17 @@ class ModelUtil:
         list[str]
             Relation attribute names.
         """
+        # Check cache first (performance optimization)
+        cache_key = (self.model, str(self.serializer_class), is_for)
+        if cache_key in self._relation_cache:
+            return self._relation_cache[cache_key].copy()
+
         reverse_rels = self._get_read_optimizations(is_for).prefetch_related.copy()
         if reverse_rels:
+            # Cache and return
+            self._relation_cache[cache_key] = reverse_rels
             return reverse_rels
+
         serializable_fields = self._get_serializable_field_names(is_for)
         for f in serializable_fields:
             field_obj = getattr(self.model, f)
@@ -581,6 +595,9 @@ class ModelUtil:
                 continue
             if isinstance(field_obj, ReverseOneToOneDescriptor):
                 reverse_rels.append(field_obj.related.name)
+
+        # Cache the result
+        self._relation_cache[cache_key] = reverse_rels
         return reverse_rels
 
     def get_select_relateds(
@@ -588,6 +605,9 @@ class ModelUtil:
     ) -> list[str]:
         """
         Discover forward relation names for safe select_related.
+
+        Performance: Results are cached per (model, serializer_class, is_for) tuple
+        since model structure is static.
 
         Parameters
         ----------
@@ -599,9 +619,17 @@ class ModelUtil:
         list[str]
             Relation attribute names.
         """
+        # Check cache first (performance optimization)
+        cache_key = (self.model, str(self.serializer_class) + "_select", is_for)
+        if cache_key in self._relation_cache:
+            return self._relation_cache[cache_key].copy()
+
         select_rels = self._get_read_optimizations(is_for).select_related.copy()
         if select_rels:
+            # Cache and return
+            self._relation_cache[cache_key] = select_rels
             return select_rels
+
         serializable_fields = self._get_serializable_field_names(is_for)
         for f in serializable_fields:
             field_obj = getattr(self.model, f)
@@ -610,6 +638,9 @@ class ModelUtil:
                 continue
             if isinstance(field_obj, ForwardManyToOneDescriptor):
                 select_rels.append(f)
+
+        # Cache the result
+        self._relation_cache[cache_key] = select_rels
         return select_rels
 
     async def _get_field(self, k: str):
@@ -784,13 +815,24 @@ class ModelUtil:
                 or (serializer.is_optional(k) and v is None)
             }
 
-        # Process payload fields
-        for k, v in payload.items():
-            if k in skip_keys:
-                continue
-            field_obj = await self._get_field(k)
-            self._decode_binary(payload, k, v, field_obj)
-            await self._resolve_fk(request, payload, k, v, field_obj)
+        # Process payload fields - gather field objects in parallel for better performance
+        fields_to_process = [(k, v) for k, v in payload.items() if k not in skip_keys]
+
+        # Fetch all field objects in parallel
+        if fields_to_process:
+            field_tasks = [self._get_field(k) for k, _ in fields_to_process]
+            field_objs = await asyncio.gather(*field_tasks)
+
+            # Decode binary fields (synchronous, must be sequential)
+            for (k, v), field_obj in zip(fields_to_process, field_objs):
+                self._decode_binary(payload, k, v, field_obj)
+
+            # Resolve all FK fields in parallel
+            fk_tasks = [
+                self._resolve_fk(request, payload, k, v, field_obj)
+                for (k, v), field_obj in zip(fields_to_process, field_objs)
+            ]
+            await asyncio.gather(*fk_tasks)
 
         # Preserve original exclusion semantics (customs if present else optionals)
         exclude_keys = customs.keys() or optionals

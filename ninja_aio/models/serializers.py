@@ -12,6 +12,7 @@ from typing import (
 import warnings
 import sys
 import threading
+from functools import lru_cache
 
 from django.conf import settings
 from ninja import Schema
@@ -1145,9 +1146,12 @@ class BaseSerializer:
         return non_relation_fields, customs
 
     @classmethod
+    @lru_cache(maxsize=128)
     def generate_read_s(cls, depth: int = 1) -> Schema:
         """
         Generate the read (Out) schema for list responses.
+
+        Performance: Results are cached per (class, depth) combination.
 
         Parameters
         ----------
@@ -1162,12 +1166,15 @@ class BaseSerializer:
         return cls._generate_model_schema("Out", depth)
 
     @classmethod
+    @lru_cache(maxsize=128)
     def generate_detail_s(cls, depth: int = 1) -> Schema:
         """
         Generate the detail (single-object) read schema.
 
         Falls back to the standard read schema if no detail-specific
         configuration is defined.
+
+        Performance: Results are cached per (class, depth) combination.
 
         Parameters
         ----------
@@ -1182,9 +1189,12 @@ class BaseSerializer:
         return cls._generate_model_schema("Detail", depth) or cls.generate_read_s(depth)
 
     @classmethod
+    @lru_cache(maxsize=128)
     def generate_create_s(cls) -> Schema:
         """
         Generate the create (In) schema for input validation.
+
+        Performance: Results are cached per class.
 
         Returns
         -------
@@ -1194,9 +1204,12 @@ class BaseSerializer:
         return cls._generate_model_schema("In")
 
     @classmethod
+    @lru_cache(maxsize=128)
     def generate_update_s(cls) -> Schema:
         """
         Generate the update (Patch) schema for partial updates.
+
+        Performance: Results are cached per class.
 
         Returns
         -------
@@ -1206,12 +1219,15 @@ class BaseSerializer:
         return cls._generate_model_schema("Patch")
 
     @classmethod
+    @lru_cache(maxsize=128)
     def generate_related_s(cls) -> Schema:
         """
         Generate the related (nested) schema for embedding in parent schemas.
 
         Includes only non-relational model fields and custom fields, preventing
         infinite nesting of related objects.
+
+        Performance: Results are cached per class.
 
         Returns
         -------
