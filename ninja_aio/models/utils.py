@@ -629,6 +629,9 @@ class ModelUtil:
         """Resolve foreign key ID to model instance in place."""
         if not isinstance(field_obj, models.ForeignKey):
             return
+        if v is None:
+            # None is valid for nullable FKs, leave as is
+            return
         rel_util = ModelUtil(field_obj.related_model)
         rel = await rel_util.get_object(request, v, with_qs_request=False)
         payload[k] = rel
@@ -638,6 +641,52 @@ class ModelUtil:
     ) -> dict:
         """Convert model instance to dict using Pydantic schema."""
         return (await sync_to_async(schema.from_orm)(obj)).model_dump()
+
+    async def _prefetch_reverse_relations_on_instance(
+        self,
+        obj: type["ModelSerializer"] | models.Model,
+        is_for: Literal["read", "detail"] = "read",
+    ) -> type["ModelSerializer"] | models.Model:
+        """
+        Prefetch reverse relations on an existing instance.
+
+        This is used to load reverse relations (reverse FK, reverse O2O, M2M)
+        on an instance that already has forward FKs loaded.
+
+        Parameters
+        ----------
+        obj : ModelSerializer | Model
+            Instance to prefetch relations on.
+        is_for : Literal["read", "detail"]
+            Purpose of the query, determines which relations to prefetch.
+
+        Returns
+        -------
+        ModelSerializer | Model
+            The same instance with reverse relations prefetched.
+
+        Notes
+        -----
+        When reverse relations exist, we must refetch the instance to apply
+        prefetch_related. To avoid losing forward FK data, we also apply
+        select_related for forward FKs that should already be in memory.
+        """
+        reverse_rels = self.get_reverse_relations(is_for)
+        if not reverse_rels:
+            # No reverse relations to load - return original instance with FK cache intact
+            return obj
+
+        # Must refetch to apply prefetch_related
+        # Also include select_related to keep forward FKs loaded
+        forward_rels = self.get_select_relateds(is_for)
+        pk_filter = {self.model_pk_name: obj.pk}
+        queryset = self.model.objects.filter(**pk_filter)
+
+        if forward_rels:
+            queryset = queryset.select_related(*forward_rels)
+        queryset = queryset.prefetch_related(*reverse_rels)
+
+        return await queryset.aget()
 
     def _validate_read_params(self, request: HttpRequest, query_data: QuerySchema) -> None:
         """Validate required parameters for read operations."""
@@ -881,12 +930,14 @@ class ModelUtil:
             Serialized created object.
         """
         payload, customs = await self.parse_input_data(request, data)
-        pk = (
-            (await self.model.objects.acreate(**payload)).pk
+        # Create object and keep the full instance (FK instances already attached from parse_input_data)
+        obj = (
+            await self.model.objects.acreate(**payload)
             if not self.with_serializer
-            else (await self.serializer.create(payload)).pk
+            else await self.serializer.create(payload)
         )
-        obj = await self.get_object(request, pk)
+        # Only prefetch reverse relations (forward FKs already loaded)
+        obj = await self._prefetch_reverse_relations_on_instance(obj, is_for="read")
         if isinstance(self.model, ModelSerializerMeta):
             await asyncio.gather(obj.custom_actions(customs), obj.post_create())
         if self.with_serializer:
@@ -1082,7 +1133,7 @@ class ModelUtil:
         dict
             Serialized updated object.
         """
-        obj = await self.get_object(request, pk)
+        obj = await self.get_object(request, pk, is_for="read")
         payload, customs = await self.parse_input_data(request, data)
         for k, v in payload.items():
             if v is not None:
@@ -1094,7 +1145,9 @@ class ModelUtil:
             await self.serializer.save(obj)
         else:
             await obj.asave()
-        updated_object = await self.get_object(request, pk)
+        # FK instances from parse_input_data are already attached to obj
+        # Only refresh reverse relations since they might have changed
+        updated_object = await self._prefetch_reverse_relations_on_instance(obj, is_for="read")
         return await self.read_s(obj_schema, request, updated_object)
 
     async def delete_s(self, request: HttpRequest, pk: int | str):
