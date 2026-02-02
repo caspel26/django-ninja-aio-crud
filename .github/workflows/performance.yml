@@ -2,9 +2,9 @@ name: Performance
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 permissions:
   contents: write
@@ -18,11 +18,13 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: '3.14'
+          python-version: "3.14"
       - name: Install Flit
         run: pip install flit
       - name: Install Dependencies
         run: flit install --symlink
+      - name: Install Comparison Dependencies
+        run: pip install -e ".[comparison]"
       # Download previous results from gh-pages to accumulate history
       - name: Download Previous Performance Results
         continue-on-error: true
@@ -37,6 +39,19 @@ jobs:
             echo "✅ Loaded $(grep -c 'timestamp' performance_results.json) previous runs"
           fi
 
+      - name: Download Previous Comparison Results
+        continue-on-error: true
+        run: |
+          curl -f -o comparison_results.json.previous \
+            https://caspel26.github.io/django-ninja-aio-crud/comparison/comparison_results.json || \
+            echo "No previous comparison results found, starting fresh"
+
+          # If previous results exist, use them as the base
+          if [ -f comparison_results.json.previous ]; then
+            mv comparison_results.json.previous comparison_results.json
+            echo "✅ Loaded previous comparison runs"
+          fi
+
       - name: Run Performance Benchmarks
         run: |
           python -m django test tests.performance --settings=tests.test_settings --tag=performance -v2
@@ -44,10 +59,19 @@ jobs:
       - name: Generate Performance Report
         run: python tests/performance/generate_report.py
 
+      - name: Run Comparison Benchmarks
+        run: |
+          python -m django test tests.comparison --settings=tests.test_settings --tag=comparison -v2
+
+      - name: Generate Comparison Reports
+        run: |
+          python tests/comparison/generate_report.py
+          python tests/comparison/generate_markdown.py
+
       # Download baseline from the latest main branch run (for regression check)
       - name: Download Baseline Performance Results
         if: github.event_name == 'pull_request' || github.ref != 'refs/heads/main'
-        uses: dawidd6/action-download-artifact@v6
+        uses: dawidd6/action-download-artifact@bf251b5aa9c2f7eeb574a96ee720e24f801b7c11 # v6
         continue-on-error: true
         with:
           workflow: performance.yml
@@ -77,6 +101,9 @@ jobs:
           path: |
             performance_report.html
             performance_results.json
+            comparison_report.html
+            comparison_results.json
+            docs/comparison.md
 
       # Deploy to GitHub Pages (main branch only)
       - name: Deploy Performance Report to GitHub Pages
@@ -88,8 +115,23 @@ jobs:
           destination_dir: performance
           keep_files: true
           publish_branch: gh-pages
-          user_name: 'github-actions[bot]'
-          user_email: 'github-actions[bot]@users.noreply.github.com'
-          commit_message: 'Deploy performance report'
+          user_name: "github-actions[bot]"
+          user_email: "github-actions[bot]@users.noreply.github.com"
+          commit_message: "Deploy performance report"
           enable_jekyll: false
-          exclude_assets: '.git*,*.py,*.pyc,ninja_aio/**,tests/**,docs/**,.venv/**,*.toml,*.cfg,*.txt,*.sh,*.md'
+          exclude_assets: ".git*,*.py,*.pyc,ninja_aio/**,tests/**,docs/**,.venv/**,*.toml,*.cfg,*.txt,*.sh,*.md"
+
+      - name: Deploy Comparison Report to GitHub Pages
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./
+          destination_dir: comparison
+          keep_files: true
+          publish_branch: gh-pages
+          user_name: "github-actions[bot]"
+          user_email: "github-actions[bot]@users.noreply.github.com"
+          commit_message: "Deploy comparison report"
+          enable_jekyll: false
+          exclude_assets: ".git*,*.py,*.pyc,ninja_aio/**,tests/**,docs/**,.venv/**,*.toml,*.cfg,*.txt,*.sh,*.md"

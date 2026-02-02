@@ -1,14 +1,28 @@
 # :material-eye: API View
 
-The `APIView` class provides a base for creating simple API endpoints with custom views.
+The `APIView` class provides a base for creating custom API endpoints outside of CRUD operations.
 
-## :material-format-list-bulleted: Overview
+<div class="grid cards" markdown>
 
-`APIView` is a lightweight wrapper around Django Ninja's `Router` that provides:
+-   :material-tag:{ .lg .middle } **Organized Routing**
 
-- :material-tag: Organized routing with tags
-- :material-shield-lock: Custom authentication configuration
-- :material-alert-circle: Error handling with standard HTTP status codes
+    ---
+
+    Automatic tag grouping in OpenAPI docs
+
+-   :material-shield-lock:{ .lg .middle } **Auth Support**
+
+    ---
+
+    Per-view and per-endpoint authentication
+
+-   :material-lightning-bolt:{ .lg .middle } **Async First**
+
+    ---
+
+    Native async with automatic sync wrapping
+
+</div>
 
 ---
 
@@ -22,8 +36,6 @@ class APIView:
     auth: list | None = NOT_SET
 ```
 
-## :material-format-list-bulleted-type: Attributes
-
 | Attribute        | Type           | Description                                     |
 | ---------------- | -------------- | ----------------------------------------------- |
 | `api`            | `NinjaAPI`     | The NinjaAPI instance to register routes        |
@@ -33,168 +45,112 @@ class APIView:
 
 ---
 
-## :material-function-variant: Methods
+## :material-function-variant: Creating Endpoints
 
-### Recommended: decorator-based endpoints
+### Recommended: `@api.view()` with decorators
 
-Prefer class method decorators to define non-CRUD endpoints. Decorators lazily bind instance methods to the router and automatically remove `self` from the OpenAPI signature while preserving type hints.
+Use class method decorators to define endpoints. Decorators lazily bind instance methods to the router and automatically remove `self` from the OpenAPI signature while preserving type hints.
+
+```python
+from ninja_aio import NinjaAIO
+from ninja_aio.views import APIView
+from ninja_aio.decorators import api_get, api_post
+from ninja import Schema
+
+api = NinjaAIO(title="My API")
+
+class StatsSchema(Schema):
+    total: int
+    active: int
+
+@api.view(prefix="/analytics", tags=["Analytics"])
+class AnalyticsView(APIView):
+    @api_get("/dashboard", response=StatsSchema)
+    async def dashboard(self, request):
+        return {"total": 1000, "active": 750}
+
+    @api_post("/track")
+    async def track_event(self, request, event: str):
+        return {"tracked": event}
+```
 
 Available decorators (from `ninja_aio.decorators`):
 
-- `@api_get(path, ...)`
-- `@api_post(path, ...)`
-- `@api_put(path, ...)`
-- `@api_patch(path, ...)`
-- `@api_delete(path, ...)`
-- `@api_options(path, ...)`
-- `@api_head(path, ...)`
+| Decorator | HTTP Method |
+|---|---|
+| `@api_get(path, ...)` | GET |
+| `@api_post(path, ...)` | POST |
+| `@api_put(path, ...)` | PUT |
+| `@api_patch(path, ...)` | PATCH |
+| `@api_delete(path, ...)` | DELETE |
+| `@api_options(path, ...)` | OPTIONS |
+| `@api_head(path, ...)` | HEAD |
 
-Example:
-
-```python
-from ninja_aio import NinjaAIO
-from ninja_aio.views import APIView
-from ninja_aio.decorators import api_get, api_post
-from ninja import Schema
-
-api = NinjaAIO(title="My API")
-
-class StatsSchema(Schema):
-    total: int
-    active: int
-
-@api.view(prefix="/analytics", tags=["Analytics"])
-class AnalyticsView(APIView):
-    @api_get("/dashboard", response=StatsSchema)
-    async def dashboard(self, request):
-        return {"total": 1000, "active": 750}
-
-    @api_post("/track")
-    async def track_event(self, request, event: str):
-        return {"tracked": event}
-```
-
-Notes:
-
-- Decorators support per-endpoint `auth`, `response`, `tags`, `summary`, `description`, throttling, and OpenAPI extras.
-- Sync methods run via `sync_to_async` automatically.
-- `self` is excluded from the exposed signature; parameter type hints are preserved.
-
-### Legacy: `views()` (still supported)
-
-You can still override `views()` to define endpoints imperatively.
-
-**Example - Basic Views:**
-
-```python
-class UserAPIView(APIView):
-    api = api_instance
-    router_tag = "Users"
-    api_route_path = "/users"
-
-    def views(self):
-        @self.router.get("/stats")
-        async def get_stats(request):
-            return {"total_users": 100}
-
-        @self.router.post("/bulk-create")
-        async def bulk_create(request, data: list[UserSchema]):
-            # bulk creation logic
-            return {"created": len(data)}
-```
-
-**Example - With Authentication:**
-
-```python
-class ProtectedAPIView(APIView):
-    api = api_instance
-    router_tag = "Protected"
-    api_route_path = "/protected"
-    auth = [JWTAuth()]
-
-    def views(self):
-        # Authenticated endpoint
-        @self.router.get("/private", auth=self.auth)
-        async def private_data(request):
-            return {"user_id": request.auth.user_id}
-
-        # Public endpoint
-        @self.router.get("/public")
-        async def public_data(request):
-            return {"message": "This is public"}
-```
-
-### `add_views_to_route()`
-
-Registers all defined views to the API instance.
-
-**Returns:** The router instance
-
-**Note:** When using `@api.view(prefix="/path", tags=[...])`, the router is mounted automatically and decorator-based endpoints are registered lazily on instantiation; manual registration via `add_views_to_route()` is not required.
+!!! tip "Decorator features"
+    Decorators support per-endpoint `auth`, `response`, `tags`, `summary`, `description`, throttling, and OpenAPI extras. Sync methods are wrapped with `sync_to_async` automatically.
 
 ---
 
-## :material-code-braces: Complete Example
+### Alternative: `views()` method (legacy)
 
-**Recommended:**
+You can override `views()` to define endpoints imperatively. This approach still works but decorator-based endpoints are preferred.
 
-```python
-from ninja_aio import NinjaAIO
-from ninja_aio.views import APIView
-from ninja_aio.decorators import api_get, api_post
-from ninja import Schema
+=== "Basic views"
 
-api = NinjaAIO(title="My API")
+    ```python
+    class UserAPIView(APIView):
+        api = api_instance
+        router_tag = "Users"
+        api_route_path = "/users"
 
-class StatsSchema(Schema):
-    total: int
-    active: int
+        def views(self):
+            @self.router.get("/stats")
+            async def get_stats(request):
+                return {"total_users": 100}
 
-@api.view(prefix="/analytics", tags=["Analytics"])
-class AnalyticsView(APIView):
-    @api_get("/dashboard", response=StatsSchema)
-    async def dashboard(self, request):
-        return {"total": 1000, "active": 750}
+            @self.router.post("/bulk-create")
+            async def bulk_create(request, data: list[UserSchema]):
+                return {"created": len(data)}
+    ```
 
-    @api_post("/track")
-    async def track_event(self, request, event: str):
-        return {"tracked": event}
-```
+=== "With authentication"
 
-**Alternative implementation:**
+    ```python
+    class ProtectedAPIView(APIView):
+        api = api_instance
+        router_tag = "Protected"
+        api_route_path = "/protected"
+        auth = [JWTAuth()]
 
-```python
-api = NinjaAIO(title="My API")
+        def views(self):
+            @self.router.get("/private", auth=self.auth)
+            async def private_data(request):
+                return {"user_id": request.auth.user_id}
 
-class AnalyticsView(APIView):
-    api = api
-    router_tag = "Analytics"
-    api_route_path = "/analytics"
+            @self.router.get("/public")
+            async def public_data(request):
+                return {"message": "This is public"}
+    ```
 
-    def views(self):
-        @self.router.get("/dashboard", response=StatsSchema)
-        async def dashboard(request):
-            return {"total": 1000, "active": 750}
+!!! note "Manual registration"
+    When using `@api.view(prefix="/path", tags=[...])`, the router is mounted automatically. With the legacy approach, call `add_views_to_route()` to register endpoints manually.
 
-        @self.router.post("/track")
-        async def track_event(request, event: str):
-            return {"tracked": event}
+---
 
-AnalyticsView().add_views_to_route()
-```
+## :material-information: When to Use APIView vs APIViewSet
 
-## Notes
+| Use Case | APIView | APIViewSet |
+|---|---|---|
+| Custom analytics endpoints | :material-check: | |
+| Health checks, webhooks | :material-check: | |
+| Full CRUD for a model | | :material-check: |
+| Model with filtering + pagination | | :material-check: |
+| Mix of CRUD + custom endpoints | | :material-check: (add custom via decorators) |
 
-- Use `APIView` for simple, non-CRUD endpoints
-- For CRUD operations, use [`APIViewSet`](api_view_set.md)
-- All views are async-compatible
-- Standard error codes are available via `self.error_codes`
-- Decorator-based endpoints are preferred for clarity and better OpenAPI signatures.
+!!! tip
+    Use `APIView` for non-CRUD endpoints. For CRUD operations, use [`APIViewSet`](api_view_set.md) which generates all endpoints automatically and still supports custom endpoints via decorators.
 
-Note:
-
-- Path schema PK type is inferred from the model’s primary key for ViewSets.
-- NinjaAIO remains API-compatible; global CSRF argument is no longer required in initialization.
+---
 
 ## :material-bookshelf: See Also
 
@@ -204,12 +160,24 @@ Note:
 
     ---
 
-    [:octicons-arrow-right-24: Full CRUD operations](api_view_set.md)
+    Full CRUD operations with auto-generated endpoints
+
+    [:octicons-arrow-right-24: Learn more](api_view_set.md)
+
+-   :material-decagram:{ .lg .middle } **Decorators**
+
+    ---
+
+    View and operation decorators for custom endpoints
+
+    [:octicons-arrow-right-24: Learn more](decorators.md)
 
 -   :material-shield-lock:{ .lg .middle } **Authentication**
 
     ---
 
-    [:octicons-arrow-right-24: Authentication setup](../authentication.md)
+    JWT and custom auth configuration
+
+    [:octicons-arrow-right-24: Learn more](../authentication.md)
 
 </div>

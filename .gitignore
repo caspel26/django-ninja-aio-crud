@@ -295,3 +295,5 @@ django-test/*
 test_api
 performance_results.json
 performance_report.html
+comparison_results.json
+comparison_report.html

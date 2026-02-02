@@ -207,6 +207,57 @@ Exit codes:
 
 **Full documentation:** See `tests/performance/tools/README.md` for detailed usage of all tools.
 
+## Framework Comparison Benchmarks
+
+Framework comparison benchmarks live in `tests/comparison/` and measure django-ninja-aio-crud performance against other popular Python REST frameworks (Django Ninja, ADRF, FastAPI).
+
+Run comparison benchmarks and generate the HTML report in one step:
+
+```sh
+. ./.venv/bin/activate && ./run-comparison.sh
+```
+
+Or run components separately:
+
+```sh
+# Install comparison dependencies
+pip install -e ".[comparison]"
+
+# Run comparison benchmarks
+. ./.venv/bin/activate && python -m django test tests.comparison --settings=tests.test_settings --tag=comparison -v2
+
+# Generate comparison report
+python tests/comparison/generate_report.py
+```
+
+### Output files
+
+- `comparison_results.json` — Machine-readable results with timing statistics for each framework and operation
+- `comparison_report.html` — Interactive HTML report with bar charts comparing framework performance
+
+Both files are gitignored.
+
+### Compared frameworks
+
+- **django-ninja-aio-crud** (this framework) — Native async CRUD automation
+- **Django Ninja** (pure) — Async-ready but manual endpoint definition
+- **ADRF** — Async Django REST Framework with native async support
+- **FastAPI** — Native async, Starlette-based
+
+### Operations tested
+
+- **create** — Creating a single item via POST
+- **list** — Listing items with pagination (20 items)
+- **retrieve** — Fetching a single item by ID
+- **update** — Updating a single item via PATCH
+- **delete** — Deleting a single item by ID
+- **filter** — Applying multiple filters to list query
+- **relation_serialization** — Serializing items with FK relations (select_related)
+- **bulk_serialization_100** — Serializing 100 items with pagination
+- **bulk_serialization_500** — Serializing 500 items to test larger dataset performance
+
+All frameworks use the same Django models and database, ensuring comparison focuses on framework overhead rather than I/O performance.
+
 ## Code Style
 
 - Ruff is used for linting and formatting (configured via pre-commit hooks)
