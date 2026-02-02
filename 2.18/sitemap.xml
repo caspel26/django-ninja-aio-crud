@@ -9,7 +9,15 @@
          <lastmod>2026-02-02</lastmod>
     </url>
     <url>
+         <loc>https://django-ninja-aio.com/2.18/comparison/</loc>
+         <lastmod>2026-02-02</lastmod>
+    </url>
+    <url>
          <loc>https://django-ninja-aio.com/2.18/contributing/</loc>
+         <lastmod>2026-02-02</lastmod>
+    </url>
+    <url>
+         <loc>https://django-ninja-aio.com/2.18/deployment/</loc>
          <lastmod>2026-02-02</lastmod>
     </url>
     <url>
@@ -18,6 +26,10 @@
     </url>
     <url>
          <loc>https://django-ninja-aio.com/2.18/release_notes/</loc>
+         <lastmod>2026-02-02</lastmod>
+    </url>
+    <url>
+         <loc>https://django-ninja-aio.com/2.18/troubleshooting/</loc>
          <lastmod>2026-02-02</lastmod>
     </url>
     <url>

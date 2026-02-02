@@ -13,10 +13,10 @@
         <link rel="canonical" href="https://django-ninja-aio.com/2.18/performance/">
       
       
-        <link rel="prev" href="../auth/">
+        <link rel="prev" href="../comparison/">
       
       
-        <link rel="next" href="../contributing/">
+        <link rel="next" href="../deployment/">
       
       
       <link rel="icon" href="../images/favicon.ico">
@@ -24,7 +24,7 @@
     
     
       
-        <title>Performance Benchmarks - Django Ninja Aio CRUD</title>
+        <title>Performance - Django Ninja Aio CRUD</title>
       
     
     
@@ -149,7 +149,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Performance Benchmarks
+              Performance
             
           </span>
         </div>
@@ -395,14 +395,55 @@
     
   
   
-    <li class="md-tabs__item md-tabs__item--active">
-      <a href="./" class="md-tabs__link">
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../comparison/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Benchmarks
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../deployment/" class="md-tabs__link">
         
   
   
     
   
-  Performance Benchmarks
+  Deployment
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../troubleshooting/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Troubleshooting
 
       </a>
     </li>
@@ -1353,6 +1394,83 @@
   
   
   
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    Benchmarks
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Benchmarks
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Framework Comparison
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
     <li class="md-nav__item md-nav__item--active">
       
       <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
@@ -1366,7 +1484,7 @@
   
   
   <span class="md-ellipsis">
-    Performance Benchmarks
+    Performance
     
   </span>
   
@@ -1379,7 +1497,7 @@
   
   
   <span class="md-ellipsis">
-    Performance Benchmarks
+    Performance
     
   </span>
   
@@ -1527,10 +1645,71 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#framework-comparison" class="md-nav__link">
+    <span class="md-ellipsis">
+      Framework Comparison
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
       
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Deployment
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Troubleshooting
+    
+  </span>
+  
+
+      </a>
     </li>
   
 
@@ -1601,7 +1780,7 @@
 <h1 id="performance-benchmarks">Performance Benchmarks<a class="headerlink" href="#performance-benchmarks" title="Permanent link">&para;</a></h1>
 <p><a href="https://github.com/caspel26/django-ninja-aio-crud/actions/workflows/performance.yml"><img alt="Performance" src="https://github.com/caspel26/django-ninja-aio-crud/actions/workflows/performance.yml/badge.svg" /></a></p>
 <h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
-<p>django-ninja-aio-crud includes an automated performance benchmark suite that measures the framework's throughput across schema generation, serialization, CRUD endpoints, and filter processing.</p>
+<p>Django Ninja AIO includes an automated performance benchmark suite that measures the framework's throughput across schema generation, serialization, CRUD endpoints, and filter processing.</p>
 <p>Benchmarks run automatically on every push to <code>main</code> and on every pull request, ensuring that performance regressions are caught early.</p>
 <hr />
 <h2 id="benchmark-categories">Benchmark Categories<a class="headerlink" href="#benchmark-categories" title="Permanent link">&para;</a></h2>
@@ -1720,6 +1899,15 @@
 <p class="admonition-title">CI vs local results</p>
 <p>Absolute timings on CI runners may differ from your local machine. Focus on <strong>relative changes</strong> between runs rather than absolute values.</p>
 </div>
+<hr />
+<h2 id="framework-comparison">Framework Comparison<a class="headerlink" href="#framework-comparison" title="Permanent link">&para;</a></h2>
+<p>Wondering how Django Ninja AIO compares to other Python REST frameworks? We provide comprehensive benchmarks comparing performance against Django Ninja, ADRF (Async DRF), and FastAPI.</p>
+<p>The comparison focuses on <strong>complex async operations</strong> - particularly reverse FK relations and M2M serialization - where Django Ninja AIO excels by automating what's notoriously difficult in async Django.</p>
+<div class="cta-buttons">
+<p><a class="md-button md-button--primary" href="../comparison/">View Full Comparison <span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9 17H7v-7h2zm4 0h-2V7h2zm4 0h-2v-4h2zm2 2H5V5h14v14.1M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2"/></svg></span></a></p>
+</div>
+<p>The comparison page includes detailed results, interactive charts, key insights, and links to the live HTML report.</p>
+<hr />
 
 
 
@@ -1759,7 +1947,7 @@
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../auth/" class="md-footer__link md-footer__link--prev" aria-label="Previous: JWT &amp; AsyncJwtBearer">
+          <a href="../comparison/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Framework Comparison">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -1769,20 +1957,20 @@
                 Previous
               </span>
               <div class="md-ellipsis">
-                JWT & AsyncJwtBearer
+                Framework Comparison
               </div>
             </div>
           </a>
         
         
           
-          <a href="../contributing/" class="md-footer__link md-footer__link--next" aria-label="Next: Contributing">
+          <a href="../deployment/" class="md-footer__link md-footer__link--next" aria-label="Next: Deployment">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Contributing
+                Deployment
               </div>
             </div>
             <div class="md-footer__button md-icon">
