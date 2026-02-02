@@ -33,6 +33,11 @@ description-file = "README.md"
 requires-python = ">=3.10, <3.15"
 
 [tool.flit.metadata.requires-extra]
+dev = [
+    "coverage",
+    "pre-commit",
+    "ruff"
+]
 test = [
     "coverage"
 ]
