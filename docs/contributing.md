@@ -56,6 +56,8 @@ source .venv/bin/activate  # or .venv\Scripts\activate on Windows
 pip install -e ".[dev]"
 ```
 
+This installs the package in editable mode with dev extras (`coverage`, `pre-commit`, `ruff`).
+
 ### 2. Install pre-commit hooks
 
 ```bash
