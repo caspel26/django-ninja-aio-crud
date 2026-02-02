@@ -65,26 +65,46 @@ To run tests without coverage:
 
 5. **Run performance benchmarks** to detect performance regressions:
    ```sh
-   . ./.venv/bin/activate && ./run-performance.sh
+   # Run tests 5 times for statistical reliability
+   . ./.venv/bin/activate
+   for i in 1 2 3 4 5; do
+     python -m django test tests.performance --settings=tests.test_settings --tag=performance -v0
+   done
    ```
 
-6. **Check for performance regressions:**
-   - Compare the latest run with previous runs in `performance_results.json`
-   - If regressions are detected (>10% slowdown in any benchmark):
-     - Investigate the root cause by analyzing the code path being tested
-     - Determine if the regression is justified by the change (e.g., added functionality that inherently costs more)
-     - If the regression is NOT justified:
-       - Identify the bottleneck using profiling tools if needed
-       - Optimize the implementation to restore performance
-       - Re-run benchmarks to verify the fix
-     - If the regression IS justified:
-       - Document why the performance trade-off is necessary
-       - Consider if the benefits outweigh the performance cost
-       - Update the changelog to note the performance impact if significant
+6. **Check for performance regressions using statistical analysis:**
+   ```sh
+   python tests/performance/tools/detect_regression.py
+   ```
+
+   This tool uses statistical methods to distinguish real regressions from noise:
+   - Compares last N runs against baseline runs
+   - Uses percentage thresholds AND statistical significance (σ)
+   - Filters out microsecond-level noise
+   - Exit code 0 = no regressions, 1 = regressions detected
+
+   **If regressions are detected:**
+   - Review the output to see which benchmarks regressed
+   - Investigate the root cause by analyzing the code path being tested
+   - Determine if the regression is justified by the change (e.g., added functionality that inherently costs more)
+   - If the regression is NOT justified:
+     - Identify the bottleneck using profiling tools if needed
+     - Optimize the implementation to restore performance
+     - Re-run benchmarks to verify the fix
+   - If the regression IS justified:
+     - Document why the performance trade-off is necessary
+     - Consider if the benefits outweigh the performance cost
+     - Update the changelog to note the performance impact if significant
 
 7. **Analyze unexpected performance changes:**
-   - If tests that should NOT be affected by your changes show regressions, run benchmarks multiple times to rule out noise
+   - If tests that should NOT be affected by your changes show regressions:
+     ```sh
+     # Check benchmark stability
+     python tests/performance/tools/analyze_variance.py
+     ```
+   - If Coefficient of Variation (CV) is high (>15%), it's likely noise
    - Check for system-level factors (CPU load, memory pressure, background processes)
+   - Run more iterations to improve statistical confidence
    - Investigate potential second-order effects (import overhead, cache invalidation, JIT compiler behavior)
 
 This protocol applies to ALL code changes, including:
@@ -135,6 +155,47 @@ Both files are gitignored.
 - **SerializationPerformanceTest** — Single/bulk object serialization, input parsing, relation serialization
 - **CRUDPerformanceTest** — Create, list, retrieve, update, delete endpoint throughput
 - **FilterPerformanceTest** — icontains, boolean, numeric, relation, match-case, and combined filter performance
+
+### Performance Analysis Tools
+
+Performance analysis tools are located in `tests/performance/tools/`. These tools help analyze benchmark results, detect regressions, and understand performance trends.
+
+**Quick reference:**
+
+```sh
+# 1. Quick overview of last 5 runs
+python tests/performance/tools/analyze_perf.py
+
+# 2. Compare performance between days
+python tests/performance/tools/compare_days.py
+
+# 3. Analyze benchmark stability and variance
+python tests/performance/tools/analyze_variance.py
+
+# 4. Detect statistical regressions (CI/CD recommended)
+python tests/performance/tools/detect_regression.py
+```
+
+**Primary tool for regression detection:**
+
+Use `detect_regression.py` for statistical analysis that distinguishes real regressions from noise:
+
+```sh
+# Default: compare last 5 runs vs previous 5, 15% threshold, 2σ significance
+python tests/performance/tools/detect_regression.py
+
+# Strict mode for CI/CD
+python tests/performance/tools/detect_regression.py --threshold 10.0 --significance 2.0
+
+# More samples for better statistical reliability
+python tests/performance/tools/detect_regression.py --baseline-size 10 --current-size 10
+```
+
+Exit codes:
+- `0` = No regressions detected ✅
+- `1` = Regressions detected ❌
+
+**Full documentation:** See `tests/performance/tools/README.md` for detailed usage of all tools.
 
 ## Code Style
 
