@@ -209,7 +209,7 @@ Exit codes:
 
 ## Framework Comparison Benchmarks
 
-Framework comparison benchmarks live in `tests/comparison/` and measure django-ninja-aio-crud performance against other popular Python REST frameworks (Django Ninja, Django REST Framework, ADRF, FastAPI).
+Framework comparison benchmarks live in `tests/comparison/` and measure django-ninja-aio-crud performance against other popular Python REST frameworks (Django Ninja, ADRF, FastAPI).
 
 Run comparison benchmarks and generate the HTML report in one step:
 
@@ -241,7 +241,6 @@ Both files are gitignored.
 
 - **django-ninja-aio-crud** (this framework) — Native async CRUD automation
 - **Django Ninja** (pure) — Async-ready but manual endpoint definition
-- **Django REST Framework** — Synchronous (wrapped with sync_to_async)
 - **ADRF** — Async Django REST Framework with native async support
 - **FastAPI** — Native async, Starlette-based
 
