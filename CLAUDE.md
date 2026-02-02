@@ -160,7 +160,17 @@ Both files are gitignored.
 
 Performance analysis tools are located in `tests/performance/tools/`. These tools help analyze benchmark results, detect regressions, and understand performance trends.
 
-**Quick reference:**
+**Quick reference using helper script:**
+
+```sh
+./check-performance.sh detect    # Detect regressions (recommended)
+./check-performance.sh quick     # Quick overview of last 5 runs
+./check-performance.sh variance  # Analyze benchmark stability
+./check-performance.sh compare   # Compare days
+./check-performance.sh all       # Run all analysis tools
+```
+
+**Or call tools directly:**
 
 ```sh
 # 1. Quick overview of last 5 runs
