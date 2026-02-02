@@ -104,9 +104,9 @@ Automatic REST APIs with auth, filtering, pagination, and serialization.
 
 ---
 
-## :material-target: Why Django Ninja Aio CRUD?
+## :material-target: Why Django Ninja AIO?
 
-Traditional Django REST development requires separate serializer classes, manual CRUD view implementation, repetitive boilerplate code, and complex relationship handling. **Django Ninja Aio CRUD** eliminates this complexity:
+Traditional Django REST development requires separate serializer classes, manual CRUD view implementation, repetitive boilerplate code, and complex relationship handling. **Django Ninja AIO** eliminates this complexity:
 
 === "Traditional Approach"
     ```python
@@ -135,7 +135,7 @@ Traditional Django REST development requires separate serializer classes, manual
     # ... more views for retrieve, update, delete
     ```
 
-=== "Django Ninja Aio CRUD"
+=== "Django Ninja AIO"
     ```python
     # models.py
     class User(ModelSerializer):
@@ -509,7 +509,7 @@ Add Pydantic `@field_validator` and `@model_validator` directly on serializer cl
 
     ---
 
-    Central to Django Ninja Aio CRUD — define schemas directly on models:
+    Central to Django Ninja AIO — define schemas directly on models:
 
     ```python
     class User(ModelSerializer):
@@ -583,7 +583,7 @@ This project is licensed under the MIT License - see the [LICENSE](https://githu
 
 ## :material-coffee: Support
 
-If you find Django Ninja Aio CRUD useful, consider supporting the project:
+If you find Django Ninja AIO useful, consider supporting the project:
 
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Support-yellow?logo=buy-me-a-coffee)](https://buymeacoffee.com/caspel26)
 

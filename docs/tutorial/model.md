@@ -272,7 +272,7 @@ class Article(ModelSerializer):
 ```
 
 !!! tip "Automatic Nested Serialization"
-    When `Author` is also a `ModelSerializer`, Django Ninja Aio CRUD automatically serializes it in the response!
+    When `Author` is also a `ModelSerializer`, Django Ninja AIO automatically serializes it in the response!
 
 ### ManyToMany Relationships
 

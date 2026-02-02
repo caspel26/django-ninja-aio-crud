@@ -1,10 +1,10 @@
 # :material-page-next: Pagination
 
-Django Ninja Aio CRUD provides built-in async pagination support for efficiently handling large datasets in your API responses.
+Django Ninja AIO provides built-in async pagination support for efficiently handling large datasets in your API responses.
 
 ## :material-format-list-bulleted: Overview
 
-Pagination in Django Ninja Aio CRUD:
+Pagination in Django Ninja AIO:
 
 - :material-lightning-bolt: **Fully async** — No blocking database queries
 - :material-cog: **Customizable** — Override default behavior per ViewSet
