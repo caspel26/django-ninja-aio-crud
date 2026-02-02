@@ -18,7 +18,7 @@ from tests.test_app.models import (
 class NinjaAIOBenchmark(FrameworkBenchmark):
     """Benchmark implementation for django-ninja-aio-crud."""
 
-    name = "django-ninja-aio-crud"
+    name = "Django Ninja AIO"
 
     def __init__(self):
         self.api = None

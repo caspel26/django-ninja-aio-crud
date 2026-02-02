@@ -36,8 +36,8 @@ nav:
   - Authentication:
       - JWT & AsyncJwtBearer: auth.md
   - Benchmarks:
-      - Performance: performance.md
       - Framework Comparison: comparison.md
+      - Performance: performance.md
   - Contributing: contributing.md
   - Release Notes: release_notes.md
 

@@ -4,7 +4,7 @@
 
 ## Overview
 
-django-ninja-aio-crud includes an automated performance benchmark suite that measures the framework's throughput across schema generation, serialization, CRUD endpoints, and filter processing.
+Django Ninja AIO includes an automated performance benchmark suite that measures the framework's throughput across schema generation, serialization, CRUD endpoints, and filter processing.
 
 Benchmarks run automatically on every push to `main` and on every pull request, ensuring that performance regressions are caught early.
 
@@ -135,9 +135,9 @@ Each benchmark reports the following metrics over its configured number of itera
 
 ## Framework Comparison
 
-Wondering how django-ninja-aio-crud compares to other Python REST frameworks? We provide comprehensive benchmarks comparing performance against Django Ninja, ADRF (Async DRF), and FastAPI.
+Wondering how Django Ninja AIO compares to other Python REST frameworks? We provide comprehensive benchmarks comparing performance against Django Ninja, ADRF (Async DRF), and FastAPI.
 
-The comparison focuses on **complex async operations** - particularly reverse FK relations and M2M serialization - where django-ninja-aio-crud excels by automating what's notoriously difficult in async Django.
+The comparison focuses on **complex async operations** - particularly reverse FK relations and M2M serialization - where Django Ninja AIO excels by automating what's notoriously difficult in async Django.
 
 <div class="cta-buttons" markdown>
 
