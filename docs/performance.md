@@ -130,3 +130,21 @@ Each benchmark reports the following metrics over its configured number of itera
 
 !!! warning "CI vs local results"
     Absolute timings on CI runners may differ from your local machine. Focus on **relative changes** between runs rather than absolute values.
+
+---
+
+## Framework Comparison
+
+Wondering how django-ninja-aio-crud compares to other Python REST frameworks? We provide comprehensive benchmarks comparing performance against Django Ninja, Django REST Framework, ADRF (Async DRF), and FastAPI.
+
+The comparison focuses on **complex async operations** - particularly reverse FK relations and M2M serialization - where django-ninja-aio-crud excels by automating what's notoriously difficult in async Django.
+
+<div class="cta-buttons" markdown>
+
+[View Full Comparison :material-chart-box-outline:](comparison.md){ .md-button .md-button--primary }
+
+</div>
+
+The comparison page includes detailed results, interactive charts, key insights, and links to the live HTML report.
+
+---
