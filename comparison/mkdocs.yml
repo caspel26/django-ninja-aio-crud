@@ -1,0 +1,176 @@
+site_name: Django Ninja Aio CRUD
+site_description: Async CRUD utilities for Django Ninja with auth, filtering, pagination.
+site_url: https://django-ninja-aio.com/
+repo_name: caspel26/django-ninja-aio-crud
+repo_url: https://github.com/caspel26/django-ninja-aio-crud
+edit_uri: edit/main/docs/
+copyright: Copyright &copy; 2024 – 2026 caspel26
+use_directory_urls: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: getting_started/installation.md
+    - Quick Start (ModelSerializer): getting_started/quick_start.md
+    - Quick Start (Serializer): getting_started/quick_start_serializer.md
+  - Tutorial:
+    - 'Step 1: Define Your Model': tutorial/model.md
+    - 'Alternative: Define Your Serializer': tutorial/serializer.md
+    - 'Step 2: Create CRUD Views': tutorial/crud.md
+    - 'Step 3: Add Authentication': tutorial/authentication.md
+    - 'Step 4: Add Filtering & Pagination': tutorial/filtering.md
+  - API Reference:
+    - Views:
+      - APIView: api/views/api_view.md
+      - APIViewSet: api/views/api_view_set.md
+      - Decorators: api/views/decorators.md
+      - Mixins: api/views/mixins.md
+    - Models:
+      - ModelSerializer: api/models/model_serializer.md
+      - ModelUtil: api/models/model_util.md
+      - Serializer (Meta-driven): api/models/serializers.md
+      - Validators: api/models/validators.md
+    - Authentication: api/authentication.md
+    - Pagination: api/pagination.md
+    - Renderers: api/renderers/orjson_renderer.md
+  - Authentication:
+      - JWT & AsyncJwtBearer: auth.md
+  - Benchmarks:
+      - Framework Comparison: comparison.md
+      - Performance: performance.md
+  - Deployment: deployment.md
+  - Troubleshooting: troubleshooting.md
+  - Contributing: contributing.md
+  - Release Notes: release_notes.md
+
+theme:
+  custom_dir: overrides
+  font:
+    text: Roboto
+    code: Roboto Mono
+  name: material
+  language: en
+  logo: images/logo.png
+  favicon: images/favicon.ico
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Auto
+      primary: deep-purple
+      accent: deep-purple
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/weather-night
+        name: Dark
+      primary: deep-purple
+      accent: deep-purple
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/weather-sunny
+        name: Light
+      primary: deep-purple
+      accent: deep-purple
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.top
+    - navigation.footer
+    - navigation.sections
+    - navigation.indexes
+    - navigation.expand
+    - navigation.path
+    - header.autohide
+    - announce.dismiss
+    - toc.follow
+    - toc.integrate
+    - content.code.copy
+    - content.code.select
+    - content.code.annotate
+    - content.tabs.link
+    - content.tooltips
+    - content.footnote.tooltips
+    - search.suggest
+    - search.highlight
+    - search.share
+
+extra:
+  project:
+    name: django-ninja-aio-crud
+    pypi: django-ninja-aio-crud
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/caspel26/django-ninja-aio-crud
+      name: GitHub
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/django-ninja-aio-crud/
+      name: PyPI
+  analytics:
+    provider: google
+  version:
+    provider: mike
+    repo: caspel26/django-ninja-aio-crud
+    default: latest
+
+plugins:
+  - macros:
+      include_dir: docs
+  - search:
+      separator: '[\\s\\-]+'
+  - autorefs
+  - section-index
+  - mkdocstrings:
+      handlers:
+        python:
+          paths:
+            - ./ninja_aio
+          options:
+            show_source: true
+            docstring_style: google
+            separate_signature: true
+            show_if_no_docstring: true
+            merge_init_into_class: true
+            members_order: source
+            filters:
+              - "!^__"
+            inherited_members: true
+            signature_crossrefs: true
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - meta
+  - toc:
+      permalink: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+      auto_title: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.magiclink:
+      repo_url_shorthand: true
+      user: caspel26
+      repo: django-ninja-aio-crud
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+  - pymdownx.caret
+  - pymdownx.mark
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - md_in_html
+
+extra_css:
+  - extra.css

@@ -1,0 +1,1459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Framework Comparison — Django Ninja AIO</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    <style>
+        :root {
+            --md-primary: #673ab7;
+            --md-primary-light: #7e57c2;
+            --md-primary-dark: #5e35b1;
+            --md-accent: #7c4dff;
+            --md-bg: #fff;
+            --md-bg-alt: #f5f5f6;
+            --md-fg: #1a1a2e;
+            --md-fg-light: #555;
+            --md-fg-lighter: #999;
+            --md-border: rgba(0, 0, 0, 0.07);
+            --md-code-bg: #f5f5f5;
+            --md-shadow: rgba(0, 0, 0, 0.08);
+            --md-shadow-heavy: rgba(0, 0, 0, 0.12);
+            --chart-grid: rgba(0, 0, 0, 0.06);
+            --chart-text: #555;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --md-bg: #1e1e2e;
+                --md-bg-alt: #2a2a3e;
+                --md-fg: #e2e2f0;
+                --md-fg-light: #a0a0b8;
+                --md-fg-lighter: #707088;
+                --md-border: rgba(255, 255, 255, 0.08);
+                --md-code-bg: #252538;
+                --md-shadow: rgba(0, 0, 0, 0.25);
+                --md-shadow-heavy: rgba(0, 0, 0, 0.4);
+                --chart-grid: rgba(255, 255, 255, 0.08);
+                --chart-text: #a0a0b8;
+            }
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--md-bg);
+            color: var(--md-fg);
+            line-height: 1.6;
+        }
+        .header {
+            background: var(--md-primary);
+            color: #fff;
+            padding: 0.6rem 2rem;
+            font-size: 0.82rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .header a {
+            color: #fff;
+            text-decoration: none;
+            opacity: 0.9;
+        }
+        .header a:hover { opacity: 1; }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem;
+        }
+        .hero {
+            text-align: center;
+            padding: 2rem 0 1rem;
+            border-bottom: 1px solid var(--md-border);
+            margin-bottom: 2rem;
+        }
+        .hero h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--md-fg);
+            margin-bottom: 0.4rem;
+        }
+        .hero .subtitle {
+            font-size: 1rem;
+            color: var(--md-fg-light);
+            margin-bottom: 1rem;
+        }
+        .meta-pills {
+            display: flex;
+            justify-content: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+        .meta-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            background: var(--md-code-bg);
+            border: 1px solid var(--md-border);
+            border-radius: 2rem;
+            padding: 0.3rem 0.9rem;
+            font-size: 0.8rem;
+            font-family: 'Roboto Mono', monospace;
+            color: var(--md-fg-light);
+        }
+        .meta-pill strong {
+            color: var(--md-primary-light);
+            font-weight: 500;
+        }
+        .section-title {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--md-fg);
+            margin: 2.5rem 0 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--md-border);
+        }
+        .chart-section {
+            background: var(--md-bg-alt);
+            border: 1px solid var(--md-border);
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            transition: box-shadow 0.25s ease, transform 0.25s ease;
+        }
+        .chart-section:hover {
+            box-shadow: 0 6px 20px var(--md-shadow);
+            transform: translateY(-2px);
+        }
+        .chart-section h2 {
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--md-primary);
+        }
+        .chart-container {
+            position: relative;
+            height: 350px;
+            margin-bottom: 1.5rem;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.82rem;
+        }
+        th, td {
+            padding: 0.55rem 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid var(--md-border);
+        }
+        th {
+            color: var(--md-primary);
+            font-weight: 600;
+            background: var(--md-code-bg);
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        tr:hover td {
+            background: var(--md-code-bg);
+        }
+        td {
+            color: var(--md-fg-light);
+            font-family: 'Roboto Mono', monospace;
+            font-size: 0.8rem;
+        }
+        td:first-child {
+            font-family: 'Roboto', sans-serif;
+            font-weight: 500;
+            color: var(--md-fg);
+        }
+        .footer {
+            text-align: center;
+            margin-top: 3rem;
+            padding: 1.5rem 0;
+            border-top: 1px solid var(--md-border);
+            font-size: 0.78rem;
+            color: var(--md-fg-lighter);
+        }
+        .footer a {
+            color: var(--md-primary-light);
+            text-decoration: none;
+        }
+        .footer a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <a href="https://django-ninja-aio.com/">Django Ninja AIO</a>
+        <span>&middot;</span>
+        <span>Framework Comparison</span>
+    </div>
+    <div class="container">
+        <div class="hero">
+            <h1>Framework Comparison</h1>
+            <p class="subtitle">Comparing Django Ninja AIO against other Python REST frameworks</p>
+            <div class="meta-pills">
+                <span class="meta-pill"><strong>Run</strong> 2026-02-02 17:50:24</span>
+                <span class="meta-pill"><strong>Python</strong> 3.14.2</span>
+                <span class="meta-pill"><strong>Frameworks</strong> 4</span>
+                <span class="meta-pill"><strong>Operations</strong> 13</span>
+            </div>
+        </div>
+
+        <h1 class="section-title">Results</h1>
+        
+        <div class="chart-section">
+            <h2>Bulk Serialization 100</h2>
+            <div class="chart-container">
+                <canvas id="chart_0"></canvas>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Framework</th>
+                        <th>Median (ms)</th>
+                        <th>Avg (ms)</th>
+                        <th>Min (ms)</th>
+                        <th>Max (ms)</th>
+                    </tr>
+                </thead>
+                <tbody>
+            <tr>
+                <td>Django Ninja AIO</td>
+                <td>14.0702</td>
+                <td>13.9966</td>
+                <td>12.2407</td>
+                <td>15.2254</td>
+            </tr>
+            <tr>
+                <td>Django Ninja</td>
+                <td>1.0730</td>
+                <td>1.0824</td>
+                <td>1.0471</td>
+                <td>1.4015</td>
+            </tr>
+            <tr>
+                <td>ADRF</td>
+                <td>112.1921</td>
+                <td>114.8748</td>
+                <td>108.3625</td>
+                <td>152.9182</td>
+            </tr>
+            <tr>
+                <td>FastAPI</td>
+                <td>1.3825</td>
+                <td>1.3943</td>
+                <td>1.3284</td>
+                <td>1.8214</td>
+            </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="chart-section">
+            <h2>Bulk Serialization 500</h2>
+            <div class="chart-container">
+                <canvas id="chart_1"></canvas>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Framework</th>
+                        <th>Median (ms)</th>
+                        <th>Avg (ms)</th>
+                        <th>Min (ms)</th>
+                        <th>Max (ms)</th>
+                    </tr>
+                </thead>
+                <tbody>
+            <tr>
+                <td>Django Ninja AIO</td>
+                <td>62.0694</td>
+                <td>63.7291</td>
+                <td>60.9197</td>
+                <td>68.9583</td>
+            </tr>
+            <tr>
+                <td>Django Ninja</td>
+                <td>4.3941</td>
+                <td>4.4302</td>
+                <td>4.1397</td>
+                <td>4.8000</td>
+            </tr>
+            <tr>
+                <td>ADRF</td>
+                <td>572.6803</td>
+                <td>570.8824</td>
+                <td>543.8353</td>
+                <td>590.1892</td>
+            </tr>
+            <tr>
+                <td>FastAPI</td>
+                <td>6.1207</td>
+                <td>6.1479</td>
+                <td>5.8402</td>
+                <td>6.5787</td>
+            </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="chart-section">
+            <h2>Complex Async Query</h2>
+            <div class="chart-container">
+                <canvas id="chart_2"></canvas>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Framework</th>
+                        <th>Median (ms)</th>
+                        <th>Avg (ms)</th>
+                        <th>Min (ms)</th>
+                        <th>Max (ms)</th>
+                    </tr>
+                </thead>
+                <tbody>
+            <tr>
+                <td>Django Ninja AIO</td>
+                <td>3.2658</td>
+                <td>3.3392</td>
+                <td>3.1359</td>
+                <td>5.6606</td>
+            </tr>
+            <tr>
+                <td>Django Ninja</td>
+                <td>0.6929</td>
+                <td>0.7077</td>
+                <td>0.6577</td>
+                <td>1.1121</td>
+            </tr>
+            <tr>
+                <td>ADRF</td>
+                <td>35.9080</td>
+                <td>36.7869</td>
+                <td>33.4407</td>
+                <td>78.8470</td>
+            </tr>
+            <tr>
+                <td>FastAPI</td>
+                <td>0.7902</td>
+                <td>0.8154</td>
+                <td>0.7584</td>
+                <td>1.4085</td>
+            </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="chart-section">
+            <h2>Create</h2>
+            <div class="chart-container">
+                <canvas id="chart_3"></canvas>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Framework</th>
+                        <th>Median (ms)</th>
+                        <th>Avg (ms)</th>
+                        <th>Min (ms)</th>
+                        <th>Max (ms)</th>
+                    </tr>
+                </thead>
+                <tbody>
+            <tr>
+                <td>Django Ninja AIO</td>
+                <td>0.9863</td>
+                <td>0.9950</td>
+                <td>0.9090</td>
+                <td>1.7640</td>
+            </tr>
+            <tr>
+                <td>Django Ninja</td>
+                <td>0.2903</td>
+                <td>0.3007</td>
+                <td>0.2744</td>
+                <td>0.5263</td>
+            </tr>
+            <tr>
+                <td>ADRF</td>
+                <td>1.8503</td>
+                <td>1.8655</td>
+                <td>1.7874</td>
+                <td>2.2497</td>
+            </tr>
+            <tr>
+                <td>FastAPI</td>
+                <td>0.2839</td>
+                <td>0.2959</td>
+                <td>0.2686</td>
+                <td>0.4337</td>
+            </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="chart-section">
+            <h2>Delete</h2>
+            <div class="chart-container">
+                <canvas id="chart_4"></canvas>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Framework</th>
+                        <th>Median (ms)</th>
+                        <th>Avg (ms)</th>
+                        <th>Min (ms)</th>
+                        <th>Max (ms)</th>
+                    </tr>
+                </thead>
+                <tbody>
+            <tr>
+                <td>Django Ninja AIO</td>
+                <td>0.7985</td>
+                <td>0.8106</td>
+                <td>0.7277</td>
+                <td>1.2827</td>
+            </tr>
+            <tr>
+                <td>Django Ninja</td>
+                <td>0.6942</td>
+                <td>0.6984</td>
+                <td>0.6455</td>
+                <td>0.8614</td>
+            </tr>
+            <tr>
+                <td>ADRF</td>
+                <td>0.6882</td>
+                <td>0.6913</td>
+                <td>0.6449</td>
+                <td>0.8432</td>
+            </tr>
+            <tr>
+                <td>FastAPI</td>
+                <td>0.6753</td>
+                <td>0.6802</td>
+                <td>0.6424</td>
+                <td>0.8108</td>
+            </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="chart-section">
+            <h2>Filter</h2>
+            <div class="chart-container">
+                <canvas id="chart_5"></canvas>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Framework</th>
+                        <th>Median (ms)</th>
+                        <th>Avg (ms)</th>
+                        <th>Min (ms)</th>
+                        <th>Max (ms)</th>
+                    </tr>
+                </thead>
+                <tbody>
+            <tr>
+                <td>Django Ninja AIO</td>
+                <td>0.6942</td>
+                <td>0.6650</td>
+                <td>0.5403</td>
+                <td>0.9210</td>
+            </tr>
+            <tr>
+                <td>Django Ninja</td>
+                <td>0.4125</td>
+                <td>0.4426</td>
+                <td>0.3685</td>
+                <td>0.6803</td>
+            </tr>
+            <tr>
+                <td>ADRF</td>
+                <td>2.0327</td>
+                <td>2.0481</td>
+                <td>1.9496</td>
+                <td>2.3311</td>
+            </tr>
+            <tr>
+                <td>FastAPI</td>
+                <td>0.4063</td>
+                <td>0.4260</td>
+                <td>0.3798</td>
+                <td>0.6881</td>
+            </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="chart-section">
+            <h2>List</h2>
+            <div class="chart-container">
+                <canvas id="chart_6"></canvas>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Framework</th>
+                        <th>Median (ms)</th>
+                        <th>Avg (ms)</th>
+                        <th>Min (ms)</th>
+                        <th>Max (ms)</th>
+                    </tr>
+                </thead>
+                <tbody>
+            <tr>
+                <td>Django Ninja AIO</td>
+                <td>3.0813</td>
+                <td>3.1005</td>
+                <td>2.7239</td>
+                <td>4.2160</td>
+            </tr>
+            <tr>
+                <td>Django Ninja</td>
+                <td>0.4299</td>
+                <td>0.4352</td>
+                <td>0.4088</td>
+                <td>0.5814</td>
+            </tr>
+            <tr>
+                <td>ADRF</td>
+                <td>22.9977</td>
+                <td>23.5682</td>
+                <td>21.7994</td>
+                <td>26.8492</td>
+            </tr>
+            <tr>
+                <td>FastAPI</td>
+                <td>0.4851</td>
+                <td>0.4944</td>
+                <td>0.4651</td>
+                <td>0.7174</td>
+            </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="chart-section">
+            <h2>Many To Many</h2>
+            <div class="chart-container">
+                <canvas id="chart_7"></canvas>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Framework</th>
+                        <th>Median (ms)</th>
+                        <th>Avg (ms)</th>
+                        <th>Min (ms)</th>
+                        <th>Max (ms)</th>
+                    </tr>
+                </thead>
+                <tbody>
+            <tr>
+                <td>Django Ninja AIO</td>
+                <td>1.2394</td>
+                <td>1.2656</td>
+                <td>1.1882</td>
+                <td>3.9086</td>
+            </tr>
+            <tr>
+                <td>Django Ninja</td>
+                <td>1.0528</td>
+                <td>1.0725</td>
+                <td>0.9726</td>
+                <td>1.2882</td>
+            </tr>
+            <tr>
+                <td>ADRF</td>
+                <td>8.8910</td>
+                <td>9.2199</td>
+                <td>8.6628</td>
+                <td>31.4799</td>
+            </tr>
+            <tr>
+                <td>FastAPI</td>
+                <td>1.0657</td>
+                <td>1.0729</td>
+                <td>1.0185</td>
+                <td>1.4842</td>
+            </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="chart-section">
+            <h2>Nested Relations</h2>
+            <div class="chart-container">
+                <canvas id="chart_8"></canvas>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Framework</th>
+                        <th>Median (ms)</th>
+                        <th>Avg (ms)</th>
+                        <th>Min (ms)</th>
+                        <th>Max (ms)</th>
+                    </tr>
+                </thead>
+                <tbody>
+            <tr>
+                <td>Django Ninja AIO</td>
+                <td>0.8782</td>
+                <td>0.8857</td>
+                <td>0.8380</td>
+                <td>1.3723</td>
+            </tr>
+            <tr>
+                <td>Django Ninja</td>
+                <td>0.4663</td>
+                <td>0.4814</td>
+                <td>0.4319</td>
+                <td>0.7846</td>
+            </tr>
+            <tr>
+                <td>ADRF</td>
+                <td>2.5896</td>
+                <td>2.5896</td>
+                <td>2.4774</td>
+                <td>2.8725</td>
+            </tr>
+            <tr>
+                <td>FastAPI</td>
+                <td>0.4737</td>
+                <td>0.4773</td>
+                <td>0.4415</td>
+                <td>0.6318</td>
+            </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="chart-section">
+            <h2>Relation Serialization</h2>
+            <div class="chart-container">
+                <canvas id="chart_9"></canvas>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Framework</th>
+                        <th>Median (ms)</th>
+                        <th>Avg (ms)</th>
+                        <th>Min (ms)</th>
+                        <th>Max (ms)</th>
+                    </tr>
+                </thead>
+                <tbody>
+            <tr>
+                <td>Django Ninja AIO</td>
+                <td>0.6501</td>
+                <td>0.6517</td>
+                <td>0.6074</td>
+                <td>0.8868</td>
+            </tr>
+            <tr>
+                <td>Django Ninja</td>
+                <td>0.4607</td>
+                <td>0.4652</td>
+                <td>0.4303</td>
+                <td>0.5666</td>
+            </tr>
+            <tr>
+                <td>ADRF</td>
+                <td>2.6395</td>
+                <td>2.8878</td>
+                <td>2.4983</td>
+                <td>16.7285</td>
+            </tr>
+            <tr>
+                <td>FastAPI</td>
+                <td>0.5713</td>
+                <td>0.5782</td>
+                <td>0.5326</td>
+                <td>0.7946</td>
+            </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="chart-section">
+            <h2>Retrieve</h2>
+            <div class="chart-container">
+                <canvas id="chart_10"></canvas>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Framework</th>
+                        <th>Median (ms)</th>
+                        <th>Avg (ms)</th>
+                        <th>Min (ms)</th>
+                        <th>Max (ms)</th>
+                    </tr>
+                </thead>
+                <tbody>
+            <tr>
+                <td>Django Ninja AIO</td>
+                <td>0.5397</td>
+                <td>0.5477</td>
+                <td>0.4925</td>
+                <td>0.7774</td>
+            </tr>
+            <tr>
+                <td>Django Ninja</td>
+                <td>0.3635</td>
+                <td>0.3701</td>
+                <td>0.3388</td>
+                <td>0.4525</td>
+            </tr>
+            <tr>
+                <td>ADRF</td>
+                <td>1.7089</td>
+                <td>1.7929</td>
+                <td>1.6465</td>
+                <td>8.9508</td>
+            </tr>
+            <tr>
+                <td>FastAPI</td>
+                <td>0.3680</td>
+                <td>0.3749</td>
+                <td>0.3461</td>
+                <td>0.5057</td>
+            </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="chart-section">
+            <h2>Reverse Relations</h2>
+            <div class="chart-container">
+                <canvas id="chart_11"></canvas>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Framework</th>
+                        <th>Median (ms)</th>
+                        <th>Avg (ms)</th>
+                        <th>Min (ms)</th>
+                        <th>Max (ms)</th>
+                    </tr>
+                </thead>
+                <tbody>
+            <tr>
+                <td>Django Ninja AIO</td>
+                <td>1.5967</td>
+                <td>1.6278</td>
+                <td>1.5426</td>
+                <td>4.2096</td>
+            </tr>
+            <tr>
+                <td>Django Ninja</td>
+                <td>1.2733</td>
+                <td>1.3460</td>
+                <td>1.2199</td>
+                <td>3.4048</td>
+            </tr>
+            <tr>
+                <td>ADRF</td>
+                <td>36.1363</td>
+                <td>36.9569</td>
+                <td>34.3427</td>
+                <td>48.2590</td>
+            </tr>
+            <tr>
+                <td>FastAPI</td>
+                <td>1.4274</td>
+                <td>1.4348</td>
+                <td>1.3610</td>
+                <td>1.8551</td>
+            </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="chart-section">
+            <h2>Update</h2>
+            <div class="chart-container">
+                <canvas id="chart_12"></canvas>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Framework</th>
+                        <th>Median (ms)</th>
+                        <th>Avg (ms)</th>
+                        <th>Min (ms)</th>
+                        <th>Max (ms)</th>
+                    </tr>
+                </thead>
+                <tbody>
+            <tr>
+                <td>Django Ninja AIO</td>
+                <td>1.1720</td>
+                <td>1.1850</td>
+                <td>1.1249</td>
+                <td>1.5808</td>
+            </tr>
+            <tr>
+                <td>Django Ninja</td>
+                <td>0.7456</td>
+                <td>0.7568</td>
+                <td>0.6985</td>
+                <td>0.9198</td>
+            </tr>
+            <tr>
+                <td>ADRF</td>
+                <td>2.3278</td>
+                <td>2.3644</td>
+                <td>2.2524</td>
+                <td>2.8288</td>
+            </tr>
+            <tr>
+                <td>FastAPI</td>
+                <td>0.7404</td>
+                <td>0.7516</td>
+                <td>0.7032</td>
+                <td>1.1323</td>
+            </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="footer">
+            Generated by <a href="https://github.com/caspel26/django-ninja-aio-crud">Django Ninja AIO</a> comparison suite
+        </div>
+    </div>
+
+    <script>
+    // Configure Chart.js defaults to match theme
+    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    Chart.defaults.color = isDark ? '#a0a0b8' : '#555';
+    Chart.defaults.borderColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+    Chart.defaults.font.family = "'Roboto', sans-serif";
+
+    
+        new Chart(document.getElementById('chart_0'), {
+            type: 'bar',
+            data: {
+                labels: ["Django Ninja AIO", "Django Ninja", "ADRF", "FastAPI"],
+                datasets: [
+                    {
+                        label: 'Median (ms)',
+                        data: [14.0702, 1.073, 112.1921, 1.3825],
+                        backgroundColor: ["rgba(103, 58, 183, 0.75)", "rgba(33, 150, 243, 0.75)", "rgba(255, 152, 0, 0.75)", "rgba(76, 175, 80, 0.75)"],
+                        borderColor: ["rgba(103, 58, 183, 1)", "rgba(33, 150, 243, 1)", "rgba(255, 152, 0, 1)", "rgba(76, 175, 80, 1)"],
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Bulk Serialization 100',
+                        font: { size: 16 }
+                    },
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            afterLabel: function(context) {
+                                const idx = context.dataIndex;
+                                return [
+                                    `Avg: [13.9966, 1.0824, 114.8748, 1.3943][idx].toFixed(4) + ' ms'`,
+                                    `Min: [12.2407, 1.0471, 108.3625, 1.3284][idx].toFixed(4) + ' ms'`,
+                                    `Max: [15.2254, 1.4015, 152.9182, 1.8214][idx].toFixed(4) + ' ms'`
+                                ];
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Time (ms)' }
+                    },
+                    x: {
+                        ticks: { maxRotation: 45, minRotation: 25 }
+                    }
+                }
+            }
+        });
+        
+        new Chart(document.getElementById('chart_1'), {
+            type: 'bar',
+            data: {
+                labels: ["Django Ninja AIO", "Django Ninja", "ADRF", "FastAPI"],
+                datasets: [
+                    {
+                        label: 'Median (ms)',
+                        data: [62.0694, 4.3941, 572.6803, 6.1207],
+                        backgroundColor: ["rgba(103, 58, 183, 0.75)", "rgba(33, 150, 243, 0.75)", "rgba(255, 152, 0, 0.75)", "rgba(76, 175, 80, 0.75)"],
+                        borderColor: ["rgba(103, 58, 183, 1)", "rgba(33, 150, 243, 1)", "rgba(255, 152, 0, 1)", "rgba(76, 175, 80, 1)"],
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Bulk Serialization 500',
+                        font: { size: 16 }
+                    },
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            afterLabel: function(context) {
+                                const idx = context.dataIndex;
+                                return [
+                                    `Avg: [63.7291, 4.4302, 570.8824, 6.1479][idx].toFixed(4) + ' ms'`,
+                                    `Min: [60.9197, 4.1397, 543.8353, 5.8402][idx].toFixed(4) + ' ms'`,
+                                    `Max: [68.9583, 4.8, 590.1892, 6.5787][idx].toFixed(4) + ' ms'`
+                                ];
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Time (ms)' }
+                    },
+                    x: {
+                        ticks: { maxRotation: 45, minRotation: 25 }
+                    }
+                }
+            }
+        });
+        
+        new Chart(document.getElementById('chart_2'), {
+            type: 'bar',
+            data: {
+                labels: ["Django Ninja AIO", "Django Ninja", "ADRF", "FastAPI"],
+                datasets: [
+                    {
+                        label: 'Median (ms)',
+                        data: [3.2658, 0.6929, 35.908, 0.7902],
+                        backgroundColor: ["rgba(103, 58, 183, 0.75)", "rgba(33, 150, 243, 0.75)", "rgba(255, 152, 0, 0.75)", "rgba(76, 175, 80, 0.75)"],
+                        borderColor: ["rgba(103, 58, 183, 1)", "rgba(33, 150, 243, 1)", "rgba(255, 152, 0, 1)", "rgba(76, 175, 80, 1)"],
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Complex Async Query',
+                        font: { size: 16 }
+                    },
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            afterLabel: function(context) {
+                                const idx = context.dataIndex;
+                                return [
+                                    `Avg: [3.3392, 0.7077, 36.7869, 0.8154][idx].toFixed(4) + ' ms'`,
+                                    `Min: [3.1359, 0.6577, 33.4407, 0.7584][idx].toFixed(4) + ' ms'`,
+                                    `Max: [5.6606, 1.1121, 78.847, 1.4085][idx].toFixed(4) + ' ms'`
+                                ];
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Time (ms)' }
+                    },
+                    x: {
+                        ticks: { maxRotation: 45, minRotation: 25 }
+                    }
+                }
+            }
+        });
+        
+        new Chart(document.getElementById('chart_3'), {
+            type: 'bar',
+            data: {
+                labels: ["Django Ninja AIO", "Django Ninja", "ADRF", "FastAPI"],
+                datasets: [
+                    {
+                        label: 'Median (ms)',
+                        data: [0.9863, 0.2903, 1.8503, 0.2839],
+                        backgroundColor: ["rgba(103, 58, 183, 0.75)", "rgba(33, 150, 243, 0.75)", "rgba(255, 152, 0, 0.75)", "rgba(76, 175, 80, 0.75)"],
+                        borderColor: ["rgba(103, 58, 183, 1)", "rgba(33, 150, 243, 1)", "rgba(255, 152, 0, 1)", "rgba(76, 175, 80, 1)"],
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Create',
+                        font: { size: 16 }
+                    },
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            afterLabel: function(context) {
+                                const idx = context.dataIndex;
+                                return [
+                                    `Avg: [0.995, 0.3007, 1.8655, 0.2959][idx].toFixed(4) + ' ms'`,
+                                    `Min: [0.909, 0.2744, 1.7874, 0.2686][idx].toFixed(4) + ' ms'`,
+                                    `Max: [1.764, 0.5263, 2.2497, 0.4337][idx].toFixed(4) + ' ms'`
+                                ];
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Time (ms)' }
+                    },
+                    x: {
+                        ticks: { maxRotation: 45, minRotation: 25 }
+                    }
+                }
+            }
+        });
+        
+        new Chart(document.getElementById('chart_4'), {
+            type: 'bar',
+            data: {
+                labels: ["Django Ninja AIO", "Django Ninja", "ADRF", "FastAPI"],
+                datasets: [
+                    {
+                        label: 'Median (ms)',
+                        data: [0.7985, 0.6942, 0.6882, 0.6753],
+                        backgroundColor: ["rgba(103, 58, 183, 0.75)", "rgba(33, 150, 243, 0.75)", "rgba(255, 152, 0, 0.75)", "rgba(76, 175, 80, 0.75)"],
+                        borderColor: ["rgba(103, 58, 183, 1)", "rgba(33, 150, 243, 1)", "rgba(255, 152, 0, 1)", "rgba(76, 175, 80, 1)"],
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Delete',
+                        font: { size: 16 }
+                    },
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            afterLabel: function(context) {
+                                const idx = context.dataIndex;
+                                return [
+                                    `Avg: [0.8106, 0.6984, 0.6913, 0.6802][idx].toFixed(4) + ' ms'`,
+                                    `Min: [0.7277, 0.6455, 0.6449, 0.6424][idx].toFixed(4) + ' ms'`,
+                                    `Max: [1.2827, 0.8614, 0.8432, 0.8108][idx].toFixed(4) + ' ms'`
+                                ];
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Time (ms)' }
+                    },
+                    x: {
+                        ticks: { maxRotation: 45, minRotation: 25 }
+                    }
+                }
+            }
+        });
+        
+        new Chart(document.getElementById('chart_5'), {
+            type: 'bar',
+            data: {
+                labels: ["Django Ninja AIO", "Django Ninja", "ADRF", "FastAPI"],
+                datasets: [
+                    {
+                        label: 'Median (ms)',
+                        data: [0.6942, 0.4125, 2.0327, 0.4063],
+                        backgroundColor: ["rgba(103, 58, 183, 0.75)", "rgba(33, 150, 243, 0.75)", "rgba(255, 152, 0, 0.75)", "rgba(76, 175, 80, 0.75)"],
+                        borderColor: ["rgba(103, 58, 183, 1)", "rgba(33, 150, 243, 1)", "rgba(255, 152, 0, 1)", "rgba(76, 175, 80, 1)"],
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Filter',
+                        font: { size: 16 }
+                    },
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            afterLabel: function(context) {
+                                const idx = context.dataIndex;
+                                return [
+                                    `Avg: [0.665, 0.4426, 2.0481, 0.426][idx].toFixed(4) + ' ms'`,
+                                    `Min: [0.5403, 0.3685, 1.9496, 0.3798][idx].toFixed(4) + ' ms'`,
+                                    `Max: [0.921, 0.6803, 2.3311, 0.6881][idx].toFixed(4) + ' ms'`
+                                ];
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Time (ms)' }
+                    },
+                    x: {
+                        ticks: { maxRotation: 45, minRotation: 25 }
+                    }
+                }
+            }
+        });
+        
+        new Chart(document.getElementById('chart_6'), {
+            type: 'bar',
+            data: {
+                labels: ["Django Ninja AIO", "Django Ninja", "ADRF", "FastAPI"],
+                datasets: [
+                    {
+                        label: 'Median (ms)',
+                        data: [3.0813, 0.4299, 22.9977, 0.4851],
+                        backgroundColor: ["rgba(103, 58, 183, 0.75)", "rgba(33, 150, 243, 0.75)", "rgba(255, 152, 0, 0.75)", "rgba(76, 175, 80, 0.75)"],
+                        borderColor: ["rgba(103, 58, 183, 1)", "rgba(33, 150, 243, 1)", "rgba(255, 152, 0, 1)", "rgba(76, 175, 80, 1)"],
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'List',
+                        font: { size: 16 }
+                    },
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            afterLabel: function(context) {
+                                const idx = context.dataIndex;
+                                return [
+                                    `Avg: [3.1005, 0.4352, 23.5682, 0.4944][idx].toFixed(4) + ' ms'`,
+                                    `Min: [2.7239, 0.4088, 21.7994, 0.4651][idx].toFixed(4) + ' ms'`,
+                                    `Max: [4.216, 0.5814, 26.8492, 0.7174][idx].toFixed(4) + ' ms'`
+                                ];
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Time (ms)' }
+                    },
+                    x: {
+                        ticks: { maxRotation: 45, minRotation: 25 }
+                    }
+                }
+            }
+        });
+        
+        new Chart(document.getElementById('chart_7'), {
+            type: 'bar',
+            data: {
+                labels: ["Django Ninja AIO", "Django Ninja", "ADRF", "FastAPI"],
+                datasets: [
+                    {
+                        label: 'Median (ms)',
+                        data: [1.2394, 1.0528, 8.891, 1.0657],
+                        backgroundColor: ["rgba(103, 58, 183, 0.75)", "rgba(33, 150, 243, 0.75)", "rgba(255, 152, 0, 0.75)", "rgba(76, 175, 80, 0.75)"],
+                        borderColor: ["rgba(103, 58, 183, 1)", "rgba(33, 150, 243, 1)", "rgba(255, 152, 0, 1)", "rgba(76, 175, 80, 1)"],
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Many To Many',
+                        font: { size: 16 }
+                    },
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            afterLabel: function(context) {
+                                const idx = context.dataIndex;
+                                return [
+                                    `Avg: [1.2656, 1.0725, 9.2199, 1.0729][idx].toFixed(4) + ' ms'`,
+                                    `Min: [1.1882, 0.9726, 8.6628, 1.0185][idx].toFixed(4) + ' ms'`,
+                                    `Max: [3.9086, 1.2882, 31.4799, 1.4842][idx].toFixed(4) + ' ms'`
+                                ];
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Time (ms)' }
+                    },
+                    x: {
+                        ticks: { maxRotation: 45, minRotation: 25 }
+                    }
+                }
+            }
+        });
+        
+        new Chart(document.getElementById('chart_8'), {
+            type: 'bar',
+            data: {
+                labels: ["Django Ninja AIO", "Django Ninja", "ADRF", "FastAPI"],
+                datasets: [
+                    {
+                        label: 'Median (ms)',
+                        data: [0.8782, 0.4663, 2.5896, 0.4737],
+                        backgroundColor: ["rgba(103, 58, 183, 0.75)", "rgba(33, 150, 243, 0.75)", "rgba(255, 152, 0, 0.75)", "rgba(76, 175, 80, 0.75)"],
+                        borderColor: ["rgba(103, 58, 183, 1)", "rgba(33, 150, 243, 1)", "rgba(255, 152, 0, 1)", "rgba(76, 175, 80, 1)"],
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Nested Relations',
+                        font: { size: 16 }
+                    },
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            afterLabel: function(context) {
+                                const idx = context.dataIndex;
+                                return [
+                                    `Avg: [0.8857, 0.4814, 2.5896, 0.4773][idx].toFixed(4) + ' ms'`,
+                                    `Min: [0.838, 0.4319, 2.4774, 0.4415][idx].toFixed(4) + ' ms'`,
+                                    `Max: [1.3723, 0.7846, 2.8725, 0.6318][idx].toFixed(4) + ' ms'`
+                                ];
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Time (ms)' }
+                    },
+                    x: {
+                        ticks: { maxRotation: 45, minRotation: 25 }
+                    }
+                }
+            }
+        });
+        
+        new Chart(document.getElementById('chart_9'), {
+            type: 'bar',
+            data: {
+                labels: ["Django Ninja AIO", "Django Ninja", "ADRF", "FastAPI"],
+                datasets: [
+                    {
+                        label: 'Median (ms)',
+                        data: [0.6501, 0.4607, 2.6395, 0.5713],
+                        backgroundColor: ["rgba(103, 58, 183, 0.75)", "rgba(33, 150, 243, 0.75)", "rgba(255, 152, 0, 0.75)", "rgba(76, 175, 80, 0.75)"],
+                        borderColor: ["rgba(103, 58, 183, 1)", "rgba(33, 150, 243, 1)", "rgba(255, 152, 0, 1)", "rgba(76, 175, 80, 1)"],
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Relation Serialization',
+                        font: { size: 16 }
+                    },
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            afterLabel: function(context) {
+                                const idx = context.dataIndex;
+                                return [
+                                    `Avg: [0.6517, 0.4652, 2.8878, 0.5782][idx].toFixed(4) + ' ms'`,
+                                    `Min: [0.6074, 0.4303, 2.4983, 0.5326][idx].toFixed(4) + ' ms'`,
+                                    `Max: [0.8868, 0.5666, 16.7285, 0.7946][idx].toFixed(4) + ' ms'`
+                                ];
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Time (ms)' }
+                    },
+                    x: {
+                        ticks: { maxRotation: 45, minRotation: 25 }
+                    }
+                }
+            }
+        });
+        
+        new Chart(document.getElementById('chart_10'), {
+            type: 'bar',
+            data: {
+                labels: ["Django Ninja AIO", "Django Ninja", "ADRF", "FastAPI"],
+                datasets: [
+                    {
+                        label: 'Median (ms)',
+                        data: [0.5397, 0.3635, 1.7089, 0.368],
+                        backgroundColor: ["rgba(103, 58, 183, 0.75)", "rgba(33, 150, 243, 0.75)", "rgba(255, 152, 0, 0.75)", "rgba(76, 175, 80, 0.75)"],
+                        borderColor: ["rgba(103, 58, 183, 1)", "rgba(33, 150, 243, 1)", "rgba(255, 152, 0, 1)", "rgba(76, 175, 80, 1)"],
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Retrieve',
+                        font: { size: 16 }
+                    },
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            afterLabel: function(context) {
+                                const idx = context.dataIndex;
+                                return [
+                                    `Avg: [0.5477, 0.3701, 1.7929, 0.3749][idx].toFixed(4) + ' ms'`,
+                                    `Min: [0.4925, 0.3388, 1.6465, 0.3461][idx].toFixed(4) + ' ms'`,
+                                    `Max: [0.7774, 0.4525, 8.9508, 0.5057][idx].toFixed(4) + ' ms'`
+                                ];
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Time (ms)' }
+                    },
+                    x: {
+                        ticks: { maxRotation: 45, minRotation: 25 }
+                    }
+                }
+            }
+        });
+        
+        new Chart(document.getElementById('chart_11'), {
+            type: 'bar',
+            data: {
+                labels: ["Django Ninja AIO", "Django Ninja", "ADRF", "FastAPI"],
+                datasets: [
+                    {
+                        label: 'Median (ms)',
+                        data: [1.5967, 1.2733, 36.1363, 1.4274],
+                        backgroundColor: ["rgba(103, 58, 183, 0.75)", "rgba(33, 150, 243, 0.75)", "rgba(255, 152, 0, 0.75)", "rgba(76, 175, 80, 0.75)"],
+                        borderColor: ["rgba(103, 58, 183, 1)", "rgba(33, 150, 243, 1)", "rgba(255, 152, 0, 1)", "rgba(76, 175, 80, 1)"],
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Reverse Relations',
+                        font: { size: 16 }
+                    },
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            afterLabel: function(context) {
+                                const idx = context.dataIndex;
+                                return [
+                                    `Avg: [1.6278, 1.346, 36.9569, 1.4348][idx].toFixed(4) + ' ms'`,
+                                    `Min: [1.5426, 1.2199, 34.3427, 1.361][idx].toFixed(4) + ' ms'`,
+                                    `Max: [4.2096, 3.4048, 48.259, 1.8551][idx].toFixed(4) + ' ms'`
+                                ];
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Time (ms)' }
+                    },
+                    x: {
+                        ticks: { maxRotation: 45, minRotation: 25 }
+                    }
+                }
+            }
+        });
+        
+        new Chart(document.getElementById('chart_12'), {
+            type: 'bar',
+            data: {
+                labels: ["Django Ninja AIO", "Django Ninja", "ADRF", "FastAPI"],
+                datasets: [
+                    {
+                        label: 'Median (ms)',
+                        data: [1.172, 0.7456, 2.3278, 0.7404],
+                        backgroundColor: ["rgba(103, 58, 183, 0.75)", "rgba(33, 150, 243, 0.75)", "rgba(255, 152, 0, 0.75)", "rgba(76, 175, 80, 0.75)"],
+                        borderColor: ["rgba(103, 58, 183, 1)", "rgba(33, 150, 243, 1)", "rgba(255, 152, 0, 1)", "rgba(76, 175, 80, 1)"],
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Update',
+                        font: { size: 16 }
+                    },
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            afterLabel: function(context) {
+                                const idx = context.dataIndex;
+                                return [
+                                    `Avg: [1.185, 0.7568, 2.3644, 0.7516][idx].toFixed(4) + ' ms'`,
+                                    `Min: [1.1249, 0.6985, 2.2524, 0.7032][idx].toFixed(4) + ' ms'`,
+                                    `Max: [1.5808, 0.9198, 2.8288, 1.1323][idx].toFixed(4) + ' ms'`
+                                ];
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Time (ms)' }
+                    },
+                    x: {
+                        ticks: { maxRotation: 45, minRotation: 25 }
+                    }
+                }
+            }
+        });
+        
+    </script>
+</body>
+</html>
