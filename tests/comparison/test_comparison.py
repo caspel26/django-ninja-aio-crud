@@ -17,7 +17,6 @@ from django.test import TestCase, tag
 
 from tests.comparison.base import BenchmarkRunner
 from tests.comparison.frameworks.adrf import ADRFBenchmark
-from tests.comparison.frameworks.drf import DRFBenchmark
 from tests.comparison.frameworks.fastapi import FastAPIBenchmark
 from tests.comparison.frameworks.ninja import PureDjangoNinjaBenchmark
 from tests.comparison.frameworks.ninja_aio import NinjaAIOBenchmark
@@ -74,7 +73,6 @@ class FrameworkComparisonTest(TestCase):
     This test suite measures the same CRUD operations across multiple frameworks:
     - django-ninja-aio-crud (this framework)
     - Django Ninja (pure, without AIO CRUD)
-    - Django REST Framework (sync)
     - ADRF (Async Django REST Framework)
     - FastAPI
 
@@ -85,7 +83,6 @@ class FrameworkComparisonTest(TestCase):
     frameworks = [
         NinjaAIOBenchmark,
         PureDjangoNinjaBenchmark,
-        DRFBenchmark,
         ADRFBenchmark,
         FastAPIBenchmark,
     ]

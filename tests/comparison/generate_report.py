@@ -48,9 +48,8 @@ def generate_html_report(results_file: Path, output_file: Path) -> None:
     colors = [
         "rgba(76, 175, 80, 0.75)",    # Green - django-ninja-aio-crud
         "rgba(33, 150, 243, 0.75)",   # Blue - Django Ninja
-        "rgba(255, 152, 0, 0.75)",    # Orange - DRF
+        "rgba(255, 152, 0, 0.75)",    # Orange - ADRF
         "rgba(156, 39, 176, 0.75)",   # Purple - FastAPI
-        "rgba(244, 67, 54, 0.75)",    # Red - Flask-RESTX
     ]
     border_colors = [c.replace("0.75", "1") for c in colors]
 

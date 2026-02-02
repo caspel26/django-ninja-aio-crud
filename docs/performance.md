@@ -135,7 +135,7 @@ Each benchmark reports the following metrics over its configured number of itera
 
 ## Framework Comparison
 
-Wondering how django-ninja-aio-crud compares to other Python REST frameworks? We provide comprehensive benchmarks comparing performance against Django Ninja, Django REST Framework, ADRF (Async DRF), and FastAPI.
+Wondering how django-ninja-aio-crud compares to other Python REST frameworks? We provide comprehensive benchmarks comparing performance against Django Ninja, ADRF (Async DRF), and FastAPI.
 
 The comparison focuses on **complex async operations** - particularly reverse FK relations and M2M serialization - where django-ninja-aio-crud excels by automating what's notoriously difficult in async Django.
 
