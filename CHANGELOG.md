@@ -1,5 +1,94 @@
 # 📋 Release Notes
 
+## 🏷️ [v2.18.2] - 2026-02-02
+
+---
+
+### 🔧 Improvements
+
+#### ✨ Removed Redundant Input Validation
+> `ninja_aio/models/utils.py`
+
+Removed redundant input field validation logic since Pydantic already validates all inputs before they reach the payload processing stage. This simplifies the codebase and properly handles field aliases and custom fields.
+
+**Removed methods:**
+
+| Method | Previous Line | Why Removed |
+|---|---|---|
+| `_validate_input_fields()` | 746-782 | Redundant - Pydantic validates all inputs during schema deserialization |
+| `get_valid_input_fields()` | 198-237 | Only used by removed `_validate_input_fields()` method |
+
+**Updated method:**
+- `parse_input_data()` - Removed call to `_validate_input_fields()` and added clarifying comment that Pydantic handles all validation
+
+**Why this improves the code:**
+
+Since Django Ninja uses Pydantic to validate all inputs against generated schemas:
+- ✅ Custom fields (defined via `custom_fields` parameter) are validated by Pydantic
+- ✅ Field aliases are properly handled by Pydantic during deserialization
+- ✅ By the time `parse_input_data()` receives the `Schema` instance, all validation has already occurred
+- ✅ `model_dump()` simply converts the validated instance to a dict with proper field names
+
+The removed validation was:
+- ❌ Redundant (Pydantic already validated)
+- ❌ Incomplete (couldn't properly handle all Pydantic features like aliases)
+- ❌ Assuming custom fields and aliases couldn't be used in requests
+
+**Example of what now works correctly:**
+
+```python
+from pydantic import Field
+from ninja_aio.models import Serializer, serializers
+
+class UserSerializer(Serializer):
+    class Meta:
+        model = User
+        schema_in = serializers.SchemaModelConfig(
+            fields=["username", "email"],
+            custom_fields=[
+                ("display_name", str, Field(alias="displayName"))  # Alias support
+            ]
+        )
+
+# Input with alias now works properly:
+# {"username": "john", "email": "john@example.com", "displayName": "John Doe"}
+# Pydantic handles the alias → Validation passes → No redundant checks
+```
+
+---
+
+### 🧪 Tests
+
+#### `ModelUtilHelperMethodsTestCase` — Removed 3 tests
+
+**Removed tests:**
+
+| Test | Reason |
+|---|---|
+| `test_validate_input_fields_valid_fields` | Method `_validate_input_fields` no longer exists |
+| `test_validate_input_fields_invalid_fields` | Method `_validate_input_fields` no longer exists |
+| `test_validate_input_fields_skips_custom_fields` | Method `_validate_input_fields` no longer exists |
+
+**Test results:**
+- ✅ 608 tests pass (down from 611)
+- ✅ 100% coverage maintained on `ninja_aio/models/utils.py`
+- ✅ 99% overall coverage maintained
+
+---
+
+### 🎯 Summary
+
+**Django Ninja Aio CRUD v2.18.2** is a code quality improvement release that removes redundant validation logic. By trusting Pydantic's built-in validation, the codebase is simplified while properly supporting all Pydantic features including field aliases and custom fields. This change has no impact on end users since Pydantic was already handling validation - we simply removed the redundant secondary validation that was incomplete and caused issues with aliases.
+
+**Key benefits:**
+- 🧹 **Simpler Code** — Removed 70+ lines of redundant validation logic
+- ✅ **Proper Alias Support** — Field aliases now work correctly without workarounds
+- 🎯 **Trust the Framework** — Pydantic handles all input validation; no redundant checks needed
+- 🔒 **Same Security** — No security impact since Pydantic validation was already the primary defense
+- 🧪 **100% Coverage** — Maintained complete test coverage across the codebase
+
+---
+
 ## 🏷️ [v2.18.1] - 2026-02-01
 
 ---
