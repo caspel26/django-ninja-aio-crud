@@ -63,6 +63,30 @@ To run tests without coverage:
 
 4. **Run tests again** to verify new tests pass and coverage is maintained
 
+5. **Run performance benchmarks** to detect performance regressions:
+   ```sh
+   . ./.venv/bin/activate && ./run-performance.sh
+   ```
+
+6. **Check for performance regressions:**
+   - Compare the latest run with previous runs in `performance_results.json`
+   - If regressions are detected (>10% slowdown in any benchmark):
+     - Investigate the root cause by analyzing the code path being tested
+     - Determine if the regression is justified by the change (e.g., added functionality that inherently costs more)
+     - If the regression is NOT justified:
+       - Identify the bottleneck using profiling tools if needed
+       - Optimize the implementation to restore performance
+       - Re-run benchmarks to verify the fix
+     - If the regression IS justified:
+       - Document why the performance trade-off is necessary
+       - Consider if the benefits outweigh the performance cost
+       - Update the changelog to note the performance impact if significant
+
+7. **Analyze unexpected performance changes:**
+   - If tests that should NOT be affected by your changes show regressions, run benchmarks multiple times to rule out noise
+   - Check for system-level factors (CPU load, memory pressure, background processes)
+   - Investigate potential second-order effects (import overhead, cache invalidation, JIT compiler behavior)
+
 This protocol applies to ALL code changes, including:
 - New features
 - Bug fixes
@@ -70,7 +94,7 @@ This protocol applies to ALL code changes, including:
 - Performance optimizations
 - Security fixes
 
-**Do not consider a task complete until all tests pass and coverage is maintained or improved.**
+**Do not consider a task complete until all tests pass, coverage is maintained or improved, and performance regressions are analyzed and justified.**
 
 ## Running Performance Tests
 
