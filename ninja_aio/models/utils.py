@@ -195,46 +195,6 @@ class ModelUtil:
         """
         return [field.name for field in self.model._meta.get_fields()]
 
-    def get_valid_input_fields(
-        self, is_serializer: bool, serializer: "ModelSerializer | None" = None
-    ) -> set[str]:
-        """
-        Get allowlist of valid field names for input validation.
-
-        Security: Prevents field injection by returning only fields that should
-        be accepted from user input.
-
-        Parameters
-        ----------
-        is_serializer : bool
-            Whether using a ModelSerializer
-        serializer : ModelSerializer, optional
-            Serializer instance if applicable
-
-        Returns
-        -------
-        set[str]
-            Set of valid field names that can be accepted in input payloads
-        """
-        valid_fields = set(self.model_fields)
-
-        # If using a serializer, also include custom fields
-        if is_serializer and serializer:
-            # Get all custom fields defined in the serializer
-            try:
-                # Custom fields are those that are not model fields but are defined
-                # in the serializer configuration
-                for schema_type in ['create', 'update', 'read', 'detail']:
-                    try:
-                        schema_fields = serializer.get_fields(schema_type)
-                        if schema_fields:
-                            valid_fields.update(schema_fields)
-                    except (AttributeError, TypeError):
-                        continue
-            except (AttributeError, TypeError):
-                pass
-
-        return valid_fields
 
     @property
     def model_name(self) -> str:
@@ -743,43 +703,6 @@ class ModelUtil:
         obj = await self.get_object(request, query_data=query_data, is_for=is_for)
         return await self._bump_object_from_schema(obj, obj_schema)
 
-    def _validate_input_fields(
-        self, payload: dict, is_serializer: bool, serializer
-    ) -> None:
-        """
-        Validate non-custom payload keys against model fields.
-
-        Parameters
-        ----------
-        payload : dict
-            Input payload to validate.
-        is_serializer : bool
-            Whether using a ModelSerializer.
-        serializer : ModelSerializer | Serializer
-            Serializer instance if applicable.
-
-        Raises
-        ------
-        SerializeError
-            If invalid field names are found in payload.
-        """
-        invalid_fields = []
-        for key in payload.keys():
-            # Skip custom fields - they're validated by Pydantic schema
-            if is_serializer and serializer.is_custom(key):
-                continue
-            # Validate non-custom fields exist on the model
-            if key not in self.model_fields:
-                invalid_fields.append(key)
-
-        if invalid_fields:
-            raise SerializeError(
-                {
-                    "detail": f"Invalid field names in payload: {', '.join(sorted(invalid_fields))}",
-                    "invalid_fields": sorted(invalid_fields),
-                },
-                400,
-            )
 
     def _collect_custom_and_optional_fields(
         self, payload: dict, is_serializer: bool, serializer
@@ -888,7 +811,7 @@ class ModelUtil:
 
         Steps
         -----
-        - Validate fields against allowlist (security).
+        - Validate fields against schema (including aliases and custom fields).
         - Strip custom fields (retain separately).
         - Drop optional fields with None (ModelSerializer only).
         - Decode BinaryField base64 values.
@@ -917,8 +840,8 @@ class ModelUtil:
         )
         serializer = self.serializer if self.with_serializer else self.model
 
-        # Security: Validate non-custom payload keys against model fields
-        self._validate_input_fields(payload, is_serializer, serializer)
+        # Note: Field validation is handled by Pydantic during schema deserialization
+        # No additional validation needed here since data is already a validated Schema instance
 
         # Collect custom and optional fields
         customs, optionals = self._collect_custom_and_optional_fields(
