@@ -71,7 +71,7 @@ jobs:
       # Download baseline from the latest main branch run (for regression check)
       - name: Download Baseline Performance Results
         if: github.event_name == 'pull_request' || github.ref != 'refs/heads/main'
-        uses: dawidd6/action-download-artifact@bf251b5aa9c2f7eeb574a96ee720e24f801b7c11 # v6
+        uses: dawidd6/action-download-artifact@5c98f0b039f36ef966fdb7dfa9779262785ecb05 # v14
         continue-on-error: true
         with:
           workflow: performance.yml
