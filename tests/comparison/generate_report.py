@@ -46,10 +46,10 @@ def generate_html_report(results_file: Path, output_file: Path) -> None:
 
     # Color palette matching performance report style
     colors = [
-        "rgba(103, 58, 183, 0.75)",   # Purple - Django Ninja AIO
-        "rgba(33, 150, 243, 0.75)",   # Blue - Django Ninja
-        "rgba(255, 152, 0, 0.75)",    # Orange - ADRF
-        "rgba(76, 175, 80, 0.75)",    # Green - FastAPI
+        "rgba(103, 58, 183, 0.75)",  # Purple - Django Ninja AIO
+        "rgba(33, 150, 243, 0.75)",  # Blue - Django Ninja
+        "rgba(255, 152, 0, 0.75)",  # Orange - ADRF
+        "rgba(76, 175, 80, 0.75)",  # Green - FastAPI
     ]
     border_colors = [c.replace("0.75", "1") for c in colors]
 
@@ -73,11 +73,15 @@ def generate_html_report(results_file: Path, output_file: Path) -> None:
                 min_values.append(stats["min_ms"])
                 max_values.append(stats["max_ms"])
 
+        # Find winner (lowest median)
+        winner_idx = median_values.index(min(median_values)) if median_values else -1
+
         # Build data table
         table_rows = ""
         for i, framework in enumerate(op_frameworks):
+            row_class = ' class="winner"' if i == winner_idx else ""
             table_rows += f"""
-            <tr>
+            <tr{row_class}>
                 <td>{html.escape(framework)}</td>
                 <td>{median_values[i]:.4f}</td>
                 <td>{avg_values[i]:.4f}</td>
@@ -91,6 +95,7 @@ def generate_html_report(results_file: Path, output_file: Path) -> None:
             <div class="chart-container">
                 <canvas id="{canvas_id}"></canvas>
             </div>
+            <div class="table-wrapper">
             <table>
                 <thead>
                     <tr>
@@ -104,6 +109,7 @@ def generate_html_report(results_file: Path, output_file: Path) -> None:
                 <tbody>{table_rows}
                 </tbody>
             </table>
+            </div>
         </div>"""
 
         # Generate chart config
@@ -299,15 +305,25 @@ def generate_html_report(results_file: Path, output_file: Path) -> None:
             height: 350px;
             margin-bottom: 1.5rem;
         }}
+        .table-wrapper {{
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }}
         table {{
             width: 100%;
             border-collapse: collapse;
             font-size: 0.82rem;
+            min-width: 450px;
         }}
         th, td {{
             padding: 0.55rem 0.75rem;
             text-align: left;
             border-bottom: 1px solid var(--md-border);
+            white-space: nowrap;
+        }}
+        tr.winner td:first-child {{
+            font-weight: 700;
+            color: var(--md-primary);
         }}
         th {{
             color: var(--md-primary);
@@ -343,6 +359,68 @@ def generate_html_report(results_file: Path, output_file: Path) -> None:
             text-decoration: none;
         }}
         .footer a:hover {{ text-decoration: underline; }}
+        @media (max-width: 768px) {{
+            .container {{
+                padding: 1rem 0.75rem;
+            }}
+            .hero h1 {{
+                font-size: 1.4rem;
+            }}
+            .hero .subtitle {{
+                font-size: 0.85rem;
+            }}
+            .section-title {{
+                font-size: 1.1rem;
+                margin: 1.5rem 0 1rem;
+                padding-top: 1rem;
+            }}
+            .chart-section {{
+                padding: 1rem;
+                border-radius: 8px;
+                margin-bottom: 1rem;
+            }}
+            .chart-section:hover {{
+                transform: none;
+            }}
+            .chart-container {{
+                height: 250px;
+            }}
+            .chart-section h2 {{
+                font-size: 0.95rem;
+            }}
+            .header {{
+                padding: 0.5rem 1rem;
+                font-size: 0.75rem;
+            }}
+            .meta-pill {{
+                font-size: 0.7rem;
+                padding: 0.25rem 0.7rem;
+            }}
+            table {{
+                font-size: 0.75rem;
+            }}
+            th, td {{
+                padding: 0.4rem 0.5rem;
+            }}
+            td {{
+                font-size: 0.72rem;
+            }}
+            th {{
+                font-size: 0.7rem;
+            }}
+        }}
+        @media (max-width: 480px) {{
+            .chart-container {{
+                height: 200px;
+            }}
+            .hero {{
+                padding: 1rem 0 0.75rem;
+                margin-bottom: 1rem;
+            }}
+            .hero h1 {{
+                font-size: 1.2rem;
+            }}
+        }}
     </style>
 </head>
 <body>

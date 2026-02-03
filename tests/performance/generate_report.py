@@ -19,14 +19,14 @@ DEFAULT_INPUT = PROJECT_ROOT / "performance_results.json"
 DEFAULT_OUTPUT = PROJECT_ROOT / "performance_report.html"
 
 COLORS = [
-    "rgba(103, 58, 183, 0.75)",   # deep purple (primary)
-    "rgba(171, 71, 188, 0.75)",   # purple accent
-    "rgba(126, 87, 194, 0.75)",   # lighter purple
+    "rgba(103, 58, 183, 0.75)",  # deep purple (primary)
+    "rgba(171, 71, 188, 0.75)",  # purple accent
+    "rgba(126, 87, 194, 0.75)",  # lighter purple
     "rgba(186, 104, 200, 0.75)",  # pink-purple
-    "rgba(94, 53, 177, 0.75)",    # darker purple
+    "rgba(94, 53, 177, 0.75)",  # darker purple
     "rgba(149, 117, 205, 0.75)",  # soft violet
     "rgba(206, 147, 216, 0.75)",  # lavender
-    "rgba(69, 39, 160, 0.75)",    # indigo-purple
+    "rgba(69, 39, 160, 0.75)",  # indigo-purple
 ]
 
 BORDER_COLORS = [c.replace("0.75", "1") for c in COLORS]
@@ -73,6 +73,7 @@ def build_latest_run_charts(run: dict) -> str:
             <div class="chart-container">
                 <canvas id="{canvas_id}"></canvas>
             </div>
+            <div class="table-wrapper">
             <table>
                 <thead>
                     <tr>
@@ -87,6 +88,7 @@ def build_latest_run_charts(run: dict) -> str:
                 <tbody>{table_rows}
                 </tbody>
             </table>
+            </div>
         </div>"""
 
         labels_json = json.dumps(labels)
@@ -191,14 +193,16 @@ def build_trend_charts(runs: list[dict]) -> str:
         for i, (bench_name, values) in enumerate(benchmarks.items()):
             color = COLORS[i % len(COLORS)]
             border = BORDER_COLORS[i % len(BORDER_COLORS)]
-            datasets.append({
-                "label": bench_name,
-                "data": values,
-                "borderColor": border,
-                "backgroundColor": color,
-                "tension": 0.2,
-                "fill": False,
-            })
+            datasets.append(
+                {
+                    "label": bench_name,
+                    "data": values,
+                    "borderColor": border,
+                    "backgroundColor": color,
+                    "tension": 0.2,
+                    "fill": False,
+                }
+            )
 
         chart_configs += f"""
         new Chart(document.getElementById('{canvas_id}'), {{
@@ -389,15 +393,21 @@ def generate_html(data: dict) -> str:
             height: 350px;
             margin-bottom: 1.5rem;
         }}
+        .table-wrapper {{
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }}
         table {{
             width: 100%;
             border-collapse: collapse;
             font-size: 0.82rem;
+            min-width: 500px;
         }}
         th, td {{
             padding: 0.55rem 0.75rem;
             text-align: left;
             border-bottom: 1px solid var(--md-border);
+            white-space: nowrap;
         }}
         th {{
             color: var(--md-primary);
@@ -433,6 +443,68 @@ def generate_html(data: dict) -> str:
             text-decoration: none;
         }}
         .footer a:hover {{ text-decoration: underline; }}
+        @media (max-width: 768px) {{
+            .container {{
+                padding: 1rem 0.75rem;
+            }}
+            .hero h1 {{
+                font-size: 1.4rem;
+            }}
+            .hero .subtitle {{
+                font-size: 0.85rem;
+            }}
+            .section-title {{
+                font-size: 1.1rem;
+                margin: 1.5rem 0 1rem;
+                padding-top: 1rem;
+            }}
+            .chart-section {{
+                padding: 1rem;
+                border-radius: 8px;
+                margin-bottom: 1rem;
+            }}
+            .chart-section:hover {{
+                transform: none;
+            }}
+            .chart-container {{
+                height: 250px;
+            }}
+            .chart-section h2 {{
+                font-size: 0.95rem;
+            }}
+            .header {{
+                padding: 0.5rem 1rem;
+                font-size: 0.75rem;
+            }}
+            .meta-pill {{
+                font-size: 0.7rem;
+                padding: 0.25rem 0.7rem;
+            }}
+            table {{
+                font-size: 0.75rem;
+            }}
+            th, td {{
+                padding: 0.4rem 0.5rem;
+            }}
+            td {{
+                font-size: 0.72rem;
+            }}
+            th {{
+                font-size: 0.7rem;
+            }}
+        }}
+        @media (max-width: 480px) {{
+            .chart-container {{
+                height: 200px;
+            }}
+            .hero {{
+                padding: 1rem 0 0.75rem;
+                margin-bottom: 1rem;
+            }}
+            .hero h1 {{
+                font-size: 1.2rem;
+            }}
+        }}
     </style>
 </head>
 <body>
@@ -478,13 +550,15 @@ def generate_html(data: dict) -> str:
 def main():
     parser = argparse.ArgumentParser(description="Generate performance report HTML")
     parser.add_argument(
-        "--input", "-i",
+        "--input",
+        "-i",
         type=Path,
         default=DEFAULT_INPUT,
         help="Path to performance_results.json",
     )
     parser.add_argument(
-        "--output", "-o",
+        "--output",
+        "-o",
         type=Path,
         default=DEFAULT_OUTPUT,
         help="Path for the output HTML report",
@@ -495,10 +569,16 @@ def main():
     output_path = args.output.resolve()
 
     if not str(input_path).startswith(str(PROJECT_ROOT)):
-        print(f"Error: input path must be within project root ({PROJECT_ROOT})", file=sys.stderr)
+        print(
+            f"Error: input path must be within project root ({PROJECT_ROOT})",
+            file=sys.stderr,
+        )
         sys.exit(1)
     if not str(output_path).startswith(str(PROJECT_ROOT)):
-        print(f"Error: output path must be within project root ({PROJECT_ROOT})", file=sys.stderr)
+        print(
+            f"Error: output path must be within project root ({PROJECT_ROOT})",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     data = load_results(input_path)
