@@ -139,15 +139,25 @@
             height: 350px;
             margin-bottom: 1.5rem;
         }
+        .table-wrapper {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
         table {
             width: 100%;
             border-collapse: collapse;
             font-size: 0.82rem;
+            min-width: 450px;
         }
         th, td {
             padding: 0.55rem 0.75rem;
             text-align: left;
             border-bottom: 1px solid var(--md-border);
+            white-space: nowrap;
+        }
+        tr.winner td:first-child {
+            font-weight: 700;
+            color: var(--md-primary);
         }
         th {
             color: var(--md-primary);
@@ -183,6 +193,68 @@
             text-decoration: none;
         }
         .footer a:hover { text-decoration: underline; }
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem 0.75rem;
+            }
+            .hero h1 {
+                font-size: 1.4rem;
+            }
+            .hero .subtitle {
+                font-size: 0.85rem;
+            }
+            .section-title {
+                font-size: 1.1rem;
+                margin: 1.5rem 0 1rem;
+                padding-top: 1rem;
+            }
+            .chart-section {
+                padding: 1rem;
+                border-radius: 8px;
+                margin-bottom: 1rem;
+            }
+            .chart-section:hover {
+                transform: none;
+            }
+            .chart-container {
+                height: 250px;
+            }
+            .chart-section h2 {
+                font-size: 0.95rem;
+            }
+            .header {
+                padding: 0.5rem 1rem;
+                font-size: 0.75rem;
+            }
+            .meta-pill {
+                font-size: 0.7rem;
+                padding: 0.25rem 0.7rem;
+            }
+            table {
+                font-size: 0.75rem;
+            }
+            th, td {
+                padding: 0.4rem 0.5rem;
+            }
+            td {
+                font-size: 0.72rem;
+            }
+            th {
+                font-size: 0.7rem;
+            }
+        }
+        @media (max-width: 480px) {
+            .chart-container {
+                height: 200px;
+            }
+            .hero {
+                padding: 1rem 0 0.75rem;
+                margin-bottom: 1rem;
+            }
+            .hero h1 {
+                font-size: 1.2rem;
+            }
+        }
     </style>
 </head>
 <body>
@@ -196,7 +268,7 @@
             <h1>Framework Comparison</h1>
             <p class="subtitle">Comparing Django Ninja AIO against other Python REST frameworks</p>
             <div class="meta-pills">
-                <span class="meta-pill"><strong>Run</strong> 2026-02-02 17:50:24</span>
+                <span class="meta-pill"><strong>Run</strong> 2026-02-03 17:19:43</span>
                 <span class="meta-pill"><strong>Python</strong> 3.14.2</span>
                 <span class="meta-pill"><strong>Frameworks</strong> 4</span>
                 <span class="meta-pill"><strong>Operations</strong> 13</span>
@@ -210,6 +282,7 @@
             <div class="chart-container">
                 <canvas id="chart_0"></canvas>
             </div>
+            <div class="table-wrapper">
             <table>
                 <thead>
                     <tr>
@@ -223,40 +296,42 @@
                 <tbody>
             <tr>
                 <td>Django Ninja AIO</td>
-                <td>14.0702</td>
-                <td>13.9966</td>
-                <td>12.2407</td>
-                <td>15.2254</td>
+                <td>16.6024</td>
+                <td>17.0144</td>
+                <td>16.1571</td>
+                <td>20.0625</td>
             </tr>
-            <tr>
+            <tr class="winner">
                 <td>Django Ninja</td>
-                <td>1.0730</td>
-                <td>1.0824</td>
-                <td>1.0471</td>
-                <td>1.4015</td>
+                <td>1.1999</td>
+                <td>1.2085</td>
+                <td>1.1735</td>
+                <td>1.3498</td>
             </tr>
             <tr>
                 <td>ADRF</td>
-                <td>112.1921</td>
-                <td>114.8748</td>
-                <td>108.3625</td>
-                <td>152.9182</td>
+                <td>150.5949</td>
+                <td>153.2544</td>
+                <td>140.4150</td>
+                <td>181.8786</td>
             </tr>
             <tr>
                 <td>FastAPI</td>
-                <td>1.3825</td>
-                <td>1.3943</td>
-                <td>1.3284</td>
-                <td>1.8214</td>
+                <td>1.5283</td>
+                <td>1.5384</td>
+                <td>1.4921</td>
+                <td>1.8778</td>
             </tr>
                 </tbody>
             </table>
+            </div>
         </div>
         <div class="chart-section">
             <h2>Bulk Serialization 500</h2>
             <div class="chart-container">
                 <canvas id="chart_1"></canvas>
             </div>
+            <div class="table-wrapper">
             <table>
                 <thead>
                     <tr>
@@ -270,40 +345,42 @@
                 <tbody>
             <tr>
                 <td>Django Ninja AIO</td>
-                <td>62.0694</td>
-                <td>63.7291</td>
-                <td>60.9197</td>
-                <td>68.9583</td>
+                <td>86.8166</td>
+                <td>87.9925</td>
+                <td>78.6208</td>
+                <td>101.6556</td>
             </tr>
-            <tr>
+            <tr class="winner">
                 <td>Django Ninja</td>
-                <td>4.3941</td>
-                <td>4.4302</td>
-                <td>4.1397</td>
-                <td>4.8000</td>
+                <td>4.7635</td>
+                <td>5.2195</td>
+                <td>4.6407</td>
+                <td>8.9748</td>
             </tr>
             <tr>
                 <td>ADRF</td>
-                <td>572.6803</td>
-                <td>570.8824</td>
-                <td>543.8353</td>
-                <td>590.1892</td>
+                <td>738.5203</td>
+                <td>741.1501</td>
+                <td>696.3273</td>
+                <td>806.3404</td>
             </tr>
             <tr>
                 <td>FastAPI</td>
-                <td>6.1207</td>
-                <td>6.1479</td>
-                <td>5.8402</td>
-                <td>6.5787</td>
+                <td>6.3694</td>
+                <td>6.3665</td>
+                <td>6.1469</td>
+                <td>6.5172</td>
             </tr>
                 </tbody>
             </table>
+            </div>
         </div>
         <div class="chart-section">
             <h2>Complex Async Query</h2>
             <div class="chart-container">
                 <canvas id="chart_2"></canvas>
             </div>
+            <div class="table-wrapper">
             <table>
                 <thead>
                     <tr>
@@ -317,40 +394,42 @@
                 <tbody>
             <tr>
                 <td>Django Ninja AIO</td>
-                <td>3.2658</td>
-                <td>3.3392</td>
-                <td>3.1359</td>
-                <td>5.6606</td>
+                <td>4.9346</td>
+                <td>4.6782</td>
+                <td>4.0903</td>
+                <td>7.4602</td>
             </tr>
-            <tr>
+            <tr class="winner">
                 <td>Django Ninja</td>
-                <td>0.6929</td>
-                <td>0.7077</td>
-                <td>0.6577</td>
-                <td>1.1121</td>
+                <td>0.7989</td>
+                <td>0.8013</td>
+                <td>0.7620</td>
+                <td>0.9251</td>
             </tr>
             <tr>
                 <td>ADRF</td>
-                <td>35.9080</td>
-                <td>36.7869</td>
-                <td>33.4407</td>
-                <td>78.8470</td>
+                <td>45.2508</td>
+                <td>48.0667</td>
+                <td>43.5900</td>
+                <td>89.7378</td>
             </tr>
             <tr>
                 <td>FastAPI</td>
-                <td>0.7902</td>
-                <td>0.8154</td>
-                <td>0.7584</td>
-                <td>1.4085</td>
+                <td>0.9199</td>
+                <td>0.9402</td>
+                <td>0.8865</td>
+                <td>1.3996</td>
             </tr>
                 </tbody>
             </table>
+            </div>
         </div>
         <div class="chart-section">
             <h2>Create</h2>
             <div class="chart-container">
                 <canvas id="chart_3"></canvas>
             </div>
+            <div class="table-wrapper">
             <table>
                 <thead>
                     <tr>
@@ -364,40 +443,42 @@
                 <tbody>
             <tr>
                 <td>Django Ninja AIO</td>
-                <td>0.9863</td>
-                <td>0.9950</td>
-                <td>0.9090</td>
-                <td>1.7640</td>
+                <td>0.9570</td>
+                <td>0.9758</td>
+                <td>0.9280</td>
+                <td>1.5309</td>
             </tr>
             <tr>
                 <td>Django Ninja</td>
-                <td>0.2903</td>
-                <td>0.3007</td>
-                <td>0.2744</td>
-                <td>0.5263</td>
+                <td>0.3651</td>
+                <td>0.3711</td>
+                <td>0.3505</td>
+                <td>0.4848</td>
             </tr>
             <tr>
                 <td>ADRF</td>
-                <td>1.8503</td>
-                <td>1.8655</td>
-                <td>1.7874</td>
-                <td>2.2497</td>
+                <td>2.3366</td>
+                <td>2.3577</td>
+                <td>2.2797</td>
+                <td>2.7254</td>
             </tr>
-            <tr>
+            <tr class="winner">
                 <td>FastAPI</td>
-                <td>0.2839</td>
-                <td>0.2959</td>
-                <td>0.2686</td>
-                <td>0.4337</td>
+                <td>0.3608</td>
+                <td>0.3630</td>
+                <td>0.3389</td>
+                <td>0.4764</td>
             </tr>
                 </tbody>
             </table>
+            </div>
         </div>
         <div class="chart-section">
             <h2>Delete</h2>
             <div class="chart-container">
                 <canvas id="chart_4"></canvas>
             </div>
+            <div class="table-wrapper">
             <table>
                 <thead>
                     <tr>
@@ -411,40 +492,42 @@
                 <tbody>
             <tr>
                 <td>Django Ninja AIO</td>
-                <td>0.7985</td>
-                <td>0.8106</td>
-                <td>0.7277</td>
-                <td>1.2827</td>
+                <td>0.8854</td>
+                <td>0.9040</td>
+                <td>0.8418</td>
+                <td>1.3528</td>
             </tr>
-            <tr>
+            <tr class="winner">
                 <td>Django Ninja</td>
-                <td>0.6942</td>
-                <td>0.6984</td>
-                <td>0.6455</td>
-                <td>0.8614</td>
+                <td>0.8024</td>
+                <td>0.8070</td>
+                <td>0.7680</td>
+                <td>0.9782</td>
             </tr>
             <tr>
                 <td>ADRF</td>
-                <td>0.6882</td>
-                <td>0.6913</td>
-                <td>0.6449</td>
-                <td>0.8432</td>
+                <td>0.8072</td>
+                <td>0.8082</td>
+                <td>0.7662</td>
+                <td>0.9062</td>
             </tr>
             <tr>
                 <td>FastAPI</td>
-                <td>0.6753</td>
-                <td>0.6802</td>
-                <td>0.6424</td>
-                <td>0.8108</td>
+                <td>0.8536</td>
+                <td>0.8728</td>
+                <td>0.7762</td>
+                <td>0.9796</td>
             </tr>
                 </tbody>
             </table>
+            </div>
         </div>
         <div class="chart-section">
             <h2>Filter</h2>
             <div class="chart-container">
                 <canvas id="chart_5"></canvas>
             </div>
+            <div class="table-wrapper">
             <table>
                 <thead>
                     <tr>
@@ -458,40 +541,42 @@
                 <tbody>
             <tr>
                 <td>Django Ninja AIO</td>
-                <td>0.6942</td>
-                <td>0.6650</td>
-                <td>0.5403</td>
-                <td>0.9210</td>
+                <td>0.7150</td>
+                <td>0.7300</td>
+                <td>0.6797</td>
+                <td>1.0400</td>
             </tr>
-            <tr>
+            <tr class="winner">
                 <td>Django Ninja</td>
-                <td>0.4125</td>
-                <td>0.4426</td>
-                <td>0.3685</td>
-                <td>0.6803</td>
+                <td>0.4920</td>
+                <td>0.5053</td>
+                <td>0.4589</td>
+                <td>0.6190</td>
             </tr>
             <tr>
                 <td>ADRF</td>
-                <td>2.0327</td>
-                <td>2.0481</td>
-                <td>1.9496</td>
-                <td>2.3311</td>
+                <td>2.6238</td>
+                <td>2.5212</td>
+                <td>2.2229</td>
+                <td>2.6746</td>
             </tr>
             <tr>
                 <td>FastAPI</td>
-                <td>0.4063</td>
-                <td>0.4260</td>
-                <td>0.3798</td>
-                <td>0.6881</td>
+                <td>0.4950</td>
+                <td>0.4954</td>
+                <td>0.4699</td>
+                <td>0.6589</td>
             </tr>
                 </tbody>
             </table>
+            </div>
         </div>
         <div class="chart-section">
             <h2>List</h2>
             <div class="chart-container">
                 <canvas id="chart_6"></canvas>
             </div>
+            <div class="table-wrapper">
             <table>
                 <thead>
                     <tr>
@@ -505,40 +590,42 @@
                 <tbody>
             <tr>
                 <td>Django Ninja AIO</td>
-                <td>3.0813</td>
-                <td>3.1005</td>
-                <td>2.7239</td>
-                <td>4.2160</td>
+                <td>3.7824</td>
+                <td>4.0210</td>
+                <td>3.5847</td>
+                <td>4.5612</td>
             </tr>
-            <tr>
+            <tr class="winner">
                 <td>Django Ninja</td>
-                <td>0.4299</td>
-                <td>0.4352</td>
-                <td>0.4088</td>
-                <td>0.5814</td>
+                <td>0.5170</td>
+                <td>0.5197</td>
+                <td>0.4874</td>
+                <td>0.6285</td>
             </tr>
             <tr>
                 <td>ADRF</td>
-                <td>22.9977</td>
-                <td>23.5682</td>
-                <td>21.7994</td>
-                <td>26.8492</td>
+                <td>29.5689</td>
+                <td>30.6843</td>
+                <td>28.3690</td>
+                <td>35.4111</td>
             </tr>
             <tr>
                 <td>FastAPI</td>
-                <td>0.4851</td>
-                <td>0.4944</td>
-                <td>0.4651</td>
-                <td>0.7174</td>
+                <td>0.5894</td>
+                <td>0.5974</td>
+                <td>0.5617</td>
+                <td>0.8786</td>
             </tr>
                 </tbody>
             </table>
+            </div>
         </div>
         <div class="chart-section">
             <h2>Many To Many</h2>
             <div class="chart-container">
                 <canvas id="chart_7"></canvas>
             </div>
+            <div class="table-wrapper">
             <table>
                 <thead>
                     <tr>
@@ -552,40 +639,42 @@
                 <tbody>
             <tr>
                 <td>Django Ninja AIO</td>
-                <td>1.2394</td>
-                <td>1.2656</td>
-                <td>1.1882</td>
-                <td>3.9086</td>
+                <td>1.4020</td>
+                <td>1.4388</td>
+                <td>1.3641</td>
+                <td>4.4979</td>
             </tr>
-            <tr>
+            <tr class="winner">
                 <td>Django Ninja</td>
-                <td>1.0528</td>
-                <td>1.0725</td>
-                <td>0.9726</td>
-                <td>1.2882</td>
+                <td>1.1643</td>
+                <td>1.1667</td>
+                <td>1.1267</td>
+                <td>1.3046</td>
             </tr>
             <tr>
                 <td>ADRF</td>
-                <td>8.8910</td>
-                <td>9.2199</td>
-                <td>8.6628</td>
-                <td>31.4799</td>
+                <td>11.8220</td>
+                <td>12.6218</td>
+                <td>11.0727</td>
+                <td>42.4008</td>
             </tr>
             <tr>
                 <td>FastAPI</td>
-                <td>1.0657</td>
-                <td>1.0729</td>
-                <td>1.0185</td>
-                <td>1.4842</td>
+                <td>1.2256</td>
+                <td>1.2331</td>
+                <td>1.1794</td>
+                <td>1.6393</td>
             </tr>
                 </tbody>
             </table>
+            </div>
         </div>
         <div class="chart-section">
             <h2>Nested Relations</h2>
             <div class="chart-container">
                 <canvas id="chart_8"></canvas>
             </div>
+            <div class="table-wrapper">
             <table>
                 <thead>
                     <tr>
@@ -599,40 +688,42 @@
                 <tbody>
             <tr>
                 <td>Django Ninja AIO</td>
-                <td>0.8782</td>
-                <td>0.8857</td>
-                <td>0.8380</td>
-                <td>1.3723</td>
+                <td>1.0807</td>
+                <td>1.1096</td>
+                <td>1.0113</td>
+                <td>1.3848</td>
             </tr>
-            <tr>
+            <tr class="winner">
                 <td>Django Ninja</td>
-                <td>0.4663</td>
-                <td>0.4814</td>
-                <td>0.4319</td>
-                <td>0.7846</td>
+                <td>0.5473</td>
+                <td>0.5552</td>
+                <td>0.5098</td>
+                <td>0.8544</td>
             </tr>
             <tr>
                 <td>ADRF</td>
-                <td>2.5896</td>
-                <td>2.5896</td>
-                <td>2.4774</td>
-                <td>2.8725</td>
+                <td>3.2415</td>
+                <td>3.2480</td>
+                <td>3.1630</td>
+                <td>3.4122</td>
             </tr>
             <tr>
                 <td>FastAPI</td>
-                <td>0.4737</td>
-                <td>0.4773</td>
-                <td>0.4415</td>
-                <td>0.6318</td>
+                <td>0.5613</td>
+                <td>0.5630</td>
+                <td>0.5318</td>
+                <td>0.6942</td>
             </tr>
                 </tbody>
             </table>
+            </div>
         </div>
         <div class="chart-section">
             <h2>Relation Serialization</h2>
             <div class="chart-container">
                 <canvas id="chart_9"></canvas>
             </div>
+            <div class="table-wrapper">
             <table>
                 <thead>
                     <tr>
@@ -646,40 +737,42 @@
                 <tbody>
             <tr>
                 <td>Django Ninja AIO</td>
-                <td>0.6501</td>
-                <td>0.6517</td>
-                <td>0.6074</td>
-                <td>0.8868</td>
+                <td>0.7735</td>
+                <td>0.7756</td>
+                <td>0.7352</td>
+                <td>0.9113</td>
             </tr>
-            <tr>
+            <tr class="winner">
                 <td>Django Ninja</td>
-                <td>0.4607</td>
-                <td>0.4652</td>
-                <td>0.4303</td>
-                <td>0.5666</td>
+                <td>0.5333</td>
+                <td>0.5372</td>
+                <td>0.5079</td>
+                <td>0.6608</td>
             </tr>
             <tr>
                 <td>ADRF</td>
-                <td>2.6395</td>
-                <td>2.8878</td>
-                <td>2.4983</td>
-                <td>16.7285</td>
+                <td>3.2706</td>
+                <td>3.4176</td>
+                <td>3.1691</td>
+                <td>16.9840</td>
             </tr>
             <tr>
                 <td>FastAPI</td>
-                <td>0.5713</td>
-                <td>0.5782</td>
-                <td>0.5326</td>
-                <td>0.7946</td>
+                <td>0.5498</td>
+                <td>0.5512</td>
+                <td>0.5221</td>
+                <td>0.7927</td>
             </tr>
                 </tbody>
             </table>
+            </div>
         </div>
         <div class="chart-section">
             <h2>Retrieve</h2>
             <div class="chart-container">
                 <canvas id="chart_10"></canvas>
             </div>
+            <div class="table-wrapper">
             <table>
                 <thead>
                     <tr>
@@ -693,40 +786,42 @@
                 <tbody>
             <tr>
                 <td>Django Ninja AIO</td>
-                <td>0.5397</td>
-                <td>0.5477</td>
-                <td>0.4925</td>
-                <td>0.7774</td>
+                <td>0.6624</td>
+                <td>0.6690</td>
+                <td>0.6236</td>
+                <td>0.8953</td>
             </tr>
-            <tr>
+            <tr class="winner">
                 <td>Django Ninja</td>
-                <td>0.3635</td>
-                <td>0.3701</td>
-                <td>0.3388</td>
-                <td>0.4525</td>
+                <td>0.4411</td>
+                <td>0.4438</td>
+                <td>0.4198</td>
+                <td>0.5388</td>
             </tr>
             <tr>
                 <td>ADRF</td>
-                <td>1.7089</td>
-                <td>1.7929</td>
-                <td>1.6465</td>
-                <td>8.9508</td>
+                <td>2.4931</td>
+                <td>2.4479</td>
+                <td>2.1118</td>
+                <td>9.9003</td>
             </tr>
             <tr>
                 <td>FastAPI</td>
-                <td>0.3680</td>
-                <td>0.3749</td>
-                <td>0.3461</td>
-                <td>0.5057</td>
+                <td>0.4537</td>
+                <td>0.4554</td>
+                <td>0.4293</td>
+                <td>0.6050</td>
             </tr>
                 </tbody>
             </table>
+            </div>
         </div>
         <div class="chart-section">
             <h2>Reverse Relations</h2>
             <div class="chart-container">
                 <canvas id="chart_11"></canvas>
             </div>
+            <div class="table-wrapper">
             <table>
                 <thead>
                     <tr>
@@ -740,40 +835,42 @@
                 <tbody>
             <tr>
                 <td>Django Ninja AIO</td>
-                <td>1.5967</td>
-                <td>1.6278</td>
-                <td>1.5426</td>
-                <td>4.2096</td>
+                <td>1.7967</td>
+                <td>1.8259</td>
+                <td>1.7477</td>
+                <td>4.5762</td>
             </tr>
-            <tr>
+            <tr class="winner">
                 <td>Django Ninja</td>
-                <td>1.2733</td>
-                <td>1.3460</td>
-                <td>1.2199</td>
-                <td>3.4048</td>
+                <td>1.4756</td>
+                <td>1.5608</td>
+                <td>1.4242</td>
+                <td>4.6331</td>
             </tr>
             <tr>
                 <td>ADRF</td>
-                <td>36.1363</td>
-                <td>36.9569</td>
-                <td>34.3427</td>
-                <td>48.2590</td>
+                <td>46.2535</td>
+                <td>48.5112</td>
+                <td>44.1417</td>
+                <td>59.2722</td>
             </tr>
             <tr>
                 <td>FastAPI</td>
-                <td>1.4274</td>
-                <td>1.4348</td>
-                <td>1.3610</td>
-                <td>1.8551</td>
+                <td>1.6133</td>
+                <td>1.6222</td>
+                <td>1.5832</td>
+                <td>1.9849</td>
             </tr>
                 </tbody>
             </table>
+            </div>
         </div>
         <div class="chart-section">
             <h2>Update</h2>
             <div class="chart-container">
                 <canvas id="chart_12"></canvas>
             </div>
+            <div class="table-wrapper">
             <table>
                 <thead>
                     <tr>
@@ -787,34 +884,35 @@
                 <tbody>
             <tr>
                 <td>Django Ninja AIO</td>
-                <td>1.1720</td>
-                <td>1.1850</td>
-                <td>1.1249</td>
-                <td>1.5808</td>
+                <td>1.3721</td>
+                <td>1.3820</td>
+                <td>1.3207</td>
+                <td>1.7933</td>
             </tr>
-            <tr>
+            <tr class="winner">
                 <td>Django Ninja</td>
-                <td>0.7456</td>
-                <td>0.7568</td>
-                <td>0.6985</td>
-                <td>0.9198</td>
+                <td>0.8713</td>
+                <td>0.8748</td>
+                <td>0.8319</td>
+                <td>0.9574</td>
             </tr>
             <tr>
                 <td>ADRF</td>
-                <td>2.3278</td>
-                <td>2.3644</td>
-                <td>2.2524</td>
-                <td>2.8288</td>
+                <td>2.7637</td>
+                <td>2.7760</td>
+                <td>2.6926</td>
+                <td>2.9486</td>
             </tr>
             <tr>
                 <td>FastAPI</td>
-                <td>0.7404</td>
-                <td>0.7516</td>
-                <td>0.7032</td>
-                <td>1.1323</td>
+                <td>0.8731</td>
+                <td>0.8826</td>
+                <td>0.8356</td>
+                <td>1.2057</td>
             </tr>
                 </tbody>
             </table>
+            </div>
         </div>
 
         <div class="footer">
@@ -837,7 +935,7 @@
                 datasets: [
                     {
                         label: 'Median (ms)',
-                        data: [14.0702, 1.073, 112.1921, 1.3825],
+                        data: [16.6024, 1.1999, 150.5949, 1.5283],
                         backgroundColor: ["rgba(103, 58, 183, 0.75)", "rgba(33, 150, 243, 0.75)", "rgba(255, 152, 0, 0.75)", "rgba(76, 175, 80, 0.75)"],
                         borderColor: ["rgba(103, 58, 183, 1)", "rgba(33, 150, 243, 1)", "rgba(255, 152, 0, 1)", "rgba(76, 175, 80, 1)"],
                         borderWidth: 1
@@ -858,9 +956,9 @@
                             afterLabel: function(context) {
                                 const idx = context.dataIndex;
                                 return [
-                                    `Avg: [13.9966, 1.0824, 114.8748, 1.3943][idx].toFixed(4) + ' ms'`,
-                                    `Min: [12.2407, 1.0471, 108.3625, 1.3284][idx].toFixed(4) + ' ms'`,
-                                    `Max: [15.2254, 1.4015, 152.9182, 1.8214][idx].toFixed(4) + ' ms'`
+                                    `Avg: [17.0144, 1.2085, 153.2544, 1.5384][idx].toFixed(4) + ' ms'`,
+                                    `Min: [16.1571, 1.1735, 140.415, 1.4921][idx].toFixed(4) + ' ms'`,
+                                    `Max: [20.0625, 1.3498, 181.8786, 1.8778][idx].toFixed(4) + ' ms'`
                                 ];
                             }
                         }
@@ -885,7 +983,7 @@
                 datasets: [
                     {
                         label: 'Median (ms)',
-                        data: [62.0694, 4.3941, 572.6803, 6.1207],
+                        data: [86.8166, 4.7635, 738.5203, 6.3694],
                         backgroundColor: ["rgba(103, 58, 183, 0.75)", "rgba(33, 150, 243, 0.75)", "rgba(255, 152, 0, 0.75)", "rgba(76, 175, 80, 0.75)"],
                         borderColor: ["rgba(103, 58, 183, 1)", "rgba(33, 150, 243, 1)", "rgba(255, 152, 0, 1)", "rgba(76, 175, 80, 1)"],
                         borderWidth: 1
@@ -906,9 +1004,9 @@
                             afterLabel: function(context) {
                                 const idx = context.dataIndex;
                                 return [
-                                    `Avg: [63.7291, 4.4302, 570.8824, 6.1479][idx].toFixed(4) + ' ms'`,
-                                    `Min: [60.9197, 4.1397, 543.8353, 5.8402][idx].toFixed(4) + ' ms'`,
-                                    `Max: [68.9583, 4.8, 590.1892, 6.5787][idx].toFixed(4) + ' ms'`
+                                    `Avg: [87.9925, 5.2195, 741.1501, 6.3665][idx].toFixed(4) + ' ms'`,
+                                    `Min: [78.6208, 4.6407, 696.3273, 6.1469][idx].toFixed(4) + ' ms'`,
+                                    `Max: [101.6556, 8.9748, 806.3404, 6.5172][idx].toFixed(4) + ' ms'`
                                 ];
                             }
                         }
@@ -933,7 +1031,7 @@
                 datasets: [
                     {
                         label: 'Median (ms)',
-                        data: [3.2658, 0.6929, 35.908, 0.7902],
+                        data: [4.9346, 0.7989, 45.2508, 0.9199],
                         backgroundColor: ["rgba(103, 58, 183, 0.75)", "rgba(33, 150, 243, 0.75)", "rgba(255, 152, 0, 0.75)", "rgba(76, 175, 80, 0.75)"],
                         borderColor: ["rgba(103, 58, 183, 1)", "rgba(33, 150, 243, 1)", "rgba(255, 152, 0, 1)", "rgba(76, 175, 80, 1)"],
                         borderWidth: 1
@@ -954,9 +1052,9 @@
                             afterLabel: function(context) {
                                 const idx = context.dataIndex;
                                 return [
-                                    `Avg: [3.3392, 0.7077, 36.7869, 0.8154][idx].toFixed(4) + ' ms'`,
-                                    `Min: [3.1359, 0.6577, 33.4407, 0.7584][idx].toFixed(4) + ' ms'`,
-                                    `Max: [5.6606, 1.1121, 78.847, 1.4085][idx].toFixed(4) + ' ms'`
+                                    `Avg: [4.6782, 0.8013, 48.0667, 0.9402][idx].toFixed(4) + ' ms'`,
+                                    `Min: [4.0903, 0.762, 43.59, 0.8865][idx].toFixed(4) + ' ms'`,
+                                    `Max: [7.4602, 0.9251, 89.7378, 1.3996][idx].toFixed(4) + ' ms'`
                                 ];
                             }
                         }
@@ -981,7 +1079,7 @@
                 datasets: [
                     {
                         label: 'Median (ms)',
-                        data: [0.9863, 0.2903, 1.8503, 0.2839],
+                        data: [0.957, 0.3651, 2.3366, 0.3608],
                         backgroundColor: ["rgba(103, 58, 183, 0.75)", "rgba(33, 150, 243, 0.75)", "rgba(255, 152, 0, 0.75)", "rgba(76, 175, 80, 0.75)"],
                         borderColor: ["rgba(103, 58, 183, 1)", "rgba(33, 150, 243, 1)", "rgba(255, 152, 0, 1)", "rgba(76, 175, 80, 1)"],
                         borderWidth: 1
@@ -1002,9 +1100,9 @@
                             afterLabel: function(context) {
                                 const idx = context.dataIndex;
                                 return [
-                                    `Avg: [0.995, 0.3007, 1.8655, 0.2959][idx].toFixed(4) + ' ms'`,
-                                    `Min: [0.909, 0.2744, 1.7874, 0.2686][idx].toFixed(4) + ' ms'`,
-                                    `Max: [1.764, 0.5263, 2.2497, 0.4337][idx].toFixed(4) + ' ms'`
+                                    `Avg: [0.9758, 0.3711, 2.3577, 0.363][idx].toFixed(4) + ' ms'`,
+                                    `Min: [0.928, 0.3505, 2.2797, 0.3389][idx].toFixed(4) + ' ms'`,
+                                    `Max: [1.5309, 0.4848, 2.7254, 0.4764][idx].toFixed(4) + ' ms'`
                                 ];
                             }
                         }
@@ -1029,7 +1127,7 @@
                 datasets: [
                     {
                         label: 'Median (ms)',
-                        data: [0.7985, 0.6942, 0.6882, 0.6753],
+                        data: [0.8854, 0.8024, 0.8072, 0.8536],
                         backgroundColor: ["rgba(103, 58, 183, 0.75)", "rgba(33, 150, 243, 0.75)", "rgba(255, 152, 0, 0.75)", "rgba(76, 175, 80, 0.75)"],
                         borderColor: ["rgba(103, 58, 183, 1)", "rgba(33, 150, 243, 1)", "rgba(255, 152, 0, 1)", "rgba(76, 175, 80, 1)"],
                         borderWidth: 1
@@ -1050,9 +1148,9 @@
                             afterLabel: function(context) {
                                 const idx = context.dataIndex;
                                 return [
-                                    `Avg: [0.8106, 0.6984, 0.6913, 0.6802][idx].toFixed(4) + ' ms'`,
-                                    `Min: [0.7277, 0.6455, 0.6449, 0.6424][idx].toFixed(4) + ' ms'`,
-                                    `Max: [1.2827, 0.8614, 0.8432, 0.8108][idx].toFixed(4) + ' ms'`
+                                    `Avg: [0.904, 0.807, 0.8082, 0.8728][idx].toFixed(4) + ' ms'`,
+                                    `Min: [0.8418, 0.768, 0.7662, 0.7762][idx].toFixed(4) + ' ms'`,
+                                    `Max: [1.3528, 0.9782, 0.9062, 0.9796][idx].toFixed(4) + ' ms'`
                                 ];
                             }
                         }
@@ -1077,7 +1175,7 @@
                 datasets: [
                     {
                         label: 'Median (ms)',
-                        data: [0.6942, 0.4125, 2.0327, 0.4063],
+                        data: [0.715, 0.492, 2.6238, 0.495],
                         backgroundColor: ["rgba(103, 58, 183, 0.75)", "rgba(33, 150, 243, 0.75)", "rgba(255, 152, 0, 0.75)", "rgba(76, 175, 80, 0.75)"],
                         borderColor: ["rgba(103, 58, 183, 1)", "rgba(33, 150, 243, 1)", "rgba(255, 152, 0, 1)", "rgba(76, 175, 80, 1)"],
                         borderWidth: 1
@@ -1098,9 +1196,9 @@
                             afterLabel: function(context) {
                                 const idx = context.dataIndex;
                                 return [
-                                    `Avg: [0.665, 0.4426, 2.0481, 0.426][idx].toFixed(4) + ' ms'`,
-                                    `Min: [0.5403, 0.3685, 1.9496, 0.3798][idx].toFixed(4) + ' ms'`,
-                                    `Max: [0.921, 0.6803, 2.3311, 0.6881][idx].toFixed(4) + ' ms'`
+                                    `Avg: [0.73, 0.5053, 2.5212, 0.4954][idx].toFixed(4) + ' ms'`,
+                                    `Min: [0.6797, 0.4589, 2.2229, 0.4699][idx].toFixed(4) + ' ms'`,
+                                    `Max: [1.04, 0.619, 2.6746, 0.6589][idx].toFixed(4) + ' ms'`
                                 ];
                             }
                         }
@@ -1125,7 +1223,7 @@
                 datasets: [
                     {
                         label: 'Median (ms)',
-                        data: [3.0813, 0.4299, 22.9977, 0.4851],
+                        data: [3.7824, 0.517, 29.5689, 0.5894],
                         backgroundColor: ["rgba(103, 58, 183, 0.75)", "rgba(33, 150, 243, 0.75)", "rgba(255, 152, 0, 0.75)", "rgba(76, 175, 80, 0.75)"],
                         borderColor: ["rgba(103, 58, 183, 1)", "rgba(33, 150, 243, 1)", "rgba(255, 152, 0, 1)", "rgba(76, 175, 80, 1)"],
                         borderWidth: 1
@@ -1146,9 +1244,9 @@
                             afterLabel: function(context) {
                                 const idx = context.dataIndex;
                                 return [
-                                    `Avg: [3.1005, 0.4352, 23.5682, 0.4944][idx].toFixed(4) + ' ms'`,
-                                    `Min: [2.7239, 0.4088, 21.7994, 0.4651][idx].toFixed(4) + ' ms'`,
-                                    `Max: [4.216, 0.5814, 26.8492, 0.7174][idx].toFixed(4) + ' ms'`
+                                    `Avg: [4.021, 0.5197, 30.6843, 0.5974][idx].toFixed(4) + ' ms'`,
+                                    `Min: [3.5847, 0.4874, 28.369, 0.5617][idx].toFixed(4) + ' ms'`,
+                                    `Max: [4.5612, 0.6285, 35.4111, 0.8786][idx].toFixed(4) + ' ms'`
                                 ];
                             }
                         }
@@ -1173,7 +1271,7 @@
                 datasets: [
                     {
                         label: 'Median (ms)',
-                        data: [1.2394, 1.0528, 8.891, 1.0657],
+                        data: [1.402, 1.1643, 11.822, 1.2256],
                         backgroundColor: ["rgba(103, 58, 183, 0.75)", "rgba(33, 150, 243, 0.75)", "rgba(255, 152, 0, 0.75)", "rgba(76, 175, 80, 0.75)"],
                         borderColor: ["rgba(103, 58, 183, 1)", "rgba(33, 150, 243, 1)", "rgba(255, 152, 0, 1)", "rgba(76, 175, 80, 1)"],
                         borderWidth: 1
@@ -1194,9 +1292,9 @@
                             afterLabel: function(context) {
                                 const idx = context.dataIndex;
                                 return [
-                                    `Avg: [1.2656, 1.0725, 9.2199, 1.0729][idx].toFixed(4) + ' ms'`,
-                                    `Min: [1.1882, 0.9726, 8.6628, 1.0185][idx].toFixed(4) + ' ms'`,
-                                    `Max: [3.9086, 1.2882, 31.4799, 1.4842][idx].toFixed(4) + ' ms'`
+                                    `Avg: [1.4388, 1.1667, 12.6218, 1.2331][idx].toFixed(4) + ' ms'`,
+                                    `Min: [1.3641, 1.1267, 11.0727, 1.1794][idx].toFixed(4) + ' ms'`,
+                                    `Max: [4.4979, 1.3046, 42.4008, 1.6393][idx].toFixed(4) + ' ms'`
                                 ];
                             }
                         }
@@ -1221,7 +1319,7 @@
                 datasets: [
                     {
                         label: 'Median (ms)',
-                        data: [0.8782, 0.4663, 2.5896, 0.4737],
+                        data: [1.0807, 0.5473, 3.2415, 0.5613],
                         backgroundColor: ["rgba(103, 58, 183, 0.75)", "rgba(33, 150, 243, 0.75)", "rgba(255, 152, 0, 0.75)", "rgba(76, 175, 80, 0.75)"],
                         borderColor: ["rgba(103, 58, 183, 1)", "rgba(33, 150, 243, 1)", "rgba(255, 152, 0, 1)", "rgba(76, 175, 80, 1)"],
                         borderWidth: 1
@@ -1242,9 +1340,9 @@
                             afterLabel: function(context) {
                                 const idx = context.dataIndex;
                                 return [
-                                    `Avg: [0.8857, 0.4814, 2.5896, 0.4773][idx].toFixed(4) + ' ms'`,
-                                    `Min: [0.838, 0.4319, 2.4774, 0.4415][idx].toFixed(4) + ' ms'`,
-                                    `Max: [1.3723, 0.7846, 2.8725, 0.6318][idx].toFixed(4) + ' ms'`
+                                    `Avg: [1.1096, 0.5552, 3.248, 0.563][idx].toFixed(4) + ' ms'`,
+                                    `Min: [1.0113, 0.5098, 3.163, 0.5318][idx].toFixed(4) + ' ms'`,
+                                    `Max: [1.3848, 0.8544, 3.4122, 0.6942][idx].toFixed(4) + ' ms'`
                                 ];
                             }
                         }
@@ -1269,7 +1367,7 @@
                 datasets: [
                     {
                         label: 'Median (ms)',
-                        data: [0.6501, 0.4607, 2.6395, 0.5713],
+                        data: [0.7735, 0.5333, 3.2706, 0.5498],
                         backgroundColor: ["rgba(103, 58, 183, 0.75)", "rgba(33, 150, 243, 0.75)", "rgba(255, 152, 0, 0.75)", "rgba(76, 175, 80, 0.75)"],
                         borderColor: ["rgba(103, 58, 183, 1)", "rgba(33, 150, 243, 1)", "rgba(255, 152, 0, 1)", "rgba(76, 175, 80, 1)"],
                         borderWidth: 1
@@ -1290,9 +1388,9 @@
                             afterLabel: function(context) {
                                 const idx = context.dataIndex;
                                 return [
-                                    `Avg: [0.6517, 0.4652, 2.8878, 0.5782][idx].toFixed(4) + ' ms'`,
-                                    `Min: [0.6074, 0.4303, 2.4983, 0.5326][idx].toFixed(4) + ' ms'`,
-                                    `Max: [0.8868, 0.5666, 16.7285, 0.7946][idx].toFixed(4) + ' ms'`
+                                    `Avg: [0.7756, 0.5372, 3.4176, 0.5512][idx].toFixed(4) + ' ms'`,
+                                    `Min: [0.7352, 0.5079, 3.1691, 0.5221][idx].toFixed(4) + ' ms'`,
+                                    `Max: [0.9113, 0.6608, 16.984, 0.7927][idx].toFixed(4) + ' ms'`
                                 ];
                             }
                         }
@@ -1317,7 +1415,7 @@
                 datasets: [
                     {
                         label: 'Median (ms)',
-                        data: [0.5397, 0.3635, 1.7089, 0.368],
+                        data: [0.6624, 0.4411, 2.4931, 0.4537],
                         backgroundColor: ["rgba(103, 58, 183, 0.75)", "rgba(33, 150, 243, 0.75)", "rgba(255, 152, 0, 0.75)", "rgba(76, 175, 80, 0.75)"],
                         borderColor: ["rgba(103, 58, 183, 1)", "rgba(33, 150, 243, 1)", "rgba(255, 152, 0, 1)", "rgba(76, 175, 80, 1)"],
                         borderWidth: 1
@@ -1338,9 +1436,9 @@
                             afterLabel: function(context) {
                                 const idx = context.dataIndex;
                                 return [
-                                    `Avg: [0.5477, 0.3701, 1.7929, 0.3749][idx].toFixed(4) + ' ms'`,
-                                    `Min: [0.4925, 0.3388, 1.6465, 0.3461][idx].toFixed(4) + ' ms'`,
-                                    `Max: [0.7774, 0.4525, 8.9508, 0.5057][idx].toFixed(4) + ' ms'`
+                                    `Avg: [0.669, 0.4438, 2.4479, 0.4554][idx].toFixed(4) + ' ms'`,
+                                    `Min: [0.6236, 0.4198, 2.1118, 0.4293][idx].toFixed(4) + ' ms'`,
+                                    `Max: [0.8953, 0.5388, 9.9003, 0.605][idx].toFixed(4) + ' ms'`
                                 ];
                             }
                         }
@@ -1365,7 +1463,7 @@
                 datasets: [
                     {
                         label: 'Median (ms)',
-                        data: [1.5967, 1.2733, 36.1363, 1.4274],
+                        data: [1.7967, 1.4756, 46.2535, 1.6133],
                         backgroundColor: ["rgba(103, 58, 183, 0.75)", "rgba(33, 150, 243, 0.75)", "rgba(255, 152, 0, 0.75)", "rgba(76, 175, 80, 0.75)"],
                         borderColor: ["rgba(103, 58, 183, 1)", "rgba(33, 150, 243, 1)", "rgba(255, 152, 0, 1)", "rgba(76, 175, 80, 1)"],
                         borderWidth: 1
@@ -1386,9 +1484,9 @@
                             afterLabel: function(context) {
                                 const idx = context.dataIndex;
                                 return [
-                                    `Avg: [1.6278, 1.346, 36.9569, 1.4348][idx].toFixed(4) + ' ms'`,
-                                    `Min: [1.5426, 1.2199, 34.3427, 1.361][idx].toFixed(4) + ' ms'`,
-                                    `Max: [4.2096, 3.4048, 48.259, 1.8551][idx].toFixed(4) + ' ms'`
+                                    `Avg: [1.8259, 1.5608, 48.5112, 1.6222][idx].toFixed(4) + ' ms'`,
+                                    `Min: [1.7477, 1.4242, 44.1417, 1.5832][idx].toFixed(4) + ' ms'`,
+                                    `Max: [4.5762, 4.6331, 59.2722, 1.9849][idx].toFixed(4) + ' ms'`
                                 ];
                             }
                         }
@@ -1413,7 +1511,7 @@
                 datasets: [
                     {
                         label: 'Median (ms)',
-                        data: [1.172, 0.7456, 2.3278, 0.7404],
+                        data: [1.3721, 0.8713, 2.7637, 0.8731],
                         backgroundColor: ["rgba(103, 58, 183, 0.75)", "rgba(33, 150, 243, 0.75)", "rgba(255, 152, 0, 0.75)", "rgba(76, 175, 80, 0.75)"],
                         borderColor: ["rgba(103, 58, 183, 1)", "rgba(33, 150, 243, 1)", "rgba(255, 152, 0, 1)", "rgba(76, 175, 80, 1)"],
                         borderWidth: 1
@@ -1434,9 +1532,9 @@
                             afterLabel: function(context) {
                                 const idx = context.dataIndex;
                                 return [
-                                    `Avg: [1.185, 0.7568, 2.3644, 0.7516][idx].toFixed(4) + ' ms'`,
-                                    `Min: [1.1249, 0.6985, 2.2524, 0.7032][idx].toFixed(4) + ' ms'`,
-                                    `Max: [1.5808, 0.9198, 2.8288, 1.1323][idx].toFixed(4) + ' ms'`
+                                    `Avg: [1.382, 0.8748, 2.776, 0.8826][idx].toFixed(4) + ' ms'`,
+                                    `Min: [1.3207, 0.8319, 2.6926, 0.8356][idx].toFixed(4) + ' ms'`,
+                                    `Max: [1.7933, 0.9574, 2.9486, 1.2057][idx].toFixed(4) + ' ms'`
                                 ];
                             }
                         }
