@@ -95,7 +95,7 @@ jobs:
           fi
 
       - name: Upload Performance Report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: performance-report
           path: |
