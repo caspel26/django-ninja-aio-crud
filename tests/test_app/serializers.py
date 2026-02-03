@@ -1,3 +1,5 @@
+from pydantic import ConfigDict
+
 from . import models
 from ninja_aio.models import serializers
 
@@ -131,9 +133,7 @@ class TestModelWithValidatorsMetaSerializer(serializers.Serializer):
     class Meta:
         model = models.TestModel
         schema_in = serializers.SchemaModelConfig(fields=["name", "description"])
-        schema_out = serializers.SchemaModelConfig(
-            fields=["id", "name", "description"]
-        )
+        schema_out = serializers.SchemaModelConfig(fields=["id", "name", "description"])
         schema_update = serializers.SchemaModelConfig(
             optionals=[("name", str), ("description", str)]
         )
@@ -164,3 +164,20 @@ class TestModelWithValidatorsMetaSerializer(serializers.Serializer):
             if v is not None and len(v.strip()) == 0:
                 raise ValueError("Name cannot be blank")
             return v
+
+
+class TestModelWithModelConfigMetaSerializer(serializers.Serializer):
+    class Meta:
+        model = models.TestModel
+        schema_in = serializers.SchemaModelConfig(
+            fields=["name", "description"],
+            model_config_override=ConfigDict(str_strip_whitespace=True),
+        )
+        schema_out = serializers.SchemaModelConfig(
+            fields=["id", "name", "description"],
+            model_config_override=ConfigDict(str_strip_whitespace=True),
+        )
+        schema_update = serializers.SchemaModelConfig(
+            optionals=[("name", str), ("description", str)],
+            model_config_override=ConfigDict(str_strip_whitespace=True),
+        )

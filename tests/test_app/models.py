@@ -1,5 +1,7 @@
 import uuid
 
+from pydantic import ConfigDict
+
 from ninja_aio.models import ModelSerializer
 from django.db import models
 
@@ -530,3 +532,19 @@ class TestModelWithValidators(BaseTestModelSerializer):
         @model_validator(mode="after")
         def add_display_check(self):
             return self
+
+
+class TestModelWithModelConfig(BaseTestModel, ModelSerializer):
+    """Model with model_config on inner serializer classes."""
+
+    class CreateSerializer:
+        fields = ["name", "description"]
+        model_config = ConfigDict(str_strip_whitespace=True)
+
+    class ReadSerializer:
+        fields = ["id", "name", "description"]
+        model_config = ConfigDict(str_strip_whitespace=True)
+
+    class UpdateSerializer:
+        optionals = [("name", str), ("description", str)]
+        model_config = ConfigDict(str_strip_whitespace=True)
