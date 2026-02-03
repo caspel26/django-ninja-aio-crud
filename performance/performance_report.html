@@ -139,15 +139,21 @@
             height: 350px;
             margin-bottom: 1.5rem;
         }
+        .table-wrapper {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
         table {
             width: 100%;
             border-collapse: collapse;
             font-size: 0.82rem;
+            min-width: 500px;
         }
         th, td {
             padding: 0.55rem 0.75rem;
             text-align: left;
             border-bottom: 1px solid var(--md-border);
+            white-space: nowrap;
         }
         th {
             color: var(--md-primary);
@@ -183,6 +189,68 @@
             text-decoration: none;
         }
         .footer a:hover { text-decoration: underline; }
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem 0.75rem;
+            }
+            .hero h1 {
+                font-size: 1.4rem;
+            }
+            .hero .subtitle {
+                font-size: 0.85rem;
+            }
+            .section-title {
+                font-size: 1.1rem;
+                margin: 1.5rem 0 1rem;
+                padding-top: 1rem;
+            }
+            .chart-section {
+                padding: 1rem;
+                border-radius: 8px;
+                margin-bottom: 1rem;
+            }
+            .chart-section:hover {
+                transform: none;
+            }
+            .chart-container {
+                height: 250px;
+            }
+            .chart-section h2 {
+                font-size: 0.95rem;
+            }
+            .header {
+                padding: 0.5rem 1rem;
+                font-size: 0.75rem;
+            }
+            .meta-pill {
+                font-size: 0.7rem;
+                padding: 0.25rem 0.7rem;
+            }
+            table {
+                font-size: 0.75rem;
+            }
+            th, td {
+                padding: 0.4rem 0.5rem;
+            }
+            td {
+                font-size: 0.72rem;
+            }
+            th {
+                font-size: 0.7rem;
+            }
+        }
+        @media (max-width: 480px) {
+            .chart-container {
+                height: 200px;
+            }
+            .hero {
+                padding: 1rem 0 0.75rem;
+                margin-bottom: 1rem;
+            }
+            .hero h1 {
+                font-size: 1.2rem;
+            }
+        }
     </style>
 </head>
 <body>
@@ -196,7 +264,7 @@
             <h1>Performance Benchmarks</h1>
             <p class="subtitle">Automated benchmark results for django-ninja-aio-crud</p>
             <div class="meta-pills">
-                <span class="meta-pill"><strong>Run</strong> 2026-02-02 17:49:49</span>
+                <span class="meta-pill"><strong>Run</strong> 2026-02-03 17:18:57</span>
                 <span class="meta-pill"><strong>Python</strong> 3.14.2</span>
                 <span class="meta-pill"><strong>Runs</strong> 1</span>
             </div>
@@ -209,6 +277,7 @@
             <div class="chart-container">
                 <canvas id="chart_0"></canvas>
             </div>
+            <div class="table-wrapper">
             <table>
                 <thead>
                     <tr>
@@ -224,51 +293,53 @@
             <tr>
                 <td>create</td>
                 <td>100</td>
-                <td>1.4858</td>
-                <td>1.5948</td>
-                <td>1.5652</td>
-                <td>2.9862</td>
+                <td>1.8081</td>
+                <td>1.9029</td>
+                <td>1.8798</td>
+                <td>2.9824</td>
             </tr>
             <tr>
                 <td>delete</td>
                 <td>100</td>
-                <td>1.4569</td>
-                <td>1.5608</td>
-                <td>1.5299</td>
-                <td>2.2642</td>
+                <td>1.7300</td>
+                <td>1.8350</td>
+                <td>1.8219</td>
+                <td>2.4429</td>
             </tr>
             <tr>
                 <td>list</td>
                 <td>100</td>
-                <td>13.1331</td>
-                <td>13.8082</td>
-                <td>13.6586</td>
-                <td>16.4110</td>
+                <td>16.9883</td>
+                <td>17.7884</td>
+                <td>17.5145</td>
+                <td>21.0367</td>
             </tr>
             <tr>
                 <td>retrieve</td>
                 <td>100</td>
-                <td>1.0015</td>
-                <td>1.0919</td>
-                <td>1.0724</td>
-                <td>1.6697</td>
+                <td>1.1595</td>
+                <td>1.2253</td>
+                <td>1.2139</td>
+                <td>1.5980</td>
             </tr>
             <tr>
                 <td>update</td>
                 <td>100</td>
-                <td>1.8621</td>
-                <td>1.9696</td>
-                <td>1.9448</td>
-                <td>2.5879</td>
+                <td>2.2284</td>
+                <td>2.3206</td>
+                <td>2.3037</td>
+                <td>2.6894</td>
             </tr>
                 </tbody>
             </table>
+            </div>
         </div>
         <div class="chart-section">
             <h2>FilterPerformanceTest</h2>
             <div class="chart-container">
                 <canvas id="chart_1"></canvas>
             </div>
+            <div class="table-wrapper">
             <table>
                 <thead>
                     <tr>
@@ -284,59 +355,61 @@
             <tr>
                 <td>boolean_filter</td>
                 <td>100</td>
-                <td>13.0814</td>
-                <td>13.8988</td>
-                <td>13.7753</td>
-                <td>16.3361</td>
+                <td>16.7296</td>
+                <td>17.8295</td>
+                <td>17.4985</td>
+                <td>21.5412</td>
             </tr>
             <tr>
                 <td>combined_filters</td>
                 <td>100</td>
-                <td>1.2412</td>
-                <td>1.3447</td>
-                <td>1.3302</td>
-                <td>1.9280</td>
+                <td>1.4296</td>
+                <td>1.5081</td>
+                <td>1.4952</td>
+                <td>1.9670</td>
             </tr>
             <tr>
                 <td>icontains_filter</td>
                 <td>100</td>
-                <td>2.2822</td>
-                <td>2.4649</td>
-                <td>2.4117</td>
-                <td>3.0065</td>
+                <td>2.8576</td>
+                <td>2.9807</td>
+                <td>2.9597</td>
+                <td>3.6264</td>
             </tr>
             <tr>
                 <td>match_case_filter</td>
                 <td>100</td>
-                <td>8.9675</td>
-                <td>9.6163</td>
-                <td>9.5271</td>
-                <td>12.9176</td>
+                <td>11.5603</td>
+                <td>12.0561</td>
+                <td>11.9436</td>
+                <td>14.2017</td>
             </tr>
             <tr>
                 <td>numeric_filter</td>
                 <td>100</td>
-                <td>1.0530</td>
-                <td>1.1193</td>
-                <td>1.1076</td>
-                <td>1.8573</td>
+                <td>1.2375</td>
+                <td>1.2998</td>
+                <td>1.2935</td>
+                <td>1.7069</td>
             </tr>
             <tr>
                 <td>relation_filter</td>
                 <td>100</td>
-                <td>20.4016</td>
-                <td>21.4231</td>
-                <td>21.2585</td>
-                <td>25.3909</td>
+                <td>24.2564</td>
+                <td>25.0278</td>
+                <td>24.7621</td>
+                <td>29.7652</td>
             </tr>
                 </tbody>
             </table>
+            </div>
         </div>
         <div class="chart-section">
             <h2>SchemaGenerationPerformanceTest</h2>
             <div class="chart-container">
                 <canvas id="chart_2"></canvas>
             </div>
+            <div class="table-wrapper">
             <table>
                 <thead>
                     <tr>
@@ -352,43 +425,45 @@
             <tr>
                 <td>meta_serializer_schema_generation</td>
                 <td>100</td>
-                <td>0.0005</td>
-                <td>0.0307</td>
                 <td>0.0006</td>
-                <td>3.0110</td>
+                <td>0.0333</td>
+                <td>0.0006</td>
+                <td>3.2677</td>
             </tr>
             <tr>
                 <td>model_serializer_schema_generation</td>
                 <td>100</td>
                 <td>0.0007</td>
-                <td>0.0010</td>
+                <td>0.0011</td>
                 <td>0.0007</td>
-                <td>0.0090</td>
+                <td>0.0087</td>
             </tr>
             <tr>
                 <td>schema_with_relations</td>
                 <td>100</td>
                 <td>0.0004</td>
-                <td>0.0175</td>
+                <td>0.0190</td>
                 <td>0.0004</td>
-                <td>1.7088</td>
+                <td>1.8504</td>
             </tr>
             <tr>
                 <td>schema_with_validators</td>
                 <td>100</td>
-                <td>0.0005</td>
-                <td>0.0343</td>
                 <td>0.0006</td>
-                <td>3.3693</td>
+                <td>0.0382</td>
+                <td>0.0006</td>
+                <td>3.7532</td>
             </tr>
                 </tbody>
             </table>
+            </div>
         </div>
         <div class="chart-section">
             <h2>SerializationPerformanceTest</h2>
             <div class="chart-container">
                 <canvas id="chart_3"></canvas>
             </div>
+            <div class="table-wrapper">
             <table>
                 <thead>
                     <tr>
@@ -404,45 +479,46 @@
             <tr>
                 <td>bulk_serialization_100</td>
                 <td>50</td>
-                <td>11.6919</td>
-                <td>12.2442</td>
-                <td>12.0962</td>
-                <td>14.8842</td>
+                <td>15.5581</td>
+                <td>16.2584</td>
+                <td>16.0091</td>
+                <td>19.0074</td>
             </tr>
             <tr>
                 <td>bulk_serialization_500</td>
                 <td>50</td>
-                <td>56.4493</td>
-                <td>60.7190</td>
-                <td>59.2692</td>
-                <td>69.0499</td>
+                <td>75.2950</td>
+                <td>80.9679</td>
+                <td>78.3868</td>
+                <td>96.0689</td>
             </tr>
             <tr>
                 <td>input_parsing</td>
                 <td>100</td>
-                <td>0.5714</td>
-                <td>0.6389</td>
-                <td>0.6266</td>
-                <td>0.9993</td>
+                <td>0.6963</td>
+                <td>0.7793</td>
+                <td>0.7735</td>
+                <td>1.0620</td>
             </tr>
             <tr>
                 <td>relation_serialization</td>
                 <td>100</td>
-                <td>0.4469</td>
-                <td>0.5002</td>
-                <td>0.4903</td>
-                <td>0.6996</td>
+                <td>0.5767</td>
+                <td>0.6169</td>
+                <td>0.6164</td>
+                <td>0.7517</td>
             </tr>
             <tr>
                 <td>single_object_serialization</td>
                 <td>100</td>
-                <td>0.4388</td>
-                <td>0.4878</td>
-                <td>0.4801</td>
-                <td>0.7398</td>
+                <td>0.5500</td>
+                <td>0.6069</td>
+                <td>0.6015</td>
+                <td>0.8972</td>
             </tr>
                 </tbody>
             </table>
+            </div>
         </div>
         
 
@@ -466,28 +542,28 @@
                 datasets: [
                     {
                         label: 'Avg (ms)',
-                        data: [1.5948, 1.5608, 13.8082, 1.0919, 1.9696],
+                        data: [1.9029, 1.835, 17.7884, 1.2253, 2.3206],
                         backgroundColor: 'rgba(103, 58, 183, 0.75)',
                         borderColor: 'rgba(103, 58, 183, 1)',
                         borderWidth: 1
                     },
                     {
                         label: 'Median (ms)',
-                        data: [1.5652, 1.5299, 13.6586, 1.0724, 1.9448],
+                        data: [1.8798, 1.8219, 17.5145, 1.2139, 2.3037],
                         backgroundColor: 'rgba(126, 87, 194, 0.75)',
                         borderColor: 'rgba(126, 87, 194, 1)',
                         borderWidth: 1
                     },
                     {
                         label: 'Min (ms)',
-                        data: [1.4858, 1.4569, 13.1331, 1.0015, 1.8621],
+                        data: [1.8081, 1.73, 16.9883, 1.1595, 2.2284],
                         backgroundColor: 'rgba(186, 104, 200, 0.75)',
                         borderColor: 'rgba(186, 104, 200, 1)',
                         borderWidth: 1
                     },
                     {
                         label: 'Max (ms)',
-                        data: [2.9862, 2.2642, 16.411, 1.6697, 2.5879],
+                        data: [2.9824, 2.4429, 21.0367, 1.598, 2.6894],
                         backgroundColor: 'rgba(171, 71, 188, 0.75)',
                         borderColor: 'rgba(171, 71, 188, 1)',
                         borderWidth: 1
@@ -523,28 +599,28 @@
                 datasets: [
                     {
                         label: 'Avg (ms)',
-                        data: [13.8988, 1.3447, 2.4649, 9.6163, 1.1193, 21.4231],
+                        data: [17.8295, 1.5081, 2.9807, 12.0561, 1.2998, 25.0278],
                         backgroundColor: 'rgba(103, 58, 183, 0.75)',
                         borderColor: 'rgba(103, 58, 183, 1)',
                         borderWidth: 1
                     },
                     {
                         label: 'Median (ms)',
-                        data: [13.7753, 1.3302, 2.4117, 9.5271, 1.1076, 21.2585],
+                        data: [17.4985, 1.4952, 2.9597, 11.9436, 1.2935, 24.7621],
                         backgroundColor: 'rgba(126, 87, 194, 0.75)',
                         borderColor: 'rgba(126, 87, 194, 1)',
                         borderWidth: 1
                     },
                     {
                         label: 'Min (ms)',
-                        data: [13.0814, 1.2412, 2.2822, 8.9675, 1.053, 20.4016],
+                        data: [16.7296, 1.4296, 2.8576, 11.5603, 1.2375, 24.2564],
                         backgroundColor: 'rgba(186, 104, 200, 0.75)',
                         borderColor: 'rgba(186, 104, 200, 1)',
                         borderWidth: 1
                     },
                     {
                         label: 'Max (ms)',
-                        data: [16.3361, 1.928, 3.0065, 12.9176, 1.8573, 25.3909],
+                        data: [21.5412, 1.967, 3.6264, 14.2017, 1.7069, 29.7652],
                         backgroundColor: 'rgba(171, 71, 188, 0.75)',
                         borderColor: 'rgba(171, 71, 188, 1)',
                         borderWidth: 1
@@ -580,7 +656,7 @@
                 datasets: [
                     {
                         label: 'Avg (ms)',
-                        data: [0.0307, 0.001, 0.0175, 0.0343],
+                        data: [0.0333, 0.0011, 0.019, 0.0382],
                         backgroundColor: 'rgba(103, 58, 183, 0.75)',
                         borderColor: 'rgba(103, 58, 183, 1)',
                         borderWidth: 1
@@ -594,14 +670,14 @@
                     },
                     {
                         label: 'Min (ms)',
-                        data: [0.0005, 0.0007, 0.0004, 0.0005],
+                        data: [0.0006, 0.0007, 0.0004, 0.0006],
                         backgroundColor: 'rgba(186, 104, 200, 0.75)',
                         borderColor: 'rgba(186, 104, 200, 1)',
                         borderWidth: 1
                     },
                     {
                         label: 'Max (ms)',
-                        data: [3.011, 0.009, 1.7088, 3.3693],
+                        data: [3.2677, 0.0087, 1.8504, 3.7532],
                         backgroundColor: 'rgba(171, 71, 188, 0.75)',
                         borderColor: 'rgba(171, 71, 188, 1)',
                         borderWidth: 1
@@ -637,28 +713,28 @@
                 datasets: [
                     {
                         label: 'Avg (ms)',
-                        data: [12.2442, 60.719, 0.6389, 0.5002, 0.4878],
+                        data: [16.2584, 80.9679, 0.7793, 0.6169, 0.6069],
                         backgroundColor: 'rgba(103, 58, 183, 0.75)',
                         borderColor: 'rgba(103, 58, 183, 1)',
                         borderWidth: 1
                     },
                     {
                         label: 'Median (ms)',
-                        data: [12.0962, 59.2692, 0.6266, 0.4903, 0.4801],
+                        data: [16.0091, 78.3868, 0.7735, 0.6164, 0.6015],
                         backgroundColor: 'rgba(126, 87, 194, 0.75)',
                         borderColor: 'rgba(126, 87, 194, 1)',
                         borderWidth: 1
                     },
                     {
                         label: 'Min (ms)',
-                        data: [11.6919, 56.4493, 0.5714, 0.4469, 0.4388],
+                        data: [15.5581, 75.295, 0.6963, 0.5767, 0.55],
                         backgroundColor: 'rgba(186, 104, 200, 0.75)',
                         borderColor: 'rgba(186, 104, 200, 1)',
                         borderWidth: 1
                     },
                     {
                         label: 'Max (ms)',
-                        data: [14.8842, 69.0499, 0.9993, 0.6996, 0.7398],
+                        data: [19.0074, 96.0689, 1.062, 0.7517, 0.8972],
                         backgroundColor: 'rgba(171, 71, 188, 0.75)',
                         borderColor: 'rgba(171, 71, 188, 1)',
                         borderWidth: 1
