@@ -1,5 +1,279 @@
 # 📋 Release Notes
 
+## 🏷️ [v2.19.0] - 2026-02-04
+
+---
+
+### ✨ New Features
+
+#### 🔧 Schema Method Overrides on Serializer Inner Classes
+> `ninja_aio/models/serializers.py`
+
+You can now define **Pydantic schema method overrides** (e.g., `model_dump`, `model_validate`, custom properties) on serializer inner classes. The framework automatically injects these methods into the generated Pydantic schema subclass, with full `super()` support via `__class__` cell rebinding.
+
+**ModelSerializer — define on inner serializer classes:**
+
+```python
+from __future__ import annotations
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from ninja import Schema
+
+class MyModel(ModelSerializer):
+    name = models.CharField(max_length=255)
+
+    class ReadSerializer:
+        fields = ["id", "name"]
+
+        def model_dump(
+            self: Schema,
+            *,
+            mode: str = "python",
+            include: Any = None,
+            exclude: Any = None,
+            context: Any = None,
+            by_alias: bool = False,
+            exclude_unset: bool = False,
+            exclude_defaults: bool = False,
+            exclude_none: bool = False,
+            round_trip: bool = False,
+            warnings: bool | str = True,
+            serialize_as_any: bool = False,
+        ) -> dict[str, Any]:
+            data = super().model_dump(
+                mode=mode, include=include, exclude=exclude,
+                context=context, by_alias=by_alias,
+                exclude_unset=exclude_unset, exclude_defaults=exclude_defaults,
+                exclude_none=exclude_none, round_trip=round_trip,
+                warnings=warnings, serialize_as_any=serialize_as_any,
+            )
+            data["name"] = data["name"].upper()
+            return data
+```
+
+**Serializer (Meta-driven) — define on validator inner classes:**
+
+```python
+class MySerializer(serializers.Serializer):
+    class Meta:
+        model = MyModel
+        schema_out = serializers.SchemaModelConfig(fields=["id", "name"])
+
+    class ReadValidators:
+        def model_dump(self: Schema, **kwargs) -> dict[str, Any]:
+            data = super().model_dump(**kwargs)
+            data["name"] = data["name"].upper()
+            return data
+```
+
+**New core methods on `BaseSerializer`:**
+
+| Method | Description |
+|---|---|
+| `_collect_schema_overrides(source_class)` | 🔍 Scans a class for regular callables that aren't validators, config attrs, or dunders |
+| `_get_schema_overrides(schema_type)` | 🗺️ Maps schema types to their override source class (overridden per serializer) |
+
+**Implementation details:**
+- Overrides are collected alongside validators during schema generation
+- `__class__` cell rebinding via `types.FunctionType` + `types.CellType` ensures bare `super()` resolves to the correct subclass
+- Validators, `model_config`, and method overrides coexist on the same inner class
+- `_CONFIG_ATTRS` frozenset filters out configuration attributes (`fields`, `customs`, `optionals`, `excludes`, `relations_as_id`, `model_config`)
+
+---
+
+#### ⚙️ Pydantic `model_config` Support on Serializers
+> `ninja_aio/models/serializers.py`
+
+Both serializer patterns now support applying Pydantic `ConfigDict` to generated schemas.
+
+**ModelSerializer — via `model_config` attribute:**
+
+```python
+from pydantic import ConfigDict
+
+class MyModel(ModelSerializer):
+    name = models.CharField(max_length=255)
+
+    class CreateSerializer:
+        fields = ["name"]
+        model_config = ConfigDict(str_strip_whitespace=True)
+```
+
+**Serializer (Meta-driven) — via `model_config_override` in `SchemaModelConfig`:**
+
+```python
+class MySerializer(serializers.Serializer):
+    class Meta:
+        model = MyModel
+        schema_in = serializers.SchemaModelConfig(
+            fields=["name"],
+            model_config_override=ConfigDict(str_strip_whitespace=True),
+        )
+```
+
+**New core methods on `BaseSerializer`:**
+
+| Method | Description |
+|---|---|
+| `_get_model_config(schema_type)` | Returns `ConfigDict` for the given schema type |
+
+**New field on `SchemaModelConfig`:**
+
+| Field | Type | Description |
+|---|---|---|
+| `model_config_override` | `Optional[dict]` | Pydantic `ConfigDict` to apply to the generated schema |
+
+---
+
+#### 🔬 Framework Comparison Benchmark Suite
+> `tests/comparison/`
+
+Added a comprehensive benchmark suite comparing django-ninja-aio-crud against other popular Python REST frameworks using the same Django models and database.
+
+**Compared frameworks:**
+- 🟣 **django-ninja-aio-crud** — Native async CRUD automation
+- 🔵 **Django Ninja** (pure) — Async-ready, manual endpoint definition
+- 🟠 **ADRF** — Async Django REST Framework
+- 🟢 **FastAPI** — Native async, Starlette-based
+
+**Operations tested:** create, list, retrieve, update, delete, filter, relation serialization, bulk serialization (100 & 500 items)
+
+**New files:**
+
+| File | Description |
+|---|---|
+| `tests/comparison/base.py` | Base benchmark test class |
+| `tests/comparison/test_comparison.py` | Comparison benchmark tests |
+| `tests/comparison/frameworks/` | Framework-specific implementations (ninja_aio, ninja, adrf, fastapi) |
+| `tests/comparison/generate_report.py` | Interactive HTML report generator |
+| `tests/comparison/generate_markdown.py` | Markdown report generator |
+| `run-comparison.sh` | Helper script to run benchmarks and generate reports |
+
+---
+
+#### 📊 Performance Analysis Tools
+> `tests/performance/tools/`
+
+Added statistical analysis tools for detecting performance regressions and analyzing benchmark stability.
+
+| Tool | Description |
+|---|---|
+| `detect_regression.py` | Statistical regression detection with σ significance (CI/CD recommended) |
+| `analyze_perf.py` | Quick overview of recent benchmark runs |
+| `analyze_variance.py` | Benchmark stability and coefficient of variation analysis |
+| `compare_days.py` | Day-over-day performance comparison |
+| `check-performance.sh` | Helper script for running all analysis tools |
+
+---
+
+### 🔧 Improvements
+
+#### 📱 Mobile Chart Fix in Reports
+> `tests/performance/generate_report.py`, `tests/comparison/generate_report.py`
+
+Fixed Chart.js charts rendering incorrectly on mobile viewports by adding `maintainAspectRatio: false` to all chart configurations, allowing charts to properly respect their container's CSS height constraints.
+
+---
+
+#### 🎨 Enhanced HTML Report Generation
+> `tests/comparison/generate_report.py`, `tests/performance/generate_report.py`
+
+- 🏆 Winner highlighting in comparison tables with purple accent
+- 🌗 Light/dark mode support via `prefers-color-scheme`
+- 📱 Responsive design with mobile breakpoints (768px, 480px)
+- 📈 Interactive Chart.js bar and trend charts
+
+---
+
+### 📚 Documentation
+
+Updated documentation for `model_config`, schema method overrides, and `self: Schema` typing pattern across model serializer, serializer, and validators docs. Added Pydantic `ConfigDict` and `BaseModel` API reference links. Added warning about no automatic argument hinting on inner classes. Updated deployment, troubleshooting, and contributing guides. Rebranded all references from "Django Ninja Aio CRUD" to "Django Ninja AIO".
+
+---
+
+### 🧪 Tests
+
+#### `ModelSerializerSchemaOverridesTestCase` — 3 tests
+
+**Category:** Schema method override verification (ModelSerializer)
+
+| Test | Verifies |
+|---|---|
+| `test_model_dump_override_applied` | ✅ `model_dump` override transforms output correctly |
+| `test_super_call_works` | ✅ Bare `super()` resolves correctly in injected methods |
+| `test_model_dump_kwargs_passthrough` | ✅ All `model_dump` kwargs are forwarded properly |
+
+#### `MetaSerializerSchemaOverridesTestCase` — 2 tests
+
+**Category:** Schema method override verification (Meta-driven Serializer)
+
+| Test | Verifies |
+|---|---|
+| `test_model_dump_override_applied` | ✅ `model_dump` override transforms output on Meta-driven Serializer |
+| `test_super_call_works` | ✅ Bare `super()` resolves correctly in Meta-driven overrides |
+
+#### `CollectSchemaOverridesTestCase` — 6 tests
+
+**Category:** `_collect_schema_overrides` unit tests
+
+| Test | Verifies |
+|---|---|
+| `test_collects_regular_methods` | ✅ Regular methods are collected |
+| `test_skips_validators` | ✅ `PydanticDescriptorProxy` instances are skipped |
+| `test_skips_config_attrs` | ✅ Config attributes (fields, customs, etc.) are skipped |
+| `test_skips_dunders` | ✅ Dunder methods are skipped |
+| `test_returns_empty_for_none` | ✅ Returns empty dict for `None` input |
+| `test_collects_staticmethod_classmethod` | ✅ Static and class methods are collected |
+
+#### `BaseSerializerSchemaOverridesDefaultTestCase` — 2 tests
+
+**Category:** Default behavior and override-only application
+
+| Test | Verifies |
+|---|---|
+| `test_default_returns_empty` | ✅ Base `_get_schema_overrides` returns empty dict |
+| `test_apply_overrides_only` | ✅ Overrides work without validators |
+
+#### `ModelConfigTestCase` — 10 tests
+
+**Category:** Pydantic `model_config` / `model_config_override` support
+
+| Test | Verifies |
+|---|---|
+| `test_model_config_*` | ✅ ConfigDict applied to ModelSerializer schemas (create/read/update) |
+| `test_meta_model_config_override_*` | ✅ ConfigDict applied to Meta-driven Serializer schemas |
+| `test_str_strip_whitespace` | ✅ Whitespace stripping works end-to-end |
+
+**New test fixtures:**
+
+| File | Addition |
+|---|---|
+| `tests/test_app/models.py` | `TestModelWithSchemaOverrides` — ModelSerializer with `model_dump` override on ReadSerializer |
+| `tests/test_app/serializers.py` | `TestModelWithSchemaOverridesMetaSerializer` — Serializer with `model_dump` override on ReadValidators |
+| `tests/test_app/serializers.py` | `TestModelWithModelConfigMetaSerializer` — Serializer with `model_config_override` on all schemas |
+
+**Test results:**
+- ✅ **656 tests pass**
+- ✅ **99% coverage** on `ninja_aio/models/serializers.py`
+
+---
+
+### 🎯 Summary
+
+**Django Ninja AIO v2.19.0** introduces two major serializer features: **schema method overrides** and **Pydantic `model_config` support**. Schema method overrides let you inject custom methods (like `model_dump`) into generated Pydantic schemas from inner serializer classes, with full `super()` support via `__class__` cell rebinding. Pydantic `ConfigDict` can now be applied per-schema for configuration like `str_strip_whitespace`. This release also adds a framework comparison benchmark suite and statistical performance analysis tools.
+
+**Key benefits:**
+- 🔧 **Schema Method Overrides** — Inject custom `model_dump`, `model_validate`, or any method into generated schemas with bare `super()` support
+- ⚙️ **Pydantic ConfigDict** — Apply `model_config` per-schema on both ModelSerializer and Meta-driven Serializer
+- 🔬 **Framework Comparison** — Benchmark against Django Ninja, ADRF, and FastAPI with interactive HTML reports
+- 📊 **Regression Detection** — Statistical tools for detecting performance regressions in CI/CD
+- 📱 **Mobile-Fixed Charts** — Chart.js charts render correctly on mobile viewports
+- 🧪 **23 New Tests** — Comprehensive coverage for overrides, model_config, and edge cases
+- 🔄 **Backward Compatible** — All changes are additive with no breaking changes
+
+---
+
 ## 🏷️ [v2.18.3] - 2026-02-02
 
 ---
