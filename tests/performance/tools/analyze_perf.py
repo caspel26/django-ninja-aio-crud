@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Analyze performance test results to compare recent runs."""
+
 import json
-from datetime import datetime
 from pathlib import Path
+
 
 def analyze_performance():
     results_file = Path("performance_results.json")
@@ -64,8 +65,11 @@ def analyze_performance():
 
                 symbol = "🔴" if delta > 0 else "🟢" if delta < 0 else "⚪"
 
-                print(f"    {symbol} {bench_name:35} {prev_median:8.4f}ms -> {latest_median:8.4f}ms "
-                      f"({pct_change:+6.2f}%)")
+                print(
+                    f"    {symbol} {bench_name:35} {prev_median:8.4f}ms -> {latest_median:8.4f}ms "
+                    f"({pct_change:+6.2f}%)"
+                )
+
 
 if __name__ == "__main__":
     analyze_performance()

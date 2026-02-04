@@ -1,6 +1,6 @@
 """FastAPI implementation for framework comparison."""
 
-from typing import Any, List
+from typing import Any
 
 from asgiref.sync import sync_to_async
 from fastapi import FastAPI

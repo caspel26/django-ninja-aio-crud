@@ -1,6 +1,6 @@
 """Pure Django Ninja implementation for framework comparison."""
 
-from typing import Any, List
+from typing import Any
 
 from asgiref.sync import sync_to_async
 from ninja import NinjaAPI, Schema
@@ -12,7 +12,6 @@ from tests.test_app.models import (
     TestModelSerializerForeignKey,
     TestModelSerializerReverseForeignKey,
     TestModelSerializerManyToMany,
-    TestModelSerializerReverseManyToMany,
 )
 
 
@@ -179,11 +178,13 @@ class PureDjangoNinjaBenchmark(FrameworkBenchmark):
         # Must manually construct the list
         children = []
         async for child in instance.test_model_serializer_foreign_keys.all():
-            children.append({
-                "id": child.pk,
-                "name": child.name,
-                "description": child.description,
-            })
+            children.append(
+                {
+                    "id": child.pk,
+                    "name": child.name,
+                    "description": child.description,
+                }
+            )
 
         return {
             "id": instance.pk,
@@ -201,11 +202,13 @@ class PureDjangoNinjaBenchmark(FrameworkBenchmark):
         # Manual async iteration for M2M
         related_items = []
         async for item in instance.test_model_serializers.all():
-            related_items.append({
-                "id": item.pk,
-                "name": item.name,
-                "description": item.description,
-            })
+            related_items.append(
+                {
+                    "id": item.pk,
+                    "name": item.name,
+                    "description": item.description,
+                }
+            )
 
         return {
             "id": instance.pk,
@@ -223,14 +226,16 @@ class PureDjangoNinjaBenchmark(FrameworkBenchmark):
         # Manual async iteration and dict construction
         items = []
         async for item in queryset:
-            items.append({
-                "id": item.pk,
-                "name": item.name,
-                "description": item.description,
-                "test_model_serializer": {
-                    "id": item.test_model_serializer.pk,
-                    "name": item.test_model_serializer.name,
-                    "description": item.test_model_serializer.description,
-                },
-            })
+            items.append(
+                {
+                    "id": item.pk,
+                    "name": item.name,
+                    "description": item.description,
+                    "test_model_serializer": {
+                        "id": item.test_model_serializer.pk,
+                        "name": item.test_model_serializer.name,
+                        "description": item.test_model_serializer.description,
+                    },
+                }
+            )
         return items

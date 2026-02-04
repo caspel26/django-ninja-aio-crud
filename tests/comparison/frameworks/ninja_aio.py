@@ -11,7 +11,6 @@ from tests.test_app.models import (
     TestModelSerializerForeignKey,
     TestModelSerializerReverseForeignKey,
     TestModelSerializerManyToMany,
-    TestModelSerializerReverseManyToMany,
 )
 
 
@@ -170,9 +169,9 @@ class NinjaAIOBenchmark(FrameworkBenchmark):
         util = ModelUtil(TestModelSerializerForeignKey)
         schema = TestModelSerializerForeignKey.generate_read_s()
         # Filters + select_related + pagination - all async
-        queryset = TestModelSerializerForeignKey.objects.filter(**filters).select_related(
-            "test_model_serializer"
-        )[:20]
+        queryset = TestModelSerializerForeignKey.objects.filter(
+            **filters
+        ).select_related("test_model_serializer")[:20]
         return await util.list_read_s(
             schema=schema,
             request=self.request.get(),

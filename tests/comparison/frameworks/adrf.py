@@ -7,7 +7,6 @@ and serializers without sync_to_async wrappers. This is the async version of DRF
 from typing import Any
 
 from adrf.serializers import ModelSerializer as AsyncModelSerializer
-from rest_framework import serializers
 
 from tests.comparison.base import FrameworkBenchmark
 from tests.test_app.models import (
