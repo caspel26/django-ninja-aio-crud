@@ -214,7 +214,7 @@ class UnionSerializerTestCase(TestCase):
                 )
                 relations_serializers = {
                     "test_model_foreign_keys": Union[
-                        "tests.test_serializers.TestModelForeignKeySerializer",
+                        "tests.test_serializers.TestModelForeignKeySerializer",  # noqa: F821
                         TestModelForeignKeySerializer,
                     ],
                 }
@@ -2633,3 +2633,172 @@ class BaseSerializerModelConfigDefaultTestCase(TestCase):
 
         result = serializers.BaseSerializer._apply_validators(DummySchema, {}, None)
         self.assertIs(result, DummySchema)
+
+
+# ==========================================================
+#              SCHEMA OVERRIDES TESTS
+# ==========================================================
+
+
+@tag("serializers", "schema_overrides")
+class ModelSerializerSchemaOverridesTestCase(TestCase):
+    """Test schema method overrides on ModelSerializer inner classes."""
+
+    def setUp(self):
+        warnings.simplefilter("ignore", UserWarning)
+
+    def test_read_schema_model_dump_override(self):
+        """model_dump override on ReadSerializer should transform output."""
+        schema = app_models.TestModelWithSchemaOverrides.generate_read_s()
+        self.assertIsNotNone(schema)
+        instance = schema(id=1, name="hello", description="world")
+        data = instance.model_dump()
+        self.assertEqual(data["name"], "HELLO")
+
+    def test_super_works_in_override(self):
+        """Bare super() should work correctly in overridden methods."""
+        schema = app_models.TestModelWithSchemaOverrides.generate_read_s()
+        instance = schema(id=1, name="test", description="desc")
+        data = instance.model_dump()
+        # super().model_dump() should have returned all fields
+        self.assertIn("id", data)
+        self.assertIn("description", data)
+        self.assertEqual(data["name"], "TEST")
+
+    def test_override_with_kwargs(self):
+        """Override should pass through kwargs to super().model_dump()."""
+        schema = app_models.TestModelWithSchemaOverrides.generate_read_s()
+        instance = schema(id=1, name="hello", description="world")
+        data = instance.model_dump(exclude={"description"})
+        self.assertNotIn("description", data)
+        self.assertEqual(data["name"], "HELLO")
+
+
+@tag("serializers", "schema_overrides")
+class MetaSerializerSchemaOverridesTestCase(TestCase):
+    """Test schema method overrides on Meta-driven Serializer validator classes."""
+
+    def setUp(self):
+        warnings.simplefilter("ignore", UserWarning)
+        from tests.test_app.serializers import (
+            TestModelWithSchemaOverridesMetaSerializer,
+        )
+
+        self.serializer = TestModelWithSchemaOverridesMetaSerializer
+
+    def test_read_schema_model_dump_override(self):
+        """model_dump override on ReadValidators should transform output."""
+        schema = self.serializer.generate_read_s()
+        self.assertIsNotNone(schema)
+        instance = schema(id=1, name="hello", description="world")
+        data = instance.model_dump()
+        self.assertEqual(data["name"], "HELLO")
+
+    def test_super_works_in_override(self):
+        """Bare super() should work correctly in overridden methods."""
+        schema = self.serializer.generate_read_s()
+        instance = schema(id=1, name="test", description="desc")
+        data = instance.model_dump()
+        self.assertIn("id", data)
+        self.assertIn("description", data)
+        self.assertEqual(data["name"], "TEST")
+
+
+@tag("serializers", "schema_overrides")
+class CollectSchemaOverridesTestCase(TestCase):
+    """Test _collect_schema_overrides method."""
+
+    def test_collects_regular_methods(self):
+        """Should collect regular callable methods."""
+
+        class Source:
+            def model_dump(self):
+                pass
+
+        overrides = serializers.BaseSerializer._collect_schema_overrides(Source)
+        self.assertIn("model_dump", overrides)
+
+    def test_skips_validators(self):
+        """Should skip PydanticDescriptorProxy instances."""
+        from pydantic import field_validator
+
+        class Source:
+            fields = ["name"]
+
+            @field_validator("name")
+            @classmethod
+            def validate_name(cls, v):
+                return v
+
+        overrides = serializers.BaseSerializer._collect_schema_overrides(Source)
+        self.assertNotIn("validate_name", overrides)
+
+    def test_skips_config_attrs(self):
+        """Should skip known config attributes."""
+
+        class Source:
+            fields = ["id", "name"]
+            model_config = {"str_strip_whitespace": True}
+
+        overrides = serializers.BaseSerializer._collect_schema_overrides(Source)
+        self.assertEqual(overrides, {})
+
+    def test_skips_dunder_attrs(self):
+        """Should skip dunder attributes."""
+
+        class Source:
+            def __init__(self):
+                pass
+
+        overrides = serializers.BaseSerializer._collect_schema_overrides(Source)
+        self.assertEqual(overrides, {})
+
+    def test_returns_empty_for_none(self):
+        """Should return empty dict for None source class."""
+        overrides = serializers.BaseSerializer._collect_schema_overrides(None)
+        self.assertEqual(overrides, {})
+
+    def test_collects_static_and_class_methods(self):
+        """Should collect staticmethod and classmethod overrides."""
+
+        class Source:
+            @staticmethod
+            def model_json_schema():
+                pass
+
+            @classmethod
+            def model_validate(cls, obj):
+                pass
+
+        overrides = serializers.BaseSerializer._collect_schema_overrides(Source)
+        self.assertIn("model_json_schema", overrides)
+        self.assertIn("model_validate", overrides)
+
+
+@tag("serializers", "schema_overrides")
+class BaseSerializerSchemaOverridesDefaultTestCase(TestCase):
+    """Test that _get_schema_overrides returns empty dict by default."""
+
+    def test_base_get_schema_overrides_returns_empty(self):
+        """BaseSerializer._get_schema_overrides should return empty dict."""
+        result = serializers.BaseSerializer._get_schema_overrides("In")
+        self.assertEqual(result, {})
+
+    def test_apply_validators_with_overrides_only(self):
+        """_apply_validators should apply schema_overrides even without validators."""
+        from ninja import Schema
+
+        class DummySchema(Schema):
+            name: str
+
+        def custom_dump(self, **kwargs):
+            data = super().model_dump(**kwargs)
+            data["name"] = data["name"].upper()
+            return data
+
+        result = serializers.BaseSerializer._apply_validators(
+            DummySchema, {}, None, {"model_dump": custom_dump}
+        )
+        instance = result(name="hello")
+        self.assertEqual(instance.model_dump()["name"], "HELLO")
+        self.assertIsNot(result, DummySchema)

@@ -9,6 +9,7 @@ from typing import (
     get_origin,
     ForwardRef,
 )
+import types
 import warnings
 import sys
 import threading
@@ -155,6 +156,52 @@ class BaseSerializer:
         if stack:
             stack.pop()
 
+    # Attributes on inner classes that are configuration, not schema overrides
+    _CONFIG_ATTRS = frozenset(
+        {
+            "fields",
+            "customs",
+            "optionals",
+            "excludes",
+            "relations_as_id",
+            "model_config",
+        }
+    )
+
+    @classmethod
+    def _collect_schema_overrides(cls, source_class) -> dict:
+        """
+        Collect callable schema method overrides from a class.
+
+        Scans the class for regular methods (not validators, not config attrs,
+        not dunder) that should be injected into the generated schema subclass.
+
+        Parameters
+        ----------
+        source_class : type | None
+            The class to scan for method overrides.
+
+        Returns
+        -------
+        dict
+            Mapping of method name to callable.
+        """
+        overrides = {}
+        if source_class is None:
+            return overrides
+        for attr_name, attr_value in vars(source_class).items():
+            if attr_name.startswith("_"):
+                continue
+            if attr_name in cls._CONFIG_ATTRS:
+                continue
+            if isinstance(attr_value, PydanticDescriptorProxy):
+                continue
+            if callable(attr_value) or isinstance(
+                attr_value, (classmethod, staticmethod)
+            ):
+                overrides[attr_name] = attr_value
+        return overrides
+
     @classmethod
     def _collect_validators(cls, source_class) -> dict:
         """
@@ -182,14 +229,22 @@ class BaseSerializer:
         return validators
 
     @classmethod
-    def _apply_validators(cls, schema, validators: dict, model_config: dict = None):
+    def _apply_validators(
+        cls,
+        schema,
+        validators: dict,
+        model_config: dict = None,
+        schema_overrides: dict = None,
+    ):
         """
-        Create a subclass of the given schema with validators and model_config attached.
+        Create a subclass of the given schema with validators, model_config,
+        and schema method overrides attached.
 
         Pydantic discovers validators via ``PydanticDescriptorProxy`` instances
         during class creation, so placing them on a subclass is sufficient.
         ``model_config`` (a ``ConfigDict``) is also applied as a class attribute
-        when provided.
+        when provided. Schema overrides are regular methods injected into the
+        subclass namespace with ``__class__`` cell rebinding for bare ``super()``.
 
         Parameters
         ----------
@@ -199,21 +254,47 @@ class BaseSerializer:
             Mapping of validator names to ``PydanticDescriptorProxy`` instances.
         model_config : dict, optional
             A Pydantic ``ConfigDict`` to apply to the generated schema.
+        schema_overrides : dict, optional
+            Mapping of method names to callables to inject as overrides.
 
         Returns
         -------
         Schema | None
-            A subclass with validators and/or model_config applied, or the
-            original schema if nothing needs to be applied.
+            A subclass with validators, model_config, and/or overrides applied,
+            or the original schema if nothing needs to be applied.
         """
         if not schema:
             return schema
         namespace = dict(validators) if validators else {}
         if model_config:
             namespace["model_config"] = model_config
+        if schema_overrides:
+            namespace.update(schema_overrides)
         if not namespace:
             return schema
-        return type(schema.__name__, (schema,), namespace)
+        subclass = type(schema.__name__, (schema,), namespace)
+        # Rebind __class__ cell in overrides so bare super() resolves correctly
+        if schema_overrides:
+            for attr_name, attr_value in schema_overrides.items():
+                if not isinstance(attr_value, types.FunctionType):
+                    continue
+                freevars = attr_value.__code__.co_freevars
+                if "__class__" not in freevars:
+                    continue
+                idx = freevars.index("__class__")
+                old_closure = attr_value.__closure__ or ()
+                new_cells = list(old_closure)
+                new_cells[idx] = types.CellType(subclass)
+                rebound = types.FunctionType(
+                    attr_value.__code__,
+                    attr_value.__globals__,
+                    attr_value.__name__,
+                    attr_value.__defaults__,
+                    tuple(new_cells),
+                )
+                rebound.__kwdefaults__ = attr_value.__kwdefaults__
+                setattr(subclass, attr_name, rebound)
+        return subclass
 
     @classmethod
     def _get_validators(cls, schema_type: type[SCHEMA_TYPES]) -> dict:
@@ -254,6 +335,26 @@ class BaseSerializer:
             A ``ConfigDict`` instance, or ``None`` if not configured.
         """
         return None
+
+    @classmethod
+    def _get_schema_overrides(cls, schema_type: type[SCHEMA_TYPES]) -> dict:
+        """
+        Return collected schema method overrides for the given schema type.
+
+        Subclasses must implement this to map schema types to the appropriate
+        source class for method overrides.
+
+        Parameters
+        ----------
+        schema_type : SCHEMA_TYPES
+            One of ``"In"``, ``"Patch"``, ``"Out"``, ``"Detail"``, or ``"Related"``.
+
+        Returns
+        -------
+        dict
+            Mapping of method names to callables.
+        """
+        return {}
 
     @classmethod
     def _get_fields(cls, s_type: type[S_TYPES], f_type: type[F_TYPES]):
@@ -1038,6 +1139,7 @@ class BaseSerializer:
         validators,
         depth: int = None,
         model_config: dict = None,
+        schema_overrides: dict = None,
     ) -> Schema | None:
         """Create schema for Out or Detail types."""
         fields, reverse_rels, excludes, customs, optionals = cls.get_schema_out_data(
@@ -1054,11 +1156,11 @@ class BaseSerializer:
             custom_fields=reverse_rels + customs + optionals,
             exclude=excludes,
         )
-        return cls._apply_validators(schema, validators, model_config)
+        return cls._apply_validators(schema, validators, model_config, schema_overrides)
 
     @classmethod
     def _create_related_schema(
-        cls, model, validators, model_config: dict = None
+        cls, model, validators, model_config: dict = None, schema_overrides: dict = None
     ) -> Schema | None:
         """Create schema for Related type."""
         fields, customs = cls.get_related_schema_data()
@@ -1070,7 +1172,7 @@ class BaseSerializer:
             fields=fields,
             custom_fields=customs,
         )
-        return cls._apply_validators(schema, validators, model_config)
+        return cls._apply_validators(schema, validators, model_config, schema_overrides)
 
     @classmethod
     def _create_in_or_patch_schema(
@@ -1079,6 +1181,7 @@ class BaseSerializer:
         model,
         validators,
         model_config: dict = None,
+        schema_overrides: dict = None,
     ) -> Schema | None:
         """Create schema for In or Patch types."""
         s_type = "create" if schema_type == "In" else "update"
@@ -1113,7 +1216,7 @@ class BaseSerializer:
             custom_fields=customs,
             exclude=excludes,
         )
-        return cls._apply_validators(schema, validators, model_config)
+        return cls._apply_validators(schema, validators, model_config, schema_overrides)
 
     @classmethod
     def _generate_model_schema(
@@ -1143,17 +1246,20 @@ class BaseSerializer:
         model = cls._get_model()
         validators = cls._get_validators(schema_type)
         model_config = cls._get_model_config(schema_type)
+        schema_overrides = cls._get_schema_overrides(schema_type)
 
         if schema_type in ("Out", "Detail"):
             return cls._create_out_or_detail_schema(
-                schema_type, model, validators, depth, model_config
+                schema_type, model, validators, depth, model_config, schema_overrides
             )
 
         if schema_type == "Related":
-            return cls._create_related_schema(model, validators, model_config)
+            return cls._create_related_schema(
+                model, validators, model_config, schema_overrides
+            )
 
         return cls._create_in_or_patch_schema(
-            schema_type, model, validators, model_config
+            schema_type, model, validators, model_config, schema_overrides
         )
 
     @classmethod
@@ -1465,6 +1571,26 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
         if config_class is None:
             return None
         return getattr(config_class, "model_config", None)
+
+    @classmethod
+    def _get_schema_overrides(cls, schema_type: type[SCHEMA_TYPES]) -> dict:
+        """
+        Collect schema method overrides from the inner serializer class.
+
+        Parameters
+        ----------
+        schema_type : SCHEMA_TYPES
+            One of ``"In"``, ``"Patch"``, ``"Out"``, ``"Detail"``, or ``"Related"``.
+
+        Returns
+        -------
+        dict
+            Mapping of method names to callables.
+        """
+        s_type = cls._SCHEMA_TO_S_TYPE.get(schema_type)
+        config_name = cls._SERIALIZER_CONFIG_MAP.get(s_type)
+        config_class = getattr(cls, config_name, None) if config_name else None
+        return cls._collect_schema_overrides(config_class)
 
     @classmethod
     def _get_relations_as_id(cls) -> list[str]:
@@ -1782,6 +1908,25 @@ class Serializer(BaseSerializer, metaclass=SerializerMeta):
         if schema_meta is None:
             return None
         return getattr(schema_meta, "model_config_override", None)
+
+    @classmethod
+    def _get_schema_overrides(cls, schema_type: type[SCHEMA_TYPES]) -> dict:
+        """
+        Collect schema method overrides from the validator inner class.
+
+        Parameters
+        ----------
+        schema_type : SCHEMA_TYPES
+            One of ``"In"``, ``"Patch"``, ``"Out"``, ``"Detail"``, or ``"Related"``.
+
+        Returns
+        -------
+        dict
+            Mapping of method names to callables.
+        """
+        class_name = cls._VALIDATORS_CLASS_MAP.get(schema_type)
+        validators_class = getattr(cls, class_name, None) if class_name else None
+        return cls._collect_schema_overrides(validators_class)
 
     @classmethod
     def _get_relations_as_id(cls) -> list[str]:

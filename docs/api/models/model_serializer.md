@@ -300,6 +300,179 @@ class User(ModelSerializer):
 
 ---
 
+## :material-cog: Pydantic Configuration & Schema Overrides
+
+### `model_config` — Pydantic ConfigDict
+
+You can set `model_config` on any inner serializer class to apply a Pydantic
+[`ConfigDict`](https://docs.pydantic.dev/latest/api/config/#pydantic.config.ConfigDict)
+to the generated schema. This lets you customize validation and serialization behavior
+without writing validators.
+
+```python
+from pydantic import ConfigDict
+from ninja_aio.models import ModelSerializer
+from django.db import models
+
+class Article(models.Model, ModelSerializer):
+    title = models.CharField(max_length=255)
+    body = models.TextField()
+
+    class CreateSerializer:
+        fields = ["title", "body"]
+        model_config = ConfigDict(str_strip_whitespace=True)
+
+    class ReadSerializer:
+        fields = ["id", "title", "body"]
+        model_config = ConfigDict(str_strip_whitespace=True)
+
+    class UpdateSerializer:
+        optionals = [("title", str), ("body", str)]
+        model_config = ConfigDict(str_strip_whitespace=True)
+```
+
+!!! info "Common ConfigDict options"
+    - `str_strip_whitespace=True` — strip leading/trailing whitespace from strings
+    - `str_to_lower=True` — convert strings to lowercase
+    - `str_to_upper=True` — convert strings to uppercase
+    - `use_enum_values=True` — store enum values instead of enum members
+    - `validate_default=True` — validate default values
+
+    See the full list of options in the [Pydantic ConfigDict reference](https://docs.pydantic.dev/latest/api/config/#pydantic.config.ConfigDict).
+
+### Schema Method Overrides
+
+You can define Pydantic schema method overrides directly on inner serializer classes.
+These methods are applied to the generated schema subclass, allowing you to customize
+methods like `model_dump`, `model_validate`, or add computed properties.
+
+```python
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from ninja import Schema
+
+class Article(models.Model, ModelSerializer):
+    title = models.CharField(max_length=255)
+    body = models.TextField()
+
+    class ReadSerializer:
+        fields = ["id", "title", "body"]
+
+        def model_dump(
+            self: Schema,
+            *,
+            mode: str = "python",
+            include: Any = None,
+            exclude: Any = None,
+            context: Any = None,
+            by_alias: bool = False,
+            exclude_unset: bool = False,
+            exclude_defaults: bool = False,
+            exclude_none: bool = False,
+            round_trip: bool = False,
+            warnings: bool | str = True,
+            serialize_as_any: bool = False,
+        ) -> dict[str, Any]:
+            data = super().model_dump(
+                mode=mode,
+                include=include,
+                exclude=exclude,
+                context=context,
+                by_alias=by_alias,
+                exclude_unset=exclude_unset,
+                exclude_defaults=exclude_defaults,
+                exclude_none=exclude_none,
+                round_trip=round_trip,
+                warnings=warnings,
+                serialize_as_any=serialize_as_any,
+            )
+            data["title"] = data["title"].title()
+            return data
+```
+
+!!! tip "IDE autocomplete for overridden methods"
+    By annotating `self: Schema` (with `Schema` imported under `TYPE_CHECKING`), your
+    IDE will provide full autocomplete and type checking for all Pydantic `BaseModel`
+    attributes and methods inside the override. The `TYPE_CHECKING` guard ensures
+    `Schema` is never imported at runtime — inner serializer classes are plain Python
+    classes, not Pydantic models.
+
+!!! warning "No automatic argument hinting"
+    Inner serializer classes are plain Python classes — not Pydantic models — so IDEs
+    cannot automatically infer parameter names or types for overridden methods like
+    `model_dump`. You must write out the full signature manually. Consult the
+    [Pydantic `BaseModel` API reference](https://docs.pydantic.dev/latest/api/base_model/)
+    for the correct parameter signatures.
+
+!!! info "How it works"
+    Methods defined on inner classes are collected and injected into the generated
+    Pydantic schema subclass. Bare `super()` calls work correctly — the framework
+    rebinds the method's class reference to the generated schema.
+
+You can combine `model_config`, validators, and method overrides on the same inner class:
+
+```python
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from ninja import Schema
+
+class Article(models.Model, ModelSerializer):
+    title = models.CharField(max_length=255)
+    body = models.TextField()
+
+    class CreateSerializer:
+        from pydantic import field_validator
+
+        fields = ["title", "body"]
+        model_config = ConfigDict(str_strip_whitespace=True)
+
+        @field_validator("title")
+        @classmethod
+        def validate_title(cls, v):
+            if len(v) < 3:
+                raise ValueError("Title too short")
+            return v
+
+        def model_dump(
+            self: Schema,
+            *,
+            mode: str = "python",
+            include: Any = None,
+            exclude: Any = None,
+            context: Any = None,
+            by_alias: bool = False,
+            exclude_unset: bool = False,
+            exclude_defaults: bool = False,
+            exclude_none: bool = False,
+            round_trip: bool = False,
+            warnings: bool | str = True,
+            serialize_as_any: bool = False,
+        ) -> dict[str, Any]:
+            data = super().model_dump(
+                mode=mode,
+                include=include,
+                exclude=exclude,
+                context=context,
+                by_alias=by_alias,
+                exclude_unset=exclude_unset,
+                exclude_defaults=exclude_defaults,
+                exclude_none=exclude_none,
+                round_trip=round_trip,
+                warnings=warnings,
+                serialize_as_any=serialize_as_any,
+            )
+            data["title"] = data["title"].title()
+            return data
+```
+
+---
+
 ## :material-auto-fix: Schema Generation
 
 ### Auto-Generated Schemas

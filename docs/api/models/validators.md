@@ -325,6 +325,137 @@ class Product(ModelSerializer):
 
 ---
 
+## :material-function: Schema Method Overrides
+
+In addition to validators, you can define **schema method overrides** on the same inner classes.
+These are regular methods (not decorated with `@field_validator` or `@model_validator`) that
+override Pydantic schema methods like `model_dump`, `model_validate`, or add custom properties.
+
+### ModelSerializer
+
+Define methods directly on the inner serializer classes:
+
+```python
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from ninja import Schema
+
+class User(models.Model, ModelSerializer):
+    name = models.CharField(max_length=255)
+    email = models.EmailField()
+
+    class ReadSerializer:
+        fields = ["id", "name", "email"]
+
+        def model_dump(
+            self: Schema,
+            *,
+            mode: str = "python",
+            include: Any = None,
+            exclude: Any = None,
+            context: Any = None,
+            by_alias: bool = False,
+            exclude_unset: bool = False,
+            exclude_defaults: bool = False,
+            exclude_none: bool = False,
+            round_trip: bool = False,
+            warnings: bool | str = True,
+            serialize_as_any: bool = False,
+        ) -> dict[str, Any]:
+            data = super().model_dump(
+                mode=mode,
+                include=include,
+                exclude=exclude,
+                context=context,
+                by_alias=by_alias,
+                exclude_unset=exclude_unset,
+                exclude_defaults=exclude_defaults,
+                exclude_none=exclude_none,
+                round_trip=round_trip,
+                warnings=warnings,
+                serialize_as_any=serialize_as_any,
+            )
+            data["display_name"] = f"{data['name']} <{data['email']}>"
+            return data
+```
+
+### Serializer (Meta-driven)
+
+Define methods on the validator inner classes:
+
+```python
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from ninja import Schema
+
+class UserSerializer(serializers.Serializer):
+    class Meta:
+        model = User
+        schema_out = serializers.SchemaModelConfig(
+            fields=["id", "name", "email"]
+        )
+
+    class ReadValidators:
+        def model_dump(
+            self: Schema,
+            *,
+            mode: str = "python",
+            include: Any = None,
+            exclude: Any = None,
+            context: Any = None,
+            by_alias: bool = False,
+            exclude_unset: bool = False,
+            exclude_defaults: bool = False,
+            exclude_none: bool = False,
+            round_trip: bool = False,
+            warnings: bool | str = True,
+            serialize_as_any: bool = False,
+        ) -> dict[str, Any]:
+            data = super().model_dump(
+                mode=mode,
+                include=include,
+                exclude=exclude,
+                context=context,
+                by_alias=by_alias,
+                exclude_unset=exclude_unset,
+                exclude_defaults=exclude_defaults,
+                exclude_none=exclude_none,
+                round_trip=round_trip,
+                warnings=warnings,
+                serialize_as_any=serialize_as_any,
+            )
+            data["display_name"] = f"{data['name']} <{data['email']}>"
+            return data
+```
+
+!!! tip "IDE autocomplete for overridden methods"
+    By annotating `self: Schema` (with `Schema` imported under `TYPE_CHECKING`), your
+    IDE will provide full autocomplete and type checking for all Pydantic `BaseModel`
+    attributes and methods inside the override. The `TYPE_CHECKING` guard ensures
+    `Schema` is never imported at runtime — inner serializer/validator classes are
+    plain Python classes, not Pydantic models.
+
+!!! warning "No automatic argument hinting"
+    Inner serializer/validator classes are plain Python classes — not Pydantic models — so
+    IDEs cannot automatically infer parameter names or types for overridden methods like
+    `model_dump`. You must write out the full signature manually. Consult the
+    [Pydantic `BaseModel` API reference](https://docs.pydantic.dev/latest/api/base_model/)
+    for the correct parameter signatures.
+
+!!! info "Validators and method overrides coexist"
+    You can mix `@field_validator`, `@model_validator`, and method overrides on the same
+    inner class. The framework collects them separately — validators via Pydantic's
+    descriptor protocol, method overrides as regular callables — and applies both to the
+    generated schema subclass. Bare `super()` calls work correctly.
+
+---
+
 ## :material-compass: See Also
 
 <div class="grid cards" markdown>

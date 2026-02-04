@@ -635,6 +635,178 @@ class ArticleSerializer(serializers.Serializer):
 
 ---
 
+## :material-cog: Pydantic Configuration & Schema Overrides
+
+### `model_config_override` — Pydantic ConfigDict
+
+You can pass `model_config_override` to any `SchemaModelConfig` to apply a Pydantic
+[`ConfigDict`](https://docs.pydantic.dev/latest/api/config/#pydantic.config.ConfigDict)
+to the generated schema:
+
+```python
+from pydantic import ConfigDict
+from ninja_aio.models import serializers
+
+class ArticleSerializer(serializers.Serializer):
+    class Meta:
+        model = Article
+        schema_in = serializers.SchemaModelConfig(
+            fields=["title", "body"],
+            model_config_override=ConfigDict(str_strip_whitespace=True),
+        )
+        schema_out = serializers.SchemaModelConfig(
+            fields=["id", "title", "body"],
+            model_config_override=ConfigDict(str_strip_whitespace=True),
+        )
+        schema_update = serializers.SchemaModelConfig(
+            optionals=[("title", str), ("body", str)],
+            model_config_override=ConfigDict(str_strip_whitespace=True),
+        )
+```
+
+!!! info "Why `model_config_override` instead of `model_config`?"
+    `SchemaModelConfig` is a Pydantic model itself, so `model_config` is a reserved
+    attribute. The `model_config_override` field is used to pass through the config to
+    the generated schema without conflicting with Pydantic internals.
+
+    See the full list of options in the [Pydantic ConfigDict reference](https://docs.pydantic.dev/latest/api/config/#pydantic.config.ConfigDict).
+
+### Schema Method Overrides
+
+You can define Pydantic schema method overrides on the validator inner classes
+(`CreateValidators`, `ReadValidators`, `UpdateValidators`, `DetailValidators`).
+These methods are applied to the generated schema subclass alongside any validators.
+
+```python
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from ninja import Schema
+
+class ArticleSerializer(serializers.Serializer):
+    class Meta:
+        model = Article
+        schema_in = serializers.SchemaModelConfig(fields=["title", "body"])
+        schema_out = serializers.SchemaModelConfig(
+            fields=["id", "title", "body"]
+        )
+
+    class ReadValidators:
+        def model_dump(
+            self: Schema,
+            *,
+            mode: str = "python",
+            include: Any = None,
+            exclude: Any = None,
+            context: Any = None,
+            by_alias: bool = False,
+            exclude_unset: bool = False,
+            exclude_defaults: bool = False,
+            exclude_none: bool = False,
+            round_trip: bool = False,
+            warnings: bool | str = True,
+            serialize_as_any: bool = False,
+        ) -> dict[str, Any]:
+            data = super().model_dump(
+                mode=mode,
+                include=include,
+                exclude=exclude,
+                context=context,
+                by_alias=by_alias,
+                exclude_unset=exclude_unset,
+                exclude_defaults=exclude_defaults,
+                exclude_none=exclude_none,
+                round_trip=round_trip,
+                warnings=warnings,
+                serialize_as_any=serialize_as_any,
+            )
+            data["title"] = data["title"].title()
+            return data
+```
+
+!!! tip "IDE autocomplete for overridden methods"
+    By annotating `self: Schema` (with `Schema` imported under `TYPE_CHECKING`), your
+    IDE will provide full autocomplete and type checking for all Pydantic `BaseModel`
+    attributes and methods inside the override. The `TYPE_CHECKING` guard ensures
+    `Schema` is never imported at runtime — validator classes are plain Python classes,
+    not Pydantic models.
+
+!!! warning "No automatic argument hinting"
+    Validator inner classes are plain Python classes — not Pydantic models — so IDEs
+    cannot automatically infer parameter names or types for overridden methods like
+    `model_dump`. You must write out the full signature manually. Consult the
+    [Pydantic `BaseModel` API reference](https://docs.pydantic.dev/latest/api/base_model/)
+    for the correct parameter signatures.
+
+You can combine validators, `model_config_override`, and method overrides:
+
+```python
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from ninja import Schema
+
+class ArticleSerializer(serializers.Serializer):
+    class Meta:
+        model = Article
+        schema_in = serializers.SchemaModelConfig(
+            fields=["title", "body"],
+            model_config_override=ConfigDict(str_strip_whitespace=True),
+        )
+
+    class CreateValidators:
+        from pydantic import field_validator
+
+        @field_validator("title")
+        @classmethod
+        def validate_title(cls, v):
+            if len(v) < 3:
+                raise ValueError("Title too short")
+            return v
+
+        def model_dump(
+            self: Schema,
+            *,
+            mode: str = "python",
+            include: Any = None,
+            exclude: Any = None,
+            context: Any = None,
+            by_alias: bool = False,
+            exclude_unset: bool = False,
+            exclude_defaults: bool = False,
+            exclude_none: bool = False,
+            round_trip: bool = False,
+            warnings: bool | str = True,
+            serialize_as_any: bool = False,
+        ) -> dict[str, Any]:
+            data = super().model_dump(
+                mode=mode,
+                include=include,
+                exclude=exclude,
+                context=context,
+                by_alias=by_alias,
+                exclude_unset=exclude_unset,
+                exclude_defaults=exclude_defaults,
+                exclude_none=exclude_none,
+                round_trip=round_trip,
+                warnings=warnings,
+                serialize_as_any=serialize_as_any,
+            )
+            data["title"] = data["title"].title()
+            return data
+```
+
+!!! info "How it works"
+    Methods defined on validator classes are collected separately from validators.
+    Both are injected into the generated Pydantic schema subclass. Bare `super()`
+    calls work correctly — the framework rebinds the method's class reference.
+
+---
+
 ## :material-view-grid: Using with APIViewSet
 
 You can attach a Serializer to an APIViewSet to auto-generate schemas and leverage queryset_request when present:
