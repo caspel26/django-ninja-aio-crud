@@ -130,6 +130,7 @@ def build_latest_run_charts(run: dict) -> str:
             }},
             options: {{
                 responsive: true,
+                maintainAspectRatio: false,
                 plugins: {{
                     title: {{
                         display: true,
@@ -213,6 +214,7 @@ def build_trend_charts(runs: list[dict]) -> str:
             }},
             options: {{
                 responsive: true,
+                maintainAspectRatio: false,
                 plugins: {{
                     title: {{
                         display: true,

@@ -12,7 +12,7 @@
 
     ---
 
-    Tested on 2026-02-02T17:25:06.993179
+    Tested on 2026-02-04T03:37:16.423338
 
 -   :fontawesome-solid-scale-balanced: **4 Frameworks**
 
@@ -275,19 +275,19 @@ This is where Django Ninja AIO truly differentiates itself. Compare **real imple
 
 | Operation | **Django Ninja AIO** | **Django Ninja** | **ADRF** | **FastAPI** |
 |-----------|---|---|---|---|
-| **Bulk Serialization 100** | 7.28ms | 0.39ms | 67.89ms | 0.51ms |
-| **Bulk Serialization 500** | 35.48ms | 1.39ms | 338.40ms | 2.25ms |
-| **Complex Async Query** | 1.74ms | 0.26ms | 22.19ms | 0.32ms |
-| **Create** | 0.53ms | 0.15ms | 1.04ms | 0.16ms |
-| **Delete** | 0.43ms | 0.37ms | 0.35ms | 0.31ms |
-| **Filter** | 0.30ms | 0.19ms | 1.01ms | 0.19ms |
-| **List** | 1.72ms | 0.19ms | 14.22ms | 0.21ms |
-| **Many To Many** | 0.54ms | 0.50ms | 5.25ms | 0.44ms |
-| **Nested Relations** | 0.45ms | 0.24ms | 1.43ms | 0.21ms |
-| **Relation Serialization** | 0.31ms | 0.21ms | 1.46ms | 0.21ms |
-| **Retrieve** | 0.27ms | 0.17ms | 0.94ms | 0.17ms |
-| **Reverse Relations** | 0.62ms | 0.59ms | 21.87ms | 0.64ms |
-| **Update** | 0.77ms | 0.34ms | 1.24ms | 0.34ms |
+| **Bulk Serialization 100** | 6.86ms | 0.36ms | 66.43ms | 0.46ms |
+| **Bulk Serialization 500** | 33.96ms | 1.30ms | 325.56ms | 1.77ms |
+| **Complex Async Query** | 1.74ms | 0.26ms | 19.79ms | 0.29ms |
+| **Create** | 0.49ms | 0.13ms | 0.93ms | 0.17ms |
+| **Delete** | 0.41ms | 0.36ms | 0.31ms | 0.29ms |
+| **Filter** | 0.26ms | 0.17ms | 0.90ms | 0.18ms |
+| **List** | 1.56ms | 0.18ms | 12.99ms | 0.22ms |
+| **Many To Many** | 0.46ms | 0.38ms | 4.80ms | 0.39ms |
+| **Nested Relations** | 0.37ms | 0.19ms | 1.31ms | 0.24ms |
+| **Relation Serialization** | 0.33ms | 0.19ms | 1.30ms | 0.19ms |
+| **Retrieve** | 0.25ms | 0.16ms | 1.06ms | 0.17ms |
+| **Reverse Relations** | 0.55ms | 0.45ms | 20.07ms | 0.50ms |
+| **Update** | 0.74ms | 0.39ms | 1.11ms | 0.31ms |
 
 
 !!! note "Understanding the Numbers"

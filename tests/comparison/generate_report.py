@@ -130,6 +130,7 @@ def generate_html_report(results_file: Path, output_file: Path) -> None:
             }},
             options: {{
                 responsive: true,
+                maintainAspectRatio: false,
                 plugins: {{
                     title: {{
                         display: true,
