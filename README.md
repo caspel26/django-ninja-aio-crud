@@ -32,6 +32,7 @@
 
 | | Feature | Description |
 |---|---|---|
+| **🔒 Type Safety** | Generic classes | Full IDE autocomplete and type checking with generic `ModelUtil`, `Serializer`, and `APIViewSet` |
 | **Meta-driven Serializer** | Dynamic schemas | Generate CRUD schemas for existing Django models without changing base classes |
 | **Async CRUD ViewSets** | Full operations | Create, list, retrieve, update, delete — all async |
 | **Auto Schemas** | Pydantic generation | Automatic read/create/update schemas from `ModelSerializer` |

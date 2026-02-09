@@ -1,4 +1,4 @@
-from typing import List
+from typing import Generic, List, TypeVar
 
 from ninja import NinjaAPI, Router, Schema, Path, Query
 from ninja.constants import NOT_SET
@@ -22,6 +22,9 @@ from ninja_aio.decorators import unique_view, decorate_view, aatomic
 from ninja_aio.models import serializers
 
 ERROR_CODES = frozenset({400, 401, 404})
+
+# TypeVar for generic model typing in ViewSets
+ModelT = TypeVar("ModelT", bound=Model)
 
 
 class API:
@@ -134,11 +137,35 @@ class APIView(API):
         return self.router
 
 
-class APIViewSet(API):
+class APIViewSet(API, Generic[ModelT]):
     """
-    Base viewset generating async CRUD + optional M2M endpoints for a Django model.
+    Generic base viewset generating async CRUD + optional M2M endpoints for Django models.
 
-    Usage:
+    Type Safety
+    -----------
+    Specify the model type parameter to get proper type hints for model_util methods:
+
+        @api.viewset(Book)
+        class BookAPI(APIViewSet[Book]):  # Explicitly typed
+            async def my_method(self, request):
+                # self.model_util is typed as ModelUtil[Book]
+                book: Book = await self.model_util.get_object(request, pk=1)
+                # IDE knows book.title, book.author, etc.
+
+    If you use serializer methods instead, type the Serializer:
+
+        class BookSerializer(Serializer[Book]):  # Type here
+            class Meta:
+                model = Book
+
+        @api.viewset(Book)
+        class BookAPI(APIViewSet):  # No generic needed
+            serializer_class = BookSerializer
+            async def my_method(self, request, data):
+                book: Book = await self.serializer.create(data)  # Typed!
+
+    Basic Usage
+    -----------
         @api.viewset(model=MyModel)
         class MyModelViewSet(APIViewSet):
             pass
@@ -224,8 +251,8 @@ class APIViewSet(API):
         unique_view decorator prevents duplicate registration.
     """
 
-    model: ModelSerializer | Model
-    serializer_class: serializers.Serializer | None = None
+    model: type[ModelT]
+    serializer_class: type[serializers.Serializer] | None = None
     schema_in: Schema | None = None
     schema_out: Schema | None = None
     schema_detail: Schema | None = None
@@ -251,17 +278,17 @@ class APIViewSet(API):
     def __init__(
         self,
         api: NinjaAPI = None,
-        model: Model | ModelSerializer = None,
+        model: type[ModelT] | None = None,
         prefix: str = None,
         tags: list[str] = None,
     ) -> None:
         self.api = api or self.api
         self.error_codes = ERROR_CODES
-        self.model = model or self.model
+        self.model: type[ModelT] = model or self.model
         self.serializer: serializers.Serializer | None = (
             None if self.serializer_class is None else self.serializer_class()
         )
-        self.model_util = (
+        self.model_util: ModelUtil[ModelT] = (
             ModelUtil(self.model, serializer_class=self.serializer_class)
             if not isinstance(self.model, ModelSerializerMeta)
             else self.model.util
@@ -347,9 +374,13 @@ class APIViewSet(API):
         Returns:
             Model class or None
         """
-        if hasattr(field, 'related_model') and field.related_model:
+        if hasattr(field, "related_model") and field.related_model:
             return field.related_model
-        if hasattr(field, 'remote_field') and field.remote_field and hasattr(field.remote_field, 'model'):
+        if (
+            hasattr(field, "remote_field")
+            and field.remote_field
+            and hasattr(field.remote_field, "model")
+        ):
             return field.remote_field.model
         return None
 
@@ -390,7 +421,7 @@ class APIViewSet(API):
         if not field_path:
             return False
 
-        parts = field_path.split('__')
+        parts = field_path.split("__")
         current_model = self.model
 
         # Iterate through the path, validating each part
@@ -681,7 +712,7 @@ class APIViewSet(API):
         return self._set_additional_views()
 
 
-class ReadOnlyViewSet(APIViewSet):
+class ReadOnlyViewSet(APIViewSet[ModelT]):
     """
     ReadOnly viewset generating async List + Retrieve endpoints for a Django model.
 
@@ -701,7 +732,7 @@ class ReadOnlyViewSet(APIViewSet):
     disable = ["create", "update", "delete"]
 
 
-class WriteOnlyViewSet(APIViewSet):
+class WriteOnlyViewSet(APIViewSet[ModelT]):
     """
     WriteOnly viewset generating async Create + Update + Delete endpoints for a Django model.
 
