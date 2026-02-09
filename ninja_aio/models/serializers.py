@@ -1860,7 +1860,7 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         cls._meta = cls.Meta
 
     class Meta:
-        model: type[ModelT] = None
+        model: Optional[type[ModelT]] = None
         schema_in: Optional[SchemaModelConfig] = None
         schema_out: Optional[SchemaModelConfig] = None
         schema_update: Optional[SchemaModelConfig] = None
@@ -2094,15 +2094,12 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         return getattr(schema, f_type, []) or []
 
     def _get_dump_schema(self, schema: Schema = None) -> Schema:
-        return (
-            (
-                self.generate_read_s()
-                if self.generate_detail_s() is None
-                else self.generate_detail_s()
-            )
-            if schema is None
-            else schema
-        )
+        if schema is None:
+            detail_schema = self.generate_detail_s()
+            if detail_schema is None:
+                return self.generate_read_s()
+            return detail_schema
+        return schema
 
     @classmethod
     async def queryset_request(cls, request: HttpRequest):
