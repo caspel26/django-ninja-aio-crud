@@ -2064,12 +2064,46 @@ class Serializer(BaseSerializer, metaclass=SerializerMeta):
                 return []
         return getattr(schema, f_type, []) or []
 
+    def _get_dump_schema(self, schema: Schema = None) -> Schema:
+        return (
+            (
+                self.generate_read_s()
+                if self.generate_detail_s() is None
+                else self.generate_detail_s()
+            )
+            if schema is None
+            else schema
+        )
+
     @classmethod
     async def queryset_request(cls, request: HttpRequest):
         return cls.query_util.apply_queryset_optimizations(
             queryset=cls.model._default_manager.all(),
             scope=cls.query_util.SCOPES.QUERYSET_REQUEST,
         )
+
+    def has_changed(self, instance: models.Model, field: str) -> bool:
+        """
+        Check if a model field has changed compared to the persisted value.
+
+        Parameters
+        ----------
+        field : str
+            Field name.
+
+        Returns
+        -------
+        bool
+            True if in-memory value differs from DB value.
+        """
+        if not instance.pk:
+            return False
+        old_value = (
+            instance.__class__._default_manager.filter(pk=instance.pk)
+            .values(field)
+            .get()[field]
+        )
+        return getattr(instance, field) != old_value
 
     async def post_create(self, instance: models.Model) -> None:
         """
@@ -2146,7 +2180,9 @@ class Serializer(BaseSerializer, metaclass=SerializerMeta):
             setattr(instance, attr, value)
         return await self.save(instance)
 
-    async def model_dump(self, instance: models.Model) -> dict[str, Any]:
+    async def model_dump(
+        self, instance: models.Model, schema: Schema = None
+    ) -> dict[str, Any]:
         """
         Serialize a model instance to a dictionary using the Out schema.
 
@@ -2155,20 +2191,21 @@ class Serializer(BaseSerializer, metaclass=SerializerMeta):
         instance : models.Model
             The model instance to serialize.
 
+        schema : Schema
+            The Pydantic schema to use for serialization.
+            defaults to the detail schema if defined, otherwise the read schema.
+
         Returns
         -------
         dict
             Serialized data.
         """
-        schema = (
-            self.generate_read_s()
-            if self.generate_detail_s() is None
-            else self.generate_detail_s()
+        return await self.util.read_s(
+            schema=self._get_dump_schema(schema), instance=instance
         )
-        return await self.util.read_s(schema=schema, instance=instance)
 
     async def models_dump(
-        self, instances: models.QuerySet[models.Model]
+        self, instances: models.QuerySet[models.Model], schema: Schema = None
     ) -> list[dict[str, Any]]:
         """
         Serialize a list of model instances to a list of dictionaries using the Out schema.
@@ -2184,7 +2221,7 @@ class Serializer(BaseSerializer, metaclass=SerializerMeta):
             List of serialized data.
         """
         return await self.util.list_read_s(
-            schema=self.generate_read_s(), instances=instances
+            schema=self._get_dump_schema(schema), instances=instances
         )
 
     def after_save(self, instance: models.Model):
