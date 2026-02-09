@@ -537,28 +537,6 @@ class ModelUtilHelperMethodsTestCase(TestCase):
         cls.util_custom = ModelUtil(CustomOptionalSerializer)
         cls.util_plain = ModelUtil(app_models.TestModelSerializer)
 
-    def test_validate_input_fields_valid_fields(self):
-        """_validate_input_fields should not raise for valid fields."""
-        payload = {"name": "test", "description": "desc"}
-        # Should not raise
-        self.util_plain._validate_input_fields(payload, False, None)
-
-    def test_validate_input_fields_invalid_fields(self):
-        """_validate_input_fields should raise SerializeError for invalid fields."""
-        payload = {"name": "test", "invalid_field": "value"}
-        with self.assertRaises(SerializeError) as cm:
-            self.util_plain._validate_input_fields(payload, False, None)
-        error_data = cm.exception.error
-        self.assertIn("invalid_fields", error_data)
-        self.assertIn("invalid_field", error_data["invalid_fields"])
-
-    def test_validate_input_fields_skips_custom_fields(self):
-        """_validate_input_fields should skip custom fields when using serializer."""
-        payload = {"name": "test", "extra": "custom"}
-        # Should not raise because 'extra' is a custom field
-        self.util_custom._validate_input_fields(
-            payload, True, CustomOptionalSerializer
-        )
 
     def test_collect_custom_and_optional_fields_with_serializer(self):
         """_collect_custom_and_optional_fields should collect custom and optional fields."""

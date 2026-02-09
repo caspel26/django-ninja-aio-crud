@@ -35,7 +35,11 @@ nav:
     - Renderers: api/renderers/orjson_renderer.md
   - Authentication:
       - JWT & AsyncJwtBearer: auth.md
-  - Performance Benchmarks: performance.md
+  - Benchmarks:
+      - Framework Comparison: comparison.md
+      - Performance: performance.md
+  - Deployment: deployment.md
+  - Troubleshooting: troubleshooting.md
   - Contributing: contributing.md
   - Release Notes: release_notes.md
 

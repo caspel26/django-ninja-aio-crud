@@ -1,75 +1,97 @@
-#!/usr/bin/env python
-"""Generate an interactive HTML performance report from performance_results.json.
+#!/usr/bin/env python3
+"""Generate interactive HTML comparison report from framework benchmark results.
 
-Uses Chart.js via CDN — no Python dependencies beyond the stdlib.
-
-Usage:
-    python tests/performance/generate_report.py
-    python tests/performance/generate_report.py --input path/to/results.json --output report.html
+This script reads comparison_results.json and generates an interactive HTML
+report with Chart.js visualizations comparing django-ninja-aio-crud against
+other popular Python REST frameworks.
 """
 
 import argparse
-import json
 import html
+import json
 import sys
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_INPUT = PROJECT_ROOT / "performance_results.json"
-DEFAULT_OUTPUT = PROJECT_ROOT / "performance_report.html"
 
-COLORS = [
-    "rgba(103, 58, 183, 0.75)",  # deep purple (primary)
-    "rgba(171, 71, 188, 0.75)",  # purple accent
-    "rgba(126, 87, 194, 0.75)",  # lighter purple
-    "rgba(186, 104, 200, 0.75)",  # pink-purple
-    "rgba(94, 53, 177, 0.75)",  # darker purple
-    "rgba(149, 117, 205, 0.75)",  # soft violet
-    "rgba(206, 147, 216, 0.75)",  # lavender
-    "rgba(69, 39, 160, 0.75)",  # indigo-purple
-]
-
-BORDER_COLORS = [c.replace("0.75", "1") for c in COLORS]
-
-
-def load_results(path: Path) -> dict:
-    if not path.exists():
-        print(f"Error: {path} not found. Run performance tests first.", file=sys.stderr)
+def generate_html_report(results_file: Path, output_file: Path) -> None:
+    """Generate HTML comparison report from JSON results."""
+    if not results_file.exists():
+        print(f"Error: Results file not found: {results_file}", file=sys.stderr)
         sys.exit(1)
-    return json.loads(path.read_text())
 
+    with open(results_file) as f:
+        data = json.load(f)
 
-def build_latest_run_charts(run: dict) -> str:
-    """Build Chart.js chart configs for the latest run, one per test class."""
-    results = run["results"]
-    charts_html = ""
+    if "runs" not in data or not data["runs"]:
+        print("Error: No comparison runs found in results file", file=sys.stderr)
+        sys.exit(1)
+
+    latest_run = data["runs"][-1]
+    ts = latest_run.get("timestamp", "Unknown")[:19].replace("T", " ")
+    py_ver = latest_run.get("python_version", "Unknown")
+    results = latest_run.get("results", {})
+
+    # Extract framework names and operations
+    frameworks = list(results.keys())
+    if not frameworks:
+        print("Error: No framework results found", file=sys.stderr)
+        sys.exit(1)
+
+    # Get all operations from the first framework
+    operations = list(results[frameworks[0]].keys())
+
+    # Build chart sections and configs
+    chart_html = ""
     chart_configs = ""
-    idx = 0
 
-    for cls_name, benchmarks in results.items():
+    # Color palette matching performance report style
+    colors = [
+        "rgba(103, 58, 183, 0.75)",  # Purple - Django Ninja AIO
+        "rgba(33, 150, 243, 0.75)",  # Blue - Django Ninja
+        "rgba(255, 152, 0, 0.75)",  # Orange - ADRF
+        "rgba(76, 175, 80, 0.75)",  # Green - FastAPI
+    ]
+    border_colors = [c.replace("0.75", "1") for c in colors]
+
+    for idx, operation in enumerate(operations):
         canvas_id = f"chart_{idx}"
-        labels = list(benchmarks.keys())
-        avg_values = [b["avg_ms"] for b in benchmarks.values()]
-        min_values = [b["min_ms"] for b in benchmarks.values()]
-        max_values = [b["max_ms"] for b in benchmarks.values()]
-        median_values = [b["median_ms"] for b in benchmarks.values()]
+        operation_title = operation.replace("_", " ").title()
 
-        # Build the data table
+        # Collect data for this operation
+        op_frameworks = []
+        median_values = []
+        avg_values = []
+        min_values = []
+        max_values = []
+
+        for framework in frameworks:
+            if operation in results[framework]:
+                stats = results[framework][operation]
+                op_frameworks.append(framework)
+                median_values.append(stats["median_ms"])
+                avg_values.append(stats["avg_ms"])
+                min_values.append(stats["min_ms"])
+                max_values.append(stats["max_ms"])
+
+        # Find winner (lowest median)
+        winner_idx = median_values.index(min(median_values)) if median_values else -1
+
+        # Build data table
         table_rows = ""
-        for name, stats in benchmarks.items():
+        for i, framework in enumerate(op_frameworks):
+            row_class = ' class="winner"' if i == winner_idx else ""
             table_rows += f"""
-            <tr>
-                <td>{html.escape(name)}</td>
-                <td>{stats['iterations']}</td>
-                <td>{stats['min_ms']:.4f}</td>
-                <td>{stats['avg_ms']:.4f}</td>
-                <td>{stats['median_ms']:.4f}</td>
-                <td>{stats['max_ms']:.4f}</td>
+            <tr{row_class}>
+                <td>{html.escape(framework)}</td>
+                <td>{median_values[i]:.4f}</td>
+                <td>{avg_values[i]:.4f}</td>
+                <td>{min_values[i]:.4f}</td>
+                <td>{max_values[i]:.4f}</td>
             </tr>"""
 
-        charts_html += f"""
+        chart_html += f"""
         <div class="chart-section">
-            <h2>{html.escape(cls_name)}</h2>
+            <h2>{html.escape(operation_title)}</h2>
             <div class="chart-container">
                 <canvas id="{canvas_id}"></canvas>
             </div>
@@ -77,11 +99,10 @@ def build_latest_run_charts(run: dict) -> str:
             <table>
                 <thead>
                     <tr>
-                        <th>Benchmark</th>
-                        <th>Iterations</th>
-                        <th>Min (ms)</th>
-                        <th>Avg (ms)</th>
+                        <th>Framework</th>
                         <th>Median (ms)</th>
+                        <th>Avg (ms)</th>
+                        <th>Min (ms)</th>
                         <th>Max (ms)</th>
                     </tr>
                 </thead>
@@ -91,39 +112,18 @@ def build_latest_run_charts(run: dict) -> str:
             </div>
         </div>"""
 
-        labels_json = json.dumps(labels)
+        # Generate chart config
         chart_configs += f"""
         new Chart(document.getElementById('{canvas_id}'), {{
             type: 'bar',
             data: {{
-                labels: {labels_json},
+                labels: {json.dumps(op_frameworks)},
                 datasets: [
-                    {{
-                        label: 'Avg (ms)',
-                        data: {json.dumps(avg_values)},
-                        backgroundColor: '{COLORS[0]}',
-                        borderColor: '{BORDER_COLORS[0]}',
-                        borderWidth: 1
-                    }},
                     {{
                         label: 'Median (ms)',
                         data: {json.dumps(median_values)},
-                        backgroundColor: '{COLORS[2]}',
-                        borderColor: '{BORDER_COLORS[2]}',
-                        borderWidth: 1
-                    }},
-                    {{
-                        label: 'Min (ms)',
-                        data: {json.dumps(min_values)},
-                        backgroundColor: '{COLORS[3]}',
-                        borderColor: '{BORDER_COLORS[3]}',
-                        borderWidth: 1
-                    }},
-                    {{
-                        label: 'Max (ms)',
-                        data: {json.dumps(max_values)},
-                        backgroundColor: '{COLORS[1]}',
-                        borderColor: '{BORDER_COLORS[1]}',
+                        backgroundColor: {json.dumps(colors[:len(op_frameworks)])},
+                        borderColor: {json.dumps(border_colors[:len(op_frameworks)])},
                         borderWidth: 1
                     }}
                 ]
@@ -134,10 +134,22 @@ def build_latest_run_charts(run: dict) -> str:
                 plugins: {{
                     title: {{
                         display: true,
-                        text: '{html.escape(cls_name)}',
+                        text: '{html.escape(operation_title)}',
                         font: {{ size: 16 }}
                     }},
-                    legend: {{ position: 'top' }}
+                    legend: {{ display: false }},
+                    tooltip: {{
+                        callbacks: {{
+                            afterLabel: function(context) {{
+                                const idx = context.dataIndex;
+                                return [
+                                    `Avg: {json.dumps(avg_values)}[idx].toFixed(4) + ' ms'`,
+                                    `Min: {json.dumps(min_values)}[idx].toFixed(4) + ' ms'`,
+                                    `Max: {json.dumps(max_values)}[idx].toFixed(4) + ' ms'`
+                                ];
+                            }}
+                        }}
+                    }}
                 }},
                 scales: {{
                     y: {{
@@ -151,115 +163,14 @@ def build_latest_run_charts(run: dict) -> str:
             }}
         }});
         """
-        idx += 1
 
-    return charts_html, chart_configs
-
-
-def build_trend_charts(runs: list[dict]) -> str:
-    """Build line charts showing benchmark trends across runs."""
-    if len(runs) < 2:
-        return "", ""
-
-    # Collect all (class, benchmark) pairs across all runs
-    all_benchmarks: dict[str, dict[str, list]] = {}
-    timestamps = []
-    for run in runs:
-        ts = run["timestamp"][:19].replace("T", " ")
-        timestamps.append(ts)
-        for cls_name, benchmarks in run["results"].items():
-            if cls_name not in all_benchmarks:
-                all_benchmarks[cls_name] = {}
-            for bench_name, stats in benchmarks.items():
-                key = bench_name
-                if key not in all_benchmarks[cls_name]:
-                    all_benchmarks[cls_name][key] = []
-                all_benchmarks[cls_name][key].append(stats["median_ms"])
-
-    charts_html = '<h1 class="section-title">Trends Across Runs</h1>'
-    chart_configs = ""
-    idx = 100
-
-    for cls_name, benchmarks in all_benchmarks.items():
-        canvas_id = f"trend_{idx}"
-        charts_html += f"""
-        <div class="chart-section">
-            <h2>{html.escape(cls_name)} — Median Trend</h2>
-            <div class="chart-container">
-                <canvas id="{canvas_id}"></canvas>
-            </div>
-        </div>"""
-
-        datasets = []
-        for i, (bench_name, values) in enumerate(benchmarks.items()):
-            color = COLORS[i % len(COLORS)]
-            border = BORDER_COLORS[i % len(BORDER_COLORS)]
-            datasets.append(
-                {
-                    "label": bench_name,
-                    "data": values,
-                    "borderColor": border,
-                    "backgroundColor": color,
-                    "tension": 0.2,
-                    "fill": False,
-                }
-            )
-
-        chart_configs += f"""
-        new Chart(document.getElementById('{canvas_id}'), {{
-            type: 'line',
-            data: {{
-                labels: {json.dumps(timestamps)},
-                datasets: {json.dumps(datasets)}
-            }},
-            options: {{
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {{
-                    title: {{
-                        display: true,
-                        text: '{html.escape(cls_name)} — Median (ms) Over Runs',
-                        font: {{ size: 16 }}
-                    }},
-                    legend: {{ position: 'top' }}
-                }},
-                scales: {{
-                    y: {{
-                        beginAtZero: true,
-                        title: {{ display: true, text: 'Median Time (ms)' }}
-                    }},
-                    x: {{
-                        title: {{ display: true, text: 'Run' }},
-                        ticks: {{ maxRotation: 45, minRotation: 25 }}
-                    }}
-                }}
-            }}
-        }});
-        """
-        idx += 1
-
-    return charts_html, chart_configs
-
-
-def generate_html(data: dict) -> str:
-    runs = data.get("runs", [])
-    if not runs:
-        print("Error: No runs found in results file.", file=sys.stderr)
-        sys.exit(1)
-
-    latest = runs[-1]
-    ts = latest["timestamp"][:19].replace("T", " ")
-    py_ver = latest.get("python_version", "unknown")
-
-    latest_html, latest_configs = build_latest_run_charts(latest)
-    trend_html, trend_configs = build_trend_charts(runs)
-
-    return f"""<!DOCTYPE html>
+    # Generate HTML matching performance report style
+    html_content = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Performance Benchmarks — django-ninja-aio-crud</title>
+    <title>Framework Comparison — Django Ninja AIO</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -403,13 +314,17 @@ def generate_html(data: dict) -> str:
             width: 100%;
             border-collapse: collapse;
             font-size: 0.82rem;
-            min-width: 500px;
+            min-width: 450px;
         }}
         th, td {{
             padding: 0.55rem 0.75rem;
             text-align: left;
             border-bottom: 1px solid var(--md-border);
             white-space: nowrap;
+        }}
+        tr.winner td:first-child {{
+            font-weight: 700;
+            color: var(--md-primary);
         }}
         th {{
             color: var(--md-primary);
@@ -511,27 +426,27 @@ def generate_html(data: dict) -> str:
 </head>
 <body>
     <div class="header">
-        <a href="https://django-ninja-aio.com/">django-ninja-aio-crud</a>
+        <a href="https://django-ninja-aio.com/">Django Ninja AIO</a>
         <span>&middot;</span>
-        <span>Performance Benchmarks</span>
+        <span>Framework Comparison</span>
     </div>
     <div class="container">
         <div class="hero">
-            <h1>Performance Benchmarks</h1>
-            <p class="subtitle">Automated benchmark results for django-ninja-aio-crud</p>
+            <h1>Framework Comparison</h1>
+            <p class="subtitle">Comparing Django Ninja AIO against other Python REST frameworks</p>
             <div class="meta-pills">
                 <span class="meta-pill"><strong>Run</strong> {html.escape(ts)}</span>
                 <span class="meta-pill"><strong>Python</strong> {html.escape(py_ver)}</span>
-                <span class="meta-pill"><strong>Runs</strong> {len(runs)}</span>
+                <span class="meta-pill"><strong>Frameworks</strong> {len(frameworks)}</span>
+                <span class="meta-pill"><strong>Operations</strong> {len(operations)}</span>
             </div>
         </div>
 
-        <h1 class="section-title">Latest Run</h1>
-        {latest_html}
-        {trend_html}
+        <h1 class="section-title">Results</h1>
+        {chart_html}
 
         <div class="footer">
-            Generated by <a href="https://github.com/caspel26/django-ninja-aio-crud">django-ninja-aio-crud</a> performance suite
+            Generated by <a href="https://github.com/caspel26/django-ninja-aio-crud">Django Ninja AIO</a> comparison suite
         </div>
     </div>
 
@@ -542,51 +457,35 @@ def generate_html(data: dict) -> str:
     Chart.defaults.borderColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
     Chart.defaults.font.family = "'Roboto', sans-serif";
 
-    {latest_configs}
-    {trend_configs}
+    {chart_configs}
     </script>
 </body>
 </html>"""
 
+    output_file.write_text(html_content)
+    print(f"Comparison report generated: {output_file}")
+
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate performance report HTML")
+    """Parse arguments and generate report."""
+    parser = argparse.ArgumentParser(
+        description="Generate framework comparison HTML report from benchmark results"
+    )
     parser.add_argument(
         "--input",
-        "-i",
         type=Path,
-        default=DEFAULT_INPUT,
-        help="Path to performance_results.json",
+        default=Path(__file__).parent.parent.parent / "comparison_results.json",
+        help="Path to comparison results JSON file",
     )
     parser.add_argument(
         "--output",
-        "-o",
         type=Path,
-        default=DEFAULT_OUTPUT,
-        help="Path for the output HTML report",
+        default=Path(__file__).parent.parent.parent / "comparison_report.html",
+        help="Path to output HTML report file",
     )
+
     args = parser.parse_args()
-
-    input_path = args.input.resolve()
-    output_path = args.output.resolve()
-
-    if not str(input_path).startswith(str(PROJECT_ROOT)):
-        print(
-            f"Error: input path must be within project root ({PROJECT_ROOT})",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-    if not str(output_path).startswith(str(PROJECT_ROOT)):
-        print(
-            f"Error: output path must be within project root ({PROJECT_ROOT})",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
-    data = load_results(input_path)
-    html_content = generate_html(data)
-    output_path.write_text(html_content)
-    print(f"Report generated: {output_path}")
+    generate_html_report(args.input, args.output)
 
 
 if __name__ == "__main__":

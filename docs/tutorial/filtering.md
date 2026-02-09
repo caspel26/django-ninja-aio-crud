@@ -537,7 +537,7 @@ GET /api/article/?exclude_ids=1,2,3
 
 ### Default Pagination
 
-Django Ninja Aio CRUD uses page-number pagination by default:
+Django Ninja AIO uses page-number pagination by default:
 
 ```python
 class ArticleViewSet(APIViewSet):

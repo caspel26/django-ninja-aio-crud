@@ -1,3 +1,5 @@
+from pydantic import ConfigDict
+
 from . import models
 from ninja_aio.models import serializers
 
@@ -131,9 +133,7 @@ class TestModelWithValidatorsMetaSerializer(serializers.Serializer):
     class Meta:
         model = models.TestModel
         schema_in = serializers.SchemaModelConfig(fields=["name", "description"])
-        schema_out = serializers.SchemaModelConfig(
-            fields=["id", "name", "description"]
-        )
+        schema_out = serializers.SchemaModelConfig(fields=["id", "name", "description"])
         schema_update = serializers.SchemaModelConfig(
             optionals=[("name", str), ("description", str)]
         )
@@ -164,3 +164,60 @@ class TestModelWithValidatorsMetaSerializer(serializers.Serializer):
             if v is not None and len(v.strip()) == 0:
                 raise ValueError("Name cannot be blank")
             return v
+
+
+class TestModelWithModelConfigMetaSerializer(serializers.Serializer):
+    class Meta:
+        model = models.TestModel
+        schema_in = serializers.SchemaModelConfig(
+            fields=["name", "description"],
+            model_config_override=ConfigDict(str_strip_whitespace=True),
+        )
+        schema_out = serializers.SchemaModelConfig(
+            fields=["id", "name", "description"],
+            model_config_override=ConfigDict(str_strip_whitespace=True),
+        )
+        schema_update = serializers.SchemaModelConfig(
+            optionals=[("name", str), ("description", str)],
+            model_config_override=ConfigDict(str_strip_whitespace=True),
+        )
+
+
+class TestModelWithSchemaOverridesMetaSerializer(serializers.Serializer):
+    """Meta-driven Serializer with schema method overrides on validator classes."""
+
+    class Meta:
+        model = models.TestModel
+        schema_out = serializers.SchemaModelConfig(fields=["id", "name", "description"])
+
+    class ReadValidators:
+        def model_dump(
+            self,
+            *,
+            mode="python",
+            include=None,
+            exclude=None,
+            context=None,
+            by_alias=False,
+            exclude_unset=False,
+            exclude_defaults=False,
+            exclude_none=False,
+            round_trip=False,
+            warnings=True,
+            serialize_as_any=False,
+        ):
+            data = super().model_dump(
+                mode=mode,
+                include=include,
+                exclude=exclude,
+                context=context,
+                by_alias=by_alias,
+                exclude_unset=exclude_unset,
+                exclude_defaults=exclude_defaults,
+                exclude_none=exclude_none,
+                round_trip=round_trip,
+                warnings=warnings,
+                serialize_as_any=serialize_as_any,
+            )
+            data["name"] = data["name"].upper()
+            return data

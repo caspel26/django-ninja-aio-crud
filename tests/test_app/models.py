@@ -1,5 +1,7 @@
 import uuid
 
+from pydantic import ConfigDict
+
 from ninja_aio.models import ModelSerializer
 from django.db import models
 
@@ -530,3 +532,60 @@ class TestModelWithValidators(BaseTestModelSerializer):
         @model_validator(mode="after")
         def add_display_check(self):
             return self
+
+
+class TestModelWithModelConfig(BaseTestModel, ModelSerializer):
+    """Model with model_config on inner serializer classes."""
+
+    class CreateSerializer:
+        fields = ["name", "description"]
+        model_config = ConfigDict(str_strip_whitespace=True)
+
+    class ReadSerializer:
+        fields = ["id", "name", "description"]
+        model_config = ConfigDict(str_strip_whitespace=True)
+
+    class UpdateSerializer:
+        optionals = [("name", str), ("description", str)]
+        model_config = ConfigDict(str_strip_whitespace=True)
+
+
+class TestModelWithSchemaOverrides(BaseTestModel, ModelSerializer):
+    """Model with schema method overrides on inner serializer classes."""
+
+    class ReadSerializer:
+        fields = ["id", "name", "description"]
+
+        def model_dump(
+            self,
+            *,
+            mode="python",
+            include=None,
+            exclude=None,
+            context=None,
+            by_alias=False,
+            exclude_unset=False,
+            exclude_defaults=False,
+            exclude_none=False,
+            round_trip=False,
+            warnings=True,
+            serialize_as_any=False,
+        ):
+            data = super().model_dump(
+                mode=mode,
+                include=include,
+                exclude=exclude,
+                context=context,
+                by_alias=by_alias,
+                exclude_unset=exclude_unset,
+                exclude_defaults=exclude_defaults,
+                exclude_none=exclude_none,
+                round_trip=round_trip,
+                warnings=warnings,
+                serialize_as_any=serialize_as_any,
+            )
+            data["name"] = data["name"].upper()
+            return data
+
+    class CreateSerializer:
+        fields = ["name", "description"]

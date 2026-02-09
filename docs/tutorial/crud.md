@@ -45,7 +45,7 @@ from .models import Article
 api = NinjaAIO(
     title="Blog API",
     version="1.0.0",
-    description="A simple blog API built with Django Ninja Aio CRUD"
+    description="A simple blog API built with Django Ninja AIO"
 )
 
 

@@ -1,10 +1,10 @@
 # :material-shield-lock: Authentication
 
-Django Ninja Aio CRUD provides built-in async JWT authentication support with flexible configuration and easy integration with your API endpoints.
+Django Ninja AIO provides built-in async JWT authentication support with flexible configuration and easy integration with your API endpoints.
 
 ## :material-format-list-bulleted: Overview
 
-Authentication in Django Ninja Aio CRUD:
+Authentication in Django Ninja AIO:
 
 - :material-lightning-bolt: **Fully Async** — No blocking operations
 - :material-key: **JWT-Based** — Industry-standard JSON Web Tokens

@@ -20,6 +20,7 @@
 <p align="center">
   <a href="https://django-ninja-aio.com">Documentation</a> ·
   <a href="https://pypi.org/project/django-ninja-aio-crud/">PyPI</a> ·
+  <a href="https://django-ninja-aio.com/comparison/">Framework Comparison</a> ·
   <a href="https://caspel26.github.io/django-ninja-aio-crud/">Performance Benchmarks</a> ·
   <a href="https://github.com/caspel26/ninja-aio-blog-example">Example Project</a> ·
   <a href="https://github.com/caspel26/django-ninja-aio-crud/issues">Issues</a>
@@ -354,6 +355,20 @@ class BookSerializer(serializers.Serializer):
 class ReadOnlyBookViewSet(APIViewSet):
     disable = ["update", "delete"]
 ```
+
+---
+
+## Framework Comparison
+
+How does Django Ninja AIO compare to other Python REST frameworks? We benchmark against Django Ninja, ADRF, and FastAPI — focusing on complex async operations like reverse FK and M2M serialization.
+
+| Framework | Lines of Code | Reverse FK Handling | Auto Prefetch | CRUD Automation |
+|---|---|---|---|---|
+| **Django Ninja AIO** | **~20** | Automatic | Yes | Full |
+| **FastAPI** | ~80+ | Manual async iteration | No | None |
+| **ADRF** | ~45+ | Needs serializer config | Manual | Partial |
+
+**[View Full Comparison](https://django-ninja-aio.com/comparison/)** — Code examples, benchmark results, and interactive charts
 
 ---
 
