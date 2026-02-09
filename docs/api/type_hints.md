@@ -36,6 +36,10 @@ book: Book = await serializer.save(book)
 
 # ✅ Type checker knows this accepts Book
 data: dict = await serializer.model_dump(book)
+
+# ✅ Optional: specify custom schema for serialization
+custom_schema = BookSerializer.generate_read_s()
+data: dict = await serializer.model_dump(book, schema=custom_schema)
 ```
 
 ### Benefits
