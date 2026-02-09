@@ -860,6 +860,60 @@ When using a Serializer with APIViewSet, CRUD operations automatically invoke th
 # 3. on_delete() - deletion hook
 ```
 
+### Serialization Methods
+
+**`model_dump(instance, schema=None)`** - Serialize a single instance to dict
+
+```python
+# Use default schema (detail schema if defined, otherwise read schema)
+data = await serializer.model_dump(article)
+
+# Use a specific schema
+custom_schema = ArticleSerializer.generate_read_s()
+data = await serializer.model_dump(article, schema=custom_schema)
+```
+
+**`models_dump(instances, schema=None)`** - Serialize multiple instances to list of dicts
+
+```python
+# Use default schema
+articles = Article.objects.all()
+data = await serializer.models_dump(articles)
+
+# Use a specific schema
+custom_schema = ArticleSerializer.generate_read_s()
+data = await serializer.models_dump(articles, schema=custom_schema)
+```
+
+### Field Change Detection
+
+**`has_changed(instance, field)`** - Check if a field value differs from the database
+
+```python
+@api.viewset(Article)
+class ArticleViewSet(APIViewSet):
+    serializer_class = ArticleSerializer
+
+    async def custom_update(self, request, pk: int, data):
+        article = await Article.objects.aget(pk=pk)
+        article.title = data.title
+
+        # Check if title changed before sending notification
+        if self.serializer.has_changed(article, "title"):
+            await send_notification(f"Title updated: {article.title}")
+
+        await article.asave()
+        return await self.serializer.model_dump(article)
+```
+
+**Use cases:**
+- Conditional notifications (only notify if a specific field changed)
+- Audit logging (track which fields were modified)
+- Validation (enforce business rules based on field changes)
+- Caching (invalidate cache only when relevant fields change)
+
+**Note:** Returns `False` for new instances (those without a primary key).
+
 ---
 
 ## :material-tune-variant: Advanced: Customs and Optionals

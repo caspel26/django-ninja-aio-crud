@@ -1,6 +1,6 @@
 import asyncio
 import base64
-from typing import Any, Literal
+from typing import Any, Generic, Literal, TypeVar
 
 from ninja import Schema
 from ninja.orm import fields
@@ -19,7 +19,6 @@ from django.db.models.fields.related_descriptors import (
 )
 
 from ninja_aio.exceptions import SerializeError, NotFoundError
-from ninja_aio.models.serializers import ModelSerializer
 from ninja_aio.types import ModelSerializerMeta
 from ninja_aio.schemas.helpers import (
     ModelQuerySetSchema,
@@ -27,6 +26,9 @@ from ninja_aio.schemas.helpers import (
     ObjectQuerySchema,
     ObjectsQuerySchema,
 )
+
+# TypeVar for generic model typing
+ModelT = TypeVar("ModelT", bound=models.Model)
 
 
 async def agetattr(obj, name: str, default=None):
@@ -50,12 +52,27 @@ async def agetattr(obj, name: str, default=None):
     return await sync_to_async(getattr)(obj, name, default)
 
 
-class ModelUtil:
+class ModelUtil(Generic[ModelT]):
     """
     ModelUtil
     =========
-    Async utility bound to a Django model class (or a ModelSerializer subclass)
-    providing high‑level CRUD helpers plus (de)serialization glue for Django Ninja.
+    Generic async utility for Django models providing type-safe CRUD operations
+    and (de)serialization for Django Ninja.
+
+    Type Safety
+    -----------
+    ModelUtil is generic over the model type. Type inference works automatically:
+
+    >>> util = ModelUtil(Book)  # Type automatically inferred as ModelUtil[Book]
+    >>> book: Book = await util.get_object(request, pk=1)  # Returns Book
+    >>> books: QuerySet[Book] = await util.get_objects(request)  # Returns QuerySet[Book]
+
+    When used in ViewSets, specify the generic type parameter on the ViewSet:
+
+    >>> class BookAPI(APIViewSet[Book]):
+    ...     # self.model_util is typed as ModelUtil[Book]
+    ...     async def my_method(self, request):
+    ...         book: Book = await self.model_util.get_object(request, pk=1)
 
     Overview
     --------
@@ -75,10 +92,10 @@ class ModelUtil:
 
     Key Methods
     -----------
-    - get_object()
-    - parse_input_data()
-    - parse_output_data()
-    - create_s / read_s / update_s / delete_s
+    - get_object() -> ModelT : Retrieve a single typed instance
+    - get_objects() -> QuerySet[ModelT] : Retrieve a typed queryset
+    - parse_input_data() : Transform inbound schema to model-ready payload
+    - create_s / read_s / update_s / delete_s : High-level CRUD operations
 
     Error Handling
     --------------
@@ -88,35 +105,39 @@ class ModelUtil:
     Performance Notes
     -----------------
     - Each FK resolution is an async DB hit; batch when necessary externally.
+    - Relation discovery results are cached per (model, serializer_class, is_for) tuple.
 
     Design
     ------
     - Stateless wrapper; safe per-request instantiation.
+    - Generic type parameter ensures all operations are properly typed.
     """
 
     # Performance: Class-level cache for relation discovery (model structure is static)
     _relation_cache: dict[tuple[type, str, str], list[str]] = {}
 
-    def __init__(
-        self, model: type["ModelSerializer"] | models.Model, serializer_class=None
-    ):
+    def __init__(self, model: type[ModelT], serializer_class=None):
         """
         Initialize with a Django model or ModelSerializer subclass.
 
         Parameters
         ----------
-        model : Model | ModelSerializerMeta
+        model : type[ModelT]
             Target model class.
+        serializer_class : type[Serializer] | None
+            Optional serializer class for the model.
         """
         from ninja_aio.models.serializers import Serializer
 
-        self.model = model
-        self.serializer_class: Serializer = serializer_class
+        self.model: type[ModelT] = model
+        self.serializer_class: type[Serializer] | None = serializer_class
         if serializer_class is not None and isinstance(model, ModelSerializerMeta):
             raise ConfigError(
                 "ModelUtil cannot accept both model and serializer_class if the model is a ModelSerializer."
             )
-        self.serializer: Serializer = serializer_class() if serializer_class else None
+        self.serializer: Serializer | None = (
+            serializer_class() if serializer_class else None
+        )
 
     @property
     def with_serializer(self) -> bool:
@@ -195,7 +216,6 @@ class ModelUtil:
         """
         return [field.name for field in self.model._meta.get_fields()]
 
-
     @property
     def model_name(self) -> str:
         """
@@ -272,7 +292,7 @@ class ModelUtil:
         query_data: QuerySchema,
         with_qs_request: bool,
         is_for: Literal["read", "detail"] | None = None,
-    ) -> models.QuerySet[type["ModelSerializer"] | models.Model]:
+    ) -> models.QuerySet[ModelT]:
         """
         Build base queryset with optimizations and filters.
 
@@ -319,7 +339,7 @@ class ModelUtil:
         query_data: ObjectsQuerySchema = None,
         with_qs_request=True,
         is_for: Literal["read", "detail"] | None = None,
-    ) -> models.QuerySet[type["ModelSerializer"] | models.Model]:
+    ) -> models.QuerySet[ModelT]:
         """
         Retrieve a queryset with optimized database queries.
 
@@ -343,7 +363,7 @@ class ModelUtil:
 
         Returns
         -------
-        models.QuerySet[type["ModelSerializer"] | models.Model]
+        models.QuerySet[ModelT]
             A QuerySet of model instances.
 
         Notes
@@ -365,7 +385,7 @@ class ModelUtil:
         query_data: ObjectQuerySchema = None,
         with_qs_request=True,
         is_for: Literal["read", "detail"] | None = None,
-    ) -> type["ModelSerializer"] | models.Model:
+    ) -> ModelT:
         """
         Retrieve a single object with optimized database queries.
 
@@ -391,7 +411,7 @@ class ModelUtil:
 
         Returns
         -------
-        type["ModelSerializer"] | models.Model
+        ModelT
             A single model instance.
 
         Raises
@@ -609,7 +629,9 @@ class ModelUtil:
         """Get Django field object for a given field name."""
         return (await agetattr(self.model, k)).field
 
-    def _decode_binary(self, payload: dict, k: str, v: Any, field_obj: models.Field) -> None:
+    def _decode_binary(
+        self, payload: dict, k: str, v: Any, field_obj: models.Field
+    ) -> None:
         """Decode base64-encoded binary field values in place."""
         if not isinstance(field_obj, models.BinaryField):
             return
@@ -636,17 +658,15 @@ class ModelUtil:
         rel = await rel_util.get_object(request, v, with_qs_request=False)
         payload[k] = rel
 
-    async def _bump_object_from_schema(
-        self, obj: type["ModelSerializer"] | models.Model, schema: Schema
-    ) -> dict:
+    async def _bump_object_from_schema(self, obj: ModelT, schema: Schema) -> dict:
         """Convert model instance to dict using Pydantic schema."""
         return (await sync_to_async(schema.from_orm)(obj)).model_dump()
 
     async def _prefetch_reverse_relations_on_instance(
         self,
-        obj: type["ModelSerializer"] | models.Model,
+        obj: ModelT,
         is_for: Literal["read", "detail"] = "read",
-    ) -> type["ModelSerializer"] | models.Model:
+    ) -> ModelT:
         """
         Prefetch reverse relations on an existing instance.
 
@@ -655,14 +675,14 @@ class ModelUtil:
 
         Parameters
         ----------
-        obj : ModelSerializer | Model
+        obj : ModelT
             Instance to prefetch relations on.
         is_for : Literal["read", "detail"]
             Purpose of the query, determines which relations to prefetch.
 
         Returns
         -------
-        ModelSerializer | Model
+        ModelT
             The same instance with reverse relations prefetched.
 
         Notes
@@ -688,7 +708,9 @@ class ModelUtil:
 
         return await queryset.aget()
 
-    def _validate_read_params(self, request: HttpRequest, query_data: QuerySchema) -> None:
+    def _validate_read_params(
+        self, request: HttpRequest, query_data: QuerySchema
+    ) -> None:
         """Validate required parameters for read operations."""
         if request is None:
             raise SerializeError(
@@ -751,7 +773,6 @@ class ModelUtil:
         """Serialize a single object."""
         obj = await self.get_object(request, query_data=query_data, is_for=is_for)
         return await self._bump_object_from_schema(obj, obj_schema)
-
 
     def _collect_custom_and_optional_fields(
         self, payload: dict, is_serializer: bool, serializer
@@ -822,7 +843,10 @@ class ModelUtil:
         return skip_keys
 
     async def _process_payload_fields(
-        self, request: HttpRequest, payload: dict, fields_to_process: list[tuple[str, Any]]
+        self,
+        request: HttpRequest,
+        payload: dict,
+        fields_to_process: list[tuple[str, Any]],
     ) -> None:
         """
         Process payload fields: decode binary and resolve foreign keys.
@@ -951,9 +975,7 @@ class ModelUtil:
         self,
         schema: Schema,
         request: HttpRequest = None,
-        instance: models.QuerySet[type["ModelSerializer"] | models.Model]
-        | type["ModelSerializer"]
-        | models.Model = None,
+        instance: models.QuerySet[ModelT] | ModelT | None = None,
         query_data: QuerySchema = None,
         is_for: Literal["read", "detail"] | None = None,
     ):
@@ -1001,7 +1023,7 @@ class ModelUtil:
         self,
         schema: Schema,
         request: HttpRequest = None,
-        instance: type["ModelSerializer"] = None,
+        instance: ModelT | None = None,
         query_data: ObjectQuerySchema = None,
         is_for: Literal["read", "detail"] | None = None,
     ) -> dict:
@@ -1017,7 +1039,7 @@ class ModelUtil:
             Read schema class for serialization output.
         request : HttpRequest, optional
             HTTP request object, required when instance is None.
-        instance : ModelSerializer | Model, optional
+        instance : ModelT | None, optional
             Single instance to serialize. If None, fetched based on query_data.
         query_data : ObjectQuerySchema, optional
             Query parameters with getters for single object lookup.
@@ -1058,7 +1080,7 @@ class ModelUtil:
         self,
         schema: Schema,
         request: HttpRequest = None,
-        instances: models.QuerySet[type["ModelSerializer"] | models.Model] = None,
+        instances: models.QuerySet[ModelT] | None = None,
         query_data: ObjectsQuerySchema = None,
         is_for: Literal["read", "detail"] | None = None,
     ) -> list[dict]:
@@ -1147,7 +1169,9 @@ class ModelUtil:
             await obj.asave()
         # FK instances from parse_input_data are already attached to obj
         # Only refresh reverse relations since they might have changed
-        updated_object = await self._prefetch_reverse_relations_on_instance(obj, is_for="read")
+        updated_object = await self._prefetch_reverse_relations_on_instance(
+            obj, is_for="read"
+        )
         return await self.read_s(obj_schema, request, updated_object)
 
     async def delete_s(self, request: HttpRequest, pk: int | str):

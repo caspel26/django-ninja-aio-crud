@@ -1,4 +1,4 @@
-from typing import Any, Sequence
+from typing import Any, Sequence, TypeVar
 
 from ninja.router import Router
 from ninja.throttling import BaseThrottle
@@ -11,7 +11,10 @@ from .parsers import ORJSONParser
 from .renders import ORJSONRenderer
 from .exceptions import set_api_exception_handlers
 from .views import APIView, APIViewSet
-from .models import ModelSerializer
+
+# TypeVar for generic typing in decorators
+ModelT = TypeVar("ModelT", bound=models.Model)
+ViewSetT = TypeVar("ViewSetT", bound=APIViewSet)
 
 
 class NinjaAIO(NinjaAPI):
@@ -63,12 +66,26 @@ class NinjaAIO(NinjaAPI):
 
     def viewset(
         self,
-        model: models.Model | ModelSerializer,
+        model: type[ModelT],
         prefix: str = None,
         tags: list[str] = None,
-    ) -> None:
-        def wrapper(viewset: type[APIViewSet]):
-            instance = viewset(api=self, model=model, prefix=prefix, tags=tags)
+    ):
+        """
+        Decorator to register an APIViewSet with a specific model.
+
+        The decorator preserves the ViewSet's type, allowing type checkers
+        to infer that model_util is properly typed based on the model parameter.
+
+        Usage:
+            @api.viewset(MyModel)
+            class MyModelViewSet(APIViewSet):
+                pass
+        """
+
+        def wrapper(viewset: type[ViewSetT]) -> ViewSetT:
+            instance: ViewSetT = viewset(
+                api=self, model=model, prefix=prefix, tags=tags
+            )
             instance.add_views_to_route()
             return instance
 

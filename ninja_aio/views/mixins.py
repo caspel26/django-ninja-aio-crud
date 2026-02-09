@@ -1,8 +1,14 @@
+from typing import TypeVar
+from django.db.models import Model
+
 from ninja_aio.views.api import APIViewSet
 from ninja_aio.schemas import RelationFilterSchema, MatchCaseFilterSchema
 
+# TypeVar for generic model typing in mixins
+ModelT = TypeVar("ModelT", bound=Model)
 
-class IcontainsFilterViewSetMixin(APIViewSet):
+
+class IcontainsFilterViewSetMixin(APIViewSet[ModelT]):
     """
     Mixin providing a convenience method to apply case-insensitive substring filters
     to a Django queryset based on request query parameters.
@@ -63,7 +69,7 @@ class IcontainsFilterViewSetMixin(APIViewSet):
         )
 
 
-class BooleanFilterViewSetMixin(APIViewSet):
+class BooleanFilterViewSetMixin(APIViewSet[ModelT]):
     """
     Mixin providing boolean-based filtering for Django QuerySets.
 
@@ -107,7 +113,7 @@ class BooleanFilterViewSetMixin(APIViewSet):
         )
 
 
-class NumericFilterViewSetMixin(APIViewSet):
+class NumericFilterViewSetMixin(APIViewSet[ModelT]):
     """
     Mixin providing numeric filtering for Django QuerySets.
 
@@ -151,7 +157,7 @@ class NumericFilterViewSetMixin(APIViewSet):
         )
 
 
-class DateFilterViewSetMixin(APIViewSet):
+class DateFilterViewSetMixin(APIViewSet[ModelT]):
     """
     Mixin enabling date/datetime-based filtering for Django QuerySets.
 
@@ -288,7 +294,7 @@ class LessEqualDateFilterViewSetMixin(DateFilterViewSetMixin):
     _compare_attr = "__lte"
 
 
-class RelationFilterViewSetMixin(APIViewSet):
+class RelationFilterViewSetMixin(APIViewSet[ModelT]):
     """
     Mixin providing filtering for related fields in Django QuerySets.
 
@@ -350,12 +356,14 @@ class RelationFilterViewSetMixin(APIViewSet):
         for rel_filter in self.relations_filters:
             value = filters.get(rel_filter.query_param)
             # Validate the configured query_filter path for security
-            if value is not None and self._validate_filter_field(rel_filter.query_filter):
+            if value is not None and self._validate_filter_field(
+                rel_filter.query_filter
+            ):
                 rel_filters[rel_filter.query_filter] = value
         return base_qs.filter(**rel_filters) if rel_filters else base_qs
 
 
-class MatchCaseFilterViewSetMixin(APIViewSet):
+class MatchCaseFilterViewSetMixin(APIViewSet[ModelT]):
     """
     Mixin providing match-case filtering for Django QuerySets.
     This mixin applies filters based on boolean query parameters defined in
@@ -417,9 +425,7 @@ class MatchCaseFilterViewSetMixin(APIViewSet):
                 lookup = case_filter.query_filter
                 # Validate all filter fields in the lookup dictionary for security
                 validated_lookup = {
-                    k: v
-                    for k, v in lookup.items()
-                    if self._validate_filter_field(k)
+                    k: v for k, v in lookup.items() if self._validate_filter_field(k)
                 }
                 if validated_lookup:
                     if case_filter.include:

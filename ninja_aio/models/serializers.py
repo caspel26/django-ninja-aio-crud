@@ -1,9 +1,11 @@
 from typing import (
     Annotated,
     Any,
+    Generic,
     List,
     Literal,
     Optional,
+    TypeVar,
     Union,
     get_args,
     get_origin,
@@ -41,6 +43,9 @@ from ninja_aio.schemas.helpers import (
     ModelQuerySetSchema,
     ModelQuerySetExtraSchema,
 )
+
+# TypeVar for generic model typing in Serializers
+ModelT = TypeVar("ModelT", bound=models.Model)
 
 
 def _extract_pk(v: Any) -> Any:
@@ -1793,14 +1798,38 @@ class SchemaModelConfig(Schema):
     model_config_override: Optional[dict] = None
 
 
-class Serializer(BaseSerializer, metaclass=SerializerMeta):
+class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
     """
     Serializer
     ----------
-    Meta-driven serializer for arbitrary Django models. Shares common behavior
-    from BaseSerializer but sources configuration from the nested Meta class.
-    Supports optional relations_serializers mapping to explicitly include related
-    schema components during read schema generation.
+    Generic, Meta-driven serializer for Django models providing type-safe CRUD operations.
+
+    This class is generic over the model type, providing proper type hints for all
+    methods. When you specify the model type parameter, methods like create(), update(),
+    save(), and model_dump() are automatically typed to work with that specific model.
+
+    Type Safety Example
+    -------------------
+    >>> class BookSerializer(Serializer[Book]):
+    ...     class Meta:
+    ...         model = Book
+    ...         schema_in = SchemaModelConfig(fields=["title", "author"])
+    ...
+    >>> serializer = BookSerializer()
+    >>> book: Book = await serializer.create({"title": "1984"})  # Returns Book
+    >>> book: Book = await serializer.save(book)                  # Accepts/returns Book
+    >>> data: dict = await serializer.model_dump(book)            # Accepts Book
+
+    Configuration
+    -------------
+    Configure via the nested Meta class with SchemaModelConfig objects for each
+    operation type (create, read, update, detail). Supports relations_serializers
+    mapping to explicitly include related schema components during read schema generation.
+
+    See Also
+    --------
+    BaseSerializer : Parent class providing shared serializer utilities
+    SchemaModelConfig : Configuration object for defining field sets per operation
     """
 
     # Serializer type to Meta schema attribute mapping
@@ -1831,7 +1860,7 @@ class Serializer(BaseSerializer, metaclass=SerializerMeta):
         cls._meta = cls.Meta
 
     class Meta:
-        model: models.Model = None
+        model: Optional[type[ModelT]] = None
         schema_in: Optional[SchemaModelConfig] = None
         schema_out: Optional[SchemaModelConfig] = None
         schema_update: Optional[SchemaModelConfig] = None
@@ -2064,12 +2093,43 @@ class Serializer(BaseSerializer, metaclass=SerializerMeta):
                 return []
         return getattr(schema, f_type, []) or []
 
+    def _get_dump_schema(self, schema: Schema = None) -> Schema:
+        if schema is None:
+            detail_schema = self.generate_detail_s()
+            if detail_schema is None:
+                return self.generate_read_s()
+            return detail_schema
+        return schema
+
     @classmethod
     async def queryset_request(cls, request: HttpRequest):
         return cls.query_util.apply_queryset_optimizations(
             queryset=cls.model._default_manager.all(),
             scope=cls.query_util.SCOPES.QUERYSET_REQUEST,
         )
+
+    def has_changed(self, instance: models.Model, field: str) -> bool:
+        """
+        Check if a model field has changed compared to the persisted value.
+
+        Parameters
+        ----------
+        field : str
+            Field name.
+
+        Returns
+        -------
+        bool
+            True if in-memory value differs from DB value.
+        """
+        if not instance.pk:
+            return False
+        old_value = (
+            instance.__class__._default_manager.filter(pk=instance.pk)
+            .values(field)
+            .get()[field]
+        )
+        return getattr(instance, field) != old_value
 
     async def post_create(self, instance: models.Model) -> None:
         """
@@ -2088,7 +2148,7 @@ class Serializer(BaseSerializer, metaclass=SerializerMeta):
         """
         pass
 
-    async def save(self, instance: models.Model) -> models.Model:
+    async def save(self, instance: ModelT) -> ModelT:
         """
         Async helper to save a model instance with lifecycle hooks.
 
@@ -2107,7 +2167,7 @@ class Serializer(BaseSerializer, metaclass=SerializerMeta):
         self.after_save(instance)
         return instance
 
-    async def create(self, payload: dict[str, Any] | Schema) -> models.Model:
+    async def create(self, payload: dict[str, Any] | Schema) -> ModelT:
         """
         Create a new model instance from the provided payload.
 
@@ -2118,15 +2178,15 @@ class Serializer(BaseSerializer, metaclass=SerializerMeta):
 
         Returns
         -------
-        models.Model
+        ModelT
             Created model instance.
         """
-        instance: models.Model = self.model(**self._parse_payload(payload))
+        instance: ModelT = self.model(**self._parse_payload(payload))
         return await self.save(instance)
 
     async def update(
-        self, instance: models.Model, payload: dict[str, Any] | Schema
-    ) -> models.Model:
+        self, instance: ModelT, payload: dict[str, Any] | Schema
+    ) -> ModelT:
         """
         Update an existing model instance with the provided payload.
 
@@ -2146,29 +2206,32 @@ class Serializer(BaseSerializer, metaclass=SerializerMeta):
             setattr(instance, attr, value)
         return await self.save(instance)
 
-    async def model_dump(self, instance: models.Model) -> dict[str, Any]:
+    async def model_dump(
+        self, instance: ModelT, schema: Schema = None
+    ) -> dict[str, Any]:
         """
         Serialize a model instance to a dictionary using the Out schema.
 
         Parameters
         ----------
-        instance : models.Model
+        instance : ModelT
             The model instance to serialize.
+
+        schema : Schema
+            The Pydantic schema to use for serialization.
+            defaults to the detail schema if defined, otherwise the read schema.
 
         Returns
         -------
         dict
             Serialized data.
         """
-        schema = (
-            self.generate_read_s()
-            if self.generate_detail_s() is None
-            else self.generate_detail_s()
+        return await self.util.read_s(
+            schema=self._get_dump_schema(schema), instance=instance
         )
-        return await self.util.read_s(schema=schema, instance=instance)
 
     async def models_dump(
-        self, instances: models.QuerySet[models.Model]
+        self, instances: models.QuerySet[models.Model], schema: Schema = None
     ) -> list[dict[str, Any]]:
         """
         Serialize a list of model instances to a list of dictionaries using the Out schema.
@@ -2184,7 +2247,7 @@ class Serializer(BaseSerializer, metaclass=SerializerMeta):
             List of serialized data.
         """
         return await self.util.list_read_s(
-            schema=self.generate_read_s(), instances=instances
+            schema=self._get_dump_schema(schema), instances=instances
         )
 
     def after_save(self, instance: models.Model):
