@@ -1,6 +1,8 @@
 from typing import Any
 
+from django.db.models import Q
 from ninja import Schema
+from pydantic import ConfigDict
 
 
 class FilterSchema(Schema):
@@ -14,6 +16,8 @@ class FilterSchema(Schema):
             This is what clients will use in requests (e.g., ?name=example).
     """
 
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     filter_type: tuple[type, Any]
     query_param: str
 
@@ -21,11 +25,16 @@ class FilterSchema(Schema):
 class MatchConditionFilterSchema(Schema):
     """
     Schema for configuring match condition filters in MatchConditionFilterViewSetMixin.
+
     Attributes:
-        query_filter: The Django ORM lookup to apply (e.g., "status", "category__name").
+        query_filter: The Django ORM lookup to apply. Can be a dict (e.g., {"status": "approved"})
+            or a Django Q object for complex conditions (e.g., Q(status="approved") | Q(priority="high")).
         include: Whether to include records matching the condition (default: True).
     """
-    query_filter: dict[str, Any]
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    query_filter: dict[str, Any] | Q
     include: bool = True
 
 

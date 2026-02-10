@@ -2,7 +2,7 @@ from typing import Callable, List, Optional, Type
 
 from ninja import Schema
 from ninja_aio.types import ModelSerializerMeta, SerializerMeta
-from django.db.models import Model
+from django.db.models import Model, Q
 from pydantic import BaseModel, ConfigDict, model_validator
 
 
@@ -112,6 +112,8 @@ class M2MRelationSchema(BaseModel):
 
 
 class ModelQuerySetSchema(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     select_related: Optional[list[str]] = []
     prefetch_related: Optional[list[str]] = []
 
@@ -132,38 +134,38 @@ class ObjectQuerySchema(ModelQuerySetSchema):
     """
     Schema defining query parameters for single object retrieval in API endpoints.
     Attributes:
-        getters (Optional[dict]): A dictionary of getters to apply to the query.
+        getters (Optional[dict | Q]): A dictionary of getters or a Django Q object for complex lookups.
         select_related (Optional[list[str]]): List of related fields for select_related optimization.
         prefetch_related (Optional[list[str]]): List of related fields for prefetch_related optimization
     """
 
-    getters: Optional[dict] = {}
+    getters: Optional[dict | Q] = {}
 
 
 class ObjectsQuerySchema(ModelQuerySetSchema):
     """
     Schema defining query parameters for multiple object retrieval in API endpoints.
     Attributes:
-        filters (Optional[dict]): A dictionary of filters to apply to the query.
+        filters (Optional[dict | Q]): A dictionary of filters or a Django Q object for complex queries.
         select_related (Optional[list[str]]): List of related fields for select_related optimization.
         prefetch_related (Optional[list[str]]): List of related fields for prefetch_related optimization
     """
 
-    filters: Optional[dict] = {}
+    filters: Optional[dict | Q] = {}
 
 
 class QuerySchema(ModelQuerySetSchema):
     """
     Schema defining query parameters for API endpoints.
     Attributes:
-        filters (Optional[dict]): A dictionary of filters to apply to the query.
-        getters (Optional[dict]): A dictionary of getters to apply to the query.
+        filters (Optional[dict | Q]): A dictionary of filters or a Django Q object for complex queries.
+        getters (Optional[dict | Q]): A dictionary of getters or a Django Q object for complex lookups.
         select_related (Optional[list[str]]): List of related fields for select_related optimization.
         prefetch_related (Optional[list[str]]): List of related fields for prefetch_related optimization
     """
 
-    filters: Optional[dict] = {}
-    getters: Optional[dict] = {}
+    filters: Optional[dict | Q] = {}
+    getters: Optional[dict | Q] = {}
 
 
 class QueryUtilBaseScopesSchema(BaseModel):

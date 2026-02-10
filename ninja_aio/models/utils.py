@@ -7,6 +7,7 @@ from ninja.orm import fields
 from ninja.errors import ConfigError
 
 from django.db import models
+from django.db.models import Q
 from django.http import HttpRequest
 from django.core.exceptions import ObjectDoesNotExist
 from asgiref.sync import sync_to_async
@@ -130,12 +131,12 @@ class ModelUtil(Generic[ModelT]):
         from ninja_aio.models.serializers import Serializer
 
         self.model: type[ModelT] = model
-        self.serializer_class: type[Serializer] | None = serializer_class
+        self.serializer_class: type[Serializer[ModelT]] | None = serializer_class
         if serializer_class is not None and isinstance(model, ModelSerializerMeta):
             raise ConfigError(
                 "ModelUtil cannot accept both model and serializer_class if the model is a ModelSerializer."
             )
-        self.serializer: Serializer | None = (
+        self.serializer: Serializer[ModelT] | None = (
             serializer_class() if serializer_class else None
         )
 
@@ -327,9 +328,12 @@ class ModelUtil(Generic[ModelT]):
         if isinstance(self.model, ModelSerializerMeta) and with_qs_request:
             obj_qs = await self.model.queryset_request(request)
 
-        # Apply filters if present
+        # Apply filters if present (supports dict or Q object)
         if hasattr(query_data, "filters") and query_data.filters:
-            obj_qs = obj_qs.filter(**query_data.filters)
+            if isinstance(query_data.filters, Q):
+                obj_qs = obj_qs.filter(query_data.filters)
+            else:
+                obj_qs = obj_qs.filter(**query_data.filters)
 
         return obj_qs
 
@@ -435,16 +439,25 @@ class ModelUtil(Generic[ModelT]):
             )
 
         # Build lookup query and get optimized queryset
-        get_q = self._build_lookup_query(pk, query_data.getters)
         obj_qs = await self._get_base_queryset(
             request, query_data, with_qs_request, is_for
         )
 
-        # Perform lookup
-        try:
-            obj = await obj_qs.aget(**get_q)
-        except ObjectDoesNotExist:
-            raise NotFoundError(self.model)
+        # Apply getters (supports dict or Q object)
+        if isinstance(query_data.getters, Q):
+            obj_qs = obj_qs.filter(query_data.getters)
+            if pk is not None:
+                obj_qs = obj_qs.filter(**{self.model_pk_name: pk})
+            try:
+                obj = await obj_qs.aget()
+            except ObjectDoesNotExist:
+                raise NotFoundError(self.model)
+        else:
+            get_q = self._build_lookup_query(pk, query_data.getters)
+            try:
+                obj = await obj_qs.aget(**get_q)
+            except ObjectDoesNotExist:
+                raise NotFoundError(self.model)
 
         return obj
 

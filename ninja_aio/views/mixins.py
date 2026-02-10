@@ -1,5 +1,6 @@
 from typing import TypeVar
-from django.db.models import Model
+
+from django.db.models import Model, Q
 
 from ninja_aio.views.api import APIViewSet
 from ninja_aio.schemas import RelationFilterSchema, MatchCaseFilterSchema
@@ -423,13 +424,22 @@ class MatchCaseFilterViewSetMixin(APIViewSet[ModelT]):
                     filter_match.cases.true if value else filter_match.cases.false
                 )
                 lookup = case_filter.query_filter
-                # Validate all filter fields in the lookup dictionary for security
-                validated_lookup = {
-                    k: v for k, v in lookup.items() if self._validate_filter_field(k)
-                }
-                if validated_lookup:
+                # Handle Q object directly
+                if isinstance(lookup, Q):
                     if case_filter.include:
-                        base_qs = base_qs.filter(**validated_lookup)
+                        base_qs = base_qs.filter(lookup)
                     else:
-                        base_qs = base_qs.exclude(**validated_lookup)
+                        base_qs = base_qs.exclude(lookup)
+                else:
+                    # Validate all filter fields in the lookup dictionary for security
+                    validated_lookup = {
+                        k: v
+                        for k, v in lookup.items()
+                        if self._validate_filter_field(k)
+                    }
+                    if validated_lookup:
+                        if case_filter.include:
+                            base_qs = base_qs.filter(**validated_lookup)
+                        else:
+                            base_qs = base_qs.exclude(**validated_lookup)
         return base_qs
