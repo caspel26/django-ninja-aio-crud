@@ -285,7 +285,7 @@ class APIViewSet(API, Generic[ModelT]):
         self.api = api or self.api
         self.error_codes = ERROR_CODES
         self.model: type[ModelT] = model or self.model
-        self.serializer: serializers.Serializer | None = (
+        self.serializer: serializers.Serializer[ModelT] | None = (
             None if self.serializer_class is None else self.serializer_class()
         )
         self.model_util: ModelUtil[ModelT] = (
