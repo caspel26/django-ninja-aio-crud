@@ -179,14 +179,23 @@ qs = util.apply_queryset_optimizations(MyModel.objects.all(), util.SCOPES.READ)
 
 ## :material-file-document-edit: Query Schemas
 
-New helper schemas standardize filters and getters:
+New helper schemas standardize filters and getters. Both `filters` and `getters` accept either a `dict` or a Django `Q` object for complex query expressions.
 
 ```python
+from django.db.models import Q
 from ninja_aio.schemas.helpers import (
-    QuerySchema,           # generic: filters or getters
-    ObjectQuerySchema,     # getters + select/prefetch
-    ObjectsQuerySchema,    # filters + select/prefetch
+    QuerySchema,           # generic: filters (dict|Q) or getters (dict|Q)
+    ObjectQuerySchema,     # getters (dict|Q) + select/prefetch
+    ObjectsQuerySchema,    # filters (dict|Q) + select/prefetch
     ModelQuerySetSchema,   # select/prefetch only
+)
+
+# Using dict filters (traditional)
+query = ObjectsQuerySchema(filters={"status": "active"})
+
+# Using Q objects (complex conditions)
+query = ObjectsQuerySchema(
+    filters=Q(status="active") | Q(priority__gte=5),
 )
 ```
 
@@ -214,10 +223,23 @@ qs = await ModelUtil(Book).get_objects(
 )
 ```
 
+Using Django Q objects for complex filtering:
+
+```python
+from django.db.models import Q
+
+qs = await ModelUtil(Book).get_objects(
+    request,
+    query_data=ObjectsQuerySchema(
+        filters=Q(is_published=True) & (Q(rating__gte=4) | Q(featured=True)),
+    ),
+)
+```
+
 **Parameters:**
 
 - `request` (`HttpRequest`): Current HTTP request
-- `query_data` (`ObjectsQuerySchema | None`): Query configuration (filters, select_related, prefetch_related)
+- `query_data` (`ObjectsQuerySchema | None`): Query configuration (filters as `dict` or `Q` object, select_related, prefetch_related)
 - `with_qs_request` (`bool`): Apply queryset_request hook if available (default: True)
 - `is_for` (`Literal["read", "detail"] | None`): Purpose of the query, determines which serializable fields to use for optimization. Use `"read"` for list operations, `"detail"` for retrieve operations. If `None`, only query_data optimizations are applied. (default: None)
 
@@ -244,13 +266,21 @@ obj = await ModelUtil(Book).get_object(
     request,
     query_data=QuerySchema(getters={"slug": "my-book-slug"}),
 )
+
+# by Q object getters
+obj = await ModelUtil(Book).get_object(
+    request,
+    query_data=ObjectQuerySchema(
+        getters=Q(slug="my-book-slug") & Q(is_published=True),
+    ),
+)
 ```
 
 **Parameters:**
 
 - `request` (`HttpRequest`): Current HTTP request
 - `pk` (`int | str | None`): Primary key value (optional if getters provided)
-- `query_data` (`ObjectQuerySchema | QuerySchema | None`): Query configuration
+- `query_data` (`ObjectQuerySchema | QuerySchema | None`): Query configuration (getters as `dict` or `Q` object)
 - `with_qs_request` (`bool`): Apply queryset_request hook if available (default: True)
 - `is_for` (`Literal["read", "detail"] | None`): Purpose of the query. Use `"detail"` for single object retrieval, `"read"` for list operations. (default: None)
 

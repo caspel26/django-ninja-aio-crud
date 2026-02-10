@@ -1,5 +1,140 @@
 # 📋 Release Notes
 
+## 🏷️ [v2.21.0] - 2026-02-10
+
+---
+
+### ✨ New Features
+
+#### 🔎 Django Q Object Support in Query Schemas and Filters
+> `ninja_aio/schemas/helpers.py`, `ninja_aio/schemas/filters.py`, `ninja_aio/models/utils.py`, `ninja_aio/views/mixins.py`
+
+`ObjectQuerySchema`, `ObjectsQuerySchema`, and `QuerySchema` now accept Django `Q` objects in their `filters` and `getters` fields, enabling complex query expressions with OR/AND logic.
+
+**Q objects in filters (list operations):**
+
+```python
+from django.db.models import Q
+from ninja_aio.schemas.helpers import ObjectsQuerySchema
+
+# Complex OR conditions
+qs = await model_util.get_objects(
+    request,
+    query_data=ObjectsQuerySchema(
+        filters=Q(status="published") | Q(featured=True),
+    ),
+)
+```
+
+**Q objects in getters (single object retrieval):**
+
+```python
+from ninja_aio.schemas.helpers import ObjectQuerySchema
+
+obj = await model_util.get_object(
+    request,
+    pk=42,
+    query_data=ObjectQuerySchema(
+        getters=Q(is_active=True) & Q(role="admin"),
+    ),
+)
+```
+
+**Q objects in MatchCaseFilterViewSetMixin:**
+
+```python
+from django.db.models import Q
+from ninja_aio.schemas import MatchCaseFilterSchema, MatchConditionFilterSchema, BooleanMatchFilterSchema
+
+class ArticleViewSet(MatchCaseFilterViewSetMixin, APIViewSet):
+    filters_match_cases = [
+        MatchCaseFilterSchema(
+            query_param="is_featured",
+            cases=BooleanMatchFilterSchema(
+                true=MatchConditionFilterSchema(
+                    query_filter=Q(status="published") & Q(priority__gte=5),
+                    include=True,
+                ),
+                false=MatchConditionFilterSchema(
+                    query_filter=Q(status="published") & Q(priority__gte=5),
+                    include=False,
+                ),
+            ),
+        ),
+    ]
+```
+
+**Implementation details:**
+
+| File | Changes |
+|---|---|
+| `ninja_aio/schemas/helpers.py` | `filters` and `getters` accept `dict \| Q`, added `ConfigDict(arbitrary_types_allowed=True)` |
+| `ninja_aio/schemas/filters.py` | `MatchConditionFilterSchema.query_filter` accepts `dict \| Q`, added `ConfigDict(arbitrary_types_allowed=True)` |
+| `ninja_aio/models/utils.py` | `_get_base_queryset()` and `get_object()` handle `Q` with `isinstance` check |
+| `ninja_aio/views/mixins.py` | `MatchCaseFilterViewSetMixin` applies `Q` objects directly via `filter()`/`exclude()` |
+
+---
+
+### 📚 Documentation
+
+- Updated `docs/api/models/model_util.md` with Q object examples for `get_objects()` and `get_object()`
+- Updated `docs/api/views/mixins.md` with Q object example for `MatchCaseFilterViewSetMixin`
+
+---
+
+### 🧪 Tests
+
+#### `MatchCaseQFilterViewSetMixinTestCase` — 3 tests
+
+**Q objects in MatchCaseFilterViewSetMixin:**
+
+| Test | Verifies |
+|---|---|
+| `test_match_case_q_filter_true_includes` | ✅ Q object filter with `include=True` returns matching records |
+| `test_match_case_q_filter_false_excludes` | ✅ Q object filter with `include=False` excludes matching records |
+| `test_match_case_q_filter_no_param_returns_all` | ✅ No filter param returns all records |
+
+#### `MatchCaseQExcludeFilterViewSetMixinTestCase` — 2 tests
+
+**Q objects with exclude behavior:**
+
+| Test | Verifies |
+|---|---|
+| `test_match_case_q_exclude_true` | ✅ Q object exclude with `True` value excludes matching records |
+| `test_match_case_q_exclude_false_includes_only` | ✅ Q object exclude with `False` value includes only matching records |
+
+#### `ModelUtilQObjectFiltersTestCase` — 5 tests
+
+**Q objects in ModelUtil filters and getters:**
+
+| Test | Verifies |
+|---|---|
+| `test_get_objects_with_q_filter` | ✅ `_get_base_queryset` applies Q filter correctly |
+| `test_get_objects_with_q_filter_or` | ✅ Q filter with OR logic returns multiple matches |
+| `test_get_object_with_q_getter` | ✅ `get_object` applies Q getter with pk |
+| `test_get_object_with_q_getter_no_pk` | ✅ `get_object` applies Q getter without pk |
+| `test_get_object_with_q_getter_not_found` | ✅ `get_object` raises `NotFoundError` when Q getter has no match |
+
+**New test viewsets:**
+
+| File | Addition |
+|---|---|
+| `tests/test_app/views.py` | `TestModelSerializerMatchCaseQFilterAPI` — MatchCaseFilter with Q objects |
+| `tests/test_app/views.py` | `TestModelSerializerMatchCaseQExcludeFilterAPI` — MatchCaseFilter with Q exclude |
+
+---
+
+### 🎯 Summary
+
+Version 2.21.0 adds **Django Q object support** across query schemas, filters, and match-case mixins, enabling complex OR/AND query expressions without writing custom queryset logic.
+
+**Key benefits:**
+- 🔎 **Q Object Support** — Use Django Q objects for complex OR/AND queries in filters, getters, and match-case filters
+- 🎯 **Zero Breaking Changes** — Existing `dict`-based filters continue to work unchanged
+- ⚡ **Zero Runtime Cost** — Q objects are passed directly to Django ORM with no overhead
+
+---
+
 ## 🏷️ [v2.20.0] - 2026-02-09
 
 ---

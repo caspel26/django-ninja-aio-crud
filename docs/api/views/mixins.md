@@ -200,7 +200,7 @@ Each `MatchCaseFilterSchema` requires:
 
 Each `MatchConditionFilterSchema` (used within `BooleanMatchFilterSchema`) requires:
 
-- `query_filter`: A dictionary of Django ORM lookups to apply (e.g., `{"status": "active"}`).
+- `query_filter`: A dictionary of Django ORM lookups (e.g., `{"status": "active"}`) or a Django `Q` object for complex conditions (e.g., `Q(status="active") | Q(priority="high")`).
 - `include`: Boolean indicating whether to use `filter()` (True) or `exclude()` (False). Defaults to `True`.
 
 Example - Simple status filtering:
@@ -266,6 +266,36 @@ This enables:
 
 - `GET /tasks?show_active=true` → `queryset.filter(status__in=["pending", "in_progress"])`
 - `GET /tasks?show_active=false` → `queryset.filter(status__in=["completed", "cancelled"])`
+
+Example - Using Django Q objects for complex conditions:
+
+```python
+from django.db.models import Q
+
+class ArticleViewSet(MatchCaseFilterViewSetMixin, APIViewSet):
+    model = models.Article
+    api = api
+    filters_match_cases = [
+        MatchCaseFilterSchema(
+            query_param="is_featured",
+            cases=BooleanMatchFilterSchema(
+                true=MatchConditionFilterSchema(
+                    query_filter=Q(status="published") & Q(priority__gte=5),
+                    include=True,
+                ),
+                false=MatchConditionFilterSchema(
+                    query_filter=Q(status="published") & Q(priority__gte=5),
+                    include=False,
+                ),
+            ),
+        ),
+    ]
+```
+
+This enables:
+
+- `GET /articles?is_featured=true` → `queryset.filter(Q(status="published") & Q(priority__gte=5))`
+- `GET /articles?is_featured=false` → `queryset.exclude(Q(status="published") & Q(priority__gte=5))`
 
 ## Tips
 
