@@ -839,7 +839,9 @@ class RelationFilterViewSetMixinTestCase(
         """Test that relations_filters are properly registered in query_params."""
         self.assertIn("test_model_serializer", self.viewset.query_params)
         self.assertIn("test_model_serializer_name", self.viewset.query_params)
-        self.assertEqual(self.viewset.query_params["test_model_serializer"], (int, None))
+        self.assertEqual(
+            self.viewset.query_params["test_model_serializer"], (int, None)
+        )
         self.assertEqual(
             self.viewset.query_params["test_model_serializer_name"], (str, None)
         )
@@ -911,9 +913,7 @@ class DetailSchemaSerializerTestCase(TestCase):
                 schema_in = ninja_serializers.SchemaModelConfig(
                     fields=["name", "description"]
                 )
-                schema_out = ninja_serializers.SchemaModelConfig(
-                    fields=["id", "name"]
-                )
+                schema_out = ninja_serializers.SchemaModelConfig(fields=["id", "name"])
                 schema_detail = ninja_serializers.SchemaModelConfig(
                     fields=["id", "name", "description"]
                 )
@@ -1125,6 +1125,129 @@ class MatchCaseFilterViewSetMixinExcludeTestCase(TestCase):
             name="rejected_item", description="desc", status="rejected"
         )
         # Filter with hide_pending=False should include only pending items
+        res = await self.viewset.query_params_handler(
+            self.model.objects.all(),
+            {"hide_pending": False},
+        )
+        self.assertEqual(await res.acount(), 1)
+        self.assertEqual(await res.afirst(), obj_pending)
+
+
+# ==========================================================
+#       MATCH CASE FILTER WITH Q OBJECTS TEST CASES
+# ==========================================================
+
+
+@tag("match_case_q_filter_mixin")
+class MatchCaseQFilterViewSetMixinTestCase(
+    BaseTests.ModelSerializerViewSetTestCaseBase,
+    Tests.ViewSetTestCase,
+):
+    """Test MatchCaseFilterViewSetMixin with Q objects."""
+
+    namespace = "test_match_case_q_filter_mixin_viewset"
+    model = models.TestModelSerializer
+    viewset = views.TestModelSerializerMatchCaseQFilterAPI()
+
+    async def _drop_all_objects(self):
+        await self.model.objects.all().adelete()
+
+    async def test_match_case_q_filter_true_includes(self):
+        """Test Q object filtering with True value includes matching records."""
+        await self._drop_all_objects()
+        obj_approved = await self.model.objects.acreate(
+            name="approved_item", description="desc", status="approved"
+        )
+        await self.model.objects.acreate(
+            name="pending_item", description="desc", status="pending"
+        )
+        res = await self.viewset.query_params_handler(
+            self.model.objects.all(),
+            {"is_approved": True},
+        )
+        self.assertEqual(await res.acount(), 1)
+        self.assertEqual(await res.afirst(), obj_approved)
+
+    async def test_match_case_q_filter_false_excludes(self):
+        """Test Q object filtering with False value excludes matching records."""
+        await self._drop_all_objects()
+        await self.model.objects.acreate(
+            name="approved_item", description="desc", status="approved"
+        )
+        obj_pending = await self.model.objects.acreate(
+            name="pending_item", description="desc", status="pending"
+        )
+        obj_rejected = await self.model.objects.acreate(
+            name="rejected_item", description="desc", status="rejected"
+        )
+        res = await self.viewset.query_params_handler(
+            self.model.objects.all(),
+            {"is_approved": False},
+        )
+        self.assertEqual(await res.acount(), 2)
+        results = [obj async for obj in res]
+        self.assertIn(obj_pending, results)
+        self.assertIn(obj_rejected, results)
+
+    async def test_match_case_q_filter_no_param_returns_all(self):
+        """Test Q object filter with no param returns all records."""
+        await self._drop_all_objects()
+        await self.model.objects.acreate(
+            name="item1", description="desc", status="approved"
+        )
+        await self.model.objects.acreate(
+            name="item2", description="desc", status="pending"
+        )
+        res = await self.viewset.query_params_handler(
+            self.model.objects.all(),
+            {},
+        )
+        self.assertEqual(await res.acount(), 2)
+
+
+@tag("match_case_q_exclude_filter_mixin")
+class MatchCaseQExcludeFilterViewSetMixinTestCase(TestCase):
+    """Test MatchCaseFilterViewSetMixin with Q objects and exclude behavior."""
+
+    model = models.TestModelSerializer
+    viewset = views.TestModelSerializerMatchCaseQExcludeFilterAPI()
+
+    async def _drop_all_objects(self):
+        await self.model.objects.all().adelete()
+
+    async def test_match_case_q_exclude_true(self):
+        """Test Q object exclude with True value excludes matching records."""
+        await self._drop_all_objects()
+        obj_approved = await self.model.objects.acreate(
+            name="approved_item", description="desc", status="approved"
+        )
+        await self.model.objects.acreate(
+            name="pending_item", description="desc", status="pending"
+        )
+        obj_rejected = await self.model.objects.acreate(
+            name="rejected_item", description="desc", status="rejected"
+        )
+        res = await self.viewset.query_params_handler(
+            self.model.objects.all(),
+            {"hide_pending": True},
+        )
+        self.assertEqual(await res.acount(), 2)
+        results = [obj async for obj in res]
+        self.assertIn(obj_approved, results)
+        self.assertIn(obj_rejected, results)
+
+    async def test_match_case_q_exclude_false_includes_only(self):
+        """Test Q object exclude with False value includes only matching records."""
+        await self._drop_all_objects()
+        await self.model.objects.acreate(
+            name="approved_item", description="desc", status="approved"
+        )
+        obj_pending = await self.model.objects.acreate(
+            name="pending_item", description="desc", status="pending"
+        )
+        await self.model.objects.acreate(
+            name="rejected_item", description="desc", status="rejected"
+        )
         res = await self.viewset.query_params_handler(
             self.model.objects.all(),
             {"hide_pending": False},

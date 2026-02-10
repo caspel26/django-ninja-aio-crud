@@ -1,8 +1,10 @@
+from django.db.models import Q
 from django.test import tag, TestCase
 from unittest import mock
 
 from ninja.errors import ConfigError
 from ninja_aio.models import ModelUtil
+from ninja_aio.schemas.helpers import ObjectQuerySchema, ObjectsQuerySchema
 from tests.test_app import models, schema
 from tests.generics.models import Tests
 
@@ -150,3 +152,87 @@ class ModelUtilObjectsQueryDefaultTestCase(TestCase):
 
         # Cleanup
         await obj.adelete()
+
+
+@tag("model_util_q_object_filters")
+class ModelUtilQObjectFiltersTestCase(TestCase):
+    """Test ModelUtil with Q objects in filters and getters."""
+
+    async def test_get_objects_with_q_filter(self):
+        """Test _get_base_queryset applies Q object filters correctly."""
+        await models.TestModel.objects.all().adelete()
+        obj1 = await models.TestModel.objects.acreate(name="alpha", description="first")
+        await models.TestModel.objects.acreate(name="beta", description="second")
+
+        util = ModelUtil(models.TestModel)
+        request = mock.Mock()
+        query_data = ObjectsQuerySchema(filters=Q(name="alpha"))
+
+        qs = await util.get_objects(request, query_data, with_qs_request=False)
+        self.assertEqual(await qs.acount(), 1)
+        self.assertEqual(await qs.afirst(), obj1)
+
+    async def test_get_objects_with_q_filter_or(self):
+        """Test _get_base_queryset applies Q object with OR logic."""
+        await models.TestModel.objects.all().adelete()
+        obj1 = await models.TestModel.objects.acreate(name="alpha", description="first")
+        obj2 = await models.TestModel.objects.acreate(name="beta", description="second")
+        await models.TestModel.objects.acreate(name="gamma", description="third")
+
+        util = ModelUtil(models.TestModel)
+        request = mock.Mock()
+        query_data = ObjectsQuerySchema(filters=Q(name="alpha") | Q(name="beta"))
+
+        qs = await util.get_objects(request, query_data, with_qs_request=False)
+        self.assertEqual(await qs.acount(), 2)
+        results = [obj async for obj in qs]
+        self.assertIn(obj1, results)
+        self.assertIn(obj2, results)
+
+    async def test_get_object_with_q_getter(self):
+        """Test get_object applies Q object getters correctly."""
+        await models.TestModel.objects.all().adelete()
+        obj = await models.TestModel.objects.acreate(
+            name="target", description="find me"
+        )
+        await models.TestModel.objects.acreate(name="other", description="not me")
+
+        util = ModelUtil(models.TestModel)
+        request = mock.Mock()
+        query_data = ObjectQuerySchema(getters=Q(name="target"))
+
+        result = await util.get_object(
+            request, pk=obj.pk, query_data=query_data, with_qs_request=False
+        )
+        self.assertEqual(result, obj)
+
+    async def test_get_object_with_q_getter_no_pk(self):
+        """Test get_object with Q getter and no pk uses Q filter only."""
+        await models.TestModel.objects.all().adelete()
+        obj = await models.TestModel.objects.acreate(
+            name="unique", description="only one"
+        )
+
+        util = ModelUtil(models.TestModel)
+        request = mock.Mock()
+        query_data = ObjectQuerySchema(getters=Q(name="unique"))
+
+        result = await util.get_object(
+            request, pk=None, query_data=query_data, with_qs_request=False
+        )
+        self.assertEqual(result, obj)
+
+    async def test_get_object_with_q_getter_not_found(self):
+        """Test get_object with Q getter raises NotFoundError when no match."""
+        from ninja_aio.exceptions import NotFoundError
+
+        await models.TestModel.objects.all().adelete()
+
+        util = ModelUtil(models.TestModel)
+        request = mock.Mock()
+        query_data = ObjectQuerySchema(getters=Q(name="nonexistent"))
+
+        with self.assertRaises(NotFoundError):
+            await util.get_object(
+                request, pk=None, query_data=query_data, with_qs_request=False
+            )

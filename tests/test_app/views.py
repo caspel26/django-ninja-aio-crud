@@ -1,4 +1,6 @@
 import datetime
+
+from django.db.models import Q
 from ninja_aio.views import mixins
 from ninja_aio.schemas import (
     RelationFilterSchema,
@@ -238,6 +240,64 @@ class TestModelSerializerMatchCaseExcludeFilterAPI(
                 false=MatchConditionFilterSchema(
                     query_filter={"status": "pending"},
                     include=True,  # include only pending when False
+                ),
+            ),
+        ),
+    ]
+
+
+# ==========================================================
+#          MATCH CASE FILTER WITH Q OBJECTS APIS
+# ==========================================================
+
+
+class TestModelSerializerMatchCaseQFilterAPI(
+    GenericAPIViewSet,
+    mixins.MatchCaseFilterViewSetMixin,
+):
+    """
+    ViewSet for testing MatchCaseFilterViewSetMixin with Q objects.
+    Uses Q objects instead of dicts for query_filter.
+    """
+
+    model = models.TestModelSerializer
+    filters_match_cases = [
+        MatchCaseFilterSchema(
+            query_param="is_approved",
+            cases=BooleanMatchFilterSchema(
+                true=MatchConditionFilterSchema(
+                    query_filter=Q(status="approved"),
+                    include=True,
+                ),
+                false=MatchConditionFilterSchema(
+                    query_filter=Q(status="approved"),
+                    include=False,
+                ),
+            ),
+        ),
+    ]
+
+
+class TestModelSerializerMatchCaseQExcludeFilterAPI(
+    GenericAPIViewSet,
+    mixins.MatchCaseFilterViewSetMixin,
+):
+    """
+    ViewSet for testing MatchCaseFilterViewSetMixin with Q objects and exclude.
+    """
+
+    model = models.TestModelSerializer
+    filters_match_cases = [
+        MatchCaseFilterSchema(
+            query_param="hide_pending",
+            cases=BooleanMatchFilterSchema(
+                true=MatchConditionFilterSchema(
+                    query_filter=Q(status="pending"),
+                    include=False,
+                ),
+                false=MatchConditionFilterSchema(
+                    query_filter=Q(status="pending"),
+                    include=True,
                 ),
             ),
         ),
