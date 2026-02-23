@@ -1,5 +1,72 @@
 # 📋 Release Notes
 
+## 🏷️ [v2.23.0] - 2026-02-23
+
+---
+
+### 🔧 Improvements
+
+#### 🐍 `NotFoundError` Class-Name Key Uses `snake_case`
+> `ninja_aio/exceptions.py`
+
+When `NINJA_AIO_NOT_FOUND_ERROR_USE_VERBOSE_NAMES = False`, the error key produced by `NotFoundError` is now automatically converted from `CamelCase` to `snake_case` (all lowercase), instead of using the raw Python class name.
+
+**Before (v2.22.0):**
+
+```python
+# settings.py
+NINJA_AIO_NOT_FOUND_ERROR_USE_VERBOSE_NAMES = False
+
+raise NotFoundError(BlogPost)
+# {"BlogPost": "not found"}  ← raw class name
+```
+
+**After (v2.23.0):**
+
+```python
+raise NotFoundError(BlogPost)
+# {"blog_post": "not found"}  ← snake_case
+
+raise NotFoundError(TestModelSerializer)
+# {"test_model_serializer": "not found"}
+```
+
+This ensures the error key is consistent with standard JSON conventions and matches the format already used by the default `verbose_name` mode.
+
+**Implementation:**
+
+| File | Change |
+|---|---|
+| `ninja_aio/exceptions.py` | `model.__name__` converted via `re.sub(r"(?<!^)(?=[A-Z])", "_", name).lower()` |
+
+---
+
+### 🧪 Tests
+
+#### `ExceptionsAndAPITestCase` — updated
+
+| Test | Verifies |
+|---|---|
+| `test_not_found_error_class_name_mode` | ✅ `use_verbose_name=False` produces `snake_case` key |
+
+#### `SubclassesTestCase` — updated
+
+| Test | Verifies |
+|---|---|
+| `test_not_found_error_use_class_name` | ✅ `use_verbose_name=False` key matches `snake_case(__name__)` |
+
+---
+
+### 🎯 Summary
+
+Version 2.23.0 refines the `use_verbose_name=False` behaviour introduced in 2.22.0. The error key is now always `snake_case`, making it consistent with both the default verbose-name format and standard JSON naming conventions.
+
+**Key benefits:**
+- 🐍 **Consistent casing** — both modes now produce `snake_case` error keys
+- ✅ **Backwards-compatible** — only affects the `use_verbose_name=False` opt-in mode
+
+---
+
 ## 🏷️ [v2.22.0] - 2026-02-23
 
 ---
@@ -13,7 +80,7 @@
 
 By default (`True`), the error key continues to use the model's `verbose_name` with spaces replaced by underscores — preserving full backwards compatibility.
 
-When set to `False`, the error key uses the Python model class name (`model.__name__`) instead, which is useful when verbose names contain spaces that are undesirable in JSON keys or when a more Pythonic identifier is preferred.
+When set to `False`, the error key is derived from the Python model class name converted to `snake_case` (`CamelCase` → `snake_case`, all lowercase). This is useful when verbose names contain spaces that are undesirable in JSON keys or when a consistent Pythonic identifier is preferred.
 
 **Default behaviour (unchanged):**
 
@@ -23,21 +90,24 @@ raise NotFoundError(BlogPost)
 # {"blog_post": "not found"}
 ```
 
-**Class name mode:**
+**Class name mode (`snake_case` from `__name__`):**
 
 ```python
 # settings.py
 NINJA_AIO_NOT_FOUND_ERROR_USE_VERBOSE_NAMES = False
 
 raise NotFoundError(BlogPost)
-# {"BlogPost": "not found"}
+# {"blog_post": "not found"}
+
+raise NotFoundError(TestModelSerializer)
+# {"test_model_serializer": "not found"}
 ```
 
 **Setting reference:**
 
 | Setting | Type | Default | Description |
 |---|---|---|---|
-| `NINJA_AIO_NOT_FOUND_ERROR_USE_VERBOSE_NAMES` | `bool` | `True` | Controls whether `NotFoundError` uses `verbose_name` (with `_`) or `__name__` as the error key |
+| `NINJA_AIO_NOT_FOUND_ERROR_USE_VERBOSE_NAMES` | `bool` | `True` | Controls whether `NotFoundError` uses `verbose_name` (with `_`) or `snake_case(__name__)` as the error key |
 
 **Implementation details:**
 
