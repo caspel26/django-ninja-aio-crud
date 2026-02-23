@@ -1,5 +1,32 @@
 # 📋 Release Notes
 
+## 🏷️ [v2.23.1] - 2026-02-23
+
+---
+
+### 🔧 Improvements
+
+#### 📦 Widened `orjson` Dependency Constraint
+> `pyproject.toml`
+
+The `orjson` version constraint has been relaxed from `<= 3.11.5` to `< 4.0.0`, allowing any stable 3.x release to satisfy the dependency. This removes the tight upper pin and lets projects use newer patch and minor releases of `orjson` as they are published, without waiting for a constraint update in this package.
+
+| Dependency | Before | After |
+|---|---|---|
+| `orjson` | `>= 3.10.7, <= 3.11.5` | `>= 3.10.7, < 4.0.0` |
+
+---
+
+### 🎯 Summary
+
+Version 2.23.1 is a maintenance release that loosens the `orjson` upper bound to track the full 3.x release line.
+
+**Key benefits:**
+- 📦 **Fewer conflicts** — projects can upgrade `orjson` freely within the 3.x series
+- 🔒 **Still safe** — the `< 4.0.0` bound guards against potentially breaking 4.x changes
+
+---
+
 ## 🏷️ [v2.23.0] - 2026-02-23
 
 ---
