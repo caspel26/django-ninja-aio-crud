@@ -53,12 +53,15 @@ class SubclassesTestCase(TestCase):
         self.assertEqual(exc.status_code, 404)
 
     def test_not_found_error_use_class_name(self):
-        """When use_verbose_name=False, the error key uses the model class name."""
+        """When use_verbose_name=False, the error key is snake_case of the model class name."""
+        import re
+
         original = NotFoundError.use_verbose_name
         try:
             NotFoundError.use_verbose_name = False
             exc = NotFoundError(app_models.TestModelSerializer)
-            self.assertIn(app_models.TestModelSerializer.__name__, exc.error)
+            expected_key = re.sub(r"(?<!^)(?=[A-Z])", "_", app_models.TestModelSerializer.__name__).lower()
+            self.assertIn(expected_key, exc.error)
             self.assertEqual(exc.status_code, 404)
         finally:
             NotFoundError.use_verbose_name = original

@@ -1,3 +1,4 @@
+import re
 from functools import partial
 from joserfc.errors import JoseError
 from ninja import NinjaAPI
@@ -62,7 +63,7 @@ class NotFoundError(BaseException):
         model_name = (
             model._meta.verbose_name.replace(" ", "_")
             if self.use_verbose_name
-            else model.__name__
+            else re.sub(r"(?<!^)(?=[A-Z])", "_", model.__name__).lower()
         )
         super().__init__(
             error={model_name: self.error},

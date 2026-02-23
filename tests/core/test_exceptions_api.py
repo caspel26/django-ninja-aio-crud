@@ -27,13 +27,16 @@ class ExceptionsAndAPITestCase(TestCase):
         )
 
     def test_not_found_error_class_name_mode(self):
-        """use_verbose_name=False uses model __name__ as error key."""
+        """use_verbose_name=False uses snake_case of model __name__ as error key."""
+        import re
+
         original = NotFoundError.use_verbose_name
         try:
             NotFoundError.use_verbose_name = False
             exc = NotFoundError(models.TestModel)
+            expected_key = re.sub(r"(?<!^)(?=[A-Z])", "_", models.TestModel.__name__).lower()
             self.assertEqual(exc.status_code, 404)
-            self.assertEqual(exc.error, {models.TestModel.__name__: "not found"})
+            self.assertEqual(exc.error, {expected_key: "not found"})
         finally:
             NotFoundError.use_verbose_name = original
 
