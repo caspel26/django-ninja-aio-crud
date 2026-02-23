@@ -111,14 +111,17 @@ raise NotFoundError(BlogPost)
 # {"blog_post": "not found"}
 ```
 
-When `NINJA_AIO_NOT_FOUND_ERROR_USE_VERBOSE_NAMES = False` the error key uses the model class name instead:
+When `NINJA_AIO_NOT_FOUND_ERROR_USE_VERBOSE_NAMES = False` the error key is derived from the model class name converted to `snake_case`:
 
 ```python
 # settings.py
 NINJA_AIO_NOT_FOUND_ERROR_USE_VERBOSE_NAMES = False
 
 raise NotFoundError(BlogPost)
-# {"BlogPost": "not found"}
+# {"blog_post": "not found"}
+
+raise NotFoundError(TestModelSerializer)
+# {"test_model_serializer": "not found"}
 ```
 
 #### `NINJA_AIO_NOT_FOUND_ERROR_USE_VERBOSE_NAMES`
@@ -126,12 +129,12 @@ raise NotFoundError(BlogPost)
 | Value | Error key source | Example |
 |-------|-----------------|---------|
 | `True` (default) | `model._meta.verbose_name` with spaces → `_` | `{"blog_post": "not found"}` |
-| `False` | `model.__name__` | `{"BlogPost": "not found"}` |
+| `False` | `model.__name__` converted to `snake_case` | `{"test_model_serializer": "not found"}` |
 
 Configure in `settings.py`:
 
 ```python
-# Use model class name in not-found errors
+# Use snake_case model class name in not-found errors
 NINJA_AIO_NOT_FOUND_ERROR_USE_VERBOSE_NAMES = False
 ```
 
