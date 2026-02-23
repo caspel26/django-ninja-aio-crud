@@ -26,6 +26,17 @@ class ExceptionsAndAPITestCase(TestCase):
             {models.TestModel._meta.verbose_name.replace(" ", "_"): "not found"},
         )
 
+    def test_not_found_error_class_name_mode(self):
+        """use_verbose_name=False uses model __name__ as error key."""
+        original = NotFoundError.use_verbose_name
+        try:
+            NotFoundError.use_verbose_name = False
+            exc = NotFoundError(models.TestModel)
+            self.assertEqual(exc.status_code, 404)
+            self.assertEqual(exc.error, {models.TestModel.__name__: "not found"})
+        finally:
+            NotFoundError.use_verbose_name = original
+
     def test_parse_jose_error(self):
         jose_exc = DummyJoseError("bad_token", "signature invalid")
         parsed = parse_jose_error(jose_exc)

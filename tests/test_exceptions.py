@@ -52,6 +52,28 @@ class SubclassesTestCase(TestCase):
         self.assertIn(key, exc.error)
         self.assertEqual(exc.status_code, 404)
 
+    def test_not_found_error_use_class_name(self):
+        """When use_verbose_name=False, the error key uses the model class name."""
+        original = NotFoundError.use_verbose_name
+        try:
+            NotFoundError.use_verbose_name = False
+            exc = NotFoundError(app_models.TestModelSerializer)
+            self.assertIn(app_models.TestModelSerializer.__name__, exc.error)
+            self.assertEqual(exc.status_code, 404)
+        finally:
+            NotFoundError.use_verbose_name = original
+
+    def test_not_found_error_use_verbose_name_true(self):
+        """When use_verbose_name=True (default), the error key uses verbose_name with underscores."""
+        original = NotFoundError.use_verbose_name
+        try:
+            NotFoundError.use_verbose_name = True
+            exc = NotFoundError(app_models.TestModelSerializer)
+            key = app_models.TestModelSerializer._meta.verbose_name.replace(" ", "_")
+            self.assertIn(key, exc.error)
+        finally:
+            NotFoundError.use_verbose_name = original
+
     def test_pydantic_validation_error(self):
         try:
             DummyModel(a=0)

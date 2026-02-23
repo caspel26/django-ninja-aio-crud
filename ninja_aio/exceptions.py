@@ -4,6 +4,7 @@ from ninja import NinjaAPI
 from django.http import HttpRequest, HttpResponse
 from pydantic import ValidationError
 from django.db.models import Model
+from django.conf import settings
 
 
 class BaseException(Exception):
@@ -52,11 +53,19 @@ class NotFoundError(BaseException):
 
     status_code = 404
     error = "not found"
+    use_verbose_name = getattr(
+        settings, "NINJA_AIO_NOT_FOUND_ERROR_USE_VERBOSE_NAMES", True
+    )
 
     def __init__(self, model: Model, details=None):
         """Build a not-found error referencing the model's verbose name."""
+        model_name = (
+            model._meta.verbose_name.replace(" ", "_")
+            if self.use_verbose_name
+            else model.__name__
+        )
         super().__init__(
-            error={model._meta.verbose_name.replace(" ", "_"): self.error},
+            error={model_name: self.error},
             status_code=self.status_code,
             details=details,
         )
