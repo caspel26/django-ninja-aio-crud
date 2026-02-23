@@ -32,6 +32,7 @@ nav:
       - Serializer (Meta-driven): api/models/serializers.md
       - Validators: api/models/validators.md
     - Authentication: api/authentication.md
+    - Exceptions: api/exceptions.md
     - Pagination: api/pagination.md
     - Renderers: api/renderers/orjson_renderer.md
   - Authentication:
