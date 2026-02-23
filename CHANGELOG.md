@@ -1,5 +1,89 @@
 # 📋 Release Notes
 
+## 🏷️ [v2.22.0] - 2026-02-23
+
+---
+
+### ✨ New Features
+
+#### 🔧 Configurable `NotFoundError` Key Format
+> `ninja_aio/exceptions.py`
+
+`NotFoundError` now supports a configurable error key format via the Django setting `NINJA_AIO_NOT_FOUND_ERROR_USE_VERBOSE_NAMES`.
+
+By default (`True`), the error key continues to use the model's `verbose_name` with spaces replaced by underscores — preserving full backwards compatibility.
+
+When set to `False`, the error key uses the Python model class name (`model.__name__`) instead, which is useful when verbose names contain spaces that are undesirable in JSON keys or when a more Pythonic identifier is preferred.
+
+**Default behaviour (unchanged):**
+
+```python
+# Model with verbose_name = "blog post"
+raise NotFoundError(BlogPost)
+# {"blog_post": "not found"}
+```
+
+**Class name mode:**
+
+```python
+# settings.py
+NINJA_AIO_NOT_FOUND_ERROR_USE_VERBOSE_NAMES = False
+
+raise NotFoundError(BlogPost)
+# {"BlogPost": "not found"}
+```
+
+**Setting reference:**
+
+| Setting | Type | Default | Description |
+|---|---|---|---|
+| `NINJA_AIO_NOT_FOUND_ERROR_USE_VERBOSE_NAMES` | `bool` | `True` | Controls whether `NotFoundError` uses `verbose_name` (with `_`) or `__name__` as the error key |
+
+**Implementation details:**
+
+| File | Change |
+|---|---|
+| `ninja_aio/exceptions.py` | Added `use_verbose_name` class attribute on `NotFoundError`, reads from `settings.NINJA_AIO_NOT_FOUND_ERROR_USE_VERBOSE_NAMES` |
+
+---
+
+### 📚 Documentation
+
+- Added `docs/api/exceptions.md` — full reference for all exception classes (`BaseException`, `SerializeError`, `AuthError`, `NotFoundError`, `PydanticValidationError`) and exception handlers
+- Added **Exceptions** entry to the API Reference section in `mkdocs.yml`
+
+---
+
+### 🧪 Tests
+
+#### `ExceptionsAndAPITestCase` — 1 new test
+
+**Configurable key format:**
+
+| Test | Verifies |
+|---|---|
+| `test_not_found_error_class_name_mode` | ✅ `use_verbose_name=False` uses `model.__name__` as error key |
+
+#### `SubclassesTestCase` — 2 new tests
+
+| Test | Verifies |
+|---|---|
+| `test_not_found_error_use_class_name` | ✅ `use_verbose_name=False` produces class-name key |
+| `test_not_found_error_use_verbose_name_true` | ✅ `use_verbose_name=True` produces `verbose_name`-based key |
+
+---
+
+### 🎯 Summary
+
+Version 2.22.0 adds fine-grained control over how `NotFoundError` formats its JSON error key. The new `NINJA_AIO_NOT_FOUND_ERROR_USE_VERBOSE_NAMES` setting is fully backwards-compatible — existing projects are unaffected unless they opt in.
+
+**Key benefits:**
+- 🔧 **Configurable** — choose between `verbose_name` (default) or `__name__` as the not-found error key
+- ✅ **Backwards-compatible** — default behaviour is identical to v2.21.0
+- 📚 **Documented** — new dedicated Exceptions API reference page
+
+---
+
 ## 🏷️ [v2.21.0] - 2026-02-10
 
 ---
