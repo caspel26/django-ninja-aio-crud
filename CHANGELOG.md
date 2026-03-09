@@ -1,5 +1,155 @@
 # 📋 Release Notes
 
+## 🏷️ [v2.24.0] - 2026-03-09
+
+---
+
+### ✨ New Features
+
+#### 🔗 Instance Binding on `Serializer`
+> `ninja_aio/models/serializers.py`
+
+`Serializer` now supports **instance binding**: a model instance can be attached to a serializer at construction time or via attribute assignment, eliminating the need to pass it on every method call.
+
+**Constructor:**
+
+```python
+serializer = ArticleSerializer(instance=article)
+```
+
+**Attribute assignment (after construction):**
+
+```python
+serializer = ArticleSerializer()
+serializer.instance = article
+```
+
+**Instance-bound usage:**
+
+```python
+serializer = ArticleSerializer(instance=article)
+
+await serializer.update({"title": "Breaking news"})  # uses bound instance
+await serializer.save()                               # uses bound instance
+data    = await serializer.model_dump()               # uses bound instance
+changed = serializer.has_changed("title")             # uses bound instance
+changed = await serializer.ahas_changed("title")      # uses bound instance
+```
+
+Explicit method arguments always take priority over `self.instance`. Calling an instance-dependent method when neither is set raises a clear `ValueError`.
+
+---
+
+### 🔧 Improvements
+
+#### 📐 Optional `instance` on `save`, `update`, `model_dump`, `has_changed`, `ahas_changed`
+> `ninja_aio/models/serializers.py`
+
+All instance-dependent methods now accept `instance` as an **optional** parameter that falls back to `self.instance`:
+
+| Method | Old signature | New signature |
+|---|---|---|
+| `save` | `save(instance)` | `save(instance=None)` |
+| `update` | `update(instance, payload)` | `update(payload, instance=None)` |
+| `model_dump` | `model_dump(instance, schema=None)` | `model_dump(instance=None, schema=None)` |
+| `has_changed` | `has_changed(instance, field)` | `has_changed(field, instance=None)` |
+| `ahas_changed` | `ahas_changed(instance, field)` | `ahas_changed(field, instance=None)` |
+
+!!! warning "Breaking: parameter order changed for `update`, `has_changed`, `ahas_changed`"
+    `payload`/`field` moved to first position and `instance` became the optional trailing arg.
+
+#### 🛡️ `_resolve_instance` helper
+> `ninja_aio/models/serializers.py`
+
+Internal `_resolve_instance(instance)` method centralizes instance resolution logic: prefers the explicit argument, falls back to `self.instance`, and raises `ValueError` with a descriptive message when neither is available.
+
+---
+
+### 📖 Documentation
+
+- `docs/api/models/serializers.md` — added **Instance Binding** section; updated all method signatures and code examples to the new parameter order; added `save` and `update` examples; added migration warning admonitions.
+- `docs/tutorial/serializer.md` — added **Instance Binding** tutorial section covering constructor binding, attribute assignment, instance replacement, priority rules, and error behaviour; updated learning objectives and checklist.
+
+---
+
+### 🧪 Tests
+
+#### `SerializerInstanceBindingTestCase` — 18 tests
+> `tests/test_serializers.py`
+
+**Constructor & attribute assignment:**
+
+| Test | Verifies |
+|---|---|
+| `test_init_without_instance_sets_none` | ✅ `Serializer()` → `self.instance` is `None` |
+| `test_init_with_instance_stores_it` | ✅ `Serializer(instance=obj)` stores the instance |
+| `test_instance_attribute_assignment` | ✅ `serializer.instance = obj` works after construction |
+| `test_instance_attribute_can_be_replaced` | ✅ `self.instance` can be replaced with a different object |
+
+**`_resolve_instance`:**
+
+| Test | Verifies |
+|---|---|
+| `test_resolve_instance_prefers_explicit_arg` | ✅ explicit arg beats `self.instance` |
+| `test_resolve_instance_falls_back_to_bound` | ✅ `None` arg falls back to `self.instance` |
+| `test_resolve_instance_raises_when_none` | ✅ raises `ValueError` when both are `None` |
+
+**`save()`:**
+
+| Test | Verifies |
+|---|---|
+| `test_save_uses_bound_instance` | ✅ `save()` persists `self.instance` |
+| `test_save_raises_without_instance` | ✅ raises `ValueError` with no instance |
+
+**`update()`:**
+
+| Test | Verifies |
+|---|---|
+| `test_update_uses_bound_instance` | ✅ `update(payload)` applies to `self.instance` |
+| `test_update_explicit_instance_overrides_bound` | ✅ explicit arg takes priority |
+| `test_update_raises_without_instance` | ✅ raises `ValueError` with no instance |
+
+**`model_dump()`:**
+
+| Test | Verifies |
+|---|---|
+| `test_model_dump_uses_bound_instance` | ✅ `model_dump()` serializes `self.instance` |
+| `test_model_dump_explicit_instance_overrides_bound` | ✅ explicit arg takes priority |
+| `test_model_dump_raises_without_instance` | ✅ raises `ValueError` with no instance |
+
+**`has_changed()`:**
+
+| Test | Verifies |
+|---|---|
+| `test_has_changed_uses_bound_instance` | ✅ `has_changed(field)` checks `self.instance` |
+| `test_has_changed_explicit_instance_overrides_bound` | ✅ explicit arg takes priority |
+| `test_has_changed_raises_without_instance` | ✅ raises `ValueError` with no instance |
+
+**`ahas_changed()`:**
+
+| Test | Verifies |
+|---|---|
+| `test_ahas_changed_uses_bound_instance` | ✅ async `ahas_changed(field)` checks `self.instance` |
+| `test_ahas_changed_explicit_instance_overrides_bound` | ✅ explicit arg takes priority |
+| `test_ahas_changed_raises_without_instance` | ✅ raises `ValueError` with no instance |
+
+**Updated existing tests** — adjusted `update`, `has_changed`, and `ahas_changed` call sites to the new parameter order.
+
+---
+
+### 🎯 Summary
+
+Version 2.24.0 introduces **instance binding** to `Serializer`, a quality-of-life feature for workflows that operate on the same model instance across multiple calls.
+
+**Key benefits:**
+- 🔗 **Less repetition** — bind the instance once, omit it from every subsequent call
+- 🔄 **Flexible** — bind at construction or assign via `serializer.instance = obj` at any time
+- ⚡ **Priority rule** — explicit method arguments always win, enabling ad-hoc overrides without rebinding
+- 🛡️ **Clear errors** — descriptive `ValueError` when no instance is available
+- ✅ **Fully backwards-compatible for `save` and `model_dump`** — existing positional calls continue to work
+
+---
+
 ## 🏷️ [v2.23.1] - 2026-02-23
 
 ---
