@@ -2423,10 +2423,10 @@ class SerializerCRUDMethodsTestCase(TestCase):
         self.serializer = SerializerForCRUD()
 
     async def test_serializer_update(self):
-        """Lines 1796-1798: Serializer.update sets attrs and saves."""
+        """Serializer.update sets attrs and saves (explicit instance arg)."""
         instance = await app_models.TestModel.objects.aget(pk=self.obj.pk)
         updated = await self.serializer.update(
-            instance, {"name": "Updated", "description": "Updated desc"}
+            {"name": "Updated", "description": "Updated desc"}, instance
         )
         self.assertEqual(updated.name, "Updated")
         self.assertEqual(updated.description, "Updated desc")
@@ -2835,21 +2835,21 @@ class SerializerAHasChangedTestCase(TestCase):
             name="orig", description="orig", test_model=self.parent
         )
         obj.name = "updated"
-        self.assertTrue(await self.serializer.ahas_changed(obj, "name"))
+        self.assertTrue(await self.serializer.ahas_changed("name", obj))
 
     async def test_ahas_changed_no_change(self):
         """ahas_changed returns False when field matches the DB value."""
         obj = await TestModelForeignKey.objects.acreate(
             name="same", description="same", test_model=self.parent
         )
-        self.assertFalse(await self.serializer.ahas_changed(obj, "name"))
+        self.assertFalse(await self.serializer.ahas_changed("name", obj))
 
     async def test_ahas_changed_before_create(self):
         """ahas_changed returns False for unsaved (pk-less) instances."""
         obj = TestModelForeignKey(
             name="new", description="new", test_model=self.parent
         )
-        self.assertFalse(await self.serializer.ahas_changed(obj, "name"))
+        self.assertFalse(await self.serializer.ahas_changed("name", obj))
 
 
 # ==========================================================
@@ -2915,3 +2915,232 @@ class SerializerSaveHooksTestCase(TestCase):
         obj.name = "u2"
         await s.save(obj)
         self.assertEqual(order, ["before_save", "after_save"])
+
+
+# ==========================================================
+#      SERIALIZER INSTANCE-BINDING TESTS
+# ==========================================================
+
+
+class _InstanceBindingSerializer(serializers.Serializer):
+    class Meta:
+        model = TestModelForeignKey
+        schema_in = serializers.SchemaModelConfig(
+            fields=["name", "description", "test_model"]
+        )
+        schema_out = serializers.SchemaModelConfig(
+            fields=["id", "name", "description"]
+        )
+
+
+@tag("serializer_instance_binding", "serializers")
+class SerializerInstanceBindingTestCase(TestCase):
+    """Verify that a Serializer can have a bound instance set at construction
+    or via attribute assignment, and that instance-dependent methods use it
+    when no explicit instance argument is supplied."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.parent = TestModelReverseForeignKey.objects.create(
+            name="parent", description="parent"
+        )
+
+    def setUp(self):
+        self.s = _InstanceBindingSerializer()
+
+    # ------------------------------------------------------------------
+    # __init__ / attribute assignment
+    # ------------------------------------------------------------------
+
+    def test_init_without_instance_sets_none(self):
+        """Serializer() with no args sets instance to None."""
+        self.assertIsNone(self.s.instance)
+
+    def test_init_with_instance_stores_it(self):
+        """Serializer(instance=obj) stores the bound instance."""
+        obj = TestModelForeignKey(
+            name="x", description="x", test_model=self.parent
+        )
+        s = _InstanceBindingSerializer(instance=obj)
+        self.assertIs(s.instance, obj)
+
+    def test_instance_attribute_assignment(self):
+        """serializer.instance = obj can be set after construction."""
+        obj = TestModelForeignKey(
+            name="y", description="y", test_model=self.parent
+        )
+        self.s.instance = obj
+        self.assertIs(self.s.instance, obj)
+
+    def test_instance_attribute_can_be_replaced(self):
+        """serializer.instance can be replaced with a different object."""
+        obj1 = TestModelForeignKey(name="a", description="a", test_model=self.parent)
+        obj2 = TestModelForeignKey(name="b", description="b", test_model=self.parent)
+        self.s.instance = obj1
+        self.s.instance = obj2
+        self.assertIs(self.s.instance, obj2)
+
+    # ------------------------------------------------------------------
+    # _resolve_instance
+    # ------------------------------------------------------------------
+
+    def test_resolve_instance_prefers_explicit_arg(self):
+        """Explicit instance arg takes priority over self.instance."""
+        bound = TestModelForeignKey(name="bound", description="b", test_model=self.parent)
+        explicit = TestModelForeignKey(name="explicit", description="e", test_model=self.parent)
+        self.s.instance = bound
+        resolved = self.s._resolve_instance(explicit)
+        self.assertIs(resolved, explicit)
+
+    def test_resolve_instance_falls_back_to_bound(self):
+        """When no explicit arg, self.instance is returned."""
+        bound = TestModelForeignKey(name="bound", description="b", test_model=self.parent)
+        self.s.instance = bound
+        resolved = self.s._resolve_instance(None)
+        self.assertIs(resolved, bound)
+
+    def test_resolve_instance_raises_when_none(self):
+        """ValueError raised when both explicit arg and self.instance are None."""
+        with self.assertRaises(ValueError):
+            self.s._resolve_instance(None)
+
+    # ------------------------------------------------------------------
+    # save() with bound instance
+    # ------------------------------------------------------------------
+
+    async def test_save_uses_bound_instance(self):
+        """save() with no arg uses self.instance to persist."""
+        obj = TestModelForeignKey(
+            name="save_bound", description="d", test_model=self.parent
+        )
+        self.s.instance = obj
+        saved = await self.s.save()
+        self.assertIsNotNone(saved.pk)
+        self.assertTrue(await TestModelForeignKey.objects.filter(pk=saved.pk).aexists())
+
+    async def test_save_raises_without_instance(self):
+        """save() raises ValueError when no instance is bound or supplied."""
+        with self.assertRaises(ValueError):
+            await self.s.save()
+
+    # ------------------------------------------------------------------
+    # update() with bound instance
+    # ------------------------------------------------------------------
+
+    async def test_update_uses_bound_instance(self):
+        """update(payload) uses self.instance when no instance arg is given."""
+        obj = await TestModelForeignKey.objects.acreate(
+            name="before", description="d", test_model=self.parent
+        )
+        self.s.instance = obj
+        updated = await self.s.update({"name": "after", "description": "d"})
+        self.assertEqual(updated.name, "after")
+
+    async def test_update_explicit_instance_overrides_bound(self):
+        """update(payload, instance) uses the explicit instance, not self.instance."""
+        bound_obj = await TestModelForeignKey.objects.acreate(
+            name="bound", description="d", test_model=self.parent
+        )
+        explicit_obj = await TestModelForeignKey.objects.acreate(
+            name="explicit", description="d", test_model=self.parent
+        )
+        self.s.instance = bound_obj
+        updated = await self.s.update({"name": "changed"}, explicit_obj)
+        self.assertEqual(updated.pk, explicit_obj.pk)
+        self.assertEqual(updated.name, "changed")
+
+    async def test_update_raises_without_instance(self):
+        """update() raises ValueError when no instance is bound or supplied."""
+        with self.assertRaises(ValueError):
+            await self.s.update({"name": "x"})
+
+    # ------------------------------------------------------------------
+    # model_dump() with bound instance
+    # ------------------------------------------------------------------
+
+    async def test_model_dump_uses_bound_instance(self):
+        """model_dump() with no arg serializes self.instance."""
+        obj = await TestModelForeignKey.objects.acreate(
+            name="dump_bound", description="d", test_model=self.parent
+        )
+        self.s.instance = obj
+        data = await self.s.model_dump()
+        self.assertEqual(data["id"], obj.pk)
+        self.assertEqual(data["name"], "dump_bound")
+
+    async def test_model_dump_explicit_instance_overrides_bound(self):
+        """model_dump(instance) uses the explicit instance, not self.instance."""
+        bound_obj = await TestModelForeignKey.objects.acreate(
+            name="bound_dump", description="d", test_model=self.parent
+        )
+        explicit_obj = await TestModelForeignKey.objects.acreate(
+            name="explicit_dump", description="d", test_model=self.parent
+        )
+        self.s.instance = bound_obj
+        data = await self.s.model_dump(explicit_obj)
+        self.assertEqual(data["id"], explicit_obj.pk)
+
+    async def test_model_dump_raises_without_instance(self):
+        """model_dump() raises ValueError when no instance is bound or supplied."""
+        with self.assertRaises(ValueError):
+            await self.s.model_dump()
+
+    # ------------------------------------------------------------------
+    # has_changed() with bound instance
+    # ------------------------------------------------------------------
+
+    def test_has_changed_uses_bound_instance(self):
+        """has_changed(field) uses self.instance when no instance arg is given."""
+        obj = TestModelForeignKey.objects.create(
+            name="hc_bound", description="d", test_model=self.parent
+        )
+        obj.name = "hc_modified"
+        self.s.instance = obj
+        self.assertTrue(self.s.has_changed("name"))
+
+    def test_has_changed_explicit_instance_overrides_bound(self):
+        """has_changed(field, instance) uses the explicit instance."""
+        bound_obj = TestModelForeignKey.objects.create(
+            name="hc_b", description="d", test_model=self.parent
+        )
+        explicit_obj = TestModelForeignKey.objects.create(
+            name="hc_e", description="d", test_model=self.parent
+        )
+        explicit_obj.name = "hc_e_changed"
+        self.s.instance = bound_obj
+        self.assertTrue(self.s.has_changed("name", explicit_obj))
+
+    def test_has_changed_raises_without_instance(self):
+        """has_changed() raises ValueError when no instance is bound or supplied."""
+        with self.assertRaises(ValueError):
+            self.s.has_changed("name")
+
+    # ------------------------------------------------------------------
+    # ahas_changed() with bound instance
+    # ------------------------------------------------------------------
+
+    async def test_ahas_changed_uses_bound_instance(self):
+        """ahas_changed(field) uses self.instance when no instance arg is given."""
+        obj = await TestModelForeignKey.objects.acreate(
+            name="ahc_bound", description="d", test_model=self.parent
+        )
+        obj.name = "ahc_modified"
+        self.s.instance = obj
+        self.assertTrue(await self.s.ahas_changed("name"))
+
+    async def test_ahas_changed_explicit_instance_overrides_bound(self):
+        """ahas_changed(field, instance) uses the explicit instance."""
+        bound_obj = await TestModelForeignKey.objects.acreate(
+            name="ahc_b", description="d", test_model=self.parent
+        )
+        explicit_obj = await TestModelForeignKey.objects.acreate(
+            name="ahc_e", description="d", test_model=self.parent
+        )
+        explicit_obj.name = "ahc_e_changed"
+        self.s.instance = bound_obj
+        self.assertTrue(await self.s.ahas_changed("name", explicit_obj))
+
+    async def test_ahas_changed_raises_without_instance(self):
+        """ahas_changed() raises ValueError when no instance is bound or supplied."""
+        with self.assertRaises(ValueError):
+            await self.s.ahas_changed("name")

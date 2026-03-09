@@ -1833,9 +1833,20 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
     ...         schema_in = SchemaModelConfig(fields=["title", "author"])
     ...
     >>> serializer = BookSerializer()
-    >>> book: Book = await serializer.create({"title": "1984"})  # Returns Book
-    >>> book: Book = await serializer.save(book)                  # Accepts/returns Book
-    >>> data: dict = await serializer.model_dump(book)            # Accepts Book
+    >>> book: Book = await serializer.create({"title": "1984"})        # Returns Book
+    >>> book: Book = await serializer.save(book)                        # Accepts/returns Book
+    >>> data: dict = await serializer.model_dump(book)                  # Accepts Book
+    >>>
+    >>> # Instance-bound usage — pass instance once, omit it from calls
+    >>> serializer = BookSerializer(instance=book)
+    >>> book: Book = await serializer.update({"title": "New title"})   # Uses bound instance
+    >>> data: dict = await serializer.model_dump()                      # Uses bound instance
+    >>> changed: bool = serializer.has_changed("title")                 # Uses bound instance
+    >>>
+    >>> # Or assign after construction
+    >>> serializer = BookSerializer()
+    >>> serializer.instance = book
+    >>> data: dict = await serializer.model_dump()
 
     Configuration
     -------------
@@ -1884,6 +1895,63 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         schema_detail: Optional[SchemaModelConfig] = None
         relations_serializers: dict[str, "Serializer"] = {}
         relations_as_id: list[str] = []
+
+    def __init__(self, instance: Optional[ModelT] = None):
+        """
+        Initialize the serializer with an optional bound model instance.
+
+        Binding an instance allows you to omit the ``instance`` argument on
+        ``save``, ``update``, ``model_dump``, ``has_changed``, and
+        ``ahas_changed`` calls made on this serializer object. The binding
+        can also be set or replaced at any time via attribute assignment::
+
+            serializer = BookSerializer(instance=book)
+            await serializer.update({"title": "New title"})
+
+            # or assign after construction
+            serializer = BookSerializer()
+            serializer.instance = book
+            data = await serializer.model_dump()
+
+        Parameters
+        ----------
+        instance : ModelT | None
+            The model instance to bind to this serializer. Defaults to
+            ``None`` (no bound instance).
+        """
+        self.instance = instance
+
+    def _resolve_instance(self, instance: Optional[ModelT]) -> ModelT:
+        """
+        Return the effective model instance, raising ``ValueError`` when none is available.
+
+        Prefers the explicitly-supplied *instance* argument over the
+        serializer's bound ``self.instance``.
+
+        Parameters
+        ----------
+        instance : ModelT | None
+            Caller-supplied instance, or ``None`` to fall back to
+            ``self.instance``.
+
+        Returns
+        -------
+        ModelT
+            The resolved model instance.
+
+        Raises
+        ------
+        ValueError
+            If both *instance* and ``self.instance`` are ``None``.
+        """
+        resolved = instance if instance is not None else self.instance
+        if resolved is None:
+            raise ValueError(
+                "No instance bound to this serializer and no instance argument was "
+                "provided. Either pass an instance to the method or bind one via "
+                "BookSerializer(instance=obj) or serializer.instance = obj."
+            )
+        return resolved
 
     def _parse_payload(self, payload: dict[str, Any] | Schema) -> dict[str, Any]:
         """
@@ -2125,20 +2193,28 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
             scope=cls.query_util.SCOPES.QUERYSET_REQUEST,
         )
 
-    def has_changed(self, instance: models.Model, field: str) -> bool:
+    def has_changed(self, field: str, instance: Optional[ModelT] = None) -> bool:
         """
         Check if a model field has changed compared to the persisted value.
+
+        If *instance* is omitted the serializer's bound ``self.instance`` is
+        used.  A ``ValueError`` is raised when neither is available.
 
         Parameters
         ----------
         field : str
-            Field name.
+            Field name to compare.
+        instance : ModelT | None
+            Model instance to inspect. Falls back to ``self.instance`` when
+            ``None``.
 
         Returns
         -------
         bool
-            True if in-memory value differs from DB value.
+            ``True`` if the in-memory value differs from the DB value,
+            ``False`` if the instance has no primary key yet.
         """
+        instance = self._resolve_instance(instance)
         if not instance.pk:
             return False
         old_value = (
@@ -2148,21 +2224,27 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         )
         return getattr(instance, field) != old_value
 
-    async def ahas_changed(self, instance: models.Model, field: str) -> bool:
+    async def ahas_changed(self, field: str, instance: Optional[ModelT] = None) -> bool:
         """
-        Async version of has_changed.
+        Async version of :meth:`has_changed`.
+
+        If *instance* is omitted the serializer's bound ``self.instance`` is
+        used.  A ``ValueError`` is raised when neither is available.
 
         Parameters
         ----------
         field : str
-            Field name.
+            Field name to compare.
+        instance : ModelT | None
+            Model instance to inspect. Falls back to ``self.instance`` when
+            ``None``.
 
         Returns
         -------
         bool
-            True if in-memory value differs from DB value.
+            ``True`` if the in-memory value differs from the DB value.
         """
-        return await sync_to_async(self.has_changed)(instance, field)
+        return await sync_to_async(self.has_changed)(field, instance)
 
     async def post_create(self, instance: models.Model) -> None:
         """
@@ -2181,15 +2263,25 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         """
         pass
 
-    async def save(self, instance: ModelT) -> ModelT:
+    async def save(self, instance: Optional[ModelT] = None) -> ModelT:
         """
         Async helper to save a model instance with lifecycle hooks.
 
+        If *instance* is omitted the serializer's bound ``self.instance`` is
+        used.  A ``ValueError`` is raised when neither is available.
+
         Parameters
         ----------
-        instance : models.Model
-            The model instance to save.
+        instance : ModelT | None
+            The model instance to save. Falls back to ``self.instance`` when
+            ``None``.
+
+        Returns
+        -------
+        ModelT
+            The saved model instance.
         """
+        instance = self._resolve_instance(instance)
         creation = instance._state.adding
         if creation:
             await sync_to_async(self.on_create_before_save)(instance)
@@ -2218,47 +2310,60 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         return await self.save(instance)
 
     async def update(
-        self, instance: ModelT, payload: dict[str, Any] | Schema
+        self,
+        payload: dict[str, Any] | Schema,
+        instance: Optional[ModelT] = None,
     ) -> ModelT:
         """
         Update an existing model instance with the provided payload.
 
+        If *instance* is omitted the serializer's bound ``self.instance`` is
+        used.  A ``ValueError`` is raised when neither is available.
+
         Parameters
         ----------
-        instance : models.Model
-            The model instance to update.
         payload : dict | Schema
-            Input data.
+            Input data to apply to the instance.
+        instance : ModelT | None
+            The model instance to update. Falls back to ``self.instance``
+            when ``None``.
 
         Returns
         -------
-        models.Model
-            Updated model instance.
+        ModelT
+            The updated model instance.
         """
+        instance = self._resolve_instance(instance)
         for attr, value in self._parse_payload(payload).items():
             setattr(instance, attr, value)
         return await self.save(instance)
 
     async def model_dump(
-        self, instance: ModelT, schema: Schema = None
+        self,
+        instance: Optional[ModelT] = None,
+        schema: Schema = None,
     ) -> dict[str, Any]:
         """
         Serialize a model instance to a dictionary using the Out schema.
 
+        If *instance* is omitted the serializer's bound ``self.instance`` is
+        used.  A ``ValueError`` is raised when neither is available.
+
         Parameters
         ----------
-        instance : ModelT
-            The model instance to serialize.
-
-        schema : Schema
-            The Pydantic schema to use for serialization.
-            defaults to the detail schema if defined, otherwise the read schema.
+        instance : ModelT | None
+            The model instance to serialize. Falls back to ``self.instance``
+            when ``None``.
+        schema : Schema | None
+            The Pydantic schema to use for serialization. Defaults to the
+            detail schema if defined, otherwise the read schema.
 
         Returns
         -------
         dict
             Serialized data.
         """
+        instance = self._resolve_instance(instance)
         return await self.util.read_s(
             schema=self._get_dump_schema(schema), instance=instance
         )
