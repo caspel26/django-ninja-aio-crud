@@ -836,6 +836,32 @@ Behavior:
 
 ---
 
+## :material-pin: Instance Binding
+
+You can bind a model instance to a serializer at construction time (or assign it later via attribute), so you don't have to pass it on every method call.
+
+```python
+# Bind at construction
+serializer = ArticleSerializer(instance=article)
+
+await serializer.update({"title": "New title"})   # uses bound instance
+await serializer.save()                             # uses bound instance
+data = await serializer.model_dump()                # uses bound instance
+changed = serializer.has_changed("title")           # uses bound instance
+changed = await serializer.ahas_changed("title")    # uses bound instance
+
+# Assign or replace after construction
+serializer = ArticleSerializer()
+serializer.instance = article
+
+await serializer.save()
+```
+
+If an explicit `instance` argument is also supplied to the method, it takes priority over `self.instance`.
+Calling a method that requires an instance when neither is set raises `ValueError`.
+
+---
+
 ## :material-database-refresh: CRUD Operations with Serializer
 
 When using a Serializer with APIViewSet, CRUD operations automatically invoke the appropriate lifecycle hooks:
@@ -865,11 +891,16 @@ When using a Serializer with APIViewSet, CRUD operations automatically invoke th
 
 ### Serialization Methods
 
-**`model_dump(instance, schema=None)`** - Serialize a single instance to dict
+**`model_dump(instance=None, schema=None)`** — Serialize a single instance to dict.
+Falls back to the bound `self.instance` when `instance` is not supplied.
 
 ```python
-# Use default schema (detail schema if defined, otherwise read schema)
+# Pass instance explicitly
 data = await serializer.model_dump(article)
+
+# Use bound instance
+serializer = ArticleSerializer(instance=article)
+data = await serializer.model_dump()
 
 # Use a specific schema
 custom_schema = ArticleSerializer.generate_read_s()
@@ -888,9 +919,42 @@ custom_schema = ArticleSerializer.generate_read_s()
 data = await serializer.models_dump(articles, schema=custom_schema)
 ```
 
+**`save(instance=None)`** — Save an instance with lifecycle hooks.
+Falls back to the bound `self.instance` when `instance` is not supplied.
+
+```python
+# Pass instance explicitly
+await serializer.save(article)
+
+# Use bound instance
+serializer = ArticleSerializer(instance=article)
+await serializer.save()
+```
+
+**`update(payload, instance=None)`** — Apply payload to an instance and save.
+Falls back to the bound `self.instance` when `instance` is not supplied.
+
+!!! warning "Signature change in v2.24.0"
+    The parameter order changed: `payload` is now first, `instance` is the optional second argument.
+    Old: `update(instance, payload)` → New: `update(payload, instance=None)`.
+
+```python
+# Pass instance explicitly
+await serializer.update({"title": "New"}, article)
+
+# Use bound instance
+serializer = ArticleSerializer(instance=article)
+await serializer.update({"title": "New"})
+```
+
 ### Field Change Detection
 
-**`has_changed(instance, field)`** — Check if a field value differs from the database (sync).
+**`has_changed(field, instance=None)`** — Check if a field value differs from the database (sync).
+Falls back to the bound `self.instance` when `instance` is not supplied.
+
+!!! warning "Signature change in v2.24.0"
+    The parameter order changed: `field` is now first, `instance` is the optional second argument.
+    Old: `has_changed(instance, field)` → New: `has_changed(field, instance=None)`.
 
 ```python
 @api.viewset(Article)
@@ -902,14 +966,15 @@ class ArticleViewSet(APIViewSet):
         article.title = data.title
 
         # Check if title changed before sending notification
-        if self.serializer.has_changed(article, "title"):
+        if self.serializer.has_changed("title", article):
             await send_notification(f"Title updated: {article.title}")
 
         await article.asave()
         return await self.serializer.model_dump(article)
 ```
 
-**`ahas_changed(instance, field)`** — Async version of `has_changed`. Use this inside async hooks or async views.
+**`ahas_changed(field, instance=None)`** — Async version of `has_changed`. Use this inside async hooks or async views.
+Falls back to the bound `self.instance` when `instance` is not supplied.
 
 ```python
 class ArticleSerializer(serializers.Serializer):
@@ -919,12 +984,12 @@ class ArticleSerializer(serializers.Serializer):
 
     def before_save(self, instance):
         # sync hook — use has_changed here
-        if self.has_changed(instance, "status"):
+        if self.has_changed("status", instance):
             instance.status_changed_at = timezone.now()
 
     async def post_create(self, instance):
         # async hook — use ahas_changed here
-        if await self.ahas_changed(instance, "title"):
+        if await self.ahas_changed("title", instance):
             await notify_subscribers_async(instance)
 ```
 

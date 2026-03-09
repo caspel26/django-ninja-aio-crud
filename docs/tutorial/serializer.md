@@ -20,6 +20,7 @@ Use Meta-driven <code>Serializer</code> to add API functionality to existing Dja
 - :material-pencil-plus: Adding custom and computed fields
 - :material-database-search: Query optimizations with `QuerySet`
 - :material-hook: Implementing lifecycle hooks
+- :material-pin: Binding a model instance to the serializer
 - :material-view-grid: Connecting to `APIViewSet`
 
 </div>
@@ -587,6 +588,68 @@ class ArticleSerializer(serializers.Serializer):
 
 ---
 
+## :material-pin: Instance Binding
+
+Instead of passing a model instance to every method call, you can bind it once to the serializer — either at construction time or via attribute assignment.
+
+### Bind at Construction
+
+```python
+serializer = ArticleSerializer(instance=article)
+
+# All these use the bound instance — no need to pass it again
+await serializer.update({"title": "New title"})
+await serializer.save()
+data   = await serializer.model_dump()
+changed = serializer.has_changed("title")
+changed = await serializer.ahas_changed("title")
+```
+
+### Assign After Construction
+
+```python
+serializer = ArticleSerializer()
+serializer.instance = article   # set later
+
+data = await serializer.model_dump()
+```
+
+### Replacing the Bound Instance
+
+```python
+serializer.instance = other_article   # replace with a different object
+```
+
+### Explicit Argument Takes Priority
+
+If you supply an instance directly to the method call, it takes priority over `self.instance`:
+
+```python
+serializer = ArticleSerializer(instance=article_a)
+data = await serializer.model_dump(article_b)  # uses article_b, not article_a
+```
+
+### Error When No Instance Is Available
+
+Calling an instance-dependent method with neither a bound instance nor an explicit argument raises `ValueError`:
+
+```python
+serializer = ArticleSerializer()   # no instance bound
+await serializer.save()            # raises ValueError
+```
+
+!!! warning "Parameter order changed in v2.24.0"
+    The following methods had their parameter order changed so `instance` is now an
+    **optional trailing** argument:
+
+    | Method | Before | After |
+    |---|---|---|
+    | `update` | `update(instance, payload)` | `update(payload, instance=None)` |
+    | `has_changed` | `has_changed(instance, field)` | `has_changed(field, instance=None)` |
+    | `ahas_changed` | `ahas_changed(instance, field)` | `ahas_changed(field, instance=None)` |
+
+---
+
 ## :material-view-grid: Connecting to APIViewSet
 
 Attach your serializer to a ViewSet using `serializer_class`:
@@ -838,6 +901,7 @@ Now continue with CRUD views, authentication, and filtering — they work the sa
 - :material-check: Adding custom computed fields
 - :material-check: Configuring query optimizations
 - :material-check: Implementing lifecycle hooks with `instance` parameter
+- :material-check: Binding a model instance to the serializer
 - :material-check: Connecting serializers to `APIViewSet`
 
 </div>
