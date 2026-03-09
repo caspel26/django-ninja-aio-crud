@@ -77,6 +77,38 @@ class SubclassesTestCase(TestCase):
         finally:
             NotFoundError.use_verbose_name = original
 
+    def test_not_found_name_string_overrides_auto_key(self):
+        """not_found_name as a string bypasses auto key generation."""
+        app_models.TestModelSerializer._meta.not_found_name = "my_entity"
+        try:
+            exc = NotFoundError(app_models.TestModelSerializer)
+            self.assertEqual(exc.error, {"error": "my_entity"})
+            self.assertEqual(exc.status_code, 404)
+        finally:
+            del app_models.TestModelSerializer._meta.not_found_name
+
+    def test_not_found_name_dict_overrides_auto_key(self):
+        """not_found_name as a dict is used directly as the error payload."""
+        app_models.TestModelSerializer._meta.not_found_name = {"my_entity": "not found"}
+        try:
+            exc = NotFoundError(app_models.TestModelSerializer)
+            self.assertEqual(exc.error, {"my_entity": "not found"})
+            self.assertEqual(exc.status_code, 404)
+        finally:
+            del app_models.TestModelSerializer._meta.not_found_name
+
+    def test_not_found_name_takes_precedence_over_use_verbose_name(self):
+        """not_found_name takes precedence over use_verbose_name setting."""
+        app_models.TestModelSerializer._meta.not_found_name = {"override": "not found"}
+        original = NotFoundError.use_verbose_name
+        try:
+            NotFoundError.use_verbose_name = False
+            exc = NotFoundError(app_models.TestModelSerializer)
+            self.assertEqual(exc.error, {"override": "not found"})
+        finally:
+            NotFoundError.use_verbose_name = original
+            del app_models.TestModelSerializer._meta.not_found_name
+
     def test_pydantic_validation_error(self):
         try:
             DummyModel(a=0)

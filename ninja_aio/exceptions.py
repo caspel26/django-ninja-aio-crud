@@ -60,6 +60,10 @@ class NotFoundError(BaseException):
 
     def __init__(self, model: Model, details=None):
         """Build a not-found error referencing the model's verbose name."""
+        if model_name := getattr(model._meta, "not_found_name", None):
+            return super().__init__(
+                error=model_name, status_code=self.status_code, details=details
+            )
         model_name = (
             model._meta.verbose_name.replace(" ", "_")
             if self.use_verbose_name

@@ -40,6 +40,26 @@ class ExceptionsAndAPITestCase(TestCase):
         finally:
             NotFoundError.use_verbose_name = original
 
+    def test_not_found_name_string(self):
+        """not_found_name string bypasses auto key and wraps under 'error' key."""
+        models.TestModel._meta.not_found_name = "custom_entity"
+        try:
+            exc = NotFoundError(models.TestModel)
+            self.assertEqual(exc.status_code, 404)
+            self.assertEqual(exc.error, {"error": "custom_entity"})
+        finally:
+            del models.TestModel._meta.not_found_name
+
+    def test_not_found_name_dict(self):
+        """not_found_name dict is used directly as the full error payload."""
+        models.TestModel._meta.not_found_name = {"custom_entity": "not found"}
+        try:
+            exc = NotFoundError(models.TestModel)
+            self.assertEqual(exc.status_code, 404)
+            self.assertEqual(exc.error, {"custom_entity": "not found"})
+        finally:
+            del models.TestModel._meta.not_found_name
+
     def test_parse_jose_error(self):
         jose_exc = DummyJoseError("bad_token", "signature invalid")
         parsed = parse_jose_error(jose_exc)

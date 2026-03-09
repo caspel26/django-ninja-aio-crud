@@ -138,6 +138,39 @@ Configure in `settings.py`:
 NINJA_AIO_NOT_FOUND_ERROR_USE_VERBOSE_NAMES = False
 ```
 
+#### Per-model override with `not_found_name`
+
+For full control over a specific model's error payload, set `not_found_name` directly on `model._meta`. This takes precedence over both `verbose_name` and `NINJA_AIO_NOT_FOUND_ERROR_USE_VERBOSE_NAMES`.
+
+**String value** — wrapped under the `"error"` key:
+
+```python
+class BlogPost(Model):
+    # logic here
+    class Meta:
+        not_found_name = "blog_post"
+
+raise NotFoundError(BlogPost)
+# {"blog_post": "not found"}
+```
+
+**Dict value** — used as the full error payload:
+
+```python
+BlogPost._meta.not_found_name = {"blog_post": "not found"}
+
+raise NotFoundError(BlogPost)
+# {"blog_post": "not found"}
+```
+
+**Resolution order:**
+
+| Priority | Source | Condition |
+|---|---|---|
+| 1 | `model._meta.not_found_name` | If set |
+| 2 | `model._meta.verbose_name` (spaces → `_`) | `use_verbose_name=True` (default) |
+| 3 | `snake_case(model.__name__)` | `use_verbose_name=False` |
+
 ---
 
 ### `PydanticValidationError`
