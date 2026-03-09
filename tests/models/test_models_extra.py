@@ -162,6 +162,23 @@ class ModelSerializerHasChangedTestCase(TestCase):
         self.assertFalse(new_obj.has_changed("name"))
         self.assertFalse(new_obj.has_changed("description"))
 
+    async def test_ahas_changed_detection(self):
+        obj = await app_models.TestModelSerializer.objects.acreate(
+            name="original_a", description="original_a"
+        )
+        obj.name = "changed"
+        self.assertTrue(await obj.ahas_changed("name"))
+
+    async def test_ahas_changed_no_change(self):
+        obj = await app_models.TestModelSerializer.objects.acreate(
+            name="stable", description="stable"
+        )
+        self.assertFalse(await obj.ahas_changed("name"))
+
+    async def test_ahas_changed_before_create(self):
+        new_obj = app_models.TestModelSerializer(name="new", description="new")
+        self.assertFalse(await new_obj.ahas_changed("name"))
+
 
 @tag("model_util_read_s_queryset_error", "model_util")
 class ModelUtilReadSQuerysetErrorTestCase(TestCase):

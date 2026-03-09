@@ -2802,3 +2802,116 @@ class BaseSerializerSchemaOverridesDefaultTestCase(TestCase):
         instance = result(name="hello")
         self.assertEqual(instance.model_dump()["name"], "HELLO")
         self.assertIsNot(result, DummySchema)
+
+
+# ==========================================================
+#        SERIALIZER ahas_changed TESTS
+# ==========================================================
+
+
+class _HasChangedSerializer(serializers.Serializer):
+    class Meta:
+        model = TestModelForeignKey
+        schema_in = serializers.SchemaModelConfig(
+            fields=["name", "description", "test_model"]
+        )
+        schema_out = serializers.SchemaModelConfig(
+            fields=["id", "name", "description"]
+        )
+
+
+@tag("serializer_ahas_changed", "serializers")
+class SerializerAHasChangedTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.parent = TestModelReverseForeignKey.objects.create(
+            name="parent", description="parent"
+        )
+        cls.serializer = _HasChangedSerializer()
+
+    async def test_ahas_changed_detects_change(self):
+        """ahas_changed returns True when field differs from saved DB value."""
+        obj = await TestModelForeignKey.objects.acreate(
+            name="orig", description="orig", test_model=self.parent
+        )
+        obj.name = "updated"
+        self.assertTrue(await self.serializer.ahas_changed(obj, "name"))
+
+    async def test_ahas_changed_no_change(self):
+        """ahas_changed returns False when field matches the DB value."""
+        obj = await TestModelForeignKey.objects.acreate(
+            name="same", description="same", test_model=self.parent
+        )
+        self.assertFalse(await self.serializer.ahas_changed(obj, "name"))
+
+    async def test_ahas_changed_before_create(self):
+        """ahas_changed returns False for unsaved (pk-less) instances."""
+        obj = TestModelForeignKey(
+            name="new", description="new", test_model=self.parent
+        )
+        self.assertFalse(await self.serializer.ahas_changed(obj, "name"))
+
+
+# ==========================================================
+#      SERIALIZER save() HOOKS ASYNC WRAPPING TESTS
+# ==========================================================
+
+
+@tag("serializer_save_hooks", "serializers")
+class SerializerSaveHooksTestCase(TestCase):
+    """Verify that sync save hooks are correctly called inside Serializer.save()."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.parent = TestModelReverseForeignKey.objects.create(
+            name="p", description="p"
+        )
+
+    async def _make_serializer_with_tracker(self):
+        order = []
+
+        class TrackedSerializer(serializers.Serializer):
+            class Meta:
+                model = TestModelForeignKey
+                schema_in = serializers.SchemaModelConfig(
+                    fields=["name", "description", "test_model"]
+                )
+                schema_out = serializers.SchemaModelConfig(
+                    fields=["id", "name", "description"]
+                )
+
+            def before_save(self, instance):
+                order.append("before_save")
+
+            def after_save(self, instance):
+                order.append("after_save")
+
+            def on_create_before_save(self, instance):
+                order.append("on_create_before_save")
+
+            def on_create_after_save(self, instance):
+                order.append("on_create_after_save")
+
+        return TrackedSerializer(), order
+
+    async def test_create_hooks_order(self):
+        """On creation all four hooks are called in the correct order."""
+        s, order = await self._make_serializer_with_tracker()
+        obj = TestModelForeignKey(
+            name="h", description="h", test_model=self.parent
+        )
+        await s.save(obj)
+        self.assertEqual(
+            order,
+            ["on_create_before_save", "before_save", "on_create_after_save", "after_save"],
+        )
+
+    async def test_update_hooks_order(self):
+        """On update only before_save/after_save are called (no on_create_* hooks)."""
+        s, order = await self._make_serializer_with_tracker()
+        obj = await TestModelForeignKey.objects.acreate(
+            name="u", description="u", test_model=self.parent
+        )
+        obj.name = "u2"
+        await s.save(obj)
+        self.assertEqual(order, ["before_save", "after_save"])

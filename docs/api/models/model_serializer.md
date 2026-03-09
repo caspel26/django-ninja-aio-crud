@@ -903,7 +903,7 @@ class User(ModelSerializer):
 
 ### `has_changed(field)`
 
-Check if a field value has changed compared to database.
+Check if a field value has changed compared to the database (sync).
 
 ```python
 class Article(ModelSerializer):
@@ -916,6 +916,22 @@ class Article(ModelSerializer):
                 self.published_at = timezone.now()
                 notify_subscribers(self)
 ```
+
+### `ahas_changed(field)`
+
+Async version of `has_changed`. Use this inside async hooks or async views.
+
+```python
+class Article(ModelSerializer):
+    title = models.CharField(max_length=200)
+    status = models.CharField(max_length=20)
+
+    async def before_save(self):
+        if await self.ahas_changed('status'):
+            await notify_subscribers_async(self)
+```
+
+Returns `False` for unsaved instances (no primary key).
 
 ### `verbose_name_path_resolver()`
 

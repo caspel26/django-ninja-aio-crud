@@ -235,6 +235,9 @@ class ArticleSerializer(serializers.Serializer):
 | `on_create_after_save(i)`   | sync  | After creation save only  | `instance`              |
 | `on_delete(instance)`       | sync  | After deletion            | `instance`              |
 
+!!! note
+    The sync hooks (`before_save`, `after_save`, `on_create_before_save`, `on_create_after_save`) are automatically wrapped with `sync_to_async` when called from the async `save()` method, so they are safe to use in async contexts without any changes.
+
 ---
 
 ## :material-arrow-left-right: Example: Reverse Relation with Nested Serialization
@@ -887,7 +890,7 @@ data = await serializer.models_dump(articles, schema=custom_schema)
 
 ### Field Change Detection
 
-**`has_changed(instance, field)`** - Check if a field value differs from the database
+**`has_changed(instance, field)`** — Check if a field value differs from the database (sync).
 
 ```python
 @api.viewset(Article)
@@ -906,13 +909,32 @@ class ArticleViewSet(APIViewSet):
         return await self.serializer.model_dump(article)
 ```
 
+**`ahas_changed(instance, field)`** — Async version of `has_changed`. Use this inside async hooks or async views.
+
+```python
+class ArticleSerializer(serializers.Serializer):
+    class Meta:
+        model = Article
+        schema_in = SchemaModelConfig(fields=["title", "status"])
+
+    def before_save(self, instance):
+        # sync hook — use has_changed here
+        if self.has_changed(instance, "status"):
+            instance.status_changed_at = timezone.now()
+
+    async def post_create(self, instance):
+        # async hook — use ahas_changed here
+        if await self.ahas_changed(instance, "title"):
+            await notify_subscribers_async(instance)
+```
+
 **Use cases:**
 - Conditional notifications (only notify if a specific field changed)
 - Audit logging (track which fields were modified)
 - Validation (enforce business rules based on field changes)
 - Caching (invalidate cache only when relevant fields change)
 
-**Note:** Returns `False` for new instances (those without a primary key).
+**Note:** Both methods return `False` for unsaved instances (those without a primary key).
 
 ---
 

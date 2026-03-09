@@ -16,6 +16,7 @@ import warnings
 import sys
 import threading
 from functools import lru_cache
+from asgiref.sync import sync_to_async
 
 from django.conf import settings
 from ninja import Schema
@@ -1689,6 +1690,22 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
         )
         return getattr(self, field) != old_value
 
+    async def ahas_changed(self, field: str) -> bool:
+        """
+        Async version of has_changed.
+
+        Parameters
+        ----------
+        field : str
+            Field name.
+
+        Returns
+        -------
+        bool
+            True if in-memory value differs from DB value.
+        """
+        return await sync_to_async(self.has_changed)(field)
+
     @classmethod
     async def queryset_request(cls, request: HttpRequest):
         return cls.query_util.apply_queryset_optimizations(
@@ -2131,6 +2148,22 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         )
         return getattr(instance, field) != old_value
 
+    async def ahas_changed(self, instance: models.Model, field: str) -> bool:
+        """
+        Async version of has_changed.
+
+        Parameters
+        ----------
+        field : str
+            Field name.
+
+        Returns
+        -------
+        bool
+            True if in-memory value differs from DB value.
+        """
+        return await sync_to_async(self.has_changed)(instance, field)
+
     async def post_create(self, instance: models.Model) -> None:
         """
         Async hook executed after first persistence (create path).
@@ -2159,12 +2192,12 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         """
         creation = instance._state.adding
         if creation:
-            self.on_create_before_save(instance)
-        self.before_save(instance)
+            await sync_to_async(self.on_create_before_save)(instance)
+        await sync_to_async(self.before_save)(instance)
         await instance.asave()
         if creation:
-            self.on_create_after_save(instance)
-        self.after_save(instance)
+            await sync_to_async(self.on_create_after_save)(instance)
+        await sync_to_async(self.after_save)(instance)
         return instance
 
     async def create(self, payload: dict[str, Any] | Schema) -> ModelT:
