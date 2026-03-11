@@ -1,3 +1,4 @@
+import logging
 import re
 from functools import partial
 from joserfc.errors import JoseError
@@ -6,6 +7,8 @@ from django.http import HttpRequest, HttpResponse
 from pydantic import ValidationError
 from django.db.models import Model
 from django.conf import settings
+
+logger = logging.getLogger("ninja_aio.exceptions")
 
 
 class BaseException(Exception):
@@ -89,6 +92,7 @@ def _default_error(
     request: HttpRequest, exc: BaseException, api: type[NinjaAPI]
 ) -> HttpResponse:
     """Default handler: convert BaseException to an API response."""
+    logger.debug(f"Handling {type(exc).__name__}: {exc.error} (status={exc.status_code})")
     return api.create_response(request, exc.error, status=exc.status_code)
 
 
@@ -96,6 +100,7 @@ def _pydantic_validation_error(
     request: HttpRequest, exc: PydanticValidationError, api: type[NinjaAPI]
 ) -> HttpResponse:
     """Translate a pydantic ValidationError into a normalized API error response."""
+    logger.debug(f"Handling PydanticValidationError: {exc.errors(include_input=False)}")
     error = PydanticValidationError(exc.errors(include_input=False))
     return api.create_response(request, error.error, status=error.status_code)
 
@@ -104,6 +109,7 @@ def _jose_error(
     request: HttpRequest, exc: JoseError, api: type[NinjaAPI]
 ) -> HttpResponse:
     """Translate a JOSE library error into an unauthorized API response."""
+    logger.debug(f"Handling JoseError: {exc.error}")
     error = BaseException(**parse_jose_error(exc), status_code=401)
     return api.create_response(request, error.error, status=error.status_code)
 
