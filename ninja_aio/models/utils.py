@@ -143,9 +143,8 @@ class ModelUtil(Generic[ModelT]):
             serializer_class() if serializer_class else None
         )
         logger.debug(
-            "ModelUtil initialized for %s (serializer=%s)",
-            model.__name__,
-            serializer_class.__name__ if serializer_class else None,
+            f"ModelUtil initialized for {model.__name__}"
+            f" (serializer={serializer_class.__name__ if serializer_class else None})"
         )
 
     @property
@@ -446,7 +445,7 @@ class ModelUtil(Generic[ModelT]):
                 "Either pk or getters must be provided for single object retrieval."
             )
 
-        logger.debug("Getting %s (pk=%s)", self.model.__name__, pk)
+        logger.debug(f"Getting {self.model.__name__} (pk={pk})")
 
         # Build lookup query and get optimized queryset
         obj_qs = await self._get_base_queryset(
@@ -461,14 +460,14 @@ class ModelUtil(Generic[ModelT]):
             try:
                 obj = await obj_qs.aget()
             except ObjectDoesNotExist:
-                logger.debug("%s not found (pk=%s)", self.model.__name__, pk)
+                logger.debug(f"{self.model.__name__} not found (pk={pk})")
                 raise NotFoundError(self.model)
         else:
             get_q = self._build_lookup_query(pk, query_data.getters)
             try:
                 obj = await obj_qs.aget(**get_q)
             except ObjectDoesNotExist:
-                logger.debug("%s not found (pk=%s)", self.model.__name__, pk)
+                logger.debug(f"{self.model.__name__} not found (pk={pk})")
                 raise NotFoundError(self.model)
 
         return obj
@@ -536,8 +535,8 @@ class ModelUtil(Generic[ModelT]):
 
         if select_related or prefetch_related:
             logger.debug(
-                "Query optimizations for %s: select_related=%s, prefetch_related=%s",
-                self.model.__name__, select_related, prefetch_related,
+                f"Query optimizations for {self.model.__name__}:"
+                f" select_related={select_related}, prefetch_related={prefetch_related}"
             )
 
         return queryset
@@ -589,18 +588,14 @@ class ModelUtil(Generic[ModelT]):
         # Check cache first (performance optimization)
         cache_key = (self.model, str(self.serializer_class), is_for)
         if cache_key in self._relation_cache:
-            logger.debug(
-                "Reverse relations cache hit for %s (is_for=%s)", self.model.__name__, is_for
-            )
+            logger.debug(f"Reverse relations cache hit for {self.model.__name__} (is_for={is_for})")
             return self._relation_cache[cache_key].copy()
 
         reverse_rels = self._get_read_optimizations(is_for).prefetch_related.copy()
         if reverse_rels:
             # Cache and return
             self._relation_cache[cache_key] = reverse_rels
-            logger.debug(
-                "Reverse relations from config for %s: %s", self.model.__name__, reverse_rels
-            )
+            logger.debug(f"Reverse relations from config for {self.model.__name__}: {reverse_rels}")
             return reverse_rels
 
         serializable_fields = self._get_serializable_field_names(is_for)
@@ -617,9 +612,7 @@ class ModelUtil(Generic[ModelT]):
 
         # Cache the result
         self._relation_cache[cache_key] = reverse_rels
-        logger.debug(
-            "Reverse relations discovered for %s: %s", self.model.__name__, reverse_rels
-        )
+        logger.debug(f"Reverse relations discovered for {self.model.__name__}: {reverse_rels}")
         return reverse_rels
 
     def get_select_relateds(
@@ -644,18 +637,14 @@ class ModelUtil(Generic[ModelT]):
         # Check cache first (performance optimization)
         cache_key = (self.model, str(self.serializer_class) + "_select", is_for)
         if cache_key in self._relation_cache:
-            logger.debug(
-                "Select related cache hit for %s (is_for=%s)", self.model.__name__, is_for
-            )
+            logger.debug(f"Select related cache hit for {self.model.__name__} (is_for={is_for})")
             return self._relation_cache[cache_key].copy()
 
         select_rels = self._get_read_optimizations(is_for).select_related.copy()
         if select_rels:
             # Cache and return
             self._relation_cache[cache_key] = select_rels
-            logger.debug(
-                "Select related from config for %s: %s", self.model.__name__, select_rels
-            )
+            logger.debug(f"Select related from config for {self.model.__name__}: {select_rels}")
             return select_rels
 
         serializable_fields = self._get_serializable_field_names(is_for)
@@ -669,9 +658,7 @@ class ModelUtil(Generic[ModelT]):
 
         # Cache the result
         self._relation_cache[cache_key] = select_rels
-        logger.debug(
-            "Select related discovered for %s: %s", self.model.__name__, select_rels
-        )
+        logger.debug(f"Select related discovered for {self.model.__name__}: {select_rels}")
         return select_rels
 
     async def _get_field(self, k: str) -> models.Field:
@@ -686,12 +673,9 @@ class ModelUtil(Generic[ModelT]):
             return
         try:
             payload[k] = base64.b64decode(v)
-            logger.debug("Decoded binary field '%s' for %s", k, self.model.__name__)
+            logger.debug(f"Decoded binary field '{k}' for {self.model.__name__}")
         except Exception as exc:
-            logger.warning(
-                "Failed to decode binary field '%s' for %s: %s",
-                k, self.model.__name__, exc,
-            )
+            logger.warning(f"Failed to decode binary field '{k}' for {self.model.__name__}: {exc}")
             raise SerializeError({k: ". ".join(exc.args)}, 400)
 
     async def _resolve_fk(
@@ -709,10 +693,7 @@ class ModelUtil(Generic[ModelT]):
             # None is valid for nullable FKs, leave as is
             return
         rel_model = field_obj.related_model
-        logger.debug(
-            "Resolving FK '%s' -> %s (pk=%s) for %s",
-            k, rel_model.__name__, v, self.model.__name__,
-        )
+        logger.debug(f"Resolving FK '{k}' -> {rel_model.__name__} (pk={v}) for {self.model.__name__}")
         rel_util = ModelUtil(rel_model)
         rel = await rel_util.get_object(request, v, with_qs_request=False)
         payload[k] = rel
@@ -1012,7 +993,7 @@ class ModelUtil(Generic[ModelT]):
         dict
             Serialized created object.
         """
-        logger.info("Creating %s", self.model.__name__)
+        logger.info(f"Creating {self.model.__name__}")
         payload, customs = await self.parse_input_data(request, data)
         # Create object and keep the full instance (FK instances already attached from parse_input_data)
         obj = (
@@ -1020,7 +1001,7 @@ class ModelUtil(Generic[ModelT]):
             if not self.with_serializer
             else await self.serializer.create(payload)
         )
-        logger.debug("Created %s (pk=%s)", self.model.__name__, obj.pk)
+        logger.debug(f"Created {self.model.__name__} (pk={obj.pk})")
         # Only prefetch reverse relations (forward FKs already loaded)
         obj = await self._prefetch_reverse_relations_on_instance(obj, is_for="read")
         if isinstance(self.model, ModelSerializerMeta):
@@ -1216,7 +1197,7 @@ class ModelUtil(Generic[ModelT]):
         dict
             Serialized updated object.
         """
-        logger.info("Updating %s (pk=%s)", self.model.__name__, pk)
+        logger.info(f"Updating {self.model.__name__} (pk={pk})")
         obj = await self.get_object(request, pk, is_for="read")
         payload, customs = await self.parse_input_data(request, data)
         for k, v in payload.items():
@@ -1229,7 +1210,7 @@ class ModelUtil(Generic[ModelT]):
             await self.serializer.save(obj)
         else:
             await obj.asave()
-        logger.debug("Updated %s (pk=%s)", self.model.__name__, pk)
+        logger.debug(f"Updated {self.model.__name__} (pk={pk})")
         # FK instances from parse_input_data are already attached to obj
         # Only refresh reverse relations since they might have changed
         updated_object = await self._prefetch_reverse_relations_on_instance(
@@ -1251,8 +1232,8 @@ class ModelUtil(Generic[ModelT]):
         -------
         None
         """
-        logger.info("Deleting %s (pk=%s)", self.model.__name__, pk)
+        logger.info(f"Deleting {self.model.__name__} (pk={pk})")
         obj = await self.get_object(request, pk)
         await obj.adelete()
-        logger.debug("Deleted %s (pk=%s)", self.model.__name__, pk)
+        logger.debug(f"Deleted {self.model.__name__} (pk={pk})")
         return None
