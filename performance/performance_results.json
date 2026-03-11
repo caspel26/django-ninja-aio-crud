@@ -1,155 +1,155 @@
 {
   "runs": [
     {
-      "timestamp": "2026-03-11T18:38:05.125904",
+      "timestamp": "2026-03-11T18:40:40.271016",
       "python_version": "3.14.3",
       "results": {
         "CRUDPerformanceTest": {
           "create": {
             "iterations": 100,
-            "min_ms": 1.7885,
-            "max_ms": 2.902,
-            "avg_ms": 1.8749,
-            "median_ms": 1.8588
+            "min_ms": 1.7882,
+            "max_ms": 3.0877,
+            "avg_ms": 1.8912,
+            "median_ms": 1.8688
           },
           "delete": {
             "iterations": 100,
-            "min_ms": 1.7233,
-            "max_ms": 2.1583,
-            "avg_ms": 1.7798,
-            "median_ms": 1.7698
+            "min_ms": 1.7242,
+            "max_ms": 2.1026,
+            "avg_ms": 1.8118,
+            "median_ms": 1.7919
           },
           "list": {
             "iterations": 100,
-            "min_ms": 16.053,
-            "max_ms": 20.8516,
-            "avg_ms": 16.9279,
-            "median_ms": 16.6064
+            "min_ms": 16.1119,
+            "max_ms": 20.886,
+            "avg_ms": 16.8705,
+            "median_ms": 16.5488
           },
           "retrieve": {
             "iterations": 100,
-            "min_ms": 1.1547,
-            "max_ms": 1.4329,
-            "avg_ms": 1.2145,
-            "median_ms": 1.2116
+            "min_ms": 1.158,
+            "max_ms": 1.3555,
+            "avg_ms": 1.1978,
+            "median_ms": 1.1926
           },
           "update": {
             "iterations": 100,
-            "min_ms": 2.1846,
-            "max_ms": 2.715,
-            "avg_ms": 2.2663,
-            "median_ms": 2.2393
+            "min_ms": 2.1818,
+            "max_ms": 2.5336,
+            "avg_ms": 2.2567,
+            "median_ms": 2.2465
           }
         },
         "FilterPerformanceTest": {
           "boolean_filter": {
             "iterations": 100,
-            "min_ms": 16.1235,
-            "max_ms": 20.9612,
-            "avg_ms": 16.8524,
-            "median_ms": 16.5747
+            "min_ms": 16.3268,
+            "max_ms": 21.1009,
+            "avg_ms": 16.9654,
+            "median_ms": 16.682
           },
           "combined_filters": {
             "iterations": 100,
-            "min_ms": 1.4357,
-            "max_ms": 1.6894,
-            "avg_ms": 1.4946,
-            "median_ms": 1.4911
+            "min_ms": 1.4256,
+            "max_ms": 1.7894,
+            "avg_ms": 1.4925,
+            "median_ms": 1.4881
           },
           "icontains_filter": {
             "iterations": 100,
-            "min_ms": 2.8229,
-            "max_ms": 3.3432,
-            "avg_ms": 2.9006,
-            "median_ms": 2.8905
+            "min_ms": 2.8657,
+            "max_ms": 3.5056,
+            "avg_ms": 2.9525,
+            "median_ms": 2.9413
           },
           "match_case_filter": {
             "iterations": 100,
-            "min_ms": 11.1518,
-            "max_ms": 14.1541,
-            "avg_ms": 11.4897,
-            "median_ms": 11.3528
+            "min_ms": 11.1777,
+            "max_ms": 14.4043,
+            "avg_ms": 11.7511,
+            "median_ms": 11.5558
           },
           "numeric_filter": {
             "iterations": 100,
-            "min_ms": 1.2394,
-            "max_ms": 1.462,
-            "avg_ms": 1.2798,
-            "median_ms": 1.2707
+            "min_ms": 1.2194,
+            "max_ms": 1.5316,
+            "avg_ms": 1.2814,
+            "median_ms": 1.2724
           },
           "relation_filter": {
             "iterations": 100,
-            "min_ms": 23.8292,
-            "max_ms": 28.6628,
-            "avg_ms": 24.8996,
-            "median_ms": 24.6148
+            "min_ms": 24.0393,
+            "max_ms": 27.8635,
+            "avg_ms": 24.7497,
+            "median_ms": 24.486
           }
         },
         "SchemaGenerationPerformanceTest": {
           "meta_serializer_schema_generation": {
             "iterations": 100,
             "min_ms": 0.0006,
-            "max_ms": 3.2041,
-            "avg_ms": 0.0328,
+            "max_ms": 3.3409,
+            "avg_ms": 0.034,
             "median_ms": 0.0006
           },
           "model_serializer_schema_generation": {
             "iterations": 100,
-            "min_ms": 0.001,
-            "max_ms": 0.0083,
-            "avg_ms": 0.0013,
-            "median_ms": 0.0011
+            "min_ms": 0.0007,
+            "max_ms": 0.0093,
+            "avg_ms": 0.001,
+            "median_ms": 0.0008
           },
           "schema_with_relations": {
             "iterations": 100,
             "min_ms": 0.0004,
-            "max_ms": 1.8629,
-            "avg_ms": 0.0191,
+            "max_ms": 1.8551,
+            "avg_ms": 0.019,
             "median_ms": 0.0004
           },
           "schema_with_validators": {
             "iterations": 100,
             "min_ms": 0.0006,
-            "max_ms": 4.0721,
-            "avg_ms": 0.0413,
+            "max_ms": 3.7217,
+            "avg_ms": 0.038,
             "median_ms": 0.0006
           }
         },
         "SerializationPerformanceTest": {
           "bulk_serialization_100": {
             "iterations": 50,
-            "min_ms": 14.8166,
-            "max_ms": 18.5064,
-            "avg_ms": 15.3662,
-            "median_ms": 15.2003
+            "min_ms": 14.9082,
+            "max_ms": 21.0077,
+            "avg_ms": 15.4299,
+            "median_ms": 15.2237
           },
           "bulk_serialization_500": {
             "iterations": 50,
-            "min_ms": 72.7667,
-            "max_ms": 95.9808,
-            "avg_ms": 78.9439,
-            "median_ms": 74.8112
+            "min_ms": 73.358,
+            "max_ms": 95.1278,
+            "avg_ms": 77.596,
+            "median_ms": 74.2764
           },
           "input_parsing": {
             "iterations": 100,
-            "min_ms": 0.7025,
-            "max_ms": 1.1072,
-            "avg_ms": 0.7722,
-            "median_ms": 0.7655
+            "min_ms": 0.724,
+            "max_ms": 1.0588,
+            "avg_ms": 0.7765,
+            "median_ms": 0.773
           },
           "relation_serialization": {
             "iterations": 100,
-            "min_ms": 0.569,
-            "max_ms": 0.7708,
-            "avg_ms": 0.6199,
-            "median_ms": 0.6202
+            "min_ms": 0.5698,
+            "max_ms": 0.7369,
+            "avg_ms": 0.6233,
+            "median_ms": 0.6231
           },
           "single_object_serialization": {
             "iterations": 100,
-            "min_ms": 0.5585,
-            "max_ms": 0.8887,
-            "avg_ms": 0.6089,
-            "median_ms": 0.6034
+            "min_ms": 0.5702,
+            "max_ms": 0.8207,
+            "avg_ms": 0.6095,
+            "median_ms": 0.6061
           }
         }
       }
