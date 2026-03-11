@@ -142,8 +142,9 @@ class ModelUtil(Generic[ModelT]):
         self.serializer: Serializer[ModelT] | None = (
             serializer_class() if serializer_class else None
         )
+        model_name = getattr(model, "__name__", str(model))
         logger.debug(
-            f"ModelUtil initialized for {model.__name__}"
+            f"ModelUtil initialized for {model_name}"
             f" (serializer={serializer_class.__name__ if serializer_class else None})"
         )
 
