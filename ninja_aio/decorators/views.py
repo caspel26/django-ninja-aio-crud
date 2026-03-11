@@ -1,7 +1,10 @@
+import logging
 from functools import wraps
 
 from django.db.transaction import Atomic
 from asgiref.sync import sync_to_async
+
+logger = logging.getLogger("ninja_aio.decorators")
 
 
 class AsyncAtomicContextManager(Atomic):
@@ -50,6 +53,7 @@ def aatomic(func):
 
     @wraps(func)
     async def wrapper(*args, **kwargs):
+        logger.debug(f"Entering atomic transaction for {func.__qualname__}")
         async with AsyncAtomicContextManager():
             return await func(*args, **kwargs)
 
