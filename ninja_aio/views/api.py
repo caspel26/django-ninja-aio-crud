@@ -1,3 +1,4 @@
+import logging
 from typing import Generic, List, TypeVar
 
 from ninja import NinjaAPI, Router, Schema, Path, Query
@@ -20,6 +21,8 @@ from ninja_aio.helpers.api import ManyToManyAPI
 from ninja_aio.types import ModelSerializerMeta, VIEW_TYPES, VALID_DJANGO_LOOKUPS
 from ninja_aio.decorators import unique_view, decorate_view, aatomic
 from ninja_aio.models import serializers
+
+logger = logging.getLogger("ninja_aio.views")
 
 ERROR_CODES = frozenset({400, 401, 404})
 
@@ -327,6 +330,7 @@ class APIViewSet(API, Generic[ModelT]):
             if not self.m2m_relations
             else ManyToManyAPI(relations=self.m2m_relations, view_set=self)
         )
+        logger.debug(f"APIViewSet initialized for {self.model.__name__} at /{self.api_route_path}")
 
     @property
     def _crud_views(self):
@@ -434,7 +438,7 @@ class APIViewSet(API, Generic[ModelT]):
             try:
                 field = current_model._meta.get_field(part)
             except (FieldDoesNotExist, AttributeError):
-                # Field doesn't exist on this model
+                logger.debug(f"Filter field validation failed: '{part}' not found on {current_model.__name__}")
                 return False
 
             # If this is a relation field and not the last part, traverse to related model
@@ -701,6 +705,7 @@ class APIViewSet(API, Generic[ModelT]):
         """
         super()._add_views()
         if "all" in self.disable:
+            logger.debug(f"All CRUD views disabled for {self.model.__name__}")
             return self._set_additional_views()
 
         for views_type, (schema, view) in self._crud_views.items():
@@ -708,6 +713,7 @@ class APIViewSet(API, Generic[ModelT]):
                 schema is not None or views_type == "delete"
             ):
                 view()
+                logger.debug(f"Registered {views_type} view for {self.model.__name__}")
 
         return self._set_additional_views()
 
