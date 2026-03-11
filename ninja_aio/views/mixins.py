@@ -415,31 +415,26 @@ class MatchCaseFilterViewSetMixin(APIViewSet[ModelT]):
     def filters_match_cases_fields(self):
         return [filter_match.query_param for filter_match in self.filters_match_cases]
 
+    def _apply_case_filter(self, queryset, case_filter):
+        lookup = case_filter.query_filter
+        qs_method = queryset.filter if case_filter.include else queryset.exclude
+        if isinstance(lookup, Q):
+            return qs_method(lookup)
+        validated_lookup = {
+            k: v for k, v in lookup.items() if self._validate_filter_field(k)
+        }
+        if not validated_lookup:
+            return queryset
+        return qs_method(**validated_lookup)
+
     async def query_params_handler(self, queryset, filters):
         base_qs = await super().query_params_handler(queryset, filters)
         for filter_match in self.filters_match_cases:
             value = filters.get(filter_match.query_param)
-            if value is not None:
-                case_filter = (
-                    filter_match.cases.true if value else filter_match.cases.false
-                )
-                lookup = case_filter.query_filter
-                # Handle Q object directly
-                if isinstance(lookup, Q):
-                    if case_filter.include:
-                        base_qs = base_qs.filter(lookup)
-                    else:
-                        base_qs = base_qs.exclude(lookup)
-                else:
-                    # Validate all filter fields in the lookup dictionary for security
-                    validated_lookup = {
-                        k: v
-                        for k, v in lookup.items()
-                        if self._validate_filter_field(k)
-                    }
-                    if validated_lookup:
-                        if case_filter.include:
-                            base_qs = base_qs.filter(**validated_lookup)
-                        else:
-                            base_qs = base_qs.exclude(**validated_lookup)
+            if value is None:
+                continue
+            case_filter = (
+                filter_match.cases.true if value else filter_match.cases.false
+            )
+            base_qs = self._apply_case_filter(base_qs, case_filter)
         return base_qs
