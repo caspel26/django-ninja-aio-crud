@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from typing import Coroutine
 
 from django.http import HttpRequest
@@ -16,6 +17,9 @@ from ninja_aio.schemas import (
     M2MRemoveSchemaIn,
 )
 from django.db.models import QuerySet, Model
+
+
+logger = logging.getLogger("ninja_aio.helpers")
 
 
 class ManyToManyAPI:
@@ -302,9 +306,14 @@ class ManyToManyAPI:
                     )
                 ).afirst()
             if rel_obj is None:
+                logger.debug(f"M2M check: {rel_model_name} with pk {obj_pk} not found")
                 errors.append(f"{rel_model_name} with pk {obj_pk} not found.")
                 continue
             if remove ^ (rel_obj in rel_objs):
+                logger.debug(
+                    f"M2M check: {rel_model_name} with pk {obj_pk}"
+                    f" is {'not ' if remove else ''}in {self.related_model_util.model_name}"
+                )
                 errors.append(
                     f"{rel_model_name} with pk {obj_pk} is {'not ' if remove else ''}in {self.related_model_util.model_name}"
                 )
@@ -470,6 +479,9 @@ class ManyToManyAPI:
 
             results = add_details + remove_details
             errors = add_errors + remove_errors
+            logger.info(
+                f"M2M manage {related_name}: {len(results)} succeeded, {len(errors)} errors"
+            )
             return {
                 "results": {"count": len(results), "details": results},
                 "errors": {"count": len(errors), "details": errors},
@@ -519,4 +531,7 @@ class ManyToManyAPI:
 
     def _add_views(self):
         for relation in self.relations:
+            logger.debug(
+                f"Registering M2M views for {self.related_model_util.model_name}.{relation.related_name}"
+            )
             self._build_views(relation)
