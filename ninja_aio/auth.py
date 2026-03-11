@@ -1,4 +1,5 @@
 import datetime
+import logging
 from typing import Optional
 
 from joserfc import jwt, jwk, errors
@@ -8,6 +9,8 @@ from django.conf import settings
 from ninja.security.http import HttpBearer
 
 from ninja_aio.types import JwtKeys
+
+logger = logging.getLogger("ninja_aio.auth")
 
 JWT_MANDATORY_CLAIMS = [
     ("iss", "JWT_ISSUER"),
@@ -108,9 +111,11 @@ class AsyncJwtBearer(HttpBearer):
         try:
             self.dcd = jwt.decode(token, self.jwt_public, algorithms=self.algorithms)
             self.validate_claims(self.dcd.claims)
-        except errors.JoseError:
+        except errors.JoseError as exc:
+            logger.debug(f"JWT authentication failed: {exc}")
             return False
 
+        logger.debug("JWT authentication successful")
         return await self.auth_handler(request)
 
 
@@ -172,6 +177,7 @@ def encode_jwt(
     algorithm = algorithm or "RS256"
     claims = validate_mandatory_claims(claims)
     kid_h = {"kid": pkey.kid} if pkey.kid else {}
+    logger.debug(f"Encoding JWT (algorithm={algorithm}, duration={duration}s)")
     return jwt.encode(
         header={"alg": algorithm, "typ": "JWT"} | kid_h,
         claims={
@@ -213,6 +219,7 @@ def decode_jwt(
             algorithms=["RS256"],
         )
     """
+    logger.debug("Decoding JWT")
     return jwt.decode(
         token,
         validate_key(public_key, "JWT_PUBLIC_KEY"),
