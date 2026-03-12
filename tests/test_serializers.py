@@ -1781,7 +1781,6 @@ class InlineCustomsModelSerializerTestCase(TestCase):
 
 @tag("serializers", "pk_from_model")
 class PkFromModelTestCase(TestCase):
-    """Test cases for PkFromModel class (covers lines 46, 65)."""
 
     def test_pk_from_model_extracts_pk_from_model_instance(self):
         """Test _extract_pk extracts pk from model instance."""
@@ -1835,7 +1834,6 @@ class PkFromModelTestCase(TestCase):
 
 @tag("serializers", "string_reference")
 class StringReferenceResolutionTestCase(TestCase):
-    """Test cases for string reference resolution errors (covers lines 144-179)."""
 
     def setUp(self):
         warnings.simplefilter("ignore", UserWarning)
@@ -1865,7 +1863,6 @@ class StringReferenceResolutionTestCase(TestCase):
         self.assertEqual(resolved, TestModelForeignKeySerializer)
 
     def test_resolve_string_reference_import_error(self):
-        """Test that invalid module path raises ValueError (covers lines 158-162)."""
         with self.assertRaises(ValueError) as cm:
             serializers.BaseSerializer._resolve_string_reference(
                 "nonexistent.module.SomeClass"
@@ -1873,7 +1870,6 @@ class StringReferenceResolutionTestCase(TestCase):
         self.assertIn("failed to import module", str(cm.exception))
 
     def test_resolve_string_reference_class_not_found_in_module(self):
-        """Test that missing class in valid module raises ValueError (covers lines 152-155)."""
         with self.assertRaises(ValueError) as cm:
             serializers.BaseSerializer._resolve_string_reference(
                 "tests.test_serializers.NonExistentClass"
@@ -1881,7 +1877,6 @@ class StringReferenceResolutionTestCase(TestCase):
         self.assertIn("not found in module", str(cm.exception))
 
     def test_resolve_string_reference_local_not_found(self):
-        """Test that missing local class raises ValueError (covers lines 176-179)."""
         with self.assertRaises(ValueError) as cm:
             serializers.BaseSerializer._resolve_string_reference(
                 "CompletelyFakeSerializerThatDoesNotExist"
@@ -1891,7 +1886,6 @@ class StringReferenceResolutionTestCase(TestCase):
 
 @tag("serializers", "union_schema")
 class UnionSchemaTestCase(TestCase):
-    """Test cases for Union schema generation (covers lines 232, 280, 284)."""
 
     def setUp(self):
         warnings.simplefilter("ignore", UserWarning)
@@ -1962,13 +1956,11 @@ class UnionSchemaTestCase(TestCase):
 
 @tag("serializers", "custom_fields_validation")
 class CustomFieldsValidationTestCase(TestCase):
-    """Test cases for custom fields validation errors (covers lines 354-355, 406-409)."""
 
     def setUp(self):
         warnings.simplefilter("ignore", UserWarning)
 
     def test_get_custom_fields_2_tuple(self):
-        """Test get_custom_fields with 2-tuple format (covers lines 354-355)."""
         from unittest.mock import patch
 
         # Mock _get_fields to return 2-tuple customs
@@ -2013,7 +2005,6 @@ class CustomFieldsValidationTestCase(TestCase):
             self.assertIn("must be a tuple", str(cm.exception))
 
     def test_get_inline_customs_invalid_tuple_length(self):
-        """Test get_inline_customs raises error for invalid tuple length (covers lines 406-409)."""
         from unittest.mock import patch
 
         # Mock _get_fields to return fields with invalid 1-tuple
@@ -2029,7 +2020,6 @@ class CustomFieldsValidationTestCase(TestCase):
 
 @tag("serializers", "model_validation")
 class ModelValidationTestCase(TestCase):
-    """Test cases for model validation errors (covers lines 1189, 1191)."""
 
     def setUp(self):
         warnings.simplefilter("ignore", UserWarning)
@@ -2063,7 +2053,6 @@ class ModelValidationTestCase(TestCase):
 
 @tag("serializers", "base_serializer")
 class BaseSerializerAbstractMethodsTestCase(TestCase):
-    """Test cases for BaseSerializer abstract method errors (covers lines 108, 113)."""
 
     def test_get_fields_raises_not_implemented(self):
         """Test _get_fields raises NotImplementedError (covers line 108)."""
@@ -2398,12 +2387,10 @@ class SerializerGetSchemaMetaEdgeCasesTestCase(TestCase):
         warnings.simplefilter("ignore", UserWarning)
 
     def test_get_schema_meta_unknown_type_returns_none(self):
-        """Lines 1663-1664: _get_schema_meta with unknown type returns None."""
         result = SerializerForCRUD._get_schema_meta("nonexistent")
         self.assertIsNone(result)
 
     def test_get_fields_unknown_s_type_returns_empty_list(self):
-        """Line 1709: _get_fields with unknown s_type returns []."""
         result = SerializerForCRUD._get_fields("nonexistent", "fields")
         self.assertEqual(result, [])
 
@@ -2432,21 +2419,18 @@ class SerializerCRUDMethodsTestCase(TestCase):
         self.assertEqual(updated.description, "Updated desc")
 
     async def test_serializer_model_dump(self):
-        """Lines 1814-1819: Serializer.model_dump serializes instance."""
         instance = await app_models.TestModel.objects.aget(pk=self.obj.pk)
         data = await self.serializer.model_dump(instance)
         self.assertIn("id", data)
         self.assertIn("name", data)
 
     async def test_serializer_models_dump(self):
-        """Line 1837: Serializer.models_dump serializes queryset."""
         qs = app_models.TestModel.objects.filter(pk=self.obj.pk)
         data = await self.serializer.models_dump(qs)
         self.assertIsInstance(data, list)
         self.assertEqual(len(data), 1)
 
     def test_serializer_on_delete_is_noop(self):
-        """Line 1869: on_delete is a no-op pass."""
         self.assertIsNone(self.serializer.on_delete(self.obj))
 
 
@@ -3144,3 +3128,117 @@ class SerializerInstanceBindingTestCase(TestCase):
         """ahas_changed() raises ValueError when no instance is bound or supplied."""
         with self.assertRaises(ValueError):
             await self.s.ahas_changed("name")
+
+
+# ============================================================
+# Coverage tests for models/serializers.py
+# ============================================================
+
+
+@tag("serializers", "coverage", "schema_overrides")
+class SchemaOverridesNonFunctionTestCase(TestCase):
+    """Cover serializers.py:286 — _apply_validators skips non-function overrides during rebind."""
+
+    def test_non_function_override_is_skipped_during_rebind(self):
+        """Non-function values in schema_overrides should not crash __class__ rebinding."""
+        from typing import ClassVar
+
+        from ninja import Schema
+
+        class DummySchema(Schema):
+            name: str
+
+        def custom_method(self):
+            return self.name.upper()
+
+        # Use ClassVar annotation to avoid Pydantic treating it as a field
+        overrides = {
+            "custom_method": custom_method,
+            "__annotations__": {"some_class_var": ClassVar[str]},
+            "some_class_var": "not_a_function",
+        }
+        result = serializers.BaseSerializer._apply_validators(
+            DummySchema, {}, None, overrides
+        )
+        self.assertIsNotNone(result)
+        self.assertTrue(hasattr(result, "custom_method"))
+        self.assertEqual(result.some_class_var, "not_a_function")
+
+
+@tag("serializers", "coverage", "circular_reference")
+class CircularReferenceDetectionTestCase(TestCase):
+    """Cover serializers.py:624-631 — circular reference warning during schema generation."""
+
+    def test_circular_reference_emits_warning(self):
+        """When a model references itself, a UserWarning should be emitted."""
+        # Use a concrete ModelSerializer that has _get_model() implemented
+        serializer_cls = app_models.TestModelSerializerForeignKey
+        model = app_models.TestModelSerializerForeignKey
+
+        stack = serializer_cls._get_resolution_stack()
+        stack.clear()
+
+        # Push the model to simulate it being in resolution already
+        model_key = f"{model._meta.app_label}.{model._meta.model_name}"
+        stack.append(model_key)
+
+        try:
+            with warnings.catch_warnings(record=True) as w:
+                warnings.simplefilter("always")
+                result = serializer_cls._resolve_relation_schema(
+                    "test_field", model
+                )
+                self.assertIsNone(result)
+                self.assertEqual(len(w), 1)
+                self.assertIn("Circular reference detected", str(w[0].message))
+        finally:
+            stack.clear()
+
+
+@tag("serializers", "coverage", "model_config")
+class ModelSerializerGetModelConfigNoneTestCase(TestCase):
+    """Cover serializers.py:1578 — _get_model_config returns None for missing inner class."""
+
+    def test_model_config_none_for_unknown_schema_type(self):
+        """ModelSerializer._get_model_config returns None for unknown schema_type."""
+        result = app_models.TestModelSerializer._get_model_config("UnknownType")
+        self.assertIsNone(result)
+
+
+@tag("serializers", "coverage", "model_config")
+class SerializerGetModelConfigUnknownTypeTestCase(TestCase):
+    """Cover serializers.py:2020 — Serializer._get_model_config with unknown schema_type."""
+
+    def test_unknown_schema_type_returns_none(self):
+        """Passing an unknown schema_type should return None."""
+        result = TestModelForeignKeySerializer._get_model_config("UnknownType")
+        self.assertIsNone(result)
+
+
+@tag("serializers", "coverage", "dump_schema")
+class SerializerGetDumpSchemaTestCase(TestCase):
+    """Cover serializers.py:2185, 2187 — _get_dump_schema fallback and passthrough."""
+
+    def test_get_dump_schema_falls_back_to_read_when_no_detail(self):
+        """When generate_detail_s() returns None, _get_dump_schema should return read schema."""
+        s = TestModelForeignKeySerializer()
+        read_schema = TestModelForeignKeySerializer.generate_read_s()
+        # Mock generate_detail_s to return None to hit the fallback path
+        with mock.patch.object(
+            type(s), "generate_detail_s", return_value=None
+        ):
+            schema = s._get_dump_schema(None)
+        self.assertIsNotNone(schema)
+        self.assertEqual(schema, read_schema)
+
+    def test_get_dump_schema_returns_provided_schema(self):
+        """When a schema is explicitly provided, it should be returned as-is."""
+        from ninja import Schema
+
+        s = TestModelForeignKeySerializer()
+
+        class CustomSchema(Schema):
+            id: int
+
+        result = s._get_dump_schema(CustomSchema)
+        self.assertEqual(result, CustomSchema)

@@ -51,7 +51,6 @@ class ORJSONRendererParserTestCase(TestCase):
         self.assertEqual(decoded["plain"], "value")
 
     def test_renderer_non_dict_data(self):
-        """Test that renderer handles non-dict data (covers lines 23-24)."""
         # When data is not a dict, it triggers the AttributeError branch
         # and falls back to self.dumps(data)
         non_dict_data = "plain string"

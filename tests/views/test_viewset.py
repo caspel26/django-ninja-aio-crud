@@ -1,10 +1,17 @@
 import datetime
 
+from django.db.models import Q
 from django.test import tag, TestCase
 from django.utils import timezone
 
 from ninja_aio.models import ModelUtil
 from ninja_aio.models import serializers as ninja_serializers
+from ninja_aio.schemas import (
+    MatchCaseFilterSchema,
+    MatchConditionFilterSchema,
+    BooleanMatchFilterSchema,
+)
+from ninja_aio.views import mixins
 from tests.generics.views import Tests
 from tests.test_app import schema, models, views, serializers
 from ninja_aio import NinjaAIO
@@ -1254,3 +1261,53 @@ class MatchCaseQExcludeFilterViewSetMixinTestCase(TestCase):
         )
         self.assertEqual(await res.acount(), 1)
         self.assertEqual(await res.afirst(), obj_pending)
+
+
+@tag("match_case_filter_mixin_invalid_field")
+class MatchCaseFilterInvalidFieldTestCase(TestCase):
+    """Test _apply_case_filter with invalid filter fields that result in empty validated_lookup."""
+
+    model = models.TestModelSerializer
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.api = NinjaAIO(urls_namespace="test_match_case_invalid_field")
+
+        class InvalidFieldMatchCaseViewSet(
+            mixins.MatchCaseFilterViewSetMixin,
+            APIViewSet,
+        ):
+            model = models.TestModelSerializer
+            filters_match_cases = [
+                MatchCaseFilterSchema(
+                    query_param="has_invalid",
+                    cases=BooleanMatchFilterSchema(
+                        true=MatchConditionFilterSchema(
+                            query_filter={"nonexistent_field__invalid": "value"},
+                            include=True,
+                        ),
+                        false=MatchConditionFilterSchema(
+                            query_filter={"nonexistent_field__invalid": "value"},
+                            include=False,
+                        ),
+                    ),
+                ),
+            ]
+
+        cls.viewset = InvalidFieldMatchCaseViewSet(api=cls.api)
+
+    async def test_apply_case_filter_empty_validated_lookup(self):
+        """When all filter fields are invalid, queryset is returned unmodified."""
+        await self.model.objects.all().adelete()
+        await self.model.objects.acreate(
+            name="item1", description="desc", status="active"
+        )
+        await self.model.objects.acreate(
+            name="item2", description="desc", status="inactive"
+        )
+        res = await self.viewset.query_params_handler(
+            self.model.objects.all(),
+            {"has_invalid": True},
+        )
+        # All filter fields are invalid, so no filtering should occur
+        self.assertEqual(await res.acount(), 2)

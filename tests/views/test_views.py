@@ -161,7 +161,6 @@ class ApiMethodFactorySyncHandlerTestCase(TestCase):
 
         @cls.api.view(prefix="/sync", tags=["Sync"])
         class SyncView(GenericAPIView):
-            # Use sync handlers at class level to cover lines 149-151
             @api_get("/ping", response=schema.SumSchemaOut)
             def sync_ping(self, request):
                 return schema.SumSchemaOut(result=42).model_dump()
@@ -217,7 +216,6 @@ class ApiMethodFactoryNoRouterTestCase(TestCase):
 
 @tag("api_method_factory")
 class ApiMethodFactoryMetadataExceptionTestCase(TestCase):
-    """Test ApiMethodFactory exception handling in _apply_metadata (covers lines 161-162, 176-177)."""
 
     def test_apply_metadata_handles_name_exception(self):
         """Test that _apply_metadata handles exceptions when setting __name__."""
@@ -271,7 +269,6 @@ class ApiMethodFactoryMetadataExceptionTestCase(TestCase):
 
 @tag("api_method_factory")
 class ApiMethodFactoryDecoratorsTestCase(TestCase):
-    """Test ApiMethodFactory decorators parameter application (covers lines 219-220)."""
 
     namespace = "test_api_method_factory_decorators"
 
@@ -391,7 +388,6 @@ class RelationsFiltersFieldsTestCase(TestCase):
 
 @tag("view", "coverage")
 class BuildHandlerTestCase(TestCase):
-    """Cover _build_handler async and sync handler wrappers (lines 147, 151)."""
 
     def test_sync_handler_invocation(self):
         """Line 151: sync clean_handler calls original synchronously."""
@@ -458,6 +454,16 @@ class FilterValidationHelpersTestCase(TestCase):
         field = app_models.TestModelSerializerForeignKey._meta.get_field(
             "test_model_serializer"
         )
+        related_model = self.view._get_related_model(field)
+        self.assertEqual(related_model, app_models.TestModelSerializerReverseForeignKey)
+
+    def test_get_related_model_via_remote_field(self):
+        """_get_related_model should fall back to remote_field.model."""
+        field = mock.Mock(spec=[])
+        field.related_model = None
+        field.remote_field = mock.Mock()
+        field.remote_field.model = app_models.TestModelSerializerReverseForeignKey
+        # hasattr(field, "related_model") is True but field.related_model is falsy
         related_model = self.view._get_related_model(field)
         self.assertEqual(related_model, app_models.TestModelSerializerReverseForeignKey)
 

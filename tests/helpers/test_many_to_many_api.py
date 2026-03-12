@@ -465,3 +465,189 @@ class GetApiPathNoSlashTestCase(TestCase):
 
         path_with_slash = m2m_api._get_api_path("relations", append_slash=True)
         self.assertTrue(path_with_slash.endswith("/"))
+
+
+class TestM2MWithQueryHandlerViewSet(GenericAPIViewSet):
+    """ViewSet with a custom query_handler for M2M objects."""
+
+    model = models.TestModelSerializerManyToMany
+    m2m_relations = [
+        M2MRelationSchema(
+            model=models.TestModelSerializerReverseManyToMany,
+            related_name="test_model_serializers",
+            append_slash=True,
+        )
+    ]
+
+    async def test_model_serializers_query_handler(self, request, pk, instance):
+        """Custom query handler that filters by pk."""
+        return models.TestModelSerializerReverseManyToMany.objects.filter(pk=pk)
+
+
+class TestM2MWithAsyncQueryParamsHandlerViewSet(GenericAPIViewSet):
+    """ViewSet with an async query_params_handler for M2M relations."""
+
+    model = models.TestModelSerializerManyToMany
+    m2m_relations = [
+        M2MRelationSchema(
+            model=models.TestModelSerializerReverseManyToMany,
+            related_name="test_model_serializers",
+            filters={"name": (str, "")},
+            append_slash=True,
+        )
+    ]
+
+    async def test_model_serializers_query_params_handler(self, queryset, filters):
+        """Async version of query_params_handler."""
+        name_filter = filters.get("name")
+        if name_filter:
+            queryset = queryset.filter(name=name_filter)
+        return queryset
+
+
+@tag("m2m", "coverage", "query_handler")
+class M2MQueryHandlerTestCase(TestCase):
+    """Cover helpers/api.py:295 — _check_m2m_objs with query_handler."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.api = NinjaAIO(urls_namespace="m2m_query_handler_test")
+        cls.viewset = TestM2MWithQueryHandlerViewSet(api=cls.api)
+        cls.viewset.add_views_to_route()
+        cls.request = Request(cls.viewset.path)
+        cls.pk_att = cls.viewset.model_util.model_pk_name
+
+        # Create base object
+        create_view = cls.viewset.create_view()
+        _, content = async_to_sync(create_view)(
+            cls.request.post(),
+            cls.viewset.schema_in(name="base", description="base"),
+        )
+        cls.base_pk = content[cls.pk_att]
+        cls.path_schema = cls.viewset.path_schema(**{cls.pk_att: cls.base_pk})
+
+        # Create related objects
+        cls.related_objs = [
+            models.TestModelSerializerReverseManyToMany.objects.create(
+                name=nm, description=nm
+            )
+            for nm in ["qh_a", "qh_b"]
+        ]
+        cls.related_pks = [o.pk for o in cls.related_objs]
+
+        # Get manage view
+        rel_util = ModelUtil(models.TestModelSerializerReverseManyToMany)
+        path = f"{cls.viewset.path_retrieve}/{rel_util.verbose_name_path_resolver()}/"
+        cls.manage_view = cls.viewset.m2m_api.router.path_operations.get(
+            path
+        ).operations[1].view_func
+
+    def _manage_data(self, add=None, remove=None):
+        action_schema = self.viewset.m2m_api.views_action_map[(True, True)][1]
+        return action_schema(add=add or [], remove=remove or [])
+
+    async def test_add_via_query_handler(self):
+        """Adding objects should use the custom query_handler path."""
+        data = self._manage_data(add=self.related_pks[:1])
+        content = await self.manage_view(
+            self.request.post(), self.path_schema, data
+        )
+        self.assertEqual(content["results"]["count"], 1)
+        self.assertEqual(content["errors"]["count"], 0)
+
+
+@tag("m2m", "coverage", "not_found")
+class M2MNotFoundTestCase(TestCase):
+    """Cover helpers/api.py:309-311 — M2M object not found."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.api = NinjaAIO(urls_namespace="m2m_not_found_test")
+        cls.viewset = TestM2MWithQueryHandlerViewSet(api=cls.api)
+        cls.viewset.add_views_to_route()
+        cls.request = Request(cls.viewset.path)
+        cls.pk_att = cls.viewset.model_util.model_pk_name
+
+        create_view = cls.viewset.create_view()
+        _, content = async_to_sync(create_view)(
+            cls.request.post(),
+            cls.viewset.schema_in(name="base", description="base"),
+        )
+        cls.base_pk = content[cls.pk_att]
+        cls.path_schema = cls.viewset.path_schema(**{cls.pk_att: cls.base_pk})
+
+        rel_util = ModelUtil(models.TestModelSerializerReverseManyToMany)
+        path = f"{cls.viewset.path_retrieve}/{rel_util.verbose_name_path_resolver()}/"
+        cls.manage_view = cls.viewset.m2m_api.router.path_operations.get(
+            path
+        ).operations[1].view_func
+
+    def _manage_data(self, add=None, remove=None):
+        action_schema = self.viewset.m2m_api.views_action_map[(True, True)][1]
+        return action_schema(add=add or [], remove=remove or [])
+
+    async def test_add_nonexistent_pk(self):
+        """Adding a nonexistent pk should yield an error via the not-found path."""
+        data = self._manage_data(add=[999999])
+        content = await self.manage_view(
+            self.request.post(), self.path_schema, data
+        )
+        self.assertEqual(content["results"]["count"], 0)
+        self.assertEqual(content["errors"]["count"], 1)
+        self.assertIn("not found", content["errors"]["details"][0])
+
+
+@tag("m2m", "coverage", "async_query_params")
+class M2MAsyncQueryParamsHandlerTestCase(TestCase):
+    """Cover helpers/api.py:402 — async query_params_handler in get_related."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.api = NinjaAIO(urls_namespace="m2m_async_qph_test")
+        cls.viewset = TestM2MWithAsyncQueryParamsHandlerViewSet(api=cls.api)
+        cls.viewset.add_views_to_route()
+        cls.request = Request(cls.viewset.path)
+        cls.pk_att = cls.viewset.model_util.model_pk_name
+
+        create_view = cls.viewset.create_view()
+        _, content = async_to_sync(create_view)(
+            cls.request.post(),
+            cls.viewset.schema_in(name="base", description="base"),
+        )
+        cls.base_pk = content[cls.pk_att]
+        cls.path_schema = cls.viewset.path_schema(**{cls.pk_att: cls.base_pk})
+
+        cls.related_objs = [
+            models.TestModelSerializerReverseManyToMany.objects.create(
+                name=nm, description=nm
+            )
+            for nm in ["async_a", "async_target"]
+        ]
+        cls.related_pks = [o.pk for o in cls.related_objs]
+
+        rel_util = ModelUtil(models.TestModelSerializerReverseManyToMany)
+        path = f"{cls.viewset.path_retrieve}/{rel_util.verbose_name_path_resolver()}/"
+        ops = cls.viewset.m2m_api.router.path_operations.get(path).operations
+        cls.get_view = ops[0].view_func
+        cls.manage_view = ops[1].view_func
+
+    def _manage_data(self, add=None, remove=None):
+        action_schema = self.viewset.m2m_api.views_action_map[(True, True)][1]
+        return action_schema(add=add or [], remove=remove or [])
+
+    async def test_get_related_with_async_filter(self):
+        """get_related should use async query_params_handler when available."""
+        # Add related objects first
+        data = self._manage_data(add=self.related_pks)
+        await self.manage_view(self.request.post(), self.path_schema, data)
+
+        # Get with filter using async handler
+        filters_schema = self.viewset.m2m_api.relations_filters_schemas[
+            "test_model_serializers"
+        ]
+        filters = filters_schema(name="async_target")
+        content = await self.get_view(
+            request=self.request.get(), pk=self.path_schema, filters=filters
+        )
+        self.assertEqual(content["count"], 1)
+        self.assertEqual(content["items"][0]["name"], "async_target")
