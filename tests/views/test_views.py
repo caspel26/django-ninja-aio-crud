@@ -461,6 +461,16 @@ class FilterValidationHelpersTestCase(TestCase):
         related_model = self.view._get_related_model(field)
         self.assertEqual(related_model, app_models.TestModelSerializerReverseForeignKey)
 
+    def test_get_related_model_via_remote_field(self):
+        """_get_related_model should fall back to remote_field.model."""
+        field = mock.Mock(spec=[])
+        field.related_model = None
+        field.remote_field = mock.Mock()
+        field.remote_field.model = app_models.TestModelSerializerReverseForeignKey
+        # hasattr(field, "related_model") is True but field.related_model is falsy
+        related_model = self.view._get_related_model(field)
+        self.assertEqual(related_model, app_models.TestModelSerializerReverseForeignKey)
+
     def test_get_related_model_non_relation(self):
         """_get_related_model should return None for non-relation fields."""
         field = app_models.TestModelSerializerForeignKey._meta.get_field("name")

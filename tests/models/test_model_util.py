@@ -236,3 +236,50 @@ class ModelUtilQObjectFiltersTestCase(TestCase):
             await util.get_object(
                 request, pk=None, query_data=query_data, with_qs_request=False
             )
+
+
+# ============================================================
+# Coverage test for models/utils.py — line 791
+# ============================================================
+
+
+@tag("model_util", "coverage", "prefetch_forward_rels")
+class PrefetchWithForwardRelsTestCase(TestCase):
+    """Cover utils.py:791 — _prefetch_reverse_relations_on_instance with forward_rels."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from tests.test_app.models import (
+            TestModelSerializerForeignKey,
+            TestModelSerializerReverseForeignKey,
+        )
+
+        cls.reverse_fk = TestModelSerializerReverseForeignKey.objects.create(
+            name="parent", description="parent"
+        )
+        cls.fk_obj = TestModelSerializerForeignKey.objects.create(
+            name="child",
+            description="child",
+            test_model_serializer=cls.reverse_fk,
+        )
+
+    async def test_prefetch_with_both_forward_and_reverse_rels(self):
+        """When both reverse and forward rels exist, select_related is applied."""
+        from tests.test_app.models import TestModelSerializerForeignKey
+
+        util = ModelUtil(TestModelSerializerForeignKey)
+        obj = await TestModelSerializerForeignKey.objects.aget(
+            pk=self.fk_obj.pk
+        )
+        # Mock reverse rels to be non-empty (triggers the prefetch path)
+        # and forward rels to be non-empty (triggers line 791: select_related)
+        # Use "test_model_serializer" which is a valid FK on this model
+        with mock.patch.object(
+            util, "get_reverse_relations",
+            return_value=["test_model_serializer"]
+        ), mock.patch.object(
+            util, "get_select_relateds",
+            return_value=["test_model_serializer"]
+        ):
+            result = await util._prefetch_reverse_relations_on_instance(obj, "read")
+        self.assertEqual(result.pk, self.fk_obj.pk)
