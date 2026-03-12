@@ -4,11 +4,18 @@
 
 ---
 
+## ✅ Completed
+
+| # | Task | File(s) | Version | Description |
+|---|------|---------|---------|-------------|
+| 1 | ~~Bounded `_relation_cache`~~ | `models/utils.py` | v2.25.0 | Replaced unbounded dict with LRU cache (`maxsize=512`). |
+
+---
+
 ## 🔴 Critical
 
 | # | Task | File(s) | Description |
 |---|------|---------|-------------|
-| 1 | Bounded `_relation_cache` | `models/utils.py:121` | Class-level dict grows unbounded in long-running processes. Replace with LRU-bounded cache (`maxsize=512`). |
 | 2 | Mutable default arguments | `schemas/helpers.py:79-80, 205-209` | `DecoratorsSchema`, `M2MRelationSchema`, query schemas use `[]` / `{}` as defaults — all instances share the same object. Use `Field(default_factory=...)`. |
 
 ---
