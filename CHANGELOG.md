@@ -1,5 +1,157 @@
 # 📋 Release Notes
 
+## 🏷️ [v2.25.0] - 2026-03-12
+
+---
+
+### ✨ New Features
+
+#### 🔍 Comprehensive Debug Logging
+> `ninja_aio/auth.py`, `ninja_aio/decorators/views.py`, `ninja_aio/exceptions.py`, `ninja_aio/factory/operations.py`, `ninja_aio/helpers/api.py`, `ninja_aio/models/utils.py`, `ninja_aio/views/api.py`
+
+All framework operations now emit structured log messages via Python's standard `logging` module. Logging is **disabled by default** with **zero runtime overhead** until explicitly enabled.
+
+**Quick start:**
+
+```python
+# settings.py
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {"class": "logging.StreamHandler"},
+    },
+    "loggers": {
+        "ninja_aio": {
+            "handlers": ["console"],
+            "level": "DEBUG",
+        },
+    },
+}
+```
+
+**Logger hierarchy:**
+
+| Logger | Covers |
+|---|---|
+| `ninja_aio` | 🌐 All framework logs (parent) |
+| `ninja_aio.auth` | 🔐 JWT authentication, encoding/decoding |
+| `ninja_aio.decorators` | 🔄 Atomic transaction entry |
+| `ninja_aio.exceptions` | ⚠️ Exception handler invocations |
+| `ninja_aio.factory` | 🏭 Endpoint registration |
+| `ninja_aio.helpers` | 🔗 M2M relation operations |
+| `ninja_aio.models` | 📦 CRUD operations, cache events, query optimizations, FK resolution |
+| `ninja_aio.views` | 🖥️ ViewSet initialization, view registration, filter validation |
+
+**Log levels used:**
+
+| Level | When |
+|---|---|
+| `INFO` | CRUD operations (create, update, delete), M2M manage results |
+| `DEBUG` | Authentication, cache hits/misses, query optimizations, FK resolution, endpoint registration, binary field decoding |
+| `WARNING` | Binary field decode failures |
+
+---
+
+#### 📦 LRU-Bounded Relation Cache
+> `ninja_aio/models/utils.py`
+
+The class-level `_relation_cache` on `ModelUtil` has been replaced with a bounded **LRU cache** (`maxsize=512`). In long-running processes, the previous unbounded `dict` could grow indefinitely; the new cache evicts least-recently-used entries when the limit is reached.
+
+```python
+class LRUCache:
+    """Thread-safe LRU cache backed by OrderedDict."""
+    def __init__(self, maxsize: int = 512): ...
+    def get(self, key): ...      # Returns None on miss, promotes on hit
+    def set(self, key, value): ... # Evicts LRU entry when full
+    def clear(self): ...
+```
+
+**Behavior:**
+- `get()` promotes entries to most-recent position (LRU semantics)
+- `set()` evicts the oldest entry when `maxsize` is exceeded, logging the eviction at DEBUG level
+- Cache key format unchanged: `(model, serializer_class_str, is_for)`
+
+---
+
+### 🔧 Improvements
+
+#### 🔁 Refactored Match Case Filter Application
+> `ninja_aio/views/mixins.py`
+
+The `MatchCaseFilterViewSetMixin.query_params_handler` method has been refactored: the inline filter application logic was extracted into a dedicated `_apply_case_filter(queryset, case_filter)` method. This improves readability and testability without changing behavior.
+
+| Before | After |
+|---|---|
+| 20-line inline `if/else` block with nested `isinstance` checks | Single `_apply_case_filter()` call per match case |
+
+---
+
+#### 🐛 Fix `NotFoundError` Constructor
+> `ninja_aio/exceptions.py`
+
+Fixed incorrect `return super().__init__(...)` in `NotFoundError.__init__` when a custom `not_found_name` is set. The `return` keyword prevented the constructor from completing properly. Now calls `super().__init__(...)` followed by an explicit `return`.
+
+---
+
+### 📖 Documentation
+
+- 📝 `docs/logging.md` — New comprehensive logging guide with quick start, logger hierarchy, per-module examples, production configuration, and performance notes
+- ⚙️ `mkdocs.yml` — Added **Logging** entry to navigation
+- 🔄 `.github/workflows/docs.yml` — Added version `2.24` to the documentation workflow
+- 🔄 `.github/workflows/performance.yml` — Updated `actions/upload-artifact` to v7 and `dawidd6/action-download-artifact` to v16
+- 📋 `TODO.md` — Added project improvement roadmap with 25 tracked tasks across 4 priority levels
+
+---
+
+### 🧪 Tests
+
+#### `LRUCacheTestCase` — 10 tests
+
+#### `M2MQueryHandlerTestCase` — 1 test
+
+#### `M2MNotFoundTestCase` — 1 test
+
+#### `M2MAsyncQueryParamsHandlerTestCase` — 1 test
+
+#### `SchemaOverridesNonFunctionTestCase` — 1 test
+
+#### `CircularReferenceDetectionTestCase` — 1 test
+
+#### `ModelSerializerGetModelConfigNoneTestCase` — 1 test
+
+#### `SerializerGetModelConfigUnknownTypeTestCase` — 1 test
+
+#### `SerializerGetDumpSchemaTestCase` — 2 tests
+
+#### `PrefetchWithForwardRelsTestCase` — 1 test
+
+#### `MatchCaseFilterInvalidFieldTestCase` — 1 test
+
+**New test helpers:**
+
+| File | Addition |
+|---|---|
+| `tests/helpers/test_many_to_many_api.py` | `TestM2MWithQueryHandlerViewSet` — ViewSet with custom M2M `query_handler` |
+| `tests/helpers/test_many_to_many_api.py` | `TestM2MWithAsyncQueryParamsHandlerViewSet` — ViewSet with async `query_params_handler` |
+
+**Coverage:** 100% across all 1878 statements in `ninja_aio/` (734 tests, 0 failures)
+
+---
+
+### 🎯 Summary
+
+Version 2.25.0 adds **comprehensive debug logging** across the entire framework and replaces the unbounded relation cache with a **bounded LRU cache** to prevent memory growth in long-running processes. The release also achieves **100% code coverage** with 21 new tests targeting previously uncovered edge cases.
+
+**Key benefits:**
+- 🔍 **Full observability** — structured logging across auth, CRUD, M2M, exceptions, and query optimization with zero overhead when disabled
+- 📦 **Memory-safe caching** — LRU eviction prevents unbounded growth of `_relation_cache` in long-lived processes
+- 🐛 **Bug fix** — corrected `NotFoundError` constructor when using `not_found_name`
+- 🧹 **Cleaner code** — extracted `_apply_case_filter()` method in match-case filter mixin
+- ✅ **100% coverage** — all source code lines covered by tests
+
+---
+
 ## 🏷️ [v2.24.0] - 2026-03-09
 
 ---
@@ -720,7 +872,7 @@ Version 2.20.0 introduces **comprehensive type safety** across the entire framew
 - 🔒 **Type Safety** — Full IDE autocomplete and type checking when you specify type parameters
 - 📚 **Documentation** — Comprehensive guide covering all type safety patterns
 - 🛠️ **Enhanced Serializers** — Field change detection and flexible schema dumping
-- ⚡ **Zero Runtime Cost** — Generic types are erased at runtime, no performance impact
+- ⚡ **Zero Runtime Cost** — Generic types are erased at runtime
 
 **Three typing approaches:**
 1. **Type the Serializer** (Recommended) — Type once, all serializer methods typed
