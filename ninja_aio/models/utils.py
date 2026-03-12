@@ -1,6 +1,7 @@
 import asyncio
 import base64
 import logging
+from collections import OrderedDict
 from typing import Any, Generic, Literal, TypeVar
 
 from ninja import Schema
@@ -33,6 +34,47 @@ from ninja_aio.schemas.helpers import (
 # TypeVar for generic model typing
 ModelT = TypeVar("ModelT", bound=models.Model)
 logger = logging.getLogger("ninja_aio.models")
+
+
+class LRUCache:
+    """
+    Thread-safe LRU cache backed by OrderedDict.
+
+    Evicts least-recently-used entries when maxsize is exceeded.
+    get() promotes entries to most-recent position.
+    """
+
+    __slots__ = ("_data", "_maxsize")
+
+    def __init__(self, maxsize: int = 512):
+        self._data: OrderedDict = OrderedDict()
+        self._maxsize = maxsize
+
+    def get(self, key):
+        try:
+            self._data.move_to_end(key)
+            return self._data[key]
+        except KeyError:
+            return None
+
+    def set(self, key, value):
+        if key in self._data:
+            self._data.move_to_end(key)
+            self._data[key] = value
+        else:
+            self._data[key] = value
+            if len(self._data) > self._maxsize:
+                evicted = self._data.popitem(last=False)
+                logger.debug(f"LRU cache evicted entry: {evicted[0]}")
+
+    def __contains__(self, key):
+        return key in self._data
+
+    def __len__(self):
+        return len(self._data)
+
+    def clear(self):
+        self._data.clear()
 
 
 async def agetattr(obj, name: str, default=None):
@@ -117,8 +159,8 @@ class ModelUtil(Generic[ModelT]):
     - Generic type parameter ensures all operations are properly typed.
     """
 
-    # Performance: Class-level cache for relation discovery (model structure is static)
-    _relation_cache: dict[tuple[type, str, str], list[str]] = {}
+    # Performance: Bounded LRU cache for relation discovery (model structure is static)
+    _relation_cache: LRUCache = LRUCache(maxsize=512)
 
     def __init__(self, model: type[ModelT], serializer_class=None):
         """
@@ -588,14 +630,15 @@ class ModelUtil(Generic[ModelT]):
         """
         # Check cache first (performance optimization)
         cache_key = (self.model, str(self.serializer_class), is_for)
-        if cache_key in self._relation_cache:
+        cached = self._relation_cache.get(cache_key)
+        if cached is not None:
             logger.debug(f"Reverse relations cache hit for {self.model.__name__} (is_for={is_for})")
-            return self._relation_cache[cache_key].copy()
+            return cached.copy()
 
         reverse_rels = self._get_read_optimizations(is_for).prefetch_related.copy()
         if reverse_rels:
             # Cache and return
-            self._relation_cache[cache_key] = reverse_rels
+            self._relation_cache.set(cache_key, reverse_rels)
             logger.debug(f"Reverse relations from config for {self.model.__name__}: {reverse_rels}")
             return reverse_rels
 
@@ -612,7 +655,7 @@ class ModelUtil(Generic[ModelT]):
                 reverse_rels.append(field_obj.related.name)
 
         # Cache the result
-        self._relation_cache[cache_key] = reverse_rels
+        self._relation_cache.set(cache_key, reverse_rels)
         logger.debug(f"Reverse relations discovered for {self.model.__name__}: {reverse_rels}")
         return reverse_rels
 
@@ -637,14 +680,15 @@ class ModelUtil(Generic[ModelT]):
         """
         # Check cache first (performance optimization)
         cache_key = (self.model, str(self.serializer_class) + "_select", is_for)
-        if cache_key in self._relation_cache:
+        cached = self._relation_cache.get(cache_key)
+        if cached is not None:
             logger.debug(f"Select related cache hit for {self.model.__name__} (is_for={is_for})")
-            return self._relation_cache[cache_key].copy()
+            return cached.copy()
 
         select_rels = self._get_read_optimizations(is_for).select_related.copy()
         if select_rels:
             # Cache and return
-            self._relation_cache[cache_key] = select_rels
+            self._relation_cache.set(cache_key, select_rels)
             logger.debug(f"Select related from config for {self.model.__name__}: {select_rels}")
             return select_rels
 
@@ -658,7 +702,7 @@ class ModelUtil(Generic[ModelT]):
                 select_rels.append(f)
 
         # Cache the result
-        self._relation_cache[cache_key] = select_rels
+        self._relation_cache.set(cache_key, select_rels)
         logger.debug(f"Select related discovered for {self.model.__name__}: {select_rels}")
         return select_rels
 
