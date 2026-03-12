@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import logging
 from typing import Any, Generic, Literal, TypeVar
 
 from ninja import Schema
@@ -21,6 +22,7 @@ from django.db.models.fields.related_descriptors import (
 
 from ninja_aio.exceptions import SerializeError, NotFoundError
 from ninja_aio.types import ModelSerializerMeta
+
 from ninja_aio.schemas.helpers import (
     ModelQuerySetSchema,
     QuerySchema,
@@ -30,6 +32,7 @@ from ninja_aio.schemas.helpers import (
 
 # TypeVar for generic model typing
 ModelT = TypeVar("ModelT", bound=models.Model)
+logger = logging.getLogger("ninja_aio.models")
 
 
 async def agetattr(obj, name: str, default=None):
@@ -138,6 +141,11 @@ class ModelUtil(Generic[ModelT]):
             )
         self.serializer: Serializer[ModelT] | None = (
             serializer_class() if serializer_class else None
+        )
+        model_name = getattr(model, "__name__", str(model))
+        logger.debug(
+            f"ModelUtil initialized for {model_name}"
+            f" (serializer={serializer_class.__name__ if serializer_class else None})"
         )
 
     @property
@@ -438,6 +446,8 @@ class ModelUtil(Generic[ModelT]):
                 "Either pk or getters must be provided for single object retrieval."
             )
 
+        logger.debug(f"Getting {self.model.__name__} (pk={pk})")
+
         # Build lookup query and get optimized queryset
         obj_qs = await self._get_base_queryset(
             request, query_data, with_qs_request, is_for
@@ -451,12 +461,14 @@ class ModelUtil(Generic[ModelT]):
             try:
                 obj = await obj_qs.aget()
             except ObjectDoesNotExist:
+                logger.debug(f"{self.model.__name__} not found (pk={pk})")
                 raise NotFoundError(self.model)
         else:
             get_q = self._build_lookup_query(pk, query_data.getters)
             try:
                 obj = await obj_qs.aget(**get_q)
             except ObjectDoesNotExist:
+                logger.debug(f"{self.model.__name__} not found (pk={pk})")
                 raise NotFoundError(self.model)
 
         return obj
@@ -522,6 +534,12 @@ class ModelUtil(Generic[ModelT]):
         if prefetch_related:
             queryset = queryset.prefetch_related(*prefetch_related)
 
+        if select_related or prefetch_related:
+            logger.debug(
+                f"Query optimizations for {self.model.__name__}:"
+                f" select_related={select_related}, prefetch_related={prefetch_related}"
+            )
+
         return queryset
 
     def _get_read_optimizations(
@@ -571,12 +589,14 @@ class ModelUtil(Generic[ModelT]):
         # Check cache first (performance optimization)
         cache_key = (self.model, str(self.serializer_class), is_for)
         if cache_key in self._relation_cache:
+            logger.debug(f"Reverse relations cache hit for {self.model.__name__} (is_for={is_for})")
             return self._relation_cache[cache_key].copy()
 
         reverse_rels = self._get_read_optimizations(is_for).prefetch_related.copy()
         if reverse_rels:
             # Cache and return
             self._relation_cache[cache_key] = reverse_rels
+            logger.debug(f"Reverse relations from config for {self.model.__name__}: {reverse_rels}")
             return reverse_rels
 
         serializable_fields = self._get_serializable_field_names(is_for)
@@ -593,6 +613,7 @@ class ModelUtil(Generic[ModelT]):
 
         # Cache the result
         self._relation_cache[cache_key] = reverse_rels
+        logger.debug(f"Reverse relations discovered for {self.model.__name__}: {reverse_rels}")
         return reverse_rels
 
     def get_select_relateds(
@@ -617,12 +638,14 @@ class ModelUtil(Generic[ModelT]):
         # Check cache first (performance optimization)
         cache_key = (self.model, str(self.serializer_class) + "_select", is_for)
         if cache_key in self._relation_cache:
+            logger.debug(f"Select related cache hit for {self.model.__name__} (is_for={is_for})")
             return self._relation_cache[cache_key].copy()
 
         select_rels = self._get_read_optimizations(is_for).select_related.copy()
         if select_rels:
             # Cache and return
             self._relation_cache[cache_key] = select_rels
+            logger.debug(f"Select related from config for {self.model.__name__}: {select_rels}")
             return select_rels
 
         serializable_fields = self._get_serializable_field_names(is_for)
@@ -636,6 +659,7 @@ class ModelUtil(Generic[ModelT]):
 
         # Cache the result
         self._relation_cache[cache_key] = select_rels
+        logger.debug(f"Select related discovered for {self.model.__name__}: {select_rels}")
         return select_rels
 
     async def _get_field(self, k: str) -> models.Field:
@@ -650,7 +674,9 @@ class ModelUtil(Generic[ModelT]):
             return
         try:
             payload[k] = base64.b64decode(v)
+            logger.debug(f"Decoded binary field '{k}' for {self.model.__name__}")
         except Exception as exc:
+            logger.warning(f"Failed to decode binary field '{k}' for {self.model.__name__}: {exc}")
             raise SerializeError({k: ". ".join(exc.args)}, 400)
 
     async def _resolve_fk(
@@ -667,7 +693,9 @@ class ModelUtil(Generic[ModelT]):
         if v is None:
             # None is valid for nullable FKs, leave as is
             return
-        rel_util = ModelUtil(field_obj.related_model)
+        rel_model = field_obj.related_model
+        logger.debug(f"Resolving FK '{k}' -> {rel_model.__name__} (pk={v}) for {self.model.__name__}")
+        rel_util = ModelUtil(rel_model)
         rel = await rel_util.get_object(request, v, with_qs_request=False)
         payload[k] = rel
 
@@ -966,6 +994,7 @@ class ModelUtil(Generic[ModelT]):
         dict
             Serialized created object.
         """
+        logger.info(f"Creating {self.model.__name__}")
         payload, customs = await self.parse_input_data(request, data)
         # Create object and keep the full instance (FK instances already attached from parse_input_data)
         obj = (
@@ -973,6 +1002,7 @@ class ModelUtil(Generic[ModelT]):
             if not self.with_serializer
             else await self.serializer.create(payload)
         )
+        logger.debug(f"Created {self.model.__name__} (pk={obj.pk})")
         # Only prefetch reverse relations (forward FKs already loaded)
         obj = await self._prefetch_reverse_relations_on_instance(obj, is_for="read")
         if isinstance(self.model, ModelSerializerMeta):
@@ -1168,6 +1198,7 @@ class ModelUtil(Generic[ModelT]):
         dict
             Serialized updated object.
         """
+        logger.info(f"Updating {self.model.__name__} (pk={pk})")
         obj = await self.get_object(request, pk, is_for="read")
         payload, customs = await self.parse_input_data(request, data)
         for k, v in payload.items():
@@ -1180,6 +1211,7 @@ class ModelUtil(Generic[ModelT]):
             await self.serializer.save(obj)
         else:
             await obj.asave()
+        logger.debug(f"Updated {self.model.__name__} (pk={pk})")
         # FK instances from parse_input_data are already attached to obj
         # Only refresh reverse relations since they might have changed
         updated_object = await self._prefetch_reverse_relations_on_instance(
@@ -1201,6 +1233,8 @@ class ModelUtil(Generic[ModelT]):
         -------
         None
         """
+        logger.info(f"Deleting {self.model.__name__} (pk={pk})")
         obj = await self.get_object(request, pk)
         await obj.adelete()
+        logger.debug(f"Deleted {self.model.__name__} (pk={pk})")
         return None

@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from typing import (
     Callable,
     Dict,
@@ -12,6 +13,9 @@ import inspect
 from ninja.constants import NOT_SET, NOT_SET_TYPE
 from ninja.throttling import BaseThrottle
 from ninja import Router
+
+
+logger = logging.getLogger("ninja_aio.factory")
 
 
 class ApiMethodFactory:
@@ -219,6 +223,9 @@ class ApiMethodFactory:
                     for dec in reversed(decorators):
                         clean_handler = dec(clean_handler)
 
+                logger.debug(
+                    f"Registering {self.method_name.upper()} endpoint at {path}"
+                )
                 route_adder = getattr(router, self.method_name)
                 route_adder(
                     path=path,
