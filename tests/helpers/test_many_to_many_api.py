@@ -467,11 +467,6 @@ class GetApiPathNoSlashTestCase(TestCase):
         self.assertTrue(path_with_slash.endswith("/"))
 
 
-# ============================================================
-# Coverage tests for helpers/api.py — lines 295, 309-311, 402
-# ============================================================
-
-
 class TestM2MWithQueryHandlerViewSet(GenericAPIViewSet):
     """ViewSet with a custom query_handler for M2M objects."""
 

@@ -124,7 +124,6 @@ class JwtAuthTests(TestCase):
         self.assertFalse(result)
 
     def test_async_bearer_authenticate_invalid_token_returns_false(self):
-        """Test that a malformed/invalid token returns False (covers lines 110-112)."""
         pub = self.public_jwk
 
         class TB(AsyncJwtBearer):

@@ -75,7 +75,6 @@ class ModelUtilModelBaseTestCase(BaseTests.ModelUtilModelBaseTestCase):
 
 @tag("model_util_config_error")
 class ModelUtilConfigErrorTestCase(TestCase):
-    """Test ModelUtil ConfigError edge cases (covers lines 113-115)."""
 
     def test_model_util_raises_config_error_for_model_serializer_with_serializer_class(
         self,
@@ -96,7 +95,6 @@ class ModelUtilConfigErrorTestCase(TestCase):
 
 @tag("model_util_pk_field_type")
 class ModelUtilPkFieldTypeTestCase(TestCase):
-    """Test ModelUtil pk_field_type error handling (covers lines 152-158)."""
 
     def test_pk_field_type_raises_config_error_for_unknown_type(self):
         """Test that pk_field_type raises ConfigError for unknown field types."""
