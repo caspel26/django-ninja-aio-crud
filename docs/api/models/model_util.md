@@ -667,6 +667,19 @@ print(path)  # "blog-posts"
 # /api/blog-posts/{id}/
 ```
 
+!!! tip "NinjaAIOMeta override"
+    If the model defines a `NinjaAIOMeta` inner class with `verbose_name_plural`, that value takes priority over Django's `Meta.verbose_name_plural`:
+
+    ```python
+    class BlogPost(models.Model):
+        class NinjaAIOMeta:
+            verbose_name_plural = "Blog Articles"
+
+    util = ModelUtil(BlogPost)
+    path = util.verbose_name_path_resolver()
+    print(path)  # "Blog-Articles"
+    ```
+
 ### `verbose_name_view_resolver()`
 
 Get display name from model's singular verbose name.

@@ -935,7 +935,7 @@ Returns `False` for unsaved instances (no primary key).
 
 ### `verbose_name_path_resolver()`
 
-Get slugified plural verbose name for URL routing.
+Get slugified plural verbose name for URL routing. If the model defines a `NinjaAIOMeta` inner class with `verbose_name_plural`, that value takes priority over Django's `Meta.verbose_name_plural`.
 
 ```python
 class BlogPost(ModelSerializer):
@@ -943,6 +943,17 @@ class BlogPost(ModelSerializer):
         verbose_name_plural = "blog posts"
 
 # Returns: "blog-posts"
+path = BlogPost.verbose_name_path_resolver()
+```
+
+With `NinjaAIOMeta` override:
+
+```python
+class BlogPost(ModelSerializer):
+    class NinjaAIOMeta:
+        verbose_name_plural = "Blog Articles"
+
+# Returns: "Blog-Articles"
 path = BlogPost.verbose_name_path_resolver()
 ```
 

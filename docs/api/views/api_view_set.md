@@ -118,6 +118,41 @@ class ArticleViewSet(APIViewSet):
 | `model_verbose_name`        | `str`                         | `""`                                               | Override model verbose name for display                                 |
 | `model_verbose_name_plural` | `str`                         | `""`                                               | Override model verbose name plural for display                          |
 
+### :material-tag: Verbose Name Resolution
+
+Verbose names are resolved using a three-tier priority:
+
+| Priority | Source | Example |
+|---|---|---|
+| 1 | ViewSet class attribute (`model_verbose_name`) | Set on the ViewSet directly |
+| 2 | `NinjaAIOMeta` inner class on the model | `class NinjaAIOMeta: verbose_name = "Blog Article"` |
+| 3 | Django `Meta` (`model._meta.verbose_name`) | Auto-derived from model class name |
+
+**Using `NinjaAIOMeta` on the model (recommended for reuse across ViewSets):**
+
+```python
+class BlogPost(models.Model):
+    title = models.CharField(max_length=255)
+
+    class NinjaAIOMeta:
+        not_found_name = "article"          # custom 404 error key
+        verbose_name = "Blog Article"       # used for endpoint summaries
+        verbose_name_plural = "Blog Articles"  # used for route paths & display
+```
+
+All attributes are optional. `NinjaAIOMeta` values are used as-is (no `.capitalize()`), while Django Meta values are auto-capitalized.
+
+**Using ViewSet attributes (per-ViewSet override):**
+
+```python
+@api.viewset(BlogPost)
+class BlogPostAPI(APIViewSet):
+    model_verbose_name = "Article"
+    model_verbose_name_plural = "Articles"
+```
+
+ViewSet attributes take highest priority, so they can override `NinjaAIOMeta` for a specific ViewSet.
+
 ## :material-shield-lock: Authentication Attributes
 
 | Attribute     | Type           | Default   | Description              |

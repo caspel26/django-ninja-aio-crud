@@ -138,36 +138,28 @@ Configure in `settings.py`:
 NINJA_AIO_NOT_FOUND_ERROR_USE_VERBOSE_NAMES = False
 ```
 
-#### Per-model override with `not_found_name`
+#### Per-model override with `NinjaAIOMeta`
 
-For full control over a specific model's error payload, set `not_found_name` directly on `model._meta`. This takes precedence over both `verbose_name` and `NINJA_AIO_NOT_FOUND_ERROR_USE_VERBOSE_NAMES`.
-
-**String value** — wrapped under the `"error"` key:
+For full control over a specific model's error payload, define a `NinjaAIOMeta` inner class on the model with a `not_found_name` attribute. This takes precedence over both `verbose_name` and `NINJA_AIO_NOT_FOUND_ERROR_USE_VERBOSE_NAMES`.
 
 ```python
 class BlogPost(Model):
-    # logic here
-    class Meta:
+    title = models.CharField(max_length=255)
+
+    class NinjaAIOMeta:
         not_found_name = "blog_post"
 
 raise NotFoundError(BlogPost)
-# {"blog_post": "not found"}
+# {"error": "blog_post"}
 ```
 
-**Dict value** — used as the full error payload:
-
-```python
-BlogPost._meta.not_found_name = {"blog_post": "not found"}
-
-raise NotFoundError(BlogPost)
-# {"blog_post": "not found"}
-```
+`NinjaAIOMeta` also supports `verbose_name` and `verbose_name_plural` for overriding API display names and route paths. See the [APIViewSet](../views/api_view_set.md) documentation for details.
 
 **Resolution order:**
 
 | Priority | Source | Condition |
 |---|---|---|
-| 1 | `model._meta.not_found_name` | If set |
+| 1 | `NinjaAIOMeta.not_found_name` | If set on model |
 | 2 | `model._meta.verbose_name` (spaces → `_`) | `use_verbose_name=True` (default) |
 | 3 | `snake_case(model.__name__)` | `use_verbose_name=False` |
 
