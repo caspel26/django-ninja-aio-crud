@@ -39,6 +39,7 @@ from ninja_aio.types import (
     SCHEMA_TYPES,
     ModelSerializerMeta,
     SerializerMeta,
+    get_ninja_aio_meta_attr,
 )
 from ninja_aio.schemas.helpers import (
     ModelQuerySetSchema,
@@ -1665,7 +1666,11 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
         str
             Hyphen-separated URL-safe path segment.
         """
-        return "-".join(cls._meta.verbose_name_plural.split(" "))
+        verbose_plural = (
+            get_ninja_aio_meta_attr(cls, "verbose_name_plural")
+            or cls._meta.verbose_name_plural
+        )
+        return "-".join(verbose_plural.split(" "))
 
     def has_changed(self, field: str) -> bool:
         """

@@ -78,36 +78,27 @@ class SubclassesTestCase(TestCase):
             NotFoundError.use_verbose_name = original
 
     def test_not_found_name_string_overrides_auto_key(self):
-        """not_found_name as a string bypasses auto key generation."""
-        app_models.TestModelSerializer._meta.not_found_name = "my_entity"
-        try:
-            exc = NotFoundError(app_models.TestModelSerializer)
-            self.assertEqual(exc.error, {"error": "my_entity"})
-            self.assertEqual(exc.status_code, 404)
-        finally:
-            del app_models.TestModelSerializer._meta.not_found_name
-
-    def test_not_found_name_dict_overrides_auto_key(self):
-        """not_found_name as a dict is used directly as the error payload."""
-        app_models.TestModelSerializer._meta.not_found_name = {"my_entity": "not found"}
-        try:
-            exc = NotFoundError(app_models.TestModelSerializer)
-            self.assertEqual(exc.error, {"my_entity": "not found"})
-            self.assertEqual(exc.status_code, 404)
-        finally:
-            del app_models.TestModelSerializer._meta.not_found_name
+        """NinjaAIOMeta.not_found_name as a string bypasses auto key generation."""
+        exc = NotFoundError(app_models.TestModelWithNinjaAIOMeta)
+        self.assertEqual(exc.error, {"error": "custom_entity"})
+        self.assertEqual(exc.status_code, 404)
 
     def test_not_found_name_takes_precedence_over_use_verbose_name(self):
-        """not_found_name takes precedence over use_verbose_name setting."""
-        app_models.TestModelSerializer._meta.not_found_name = {"override": "not found"}
+        """NinjaAIOMeta.not_found_name takes precedence over use_verbose_name setting."""
         original = NotFoundError.use_verbose_name
         try:
             NotFoundError.use_verbose_name = False
-            exc = NotFoundError(app_models.TestModelSerializer)
-            self.assertEqual(exc.error, {"override": "not found"})
+            exc = NotFoundError(app_models.TestModelWithNinjaAIOMeta)
+            self.assertEqual(exc.error, {"error": "custom_entity"})
         finally:
             NotFoundError.use_verbose_name = original
-            del app_models.TestModelSerializer._meta.not_found_name
+
+    def test_model_without_ninja_aio_meta_uses_django_meta(self):
+        """Models without NinjaAIOMeta fall back to Django verbose_name."""
+        exc = NotFoundError(app_models.TestModelSerializer)
+        key = app_models.TestModelSerializer._meta.verbose_name.replace(" ", "_")
+        self.assertIn(key, exc.error)
+        self.assertEqual(exc.status_code, 404)
 
     def test_pydantic_validation_error(self):
         try:

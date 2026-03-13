@@ -8,6 +8,8 @@ from pydantic import ValidationError
 from django.db.models import Model
 from django.conf import settings
 
+from ninja_aio.types import get_ninja_aio_meta_attr
+
 logger = logging.getLogger("ninja_aio.exceptions")
 
 
@@ -63,7 +65,7 @@ class NotFoundError(BaseException):
 
     def __init__(self, model: Model, details=None):
         """Build a not-found error referencing the model's verbose name."""
-        if model_name := getattr(model._meta, "not_found_name", None):
+        if model_name := get_ninja_aio_meta_attr(model, "not_found_name"):
             super().__init__(
                 error=model_name, status_code=self.status_code, details=details
             )

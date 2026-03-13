@@ -22,7 +22,7 @@ from django.db.models.fields.related_descriptors import (
 )
 
 from ninja_aio.exceptions import SerializeError, NotFoundError
-from ninja_aio.types import ModelSerializerMeta
+from ninja_aio.types import ModelSerializerMeta, get_ninja_aio_meta_attr
 
 from ninja_aio.schemas.helpers import (
     ModelQuerySetSchema,
@@ -290,6 +290,20 @@ class ModelUtil(Generic[ModelT]):
         return self.model._meta.pk.attname
 
     @property
+    def model_verbose_name(self) -> str:
+        """
+        Human readable singular verbose name.
+
+        Returns
+        -------
+        str
+        """
+        return (
+            get_ninja_aio_meta_attr(self.model, "verbose_name")
+            or self.model._meta.verbose_name
+        )
+
+    @property
     def model_verbose_name_plural(self) -> str:
         """
         Human readable plural verbose name.
@@ -298,7 +312,10 @@ class ModelUtil(Generic[ModelT]):
         -------
         str
         """
-        return self.model._meta.verbose_name_plural
+        return (
+            get_ninja_aio_meta_attr(self.model, "verbose_name_plural")
+            or self.model._meta.verbose_name_plural
+        )
 
     def verbose_name_path_resolver(self) -> str:
         """

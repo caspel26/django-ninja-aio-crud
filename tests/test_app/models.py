@@ -589,3 +589,19 @@ class TestModelWithSchemaOverrides(BaseTestModel, ModelSerializer):
 
     class CreateSerializer:
         fields = ["name", "description"]
+
+
+class TestModelWithNinjaAIOMeta(BaseTestModelSerializer):
+    """Model with full NinjaAIOMeta configuration."""
+
+    class NinjaAIOMeta:
+        not_found_name = "custom_entity"
+        verbose_name = "Custom Entity"
+        verbose_name_plural = "Custom Entities"
+
+
+class TestModelWithPartialNinjaAIOMeta(BaseTestModelSerializer):
+    """Model with partial NinjaAIOMeta — only not_found_name set."""
+
+    class NinjaAIOMeta:
+        not_found_name = "partial_entity"

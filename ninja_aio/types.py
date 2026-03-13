@@ -60,3 +60,11 @@ class ModelSerializerMeta(SerializerMeta, type(Model)):
     """Metaclass combining SerializerMeta with Django's ModelBase."""
 
     pass
+
+
+def get_ninja_aio_meta_attr(model, attr: str, default=None):
+    """Look up an attribute on the model's NinjaAIOMeta inner class, or return default."""
+    ninja_meta = getattr(model, "NinjaAIOMeta", None)
+    if ninja_meta is None:
+        return default
+    return getattr(ninja_meta, attr, default)

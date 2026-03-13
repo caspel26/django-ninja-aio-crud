@@ -18,7 +18,7 @@ from ninja_aio.schemas import (
     M2MRelationSchema,
 )
 from ninja_aio.helpers.api import ManyToManyAPI
-from ninja_aio.types import ModelSerializerMeta, VIEW_TYPES, VALID_DJANGO_LOOKUPS
+from ninja_aio.types import ModelSerializerMeta, VIEW_TYPES, VALID_DJANGO_LOOKUPS, get_ninja_aio_meta_attr
 from ninja_aio.decorators import unique_view, decorate_view, aatomic
 from ninja_aio.models import serializers
 
@@ -302,10 +302,13 @@ class APIViewSet(API, Generic[ModelT]):
         self.path_schema = self._generate_path_schema()
         self.filters_schema = self._generate_filters_schema()
         self.model_verbose_name = (
-            self.model_verbose_name or self.model._meta.verbose_name.capitalize()
+            self.model_verbose_name
+            or get_ninja_aio_meta_attr(self.model, "verbose_name")
+            or self.model._meta.verbose_name.capitalize()
         )
         self.model_verbose_name_plural = (
             self.model_verbose_name_plural
+            or get_ninja_aio_meta_attr(self.model, "verbose_name_plural")
             or self.model._meta.verbose_name_plural.capitalize()
         )
         self.router_tag = self.router_tag or self.model_verbose_name

@@ -281,3 +281,93 @@ class PrefetchWithForwardRelsTestCase(TestCase):
         ):
             result = await util._prefetch_reverse_relations_on_instance(obj, "read")
         self.assertEqual(result.pk, self.fk_obj.pk)
+
+
+# ============================================================
+# NinjaAIOMeta verbose name resolution tests
+# ============================================================
+
+
+@tag("model_util", "ninja_aio_meta")
+class NinjaAIOMetaVerboseNameTestCase(TestCase):
+    """Test that ModelUtil picks up verbose names from NinjaAIOMeta."""
+
+    def test_model_verbose_name_from_ninja_aio_meta(self):
+        """NinjaAIOMeta.verbose_name overrides Django Meta."""
+        util = ModelUtil(models.TestModelWithNinjaAIOMeta)
+        self.assertEqual(util.model_verbose_name, "Custom Entity")
+
+    def test_model_verbose_name_plural_from_ninja_aio_meta(self):
+        """NinjaAIOMeta.verbose_name_plural overrides Django Meta."""
+        util = ModelUtil(models.TestModelWithNinjaAIOMeta)
+        self.assertEqual(util.model_verbose_name_plural, "Custom Entities")
+
+    def test_verbose_name_path_resolver_uses_ninja_aio_meta(self):
+        """verbose_name_path_resolver uses NinjaAIOMeta.verbose_name_plural."""
+        util = ModelUtil(models.TestModelWithNinjaAIOMeta)
+        self.assertEqual(util.verbose_name_path_resolver(), "Custom-Entities")
+
+    def test_verbose_name_view_resolver_uses_ninja_aio_meta(self):
+        """verbose_name_view_resolver uses NinjaAIOMeta.verbose_name_plural."""
+        util = ModelUtil(models.TestModelWithNinjaAIOMeta)
+        self.assertEqual(util.verbose_name_view_resolver(), "CustomEntities")
+
+    def test_partial_ninja_aio_meta_falls_back_to_django_meta(self):
+        """Model with partial NinjaAIOMeta falls back to Django Meta for missing attrs."""
+        util = ModelUtil(models.TestModelWithPartialNinjaAIOMeta)
+        # verbose_name not in NinjaAIOMeta, should fall back to Django Meta
+        self.assertEqual(
+            util.model_verbose_name,
+            models.TestModelWithPartialNinjaAIOMeta._meta.verbose_name,
+        )
+        self.assertEqual(
+            util.model_verbose_name_plural,
+            models.TestModelWithPartialNinjaAIOMeta._meta.verbose_name_plural,
+        )
+
+    def test_model_without_ninja_aio_meta_uses_django_meta(self):
+        """Models without NinjaAIOMeta use Django Meta as before."""
+        util = ModelUtil(models.TestModelSerializer)
+        self.assertEqual(
+            util.model_verbose_name,
+            models.TestModelSerializer._meta.verbose_name,
+        )
+        self.assertEqual(
+            util.model_verbose_name_plural,
+            models.TestModelSerializer._meta.verbose_name_plural,
+        )
+
+
+@tag("model_util", "ninja_aio_meta", "get_ninja_aio_meta_attr")
+class GetNinjaAIOMetaAttrTestCase(TestCase):
+    """Test the get_ninja_aio_meta_attr helper function."""
+
+    def test_returns_attr_when_present(self):
+        from ninja_aio.types import get_ninja_aio_meta_attr
+
+        result = get_ninja_aio_meta_attr(
+            models.TestModelWithNinjaAIOMeta, "not_found_name"
+        )
+        self.assertEqual(result, "custom_entity")
+
+    def test_returns_default_when_attr_missing(self):
+        from ninja_aio.types import get_ninja_aio_meta_attr
+
+        result = get_ninja_aio_meta_attr(
+            models.TestModelWithPartialNinjaAIOMeta, "verbose_name"
+        )
+        self.assertIsNone(result)
+
+    def test_returns_default_when_no_ninja_aio_meta(self):
+        from ninja_aio.types import get_ninja_aio_meta_attr
+
+        result = get_ninja_aio_meta_attr(models.TestModelSerializer, "not_found_name")
+        self.assertIsNone(result)
+
+    def test_custom_default(self):
+        from ninja_aio.types import get_ninja_aio_meta_attr
+
+        result = get_ninja_aio_meta_attr(
+            models.TestModelSerializer, "not_found_name", default="fallback"
+        )
+        self.assertEqual(result, "fallback")
