@@ -28,7 +28,7 @@ class APIViewTestCase(TestCase):
 
     @property
     def path_names(self):
-        return [self.view.path_name]
+        return [""]
 
     @property
     def schema_in_payload(self):

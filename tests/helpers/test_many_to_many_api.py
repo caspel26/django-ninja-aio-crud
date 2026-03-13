@@ -95,11 +95,11 @@ class Tests:
         def _create_base_object(cls):
             """Create base object. Override for different creation methods."""
             create_view = cls.viewset.create_view()
-            _, content = async_to_sync(create_view)(
+            result = async_to_sync(create_view)(
                 cls.request.post(),
                 cls.viewset.schema_in(name="base", description="base"),
             )
-            return content[cls.viewset.model_util.model_pk_name]
+            return result.value[cls.viewset.model_util.model_pk_name]
 
         @classmethod
         def _get_related_views(cls):
@@ -117,7 +117,8 @@ class Tests:
             """Helper to add related objects."""
             pks = pks or self.related_pks[:2]
             data = self._manage_data(add=pks)
-            return await self.manage_view(self.request.post(), self.path_schema, data)
+            result = await self.manage_view(self.request.post(), self.path_schema, data)
+            return result.value.model_dump()
 
         async def test_add_related(self):
             """Test adding related objects."""
@@ -128,9 +129,10 @@ class Tests:
         async def test_get_related(self):
             """Test retrieving related objects."""
             await self._add_related()
-            content = await self.get_view(
+            result = await self.get_view(
                 request=self.request.get(), pk=self.path_schema
             )
+            content = result.value
             self.assertEqual(set(content.keys()), {"items", "count"})
             self.assertEqual(content["count"], 2)
             # Verify schema fields are present
@@ -146,9 +148,10 @@ class Tests:
                 self.related_name
             ]
             filters = filters_schema(name=self.related_names[1])
-            content = await self.get_view(
+            result = await self.get_view(
                 request=self.request.get(), pk=self.path_schema, filters=filters
             )
+            content = result.value
             self.assertEqual(content["count"], 1)
             self.assertEqual(content["items"][0]["name"], self.related_names[1])
 
@@ -157,16 +160,18 @@ class Tests:
             await self._add_related()
             # Remove one
             data = self._manage_data(remove=[self.related_pks[0]])
-            content = await self.manage_view(
+            result = await self.manage_view(
                 self.request.post(), self.path_schema, data
             )
+            content = result.value.model_dump()
             self.assertEqual(content["results"]["count"], 1)
             self.assertEqual(content["errors"]["count"], 0)
             # Removing again same pk should yield error
             data2 = self._manage_data(remove=[self.related_pks[0]])
-            content2 = await self.manage_view(
+            result2 = await self.manage_view(
                 self.request.post(), self.path_schema, data2
             )
+            content2 = result2.value.model_dump()
             self.assertEqual(content2["results"]["count"], 0)
             self.assertEqual(content2["errors"]["count"], 1)
 
@@ -174,9 +179,10 @@ class Tests:
             """Test that adding already related objects yields errors."""
             await self._add_related()
             data = self._manage_data(add=self.related_pks[:1])
-            content = await self.manage_view(
+            result = await self.manage_view(
                 self.request.post(), self.path_schema, data
             )
+            content = result.value.model_dump()
             self.assertEqual(content["results"]["count"], 0)
             self.assertEqual(content["errors"]["count"], 1)
 
@@ -194,7 +200,8 @@ class ManyToManyAPITestCase(Tests.BaseManyToManyAPITestCase):
     async def test_get_related_names(self):
         """Test that names are correctly retrieved for ModelSerializer."""
         await self._add_related()
-        content = await self.get_view(request=self.request.get(), pk=self.path_schema)
+        result = await self.get_view(request=self.request.get(), pk=self.path_schema)
+        content = result.value
         names = {item["name"] for item in content["items"]}
         self.assertEqual(names, {"a", "target"})
 
@@ -519,11 +526,11 @@ class M2MQueryHandlerTestCase(TestCase):
 
         # Create base object
         create_view = cls.viewset.create_view()
-        _, content = async_to_sync(create_view)(
+        result = async_to_sync(create_view)(
             cls.request.post(),
             cls.viewset.schema_in(name="base", description="base"),
         )
-        cls.base_pk = content[cls.pk_att]
+        cls.base_pk = result.value[cls.pk_att]
         cls.path_schema = cls.viewset.path_schema(**{cls.pk_att: cls.base_pk})
 
         # Create related objects
@@ -549,9 +556,10 @@ class M2MQueryHandlerTestCase(TestCase):
     async def test_add_via_query_handler(self):
         """Adding objects should use the custom query_handler path."""
         data = self._manage_data(add=self.related_pks[:1])
-        content = await self.manage_view(
+        result = await self.manage_view(
             self.request.post(), self.path_schema, data
         )
+        content = result.value.model_dump()
         self.assertEqual(content["results"]["count"], 1)
         self.assertEqual(content["errors"]["count"], 0)
 
@@ -569,11 +577,11 @@ class M2MNotFoundTestCase(TestCase):
         cls.pk_att = cls.viewset.model_util.model_pk_name
 
         create_view = cls.viewset.create_view()
-        _, content = async_to_sync(create_view)(
+        result = async_to_sync(create_view)(
             cls.request.post(),
             cls.viewset.schema_in(name="base", description="base"),
         )
-        cls.base_pk = content[cls.pk_att]
+        cls.base_pk = result.value[cls.pk_att]
         cls.path_schema = cls.viewset.path_schema(**{cls.pk_att: cls.base_pk})
 
         rel_util = ModelUtil(models.TestModelSerializerReverseManyToMany)
@@ -589,9 +597,10 @@ class M2MNotFoundTestCase(TestCase):
     async def test_add_nonexistent_pk(self):
         """Adding a nonexistent pk should yield an error via the not-found path."""
         data = self._manage_data(add=[999999])
-        content = await self.manage_view(
+        result = await self.manage_view(
             self.request.post(), self.path_schema, data
         )
+        content = result.value.model_dump()
         self.assertEqual(content["results"]["count"], 0)
         self.assertEqual(content["errors"]["count"], 1)
         self.assertIn("not found", content["errors"]["details"][0])
@@ -610,11 +619,11 @@ class M2MAsyncQueryParamsHandlerTestCase(TestCase):
         cls.pk_att = cls.viewset.model_util.model_pk_name
 
         create_view = cls.viewset.create_view()
-        _, content = async_to_sync(create_view)(
+        result = async_to_sync(create_view)(
             cls.request.post(),
             cls.viewset.schema_in(name="base", description="base"),
         )
-        cls.base_pk = content[cls.pk_att]
+        cls.base_pk = result.value[cls.pk_att]
         cls.path_schema = cls.viewset.path_schema(**{cls.pk_att: cls.base_pk})
 
         cls.related_objs = [
@@ -646,8 +655,9 @@ class M2MAsyncQueryParamsHandlerTestCase(TestCase):
             "test_model_serializers"
         ]
         filters = filters_schema(name="async_target")
-        content = await self.get_view(
+        result = await self.get_view(
             request=self.request.get(), pk=self.path_schema, filters=filters
         )
+        content = result.value
         self.assertEqual(content["count"], 1)
         self.assertEqual(content["items"][0]["name"], "async_target")

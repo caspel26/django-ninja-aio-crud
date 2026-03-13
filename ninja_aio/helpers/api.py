@@ -3,7 +3,7 @@ import logging
 from typing import Coroutine
 
 from django.http import HttpRequest
-from ninja import Path, Query
+from ninja import Path, Query, Status
 from ninja.pagination import paginate
 from ninja_aio.decorators import unique_view, decorate_view
 from ninja_aio.models import ModelSerializer, ModelUtil
@@ -403,7 +403,9 @@ class ManyToManyAPI:
                 else:
                     related_qs = query_handler(related_qs, filters.model_dump())
 
-            return await rel_util.list_read_s(related_schema, request, related_qs)
+            return Status(
+                200, await rel_util.list_read_s(related_schema, request, related_qs)
+            )
 
     def _resolve_action_schema(self, add: bool, remove: bool):
         return self.views_action_map[(add, remove)]
@@ -482,10 +484,13 @@ class ManyToManyAPI:
             logger.info(
                 f"M2M manage {related_name}: {len(results)} succeeded, {len(errors)} errors"
             )
-            return {
-                "results": {"count": len(results), "details": results},
-                "errors": {"count": len(errors), "details": errors},
-            }
+            return Status(
+                200,
+                M2MSchemaOut(
+                    results={"count": len(results), "details": results},
+                    errors={"count": len(errors), "details": errors},
+                ),
+            )
 
     def _build_views(self, relation: M2MRelationSchema):
         model = relation.model

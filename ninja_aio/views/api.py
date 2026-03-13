@@ -1,7 +1,7 @@
 import logging
 from typing import Generic, List, TypeVar
 
-from ninja import NinjaAPI, Router, Schema, Path, Query
+from ninja import NinjaAPI, Router, Schema, Path, Query, Status
 from ninja.constants import NOT_SET
 from ninja.pagination import paginate, AsyncPaginationBase, PageNumberPagination
 from django.http import HttpRequest
@@ -18,7 +18,12 @@ from ninja_aio.schemas import (
     M2MRelationSchema,
 )
 from ninja_aio.helpers.api import ManyToManyAPI
-from ninja_aio.types import ModelSerializerMeta, VIEW_TYPES, VALID_DJANGO_LOOKUPS, get_ninja_aio_meta_attr
+from ninja_aio.types import (
+    ModelSerializerMeta,
+    VIEW_TYPES,
+    VALID_DJANGO_LOOKUPS,
+    get_ninja_aio_meta_attr,
+)
 from ninja_aio.decorators import unique_view, decorate_view, aatomic
 from ninja_aio.models import serializers
 
@@ -333,7 +338,9 @@ class APIViewSet(API, Generic[ModelT]):
             if not self.m2m_relations
             else ManyToManyAPI(relations=self.m2m_relations, view_set=self)
         )
-        logger.debug(f"APIViewSet initialized for {self.model.__name__} at /{self.api_route_path}")
+        logger.debug(
+            f"APIViewSet initialized for {self.model.__name__} at /{self.api_route_path}"
+        )
 
     @property
     def _crud_views(self):
@@ -441,7 +448,9 @@ class APIViewSet(API, Generic[ModelT]):
             try:
                 field = current_model._meta.get_field(part)
             except (FieldDoesNotExist, AttributeError):
-                logger.debug(f"Filter field validation failed: '{part}' not found on {current_model.__name__}")
+                logger.debug(
+                    f"Filter field validation failed: '{part}' not found on {current_model.__name__}"
+                )
                 return False
 
             # If this is a relation field and not the last part, traverse to related model
@@ -571,7 +580,9 @@ class APIViewSet(API, Generic[ModelT]):
         )
         @decorate_view(aatomic, unique_view(self), *self.extra_decorators.create)
         async def create(request: HttpRequest, data: self.schema_in):  # type: ignore
-            return 201, await self.model_util.create_s(request, data, self.schema_out)
+            return Status(
+                201, await self.model_util.create_s(request, data, self.schema_out)
+            )
 
         return create
 
@@ -606,8 +617,11 @@ class APIViewSet(API, Generic[ModelT]):
             )
             if filters is not None:
                 qs = await self.query_params_handler(qs, filters.model_dump())
-            return await self.model_util.list_read_s(
-                self.schema_out, request, qs, is_for="read"
+            return Status(
+                200,
+                await self.model_util.list_read_s(
+                    self.schema_out, request, qs, is_for="read"
+                ),
             )
 
         return list
@@ -635,13 +649,16 @@ class APIViewSet(API, Generic[ModelT]):
         @decorate_view(unique_view(self), *self.extra_decorators.retrieve)
         async def retrieve(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
             query_data = self._get_query_data()
-            return await self.model_util.read_s(
-                retrieve_schema,
-                request,
-                query_data=QuerySchema(
-                    getters={"pk": self._get_pk(pk)}, **query_data.model_dump()
+            return Status(
+                200,
+                await self.model_util.read_s(
+                    retrieve_schema,
+                    request,
+                    query_data=QuerySchema(
+                        getters={"pk": self._get_pk(pk)}, **query_data.model_dump()
+                    ),
+                    is_for="detail" if self.schema_detail else "read",
                 ),
-                is_for="detail" if self.schema_detail else "read",
             )
 
         return retrieve
@@ -664,8 +681,11 @@ class APIViewSet(API, Generic[ModelT]):
             data: self.schema_update,  # type: ignore
             pk: Path[self.path_schema],  # type: ignore
         ):
-            return await self.model_util.update_s(
-                request, data, self._get_pk(pk), self.schema_out
+            return Status(
+                200,
+                await self.model_util.update_s(
+                    request, data, self._get_pk(pk), self.schema_out
+                ),
             )
 
         return update
@@ -684,7 +704,9 @@ class APIViewSet(API, Generic[ModelT]):
         )
         @decorate_view(aatomic, unique_view(self), *self.extra_decorators.delete)
         async def delete(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
-            return 204, await self.model_util.delete_s(request, self._get_pk(pk))
+            return Status(
+                204, await self.model_util.delete_s(request, self._get_pk(pk))
+            )
 
         return delete
 
