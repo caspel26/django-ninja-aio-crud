@@ -1,7 +1,9 @@
+from unittest.mock import patch
+
 from django.test import TestCase, tag
 
 from ninja_aio import NinjaAIO
-from ninja_aio.exceptions import NotFoundError
+from ninja_aio.exceptions import SerializeError
 from ninja_aio.models import ModelUtil
 from tests.generics.request import Request
 from tests.test_app import models, views, schema
@@ -60,13 +62,13 @@ class BulkModelViewSetTestCase(TestCase):
         view = self.viewset.bulk_create_view()
         result = await view(self.post_request, items)
 
-        self.assertEqual(result.status_code, 201)
-        self.assertEqual(len(result.value), 3)
-
-        # Verify response data
-        self.assertEqual(result.value[0]["name"], "bulk_1")
-        self.assertEqual(result.value[1]["name"], "bulk_2")
-        self.assertEqual(result.value[2]["name"], "bulk_3")
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(result.value["success"]["count"], 3)
+        self.assertEqual(result.value["errors"]["count"], 0)
+        self.assertEqual(len(result.value["success"]["details"]), 3)
+        self.assertEqual(result.value["success"]["details"][0]["name"], "bulk_1")
+        self.assertEqual(result.value["success"]["details"][1]["name"], "bulk_2")
+        self.assertEqual(result.value["success"]["details"][2]["name"], "bulk_3")
 
         # Verify objects exist in DB
         count = await self.model.objects.acount()
@@ -77,14 +79,14 @@ class BulkModelViewSetTestCase(TestCase):
         view = self.viewset.bulk_create_view()
         result = await view(self.post_request, [])
 
-        self.assertEqual(result.status_code, 201)
-        self.assertEqual(result.value, [])
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(result.value["success"]["count"], 0)
+        self.assertEqual(result.value["errors"]["count"], 0)
 
     async def test_bulk_update(self):
         """Update multiple objects in one request."""
         await self.model.objects.all().adelete()
 
-        # Create objects first
         obj1 = await self.model.objects.acreate(name="orig_1", description="desc_1")
         obj2 = await self.model.objects.acreate(name="orig_2", description="desc_2")
 
@@ -97,25 +99,37 @@ class BulkModelViewSetTestCase(TestCase):
         result = await view(self.patch_request, update_items)
 
         self.assertEqual(result.status_code, 200)
-        self.assertEqual(len(result.value), 2)
+        self.assertEqual(result.value["success"]["count"], 2)
+        self.assertEqual(result.value["errors"]["count"], 0)
+        self.assertEqual(
+            result.value["success"]["details"][0]["description"], "updated_1"
+        )
+        self.assertEqual(result.value["success"]["details"][0]["name"], "orig_1")
+        self.assertEqual(
+            result.value["success"]["details"][1]["description"], "updated_2"
+        )
+        self.assertEqual(result.value["success"]["details"][1]["name"], "orig_2")
 
-        # Verify updated data
-        self.assertEqual(result.value[0]["description"], "updated_1")
-        self.assertEqual(result.value[0]["name"], "orig_1")
-        self.assertEqual(result.value[1]["description"], "updated_2")
-        self.assertEqual(result.value[1]["name"], "orig_2")
-
-    async def test_bulk_update_not_found(self):
-        """Bulk update raises NotFoundError for non-existent PK."""
+    async def test_bulk_update_partial_failure(self):
+        """Bulk update with one valid and one non-existent PK returns partial success."""
         await self.model.objects.all().adelete()
 
+        obj1 = await self.model.objects.acreate(name="orig_1", description="desc_1")
+
         update_items = [
+            self.viewset.bulk_update_schema(id=obj1.pk, description="updated_1"),
             self.viewset.bulk_update_schema(id=99999, description="nope"),
         ]
 
         view = self.viewset.bulk_update_view()
-        with self.assertRaises(NotFoundError):
-            await view(self.patch_request, update_items)
+        result = await view(self.patch_request, update_items)
+
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(result.value["success"]["count"], 1)
+        self.assertEqual(result.value["errors"]["count"], 1)
+        self.assertEqual(
+            result.value["success"]["details"][0]["description"], "updated_1"
+        )
 
     async def test_bulk_delete(self):
         """Delete multiple objects in one request."""
@@ -130,8 +144,11 @@ class BulkModelViewSetTestCase(TestCase):
         view = self.viewset.bulk_delete_view()
         result = await view(self.delete_request, delete_data)
 
-        self.assertEqual(result.status_code, 204)
-        self.assertIsNone(result.value)
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(result.value["success"]["count"], 2)
+        self.assertEqual(result.value["errors"]["count"], 0)
+        self.assertIn(obj1.pk, result.value["success"]["details"])
+        self.assertIn(obj2.pk, result.value["success"]["details"])
 
         # Verify only obj3 remains
         count = await self.model.objects.acount()
@@ -139,15 +156,24 @@ class BulkModelViewSetTestCase(TestCase):
         remaining = await self.model.objects.afirst()
         self.assertEqual(remaining.pk, obj3.pk)
 
-    async def test_bulk_delete_not_found(self):
-        """Bulk delete raises NotFoundError for non-existent PK."""
+    async def test_bulk_delete_partial_failure(self):
+        """Bulk delete with some non-existent PKs returns partial success."""
         await self.model.objects.all().adelete()
 
-        delete_data = self.viewset.bulk_delete_schema(ids=[99999])
+        obj1 = await self.model.objects.acreate(name="del_1", description="desc_1")
+
+        delete_data = self.viewset.bulk_delete_schema(ids=[obj1.pk, 99999])
 
         view = self.viewset.bulk_delete_view()
-        with self.assertRaises(NotFoundError):
-            await view(self.delete_request, delete_data)
+        result = await view(self.delete_request, delete_data)
+
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(result.value["success"]["count"], 1)
+        self.assertEqual(result.value["errors"]["count"], 1)
+        self.assertIn(obj1.pk, result.value["success"]["details"])
+
+        count = await self.model.objects.acount()
+        self.assertEqual(count, 0)
 
     async def test_bulk_delete_empty_list(self):
         """Bulk delete with an empty list is a no-op."""
@@ -158,9 +184,83 @@ class BulkModelViewSetTestCase(TestCase):
         view = self.viewset.bulk_delete_view()
         result = await view(self.delete_request, delete_data)
 
-        self.assertEqual(result.status_code, 204)
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(result.value["success"]["count"], 0)
+        self.assertEqual(result.value["errors"]["count"], 0)
         final_count = await self.model.objects.acount()
         self.assertEqual(initial_count, final_count)
+
+    async def test_bulk_create_serialize_error(self):
+        """Bulk create collects SerializeError as error details."""
+        await self.model.objects.all().adelete()
+
+        items = [
+            schema.TestModelSchemaIn(name="ok_item", description="desc"),
+            schema.TestModelSchemaIn(name="bad_item", description="desc"),
+        ]
+
+        original_create_s = self.viewset.model_util.create_s
+
+        async def mock_create_s(request, data, obj_schema):
+            if data.name == "bad_item":
+                raise SerializeError("create failed")
+            return await original_create_s(request, data, obj_schema)
+
+        with patch.object(
+            self.viewset.model_util, "create_s", side_effect=mock_create_s
+        ):
+            view = self.viewset.bulk_create_view()
+            result = await view(self.post_request, items)
+
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(result.value["success"]["count"], 1)
+        self.assertEqual(result.value["errors"]["count"], 1)
+
+    async def test_bulk_create_generic_exception(self):
+        """Bulk create collects generic exceptions via _format_bulk_error fallback."""
+        await self.model.objects.all().adelete()
+
+        items = [
+            schema.TestModelSchemaIn(name="bad", description="desc"),
+        ]
+
+        with patch.object(
+            self.viewset.model_util,
+            "create_s",
+            side_effect=RuntimeError("unexpected"),
+        ):
+            view = self.viewset.bulk_create_view()
+            result = await view(self.post_request, items)
+
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(result.value["success"]["count"], 0)
+        self.assertEqual(result.value["errors"]["count"], 1)
+        self.assertEqual(result.value["errors"]["details"][0]["error"], "unexpected")
+
+    async def test_bulk_update_generic_exception(self):
+        """Bulk update collects generic exceptions via _format_bulk_error fallback."""
+        await self.model.objects.all().adelete()
+
+        obj1 = await self.model.objects.acreate(name="orig", description="desc")
+
+        update_items = [
+            self.viewset.bulk_update_schema(id=obj1.pk, description="updated"),
+        ]
+
+        with patch.object(
+            self.viewset.model_util,
+            "update_s",
+            side_effect=RuntimeError("unexpected update"),
+        ):
+            view = self.viewset.bulk_update_view()
+            result = await view(self.patch_request, update_items)
+
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(result.value["success"]["count"], 0)
+        self.assertEqual(result.value["errors"]["count"], 1)
+        self.assertEqual(
+            result.value["errors"]["details"][0]["error"], "unexpected update"
+        )
 
 
 @tag("bulk")
@@ -205,10 +305,11 @@ class BulkModelSerializerViewSetTestCase(TestCase):
         view = self.viewset.bulk_create_view()
         result = await view(self.post_request, items)
 
-        self.assertEqual(result.status_code, 201)
-        self.assertEqual(len(result.value), 2)
-        self.assertEqual(result.value[0]["name"], "ms_bulk_1")
-        self.assertEqual(result.value[1]["name"], "ms_bulk_2")
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(result.value["success"]["count"], 2)
+        self.assertEqual(result.value["errors"]["count"], 0)
+        self.assertEqual(result.value["success"]["details"][0]["name"], "ms_bulk_1")
+        self.assertEqual(result.value["success"]["details"][1]["name"], "ms_bulk_2")
 
         count = await self.model.objects.acount()
         self.assertEqual(count, 2)
@@ -229,9 +330,14 @@ class BulkModelSerializerViewSetTestCase(TestCase):
         result = await view(self.patch_request, update_items)
 
         self.assertEqual(result.status_code, 200)
-        self.assertEqual(len(result.value), 2)
-        self.assertEqual(result.value[0]["description"], "ms_updated_1")
-        self.assertEqual(result.value[1]["description"], "ms_updated_2")
+        self.assertEqual(result.value["success"]["count"], 2)
+        self.assertEqual(result.value["errors"]["count"], 0)
+        self.assertEqual(
+            result.value["success"]["details"][0]["description"], "ms_updated_1"
+        )
+        self.assertEqual(
+            result.value["success"]["details"][1]["description"], "ms_updated_2"
+        )
 
     async def test_bulk_delete(self):
         """Bulk delete with ModelSerializer."""
@@ -245,7 +351,9 @@ class BulkModelSerializerViewSetTestCase(TestCase):
         view = self.viewset.bulk_delete_view()
         result = await view(self.delete_request, delete_data)
 
-        self.assertEqual(result.status_code, 204)
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(result.value["success"]["count"], 2)
+        self.assertEqual(result.value["errors"]["count"], 0)
         count = await self.model.objects.acount()
         self.assertEqual(count, 0)
 

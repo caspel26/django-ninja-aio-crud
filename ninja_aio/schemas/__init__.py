@@ -5,6 +5,8 @@ from .api import (
     M2MAddSchemaIn,
     M2MRemoveSchemaIn,
     M2MSchemaIn,
+    BulkDetailSchema,
+    BulkResultSchema,
 )
 from .filters import (
     RelationFilterSchema,
@@ -27,6 +29,8 @@ __all__ = [
     "M2MAddSchemaIn",
     "M2MRemoveSchemaIn",
     "M2MSchemaIn",
+    "BulkDetailSchema",
+    "BulkResultSchema",
     "M2MRelationSchema",
     "QuerySchema",
     "ModelQuerySetSchema",

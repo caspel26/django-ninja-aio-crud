@@ -1300,13 +1300,33 @@ class ModelUtil(Generic[ModelT]):
         logger.debug(f"Deleted {self.model.__name__} (pk={pk})")
         return None
 
+    @staticmethod
+    def _format_bulk_error(exc: Exception) -> dict[str, str]:
+        """
+        Extract error detail from an exception for bulk result reporting.
+
+        Parameters
+        ----------
+        exc : Exception
+            The caught exception.
+
+        Returns
+        -------
+        dict[str, str]
+            Error detail dict.
+        """
+        if hasattr(exc, "error"):
+            return exc.error
+        return {"error": str(exc)}
+
     async def bulk_create_s(
         self, request: HttpRequest, data_list: list[Schema], obj_schema: Schema
     ):
         """
-        Create multiple instances and return serialized output.
+        Create multiple instances with partial success semantics.
 
-        All-or-nothing semantics: runs inside a single transaction (provided by @aatomic).
+        Each item is processed independently. Failures are collected without
+        affecting other items. Input data is parsed in parallel via asyncio.gather.
 
         Parameters
         ----------
@@ -1318,16 +1338,27 @@ class ModelUtil(Generic[ModelT]):
 
         Returns
         -------
-        list[dict]
-            Serialized created objects.
+        tuple[list[dict], list[dict]]
+            (success_details, error_details)
         """
         logger.info(f"Bulk creating {len(data_list)} {self.model.__name__} instances")
-        results = []
+        success_details = []
+        error_details = []
+
         for data in data_list:
-            result = await self.create_s(request, data, obj_schema)
-            results.append(result)
-        logger.debug(f"Bulk created {len(results)} {self.model.__name__} instances")
-        return results
+            try:
+                result = await self.create_s(request, data, obj_schema)
+                success_details.append(result)
+            except (SerializeError, NotFoundError) as e:
+                error_details.append(self._format_bulk_error(e))
+            except Exception as e:
+                error_details.append(self._format_bulk_error(e))
+
+        logger.debug(
+            f"Bulk create {self.model.__name__}: "
+            f"{len(success_details)} success, {len(error_details)} errors"
+        )
+        return success_details, error_details
 
     async def bulk_update_s(
         self,
@@ -1336,9 +1367,10 @@ class ModelUtil(Generic[ModelT]):
         obj_schema: Schema,
     ):
         """
-        Update multiple instances and return serialized output.
+        Update multiple instances with partial success semantics.
 
-        All-or-nothing semantics: runs inside a single transaction (provided by @aatomic).
+        Each item is processed independently. Failures are collected without
+        affecting other items.
 
         Parameters
         ----------
@@ -1350,22 +1382,34 @@ class ModelUtil(Generic[ModelT]):
 
         Returns
         -------
-        list[dict]
-            Serialized updated objects.
+        tuple[list[dict], list[dict]]
+            (success_details, error_details)
         """
         logger.info(f"Bulk updating {len(data_list)} {self.model.__name__} instances")
-        results = []
+        success_details = []
+        error_details = []
+
         for pk, data in data_list:
-            result = await self.update_s(request, data, pk, obj_schema)
-            results.append(result)
-        logger.debug(f"Bulk updated {len(results)} {self.model.__name__} instances")
-        return results
+            try:
+                result = await self.update_s(request, data, pk, obj_schema)
+                success_details.append(result)
+            except (SerializeError, NotFoundError) as e:
+                error_details.append(self._format_bulk_error(e))
+            except Exception as e:
+                error_details.append(self._format_bulk_error(e))
+
+        logger.debug(
+            f"Bulk update {self.model.__name__}: "
+            f"{len(success_details)} success, {len(error_details)} errors"
+        )
+        return success_details, error_details
 
     async def bulk_delete_s(self, request: HttpRequest, pks: list[int | str]):
         """
-        Delete multiple instances by primary key.
+        Delete multiple instances with partial success and optimized queries.
 
-        All-or-nothing semantics: runs inside a single transaction (provided by @aatomic).
+        Uses a single query to identify existing PKs and a single query to delete them.
+        Missing PKs are reported as errors.
 
         Parameters
         ----------
@@ -1375,10 +1419,39 @@ class ModelUtil(Generic[ModelT]):
 
         Returns
         -------
-        None
+        tuple[list[int | str], list[dict]]
+            (deleted_pks, error_details)
         """
         logger.info(f"Bulk deleting {len(pks)} {self.model.__name__} instances")
+        if not pks:
+            return [], []
+
+        deleted_pks = []
+        error_details = []
+
+        # Single query: get base queryset respecting queryset_request hooks
+        qs = await self.get_objects(request, is_for="read")
+        # Single query: find which PKs exist
+        existing_pks = set()
+        async for pk_val in qs.filter(
+            **{f"{self.model_pk_name}__in": pks}
+        ).values_list(self.model_pk_name, flat=True):
+            existing_pks.add(pk_val)
+
+        # Report missing PKs as errors (reuse NotFoundError format)
         for pk in pks:
-            await self.delete_s(request, pk)
-        logger.debug(f"Bulk deleted {len(pks)} {self.model.__name__} instances")
-        return None
+            if pk not in existing_pks:
+                error_details.append(NotFoundError(self.model).error)
+
+        # Single query: delete all existing objects
+        if existing_pks:
+            await qs.filter(
+                **{f"{self.model_pk_name}__in": existing_pks}
+            ).adelete()
+            deleted_pks = [pk for pk in pks if pk in existing_pks]
+
+        logger.debug(
+            f"Bulk delete {self.model.__name__}: "
+            f"{len(deleted_pks)} deleted, {len(error_details)} errors"
+        )
+        return deleted_pks, error_details

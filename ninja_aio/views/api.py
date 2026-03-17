@@ -16,6 +16,7 @@ from ninja_aio.models import ModelSerializer, ModelUtil
 from ninja_aio.schemas import (
     GenericMessageSchema,
     M2MRelationSchema,
+    BulkResultSchema,
 )
 from ninja_aio.helpers.api import ManyToManyAPI
 from ninja_aio.types import (
@@ -764,17 +765,23 @@ class APIViewSet(API, Generic[ModelT]):
             auth=self.post_view_auth(),
             summary=f"Bulk Create {self.model_verbose_name_plural}",
             description=self.bulk_create_docs,
-            response={201: List[self.schema_out], self.error_codes: GenericMessageSchema},
+            response={200: BulkResultSchema, self.error_codes: GenericMessageSchema},
         )
         @decorate_view(
-            aatomic, unique_view(self, plural=True), *self.extra_decorators.bulk_create
+            unique_view(self, plural=True), *self.extra_decorators.bulk_create
         )
         async def bulk_create(
             request: HttpRequest, data: List[self.schema_in]  # type: ignore
         ):
+            success, errors = await self.model_util.bulk_create_s(
+                request, data, self.schema_out
+            )
             return Status(
-                201,
-                await self.model_util.bulk_create_s(request, data, self.schema_out),
+                200,
+                {
+                    "success": {"count": len(success), "details": success},
+                    "errors": {"count": len(errors), "details": errors},
+                },
             )
 
         return bulk_create
@@ -791,12 +798,12 @@ class APIViewSet(API, Generic[ModelT]):
             summary=f"Bulk Update {self.model_verbose_name_plural}",
             description=self.bulk_update_docs,
             response={
-                200: List[self.schema_out],
+                200: BulkResultSchema,
                 self.error_codes: GenericMessageSchema,
             },
         )
         @decorate_view(
-            aatomic, unique_view(self, plural=True), *self.extra_decorators.bulk_update
+            unique_view(self, plural=True), *self.extra_decorators.bulk_update
         )
         async def bulk_update(
             request: HttpRequest,
@@ -810,11 +817,15 @@ class APIViewSet(API, Generic[ModelT]):
                 }
                 update_data = self.schema_update(**update_fields)
                 data_list.append((pk, update_data))
+            success, errors = await self.model_util.bulk_update_s(
+                request, data_list, self.schema_out
+            )
             return Status(
                 200,
-                await self.model_util.bulk_update_s(
-                    request, data_list, self.schema_out
-                ),
+                {
+                    "success": {"count": len(success), "details": success},
+                    "errors": {"count": len(errors), "details": errors},
+                },
             )
 
         return bulk_update
@@ -829,17 +840,23 @@ class APIViewSet(API, Generic[ModelT]):
             auth=self.delete_view_auth(),
             summary=f"Bulk Delete {self.model_verbose_name_plural}",
             description=self.bulk_delete_docs,
-            response={204: None, self.error_codes: GenericMessageSchema},
+            response={200: BulkResultSchema, self.error_codes: GenericMessageSchema},
         )
         @decorate_view(
-            aatomic, unique_view(self, plural=True), *self.extra_decorators.bulk_delete
+            unique_view(self, plural=True), *self.extra_decorators.bulk_delete
         )
         async def bulk_delete(
             request: HttpRequest, data: self.bulk_delete_schema  # type: ignore
         ):
+            deleted_pks, errors = await self.model_util.bulk_delete_s(
+                request, data.ids
+            )
             return Status(
-                204,
-                await self.model_util.bulk_delete_s(request, data.ids),
+                200,
+                {
+                    "success": {"count": len(deleted_pks), "details": deleted_pks},
+                    "errors": {"count": len(errors), "details": errors},
+                },
             )
 
         return bulk_delete

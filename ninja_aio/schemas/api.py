@@ -22,3 +22,13 @@ class M2MRemoveSchemaIn(Schema):
 class M2MSchemaIn(Schema):
     add: list = []
     remove: list = []
+
+
+class BulkDetailSchema(Schema):
+    count: int
+    details: list
+
+
+class BulkResultSchema(Schema):
+    success: BulkDetailSchema
+    errors: BulkDetailSchema
