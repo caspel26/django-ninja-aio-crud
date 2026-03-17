@@ -24,9 +24,150 @@ Notes:
   - When True (default, for backward compatibility), retrieve and POST paths includes a trailing slash into CRUD: `/{base}/{pk}/`.
   - When False, retrieve and post paths is generated without a trailing slash: `/{base}/{pk}`.
 
-## :material-star: Recommended: Decorator-based extra endpoints
+## :material-star: Recommended: `@action` Decorator (DRF-style)
 
-Use class method decorators to add non-CRUD endpoints to your ViewSet. This is the preferred way to extend a ViewSet with custom routes. The decorators lazily bind instance methods to the router and ensure correct OpenAPI signatures (no `self` in parameters).
+The `@action` decorator is the recommended way to add custom endpoints to your ViewSet. It provides a DRF-style API with automatic URL generation, auth inheritance, detail/list distinction, and full OpenAPI metadata support.
+
+```python
+from ninja_aio.decorators import action
+```
+
+### Basic Usage
+
+```python
+from ninja import Schema, Status
+from ninja_aio.decorators import action
+
+class CountSchema(Schema):
+    count: int
+
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    @action(detail=True, methods=["post"], url_path="activate")
+    async def activate(self, request, pk):
+        obj = await self.model_util.get_object(request, pk)
+        obj.is_active = True
+        await obj.asave()
+        return Status(200, {"message": "activated"})
+
+    @action(detail=False, methods=["get"], url_path="count", response=CountSchema)
+    async def count(self, request):
+        total = await self.model.objects.acount()
+        return {"count": total}
+```
+
+### Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `detail` | `bool` | — (required) | `True` = instance action (`/{pk}/path`), `False` = collection action |
+| `methods` | `list[str]` | `["get"]` | HTTP methods to register |
+| `url_path` | `str \| None` | `None` | Custom URL segment. Defaults to method name with `_` → `-` |
+| `url_name` | `str \| None` | `None` | Django URL name for reverse resolution |
+| `auth` | `Any` | `NOT_SET` | Auth override. `NOT_SET` inherits from viewset per-verb auth |
+| `response` | `Any` | `NOT_SET` | Response schema. `NOT_SET` lets Django Ninja infer it |
+| `summary` | `str \| None` | `None` | OpenAPI summary (auto-generated if None) |
+| `description` | `str \| None` | `None` | OpenAPI description |
+| `tags` | `list[str] \| None` | `None` | OpenAPI tags (inherits from viewset if None) |
+| `deprecated` | `bool \| None` | `None` | Mark as deprecated in OpenAPI |
+| `decorators` | `list[Callable] \| None` | `None` | Additional decorators to apply |
+| `throttle` | `BaseThrottle \| list[BaseThrottle]` | `NOT_SET` | Throttle configuration |
+| `include_in_schema` | `bool` | `True` | Whether to include in OpenAPI schema |
+| `openapi_extra` | `dict \| None` | `None` | Additional OpenAPI metadata |
+
+### Detail vs List Actions
+
+**Detail actions** (`detail=True`) operate on a single instance. The `pk` parameter is automatically added to the URL and renamed to match the model's primary key field name:
+
+```python
+@action(detail=True, methods=["post"], url_path="publish")
+async def publish(self, request, pk):
+    # URL: /article/{id}/publish
+    obj = await self.model_util.get_object(request, pk)
+    ...
+```
+
+**List actions** (`detail=False`) operate on the collection:
+
+```python
+@action(detail=False, methods=["get"], url_path="stats")
+async def stats(self, request):
+    # URL: /article/stats
+    ...
+```
+
+### Multiple HTTP Methods
+
+Register the same action for multiple HTTP methods:
+
+```python
+@action(detail=True, methods=["get", "post"], url_path="toggle")
+async def toggle(self, request, pk):
+    # Registers both GET and POST on /article/{id}/toggle
+    ...
+```
+
+### Auth Inheritance
+
+Actions inherit authentication from the viewset by default:
+
+```python
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    auth = [JWTAuth()]
+
+    # Inherits JWTAuth from viewset
+    @action(detail=False, methods=["get"], url_path="protected")
+    async def protected(self, request):
+        ...
+
+    # Override: make public
+    @action(detail=False, methods=["get"], url_path="public", auth=None)
+    async def public(self, request):
+        ...
+```
+
+### Custom Decorators
+
+Apply additional decorators to action handlers:
+
+```python
+from ninja_aio.decorators import aatomic
+
+@action(detail=False, methods=["post"], url_path="batch-op", decorators=[aatomic])
+async def batch_operation(self, request):
+    # Wrapped in atomic transaction
+    ...
+```
+
+### URL Path Auto-Generation
+
+When `url_path` is not provided, the method name is used with underscores replaced by hyphens:
+
+```python
+@action(detail=False, methods=["get"])
+async def my_custom_endpoint(self, request):
+    # URL: /article/my-custom-endpoint
+    ...
+```
+
+### Actions and `disable`
+
+Actions are **not affected** by `disable = ["all"]`. Custom actions are always registered even when all CRUD endpoints are disabled:
+
+```python
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    disable = ["all"]  # No CRUD endpoints
+
+    @action(detail=False, methods=["get"], url_path="health")
+    async def health(self, request):
+        return {"status": "ok"}  # Still registered
+```
+
+## :material-factory: Alternative: `@api_get` / `@api_post` decorators
+
+Class method decorators for adding custom endpoints. These provide direct control over the path and HTTP method, but without the automatic features of `@action` (no auto `{pk}`, no auth inheritance, no auto URL path).
 
 Available decorators (from `ninja_aio.decorators`):
 
@@ -71,7 +212,7 @@ Notes:
 
 ## :material-history: Legacy: views() method (still supported)
 
-The previous pattern of injecting endpoints inside `views()` is still supported, but the decorator-based approach above is now recommended.
+The previous pattern of injecting endpoints inside `views()` is still supported, but the `@action` and `@api_*` approaches above are now recommended.
 
 ```python
 class ArticleViewSet(APIViewSet):

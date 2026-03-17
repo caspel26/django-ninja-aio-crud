@@ -204,9 +204,9 @@ GET /api/article/?is_published=true&page=2&page_size=20
 
 ---
 
-## :material-pencil-plus: Custom Endpoints
+## :material-pencil-plus: Custom Endpoints (using `@api_get` / `@api_post`)
 
-Add custom endpoints beyond CRUD:
+Add custom endpoints beyond CRUD using method decorators. For a higher-level alternative with automatic URL generation, auth inheritance, and detail/list distinction, see [Custom Actions (DRF-style)](#custom-actions-drf-style) below.
 
 ```python
 from ninja_aio.decorators import api_get, api_post
@@ -319,6 +319,72 @@ GET /api/article/popular/
 # Get top 20
 GET /api/article/popular/?limit=20
 ```
+
+---
+
+## :material-star: Custom Actions (DRF-style)
+
+Use the `@action` decorator to add custom endpoints with a DRF-like API. Actions can operate on single instances (detail) or the collection (list):
+
+```python
+from ninja import Schema, Status
+from ninja_aio.views import APIViewSet
+from ninja_aio.decorators import action
+from .models import Article
+
+
+class CountSchema(Schema):
+    count: int
+
+
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    # Detail action: operates on a single article
+    @action(detail=True, methods=["post"], url_path="activate")
+    async def activate(self, request, pk):
+        obj = await self.model_util.get_object(request, pk)
+        obj.is_active = True
+        await obj.asave()
+        return Status(200, {"message": "activated"})
+
+    # List action: operates on the collection
+    @action(detail=False, methods=["get"], url_path="count", response=CountSchema)
+    async def count(self, request):
+        total = await self.model.objects.acount()
+        return {"count": total}
+
+    # Action with request body
+    @action(detail=False, methods=["post"], url_path="import")
+    async def import_articles(self, request, data: ArticleImportSchema):
+        return Status(200, {"message": f"imported {len(data.items)} articles"})
+
+    # Auto url_path from method name (underscores → hyphens)
+    @action(detail=False, methods=["get"])
+    async def recent_published(self, request):
+        return {"message": "recent"}
+```
+
+This generates:
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/article/{id}/activate` | Activate a single article |
+| `GET` | `/api/article/count` | Count all articles |
+| `POST` | `/api/article/import` | Import articles |
+| `GET` | `/api/article/recent-published` | Recent published (auto path) |
+
+### Key differences from `@api_get` / `@api_post`
+
+| Feature | `@action` | `@api_get` / `@api_post` |
+|---------|-----------|--------------------------|
+| Detail actions (with pk) | `detail=True` auto-adds `{pk}` | Manual `/{pk}/path` |
+| Multiple methods | `methods=["get", "post"]` | One decorator per method |
+| Auth inheritance | Inherits from viewset per-verb auth | Manual `auth=` |
+| URL path | Auto-generated from method name | Manual path required |
+| OpenAPI metadata | `summary`, `description`, `tags`, `deprecated` | Same via kwargs |
+
+!!! tip
+    Actions are **not affected** by `disable = ["all"]` — they are always registered, even when all CRUD endpoints are disabled.
 
 ---
 
