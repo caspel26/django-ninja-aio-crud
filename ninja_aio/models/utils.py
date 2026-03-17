@@ -1299,3 +1299,86 @@ class ModelUtil(Generic[ModelT]):
         await obj.adelete()
         logger.debug(f"Deleted {self.model.__name__} (pk={pk})")
         return None
+
+    async def bulk_create_s(
+        self, request: HttpRequest, data_list: list[Schema], obj_schema: Schema
+    ):
+        """
+        Create multiple instances and return serialized output.
+
+        All-or-nothing semantics: runs inside a single transaction (provided by @aatomic).
+
+        Parameters
+        ----------
+        request : HttpRequest
+        data_list : list[Schema]
+            List of input schema instances.
+        obj_schema : Schema
+            Read schema class for output.
+
+        Returns
+        -------
+        list[dict]
+            Serialized created objects.
+        """
+        logger.info(f"Bulk creating {len(data_list)} {self.model.__name__} instances")
+        results = []
+        for data in data_list:
+            result = await self.create_s(request, data, obj_schema)
+            results.append(result)
+        logger.debug(f"Bulk created {len(results)} {self.model.__name__} instances")
+        return results
+
+    async def bulk_update_s(
+        self,
+        request: HttpRequest,
+        data_list: list[tuple[int | str, Schema]],
+        obj_schema: Schema,
+    ):
+        """
+        Update multiple instances and return serialized output.
+
+        All-or-nothing semantics: runs inside a single transaction (provided by @aatomic).
+
+        Parameters
+        ----------
+        request : HttpRequest
+        data_list : list[tuple[int | str, Schema]]
+            List of (pk, update_schema_instance) tuples.
+        obj_schema : Schema
+            Read schema class for output.
+
+        Returns
+        -------
+        list[dict]
+            Serialized updated objects.
+        """
+        logger.info(f"Bulk updating {len(data_list)} {self.model.__name__} instances")
+        results = []
+        for pk, data in data_list:
+            result = await self.update_s(request, data, pk, obj_schema)
+            results.append(result)
+        logger.debug(f"Bulk updated {len(results)} {self.model.__name__} instances")
+        return results
+
+    async def bulk_delete_s(self, request: HttpRequest, pks: list[int | str]):
+        """
+        Delete multiple instances by primary key.
+
+        All-or-nothing semantics: runs inside a single transaction (provided by @aatomic).
+
+        Parameters
+        ----------
+        request : HttpRequest
+        pks : list[int | str]
+            List of primary keys.
+
+        Returns
+        -------
+        None
+        """
+        logger.info(f"Bulk deleting {len(pks)} {self.model.__name__} instances")
+        for pk in pks:
+            await self.delete_s(request, pk)
+        logger.debug(f"Bulk deleted {len(pks)} {self.model.__name__} instances")
+        return None

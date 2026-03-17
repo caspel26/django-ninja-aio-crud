@@ -21,6 +21,7 @@ from ninja_aio.helpers.api import ManyToManyAPI
 from ninja_aio.types import (
     ModelSerializerMeta,
     VIEW_TYPES,
+    BULK_TYPES,
     VALID_DJANGO_LOOKUPS,
     get_ninja_aio_meta_attr,
 )
@@ -282,6 +283,10 @@ class APIViewSet(API, Generic[ModelT]):
     extra_decorators: DecoratorsSchema = DecoratorsSchema()
     model_verbose_name: str = ""
     model_verbose_name_plural: str = ""
+    bulk_operations: list[type[BULK_TYPES]] = []
+    bulk_create_docs = "Create multiple objects in a single request."
+    bulk_update_docs = "Update multiple objects in a single request."
+    bulk_delete_docs = "Delete multiple objects in a single request."
 
     def __init__(
         self,
@@ -333,6 +338,9 @@ class APIViewSet(API, Generic[ModelT]):
             or prefix
             or self.model_util.verbose_name_path_resolver()
         )
+        self.bulk_path = "bulk/" if self.append_slash else "bulk"
+        self.bulk_update_schema = self._generate_bulk_update_schema()
+        self.bulk_delete_schema = self._generate_bulk_delete_schema()
         self.m2m_api = (
             None
             if not self.m2m_relations
@@ -354,6 +362,19 @@ class APIViewSet(API, Generic[ModelT]):
             "update": (self.schema_update, self.update_view),
             "delete": (None, self.delete_view),
         }
+
+    @property
+    def _bulk_views(self):
+        """
+        Mapping of bulk operation name to (schema, view factory).
+        Only operations listed in bulk_operations are included.
+        """
+        mapping = {
+            "create": (self.schema_in, self.bulk_create_view),
+            "update": (self.bulk_update_schema, self.bulk_update_view),
+            "delete": (None, self.bulk_delete_view),
+        }
+        return {k: v for k, v in mapping.items() if k in self.bulk_operations}
 
     def _check_relations_filters(self, filter: str):
         return filter in getattr(self, "relations_filters_fields", [])
@@ -710,6 +731,119 @@ class APIViewSet(API, Generic[ModelT]):
 
         return delete
 
+    def _generate_bulk_update_schema(self) -> Schema | None:
+        """
+        Dynamically build a schema combining the PK field (required) with update fields.
+        Returns None if schema_update is not available.
+        """
+        if self.schema_update is None:
+            return None
+        return create_model(
+            f"{self.model_util.model_name}BulkUpdateSchema",
+            __base__=self.schema_update,
+            **{self.model_util.model_pk_name: (self.model_util.pk_field_type, ...)},
+        )
+
+    def _generate_bulk_delete_schema(self) -> Schema:
+        """
+        Dynamically build a schema with a list of PK values for bulk deletion.
+        """
+        pk_python_type = self.model_util.pk_field_type
+        return create_model(
+            f"{self.model_util.model_name}BulkDeleteSchema",
+            ids=(List[pk_python_type], ...),
+        )
+
+    def bulk_create_view(self):
+        """
+        Register bulk create endpoint.
+        """
+
+        @self.router.post(
+            self.bulk_path,
+            auth=self.post_view_auth(),
+            summary=f"Bulk Create {self.model_verbose_name_plural}",
+            description=self.bulk_create_docs,
+            response={201: List[self.schema_out], self.error_codes: GenericMessageSchema},
+        )
+        @decorate_view(
+            aatomic, unique_view(self, plural=True), *self.extra_decorators.bulk_create
+        )
+        async def bulk_create(
+            request: HttpRequest, data: List[self.schema_in]  # type: ignore
+        ):
+            return Status(
+                201,
+                await self.model_util.bulk_create_s(request, data, self.schema_out),
+            )
+
+        return bulk_create
+
+    def bulk_update_view(self):
+        """
+        Register bulk update endpoint.
+        """
+        pk_name = self.model_util.model_pk_name
+
+        @self.router.patch(
+            self.bulk_path,
+            auth=self.patch_view_auth(),
+            summary=f"Bulk Update {self.model_verbose_name_plural}",
+            description=self.bulk_update_docs,
+            response={
+                200: List[self.schema_out],
+                self.error_codes: GenericMessageSchema,
+            },
+        )
+        @decorate_view(
+            aatomic, unique_view(self, plural=True), *self.extra_decorators.bulk_update
+        )
+        async def bulk_update(
+            request: HttpRequest,
+            data: List[self.bulk_update_schema],  # type: ignore
+        ):
+            data_list = []
+            for item in data:
+                pk = getattr(item, pk_name)
+                update_fields = {
+                    k: v for k, v in item.model_dump().items() if k != pk_name
+                }
+                update_data = self.schema_update(**update_fields)
+                data_list.append((pk, update_data))
+            return Status(
+                200,
+                await self.model_util.bulk_update_s(
+                    request, data_list, self.schema_out
+                ),
+            )
+
+        return bulk_update
+
+    def bulk_delete_view(self):
+        """
+        Register bulk delete endpoint.
+        """
+
+        @self.router.delete(
+            self.bulk_path,
+            auth=self.delete_view_auth(),
+            summary=f"Bulk Delete {self.model_verbose_name_plural}",
+            description=self.bulk_delete_docs,
+            response={204: None, self.error_codes: GenericMessageSchema},
+        )
+        @decorate_view(
+            aatomic, unique_view(self, plural=True), *self.extra_decorators.bulk_delete
+        )
+        async def bulk_delete(
+            request: HttpRequest, data: self.bulk_delete_schema  # type: ignore
+        ):
+            return Status(
+                204,
+                await self.model_util.bulk_delete_s(request, data.ids),
+            )
+
+        return bulk_delete
+
     def views(self):
         """
         Override to register custom non-CRUD endpoints on self.router.
@@ -721,25 +855,35 @@ class APIViewSet(API, Generic[ModelT]):
         self.views()
         if self.m2m_api is not None:
             self.m2m_api._add_views()
+        
+        for bulk_type, (schema, view) in self._bulk_views.items():
+            bulk_key = f"bulk_{bulk_type}"
+            if bulk_key not in self.disable and (
+                schema is not None or bulk_type == "delete"
+            ):
+                view()
+                logger.debug(
+                    f"Registered bulk_{bulk_type} view for {self.model.__name__}"
+                )
         return self.router
 
     def _add_views(self):
         """
-        Register CRUD (unless disabled), custom views, and M2M endpoints.
-        If 'all' in disable only CRUD is skipped; M2M + custom still added.
+        Register CRUD (unless disabled), bulk, custom views, and M2M endpoints.
+        If 'all' in disable only CRUD is skipped; bulk + M2M + custom still added.
         """
         super()._add_views()
         if "all" in self.disable:
             logger.debug(f"All CRUD views disabled for {self.model.__name__}")
             return self._set_additional_views()
-
         for views_type, (schema, view) in self._crud_views.items():
             if views_type not in self.disable and (
                 schema is not None or views_type == "delete"
             ):
                 view()
-                logger.debug(f"Registered {views_type} view for {self.model.__name__}")
-
+                logger.debug(
+                    f"Registered {views_type} view for {self.model.__name__}"
+                )
         return self._set_additional_views()
 
 

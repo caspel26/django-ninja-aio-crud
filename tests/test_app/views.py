@@ -70,6 +70,11 @@ class TestModelSerializerLessEqualMixinAPI(
     }
 
 
+class TestModelSerializerBulkAPI(GenericAPIViewSet):
+    model = models.TestModelSerializer
+    bulk_operations = ["create", "update", "delete"]
+
+
 class TestModelSerializerReverseForeignKeyAPI(GenericAPIViewSet):
     model = models.TestModelSerializerReverseForeignKey
 
@@ -104,6 +109,14 @@ class TestModelAPI(GenericAPIViewSet):
     schema_in = schema.TestModelSchemaIn
     schema_out = schema.TestModelSchemaOut
     schema_update = schema.TestModelSchemaPatch
+
+
+class TestModelBulkAPI(GenericAPIViewSet):
+    model = models.TestModel
+    schema_in = schema.TestModelSchemaIn
+    schema_out = schema.TestModelSchemaOut
+    schema_update = schema.TestModelSchemaPatch
+    bulk_operations = ["create", "update", "delete"]
 
 
 class TestModelReverseForeignKeyAPI(GenericAPIViewSet):
