@@ -774,7 +774,7 @@ class APIViewSet(API, Generic[ModelT]):
             request: HttpRequest, data: List[self.schema_in]  # type: ignore
         ):
             success, errors = await self.model_util.bulk_create_s(
-                request, data, self.schema_out
+                request, data
             )
             return Status(
                 200,
@@ -818,7 +818,7 @@ class APIViewSet(API, Generic[ModelT]):
                 update_data = self.schema_update(**update_fields)
                 data_list.append((pk, update_data))
             success, errors = await self.model_util.bulk_update_s(
-                request, data_list, self.schema_out
+                request, data_list
             )
             return Status(
                 200,
