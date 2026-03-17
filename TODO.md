@@ -9,14 +9,7 @@
 | # | Task | File(s) | Version | Description |
 |---|------|---------|---------|-------------|
 | 1 | ~~Bounded `_relation_cache`~~ | `models/utils.py` | v2.25.0 | Replaced unbounded dict with LRU cache (`maxsize=512`). |
-
----
-
-## 🔴 Critical
-
-| # | Task | File(s) | Description |
-|---|------|---------|-------------|
-| 2 | Mutable default arguments | `schemas/helpers.py:79-80, 205-209` | `DecoratorsSchema`, `M2MRelationSchema`, query schemas use `[]` / `{}` as defaults — all instances share the same object. Use `Field(default_factory=...)`. |
+| 2 | ~~Mutable default arguments~~ | `schemas/helpers.py` | — | Not a bug: Pydantic v2 deep-copies mutable defaults per instance. `Field(default_factory=...)` also incompatible with `ninja.Schema` root validator. |
 
 ---
 
