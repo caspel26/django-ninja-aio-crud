@@ -207,3 +207,6 @@ class DecoratorsSchema(Schema):
     create: Optional[List] = []
     update: Optional[List] = []
     delete: Optional[List] = []
+    bulk_create: Optional[List] = []
+    bulk_update: Optional[List] = []
+    bulk_delete: Optional[List] = []

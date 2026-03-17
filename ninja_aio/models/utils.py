@@ -1036,11 +1036,45 @@ class ModelUtil(Generic[ModelT]):
 
         return new_payload, customs
 
+    async def _create_instance(self, request: HttpRequest, data: Schema):
+        """
+        Create a new instance and run hooks.
+
+        Handles input parsing, object creation, and custom_actions/post_create
+        hooks. Does not serialize the output.
+
+        Parameters
+        ----------
+        request : HttpRequest
+        data : Schema
+            Input schema instance.
+
+        Returns
+        -------
+        ModelT
+            The created model instance.
+        """
+        logger.info(f"Creating {self.model.__name__}")
+        payload, customs = await self.parse_input_data(request, data)
+        # Create object and keep the full instance (FK instances already attached from parse_input_data)
+        obj = (
+            await self.model.objects.acreate(**payload)
+            if not self.with_serializer
+            else await self.serializer.create(payload)
+        )
+        logger.debug(f"Created {self.model.__name__} (pk={obj.pk})")
+        if isinstance(self.model, ModelSerializerMeta):
+            await asyncio.gather(obj.custom_actions(customs), obj.post_create())
+        if self.with_serializer:
+            await asyncio.gather(
+                self.serializer.custom_actions(customs, obj),
+                self.serializer.post_create(obj),
+            )
+        return obj
+
     async def create_s(self, request: HttpRequest, data: Schema, obj_schema: Schema):
         """
         Create a new instance and return serialized output.
-
-        Applies custom_actions + post_create hooks if available.
 
         Parameters
         ----------
@@ -1055,24 +1089,9 @@ class ModelUtil(Generic[ModelT]):
         dict
             Serialized created object.
         """
-        logger.info(f"Creating {self.model.__name__}")
-        payload, customs = await self.parse_input_data(request, data)
-        # Create object and keep the full instance (FK instances already attached from parse_input_data)
-        obj = (
-            await self.model.objects.acreate(**payload)
-            if not self.with_serializer
-            else await self.serializer.create(payload)
-        )
-        logger.debug(f"Created {self.model.__name__} (pk={obj.pk})")
+        obj = await self._create_instance(request, data)
         # Only prefetch reverse relations (forward FKs already loaded)
         obj = await self._prefetch_reverse_relations_on_instance(obj, is_for="read")
-        if isinstance(self.model, ModelSerializerMeta):
-            await asyncio.gather(obj.custom_actions(customs), obj.post_create())
-        if self.with_serializer:
-            await asyncio.gather(
-                self.serializer.custom_actions(customs, obj),
-                self.serializer.post_create(obj),
-            )
         return await self.read_s(obj_schema, request, obj)
 
     async def _read_s(
@@ -1236,13 +1255,49 @@ class ModelUtil(Generic[ModelT]):
             is_for,
         )
 
+    async def _update_instance(
+        self, request: HttpRequest, data: Schema, pk: int | str
+    ):
+        """
+        Update an existing instance and run hooks.
+
+        Handles input parsing, field assignment, custom_actions hooks, and
+        saving. Does not serialize the output.
+
+        Parameters
+        ----------
+        request : HttpRequest
+        data : Schema
+            Input update schema instance.
+        pk : int | str
+            Primary key of target object.
+
+        Returns
+        -------
+        ModelT
+            The updated model instance.
+        """
+        logger.info(f"Updating {self.model.__name__} (pk={pk})")
+        obj = await self.get_object(request, pk, is_for="read")
+        payload, customs = await self.parse_input_data(request, data)
+        for k, v in payload.items():
+            if v is not None:
+                setattr(obj, k, v)
+        if isinstance(self.model, ModelSerializerMeta):
+            await obj.custom_actions(customs)
+        if self.with_serializer:
+            await self.serializer.custom_actions(customs, obj)
+            await self.serializer.save(obj)
+        else:
+            await obj.asave()
+        logger.debug(f"Updated {self.model.__name__} (pk={pk})")
+        return obj
+
     async def update_s(
         self, request: HttpRequest, data: Schema, pk: int | str, obj_schema: Schema
     ):
         """
         Update an existing instance and return serialized output.
-
-        Only non-null fields are applied to the instance.
 
         Parameters
         ----------
@@ -1259,20 +1314,7 @@ class ModelUtil(Generic[ModelT]):
         dict
             Serialized updated object.
         """
-        logger.info(f"Updating {self.model.__name__} (pk={pk})")
-        obj = await self.get_object(request, pk, is_for="read")
-        payload, customs = await self.parse_input_data(request, data)
-        for k, v in payload.items():
-            if v is not None:
-                setattr(obj, k, v)
-        if isinstance(self.model, ModelSerializerMeta):
-            await obj.custom_actions(customs)
-        if self.with_serializer:
-            await self.serializer.custom_actions(customs, obj)
-            await self.serializer.save(obj)
-        else:
-            await obj.asave()
-        logger.debug(f"Updated {self.model.__name__} (pk={pk})")
+        obj = await self._update_instance(request, data, pk)
         # FK instances from parse_input_data are already attached to obj
         # Only refresh reverse relations since they might have changed
         updated_object = await self._prefetch_reverse_relations_on_instance(
@@ -1299,3 +1341,156 @@ class ModelUtil(Generic[ModelT]):
         await obj.adelete()
         logger.debug(f"Deleted {self.model.__name__} (pk={pk})")
         return None
+
+    @staticmethod
+    def _format_bulk_error(exc: Exception) -> dict[str, str]:
+        """
+        Extract error detail from an exception for bulk result reporting.
+
+        Parameters
+        ----------
+        exc : Exception
+            The caught exception.
+
+        Returns
+        -------
+        dict[str, str]
+            Error detail dict.
+        """
+        if hasattr(exc, "error"):
+            return exc.error
+        return {"error": str(exc)}
+
+    async def bulk_create_s(
+        self, request: HttpRequest, data_list: list[Schema]
+    ):
+        """
+        Create multiple instances with partial success semantics.
+
+        Each item is processed independently. Failures are collected without
+        affecting other items. Returns PKs of created objects instead of
+        serialized output.
+
+        Parameters
+        ----------
+        request : HttpRequest
+        data_list : list[Schema]
+            List of input schema instances.
+
+        Returns
+        -------
+        tuple[list[int | str], list[dict]]
+            (created_pks, error_details)
+        """
+        logger.info(f"Bulk creating {len(data_list)} {self.model.__name__} instances")
+        success_details = []
+        error_details = []
+
+        for data in data_list:
+            try:
+                obj = await self._create_instance(request, data)
+                success_details.append(obj.pk)
+            except (SerializeError, NotFoundError) as e:
+                error_details.append(self._format_bulk_error(e))
+            except Exception as e:
+                error_details.append(self._format_bulk_error(e))
+
+        logger.debug(
+            f"Bulk create {self.model.__name__}: "
+            f"{len(success_details)} success, {len(error_details)} errors"
+        )
+        return success_details, error_details
+
+    async def bulk_update_s(
+        self,
+        request: HttpRequest,
+        data_list: list[tuple[int | str, Schema]],
+    ):
+        """
+        Update multiple instances with partial success semantics.
+
+        Each item is processed independently. Failures are collected without
+        affecting other items. Returns PKs of updated objects instead of
+        serialized output.
+
+        Parameters
+        ----------
+        request : HttpRequest
+        data_list : list[tuple[int | str, Schema]]
+            List of (pk, update_schema_instance) tuples.
+
+        Returns
+        -------
+        tuple[list[int | str], list[dict]]
+            (updated_pks, error_details)
+        """
+        logger.info(f"Bulk updating {len(data_list)} {self.model.__name__} instances")
+        success_details = []
+        error_details = []
+
+        for pk, data in data_list:
+            try:
+                await self._update_instance(request, data, pk)
+                success_details.append(pk)
+            except (SerializeError, NotFoundError) as e:
+                error_details.append(self._format_bulk_error(e))
+            except Exception as e:
+                error_details.append(self._format_bulk_error(e))
+
+        logger.debug(
+            f"Bulk update {self.model.__name__}: "
+            f"{len(success_details)} success, {len(error_details)} errors"
+        )
+        return success_details, error_details
+
+    async def bulk_delete_s(self, request: HttpRequest, pks: list[int | str]):
+        """
+        Delete multiple instances with partial success and optimized queries.
+
+        Uses a single query to identify existing PKs and a single query to delete them.
+        Missing PKs are reported as errors.
+
+        Parameters
+        ----------
+        request : HttpRequest
+        pks : list[int | str]
+            List of primary keys.
+
+        Returns
+        -------
+        tuple[list[int | str], list[dict]]
+            (deleted_pks, error_details)
+        """
+        logger.info(f"Bulk deleting {len(pks)} {self.model.__name__} instances")
+        if not pks:
+            return [], []
+
+        deleted_pks = []
+        error_details = []
+
+        # Single query: get base queryset respecting queryset_request hooks
+        qs = await self.get_objects(request, is_for="read")
+        # Single query: find which PKs exist
+        existing_pks = set()
+        async for pk_val in qs.filter(
+            **{f"{self.model_pk_name}__in": pks}
+        ).values_list(self.model_pk_name, flat=True):
+            existing_pks.add(pk_val)
+
+        # Report missing PKs as errors (reuse NotFoundError format)
+        for pk in pks:
+            if pk not in existing_pks:
+                error_details.append(NotFoundError(self.model).error)
+
+        # Single query: delete all existing objects
+        if existing_pks:
+            await qs.filter(
+                **{f"{self.model_pk_name}__in": existing_pks}
+            ).adelete()
+            deleted_pks = [pk for pk in pks if pk in existing_pks]
+
+        logger.debug(
+            f"Bulk delete {self.model.__name__}: "
+            f"{len(deleted_pks)} deleted, {len(error_details)} errors"
+        )
+        return deleted_pks, error_details
