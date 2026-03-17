@@ -1,3 +1,4 @@
+import inspect
 import logging
 from typing import Generic, List, TypeVar
 
@@ -27,6 +28,8 @@ from ninja_aio.types import (
     get_ninja_aio_meta_attr,
 )
 from ninja_aio.decorators import unique_view, decorate_view, aatomic
+from ninja_aio.decorators.actions import ActionConfig
+from ninja_aio.factory import ApiMethodFactory
 from ninja_aio.models import serializers
 
 logger = logging.getLogger("ninja_aio.views")
@@ -868,11 +871,95 @@ class APIViewSet(API, Generic[ModelT]):
         """
         pass
 
+    def _register_single_action(
+        self, name: str, method: callable, config: ActionConfig
+    ) -> None:
+        """
+        Register a single @action-decorated method on the router.
+
+        For each HTTP method in config.methods, resolves the URL path,
+        auth, and decorators, then registers the handler on the router.
+        """
+        url_path = config.url_path if config.url_path is not None else name.replace(
+            "_", "-"
+        )
+
+        for http_method in config.methods:
+            factory = ApiMethodFactory(http_method)
+
+            if config.detail:
+                path = f"{self.get_path_retrieve}/{url_path}"
+            else:
+                path = url_path
+
+            auth = (
+                config.auth
+                if config.auth is not NOT_SET
+                else self._auth_view(http_method)
+            )
+
+            summary = config.summary or (
+                f"{http_method.upper()} {name.replace('_', ' ').title()}"
+                f" {self.model_verbose_name}"
+            )
+
+            handler = factory._build_handler(self, method)
+            factory._apply_metadata(handler, method)
+
+            if config.detail:
+                pk_name = self.model_util.model_pk_name
+                sig = inspect.signature(handler)
+                params = []
+                for p in sig.parameters.values():
+                    if p.name == "pk":
+                        params.append(p.replace(name=pk_name))
+                    else:
+                        params.append(p)
+                handler.__signature__ = sig.replace(parameters=params)
+
+            handler.__name__ = f"{name}_{http_method}_{self.model_util.model_name}"
+
+            if config.decorators:
+                for dec in reversed(config.decorators):
+                    handler = dec(handler)
+
+            route_adder = getattr(self.router, http_method)
+            route_adder(
+                path=path,
+                auth=auth,
+                throttle=config.throttle,
+                response=config.response,
+                summary=summary,
+                description=config.description,
+                tags=config.tags,
+                deprecated=config.deprecated,
+                url_name=config.url_name,
+                include_in_schema=config.include_in_schema,
+                openapi_extra=config.openapi_extra,
+            )(handler)
+
+            logger.debug(
+                f"Registered action {http_method.upper()} {path} "
+                f"for {self.model.__name__}"
+            )
+
+    def _register_actions(self) -> None:
+        """Discover and register @action-decorated methods on the router."""
+        for name in dir(self.__class__):
+            method = getattr(self.__class__, name, None)
+            if method is None:
+                continue
+            config = getattr(method, "_action_config", None)
+            if config is None:
+                continue
+            self._register_single_action(name, method, config)
+
     def _set_additional_views(self):
         self.views()
+        self._register_actions()
         if self.m2m_api is not None:
             self.m2m_api._add_views()
-        
+
         for bulk_type, (schema, view) in self._bulk_views.items():
             bulk_key = f"bulk_{bulk_type}"
             if bulk_key not in self.disable and (
