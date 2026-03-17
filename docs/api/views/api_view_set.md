@@ -105,7 +105,7 @@ class ArticleViewSet(APIViewSet):
 | `schema_update`             | `Schema \| None`              | `None` (auto)                                      | Update input schema override                                            |
 | `pagination_class`          | `type[AsyncPaginationBase]`   | `PageNumberPagination`                             | Pagination strategy                                                     |
 | `query_params`              | `dict[str, tuple[type, ...]]` | `{}`                                               | List endpoint filters definition                                        |
-| `disable`                   | `list[type[VIEW_TYPES]]`      | `[]`                                               | Disable CRUD views (`create`,`list`,`retrieve`,`update`,`delete`,`all`) |
+| `disable`                   | `list[type[VIEW_TYPES]]`      | `[]`                                               | Disable views (`create`,`list`,`retrieve`,`update`,`delete`,`bulk_create`,`bulk_update`,`bulk_delete`,`all`) |
 | `api_route_path`            | `str`                         | `""`                                               | Base route segment                                                      |
 | `list_docs`                 | `str`                         | `"List all objects."`                              | List endpoint description                                               |
 | `create_docs`               | `str`                         | `"Create a new object."`                           | Create endpoint description                                             |
@@ -114,9 +114,13 @@ class ArticleViewSet(APIViewSet):
 | `delete_docs`               | `str`                         | `"Delete an object by its primary key."`           | Delete endpoint description                                             |
 | `m2m_relations`             | `list[M2MRelationSchema]`     | `[]`                                               | M2M relation configs                                                    |
 | `m2m_auth`                  | `list \| None`                | `NOT_SET`                                          | Default auth for all M2M endpoints (overridden per relation if set)     |
-| `extra_decorators`          | `DecoratorsSchema`            | `DecoratorsSchema()`                               | Custom decorators for CRUD operations                                   |
+| `extra_decorators`          | `DecoratorsSchema`            | `DecoratorsSchema()`                               | Custom decorators for CRUD and bulk operations                          |
 | `model_verbose_name`        | `str`                         | `""`                                               | Override model verbose name for display                                 |
 | `model_verbose_name_plural` | `str`                         | `""`                                               | Override model verbose name plural for display                          |
+| `bulk_operations`           | `list[Literal["create", "update", "delete"]]` | `[]`                          | Bulk operations to enable (opt-in)                                      |
+| `bulk_create_docs`          | `str`                         | `"Create multiple objects in a single request."`   | Bulk create endpoint description                                        |
+| `bulk_update_docs`          | `str`                         | `"Update multiple objects in a single request."`   | Bulk update endpoint description                                        |
+| `bulk_delete_docs`          | `str`                         | `"Delete multiple objects in a single request."`   | Bulk delete endpoint description                                        |
 
 ### :material-tag: Verbose Name Resolution
 
@@ -246,6 +250,146 @@ class ArticleViewSet(APIViewSet):
 Endpoints behavior:
 - `GET /articles/` returns `[{"id": 1, "title": "...", "summary": "..."}, ...]`
 - `GET /articles/1` returns `{"id": 1, "title": "...", "summary": "...", "content": "...", "author": {...}, "tags": [...]}`
+
+## :material-content-copy: Bulk Operations
+
+Bulk operations allow creating, updating, or deleting multiple objects in a single request. They are **opt-in** — no bulk endpoints are registered unless explicitly enabled via `bulk_operations`.
+
+### Enabling Bulk Operations
+
+```python
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    bulk_operations = ["create", "update", "delete"]
+```
+
+### Generated Bulk Endpoints
+
+| Method | Path             | Summary       | Response                  |
+| ------ | ---------------- | ------------- | ------------------------- |
+| POST   | `/{base}/bulk/`  | Bulk Create   | `200 BulkResultSchema`    |
+| PATCH  | `/{base}/bulk/`  | Bulk Update   | `200 BulkResultSchema`    |
+| DELETE | `/{base}/bulk/`  | Bulk Delete   | `200 BulkResultSchema`    |
+
+### Response Format
+
+All bulk endpoints return a `BulkResultSchema` with **partial success** semantics — each item is processed independently, and failures don't affect other items:
+
+```json
+{
+  "success": {
+    "count": 2,
+    "details": [1, 3]
+  },
+  "errors": {
+    "count": 1,
+    "details": [{"error": "Not found."}]
+  }
+}
+```
+
+- **`success.details`** — list of primary keys of successfully processed objects.
+- **`errors.details`** — list of error detail dicts for each failed item.
+
+### Request Formats
+
+**Bulk Create** — request body is `List[schema_in]`:
+
+```json
+[
+  {"title": "Article 1", "content": "..."},
+  {"title": "Article 2", "content": "..."}
+]
+```
+
+**Bulk Update** — request body is a list of objects with the PK field (required) plus update fields. A dynamic schema is generated combining the PK field with `schema_update`:
+
+```json
+[
+  {"id": 1, "title": "Updated Title"},
+  {"id": 2, "content": "Updated Content"}
+]
+```
+
+**Bulk Delete** — request body contains a list of PK values:
+
+```json
+{"ids": [1, 2, 3]}
+```
+
+### Selective Enablement
+
+Enable only specific operations:
+
+```python
+bulk_operations = ["create"]          # Only bulk create
+bulk_operations = ["create", "delete"]  # Create and delete, no update
+```
+
+### Disabling Individual Bulk Views
+
+Bulk views can also be disabled via the `disable` attribute:
+
+```python
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    bulk_operations = ["create", "update", "delete"]
+    disable = ["bulk_update"]  # Disable only bulk update
+```
+
+Valid disable values: `bulk_create`, `bulk_update`, `bulk_delete`.
+
+### Partial Success Semantics
+
+Each item in a bulk request is processed independently. If an item fails (validation error, not found, etc.), the error is collected in the response but other items continue processing normally. This means:
+
+- Successful items are committed to the database immediately.
+- Failed items appear in `errors.details` with the error message.
+- The response always returns HTTP `200` with the combined result.
+
+### Performance
+
+- **Bulk Delete** is optimized to use a single database query (`DELETE ... WHERE pk IN (...)`) instead of deleting objects one by one.
+- **Bulk Create** and **Bulk Update** process items individually to preserve `save()` validations and hooks.
+
+### Authentication
+
+Bulk endpoints inherit per-verb authentication:
+
+| Bulk Operation | Auth Source    |
+| -------------- | ------------- |
+| Bulk Create    | `post_auth`   |
+| Bulk Update    | `patch_auth`  |
+| Bulk Delete    | `delete_auth` |
+
+### Hooks and Validators
+
+Bulk operations call the same hooks as single-item operations, **per item**:
+
+- `parse_input_data()` — field validation, FK resolution, base64 decoding
+- `custom_actions()` — custom field processing (create, update)
+- `post_create()` — post-creation hook (create only)
+
+### Extra Decorators
+
+Apply custom decorators to bulk endpoints via `extra_decorators`:
+
+```python
+extra_decorators = DecoratorsSchema(
+    bulk_create=[rate_limit],
+    bulk_update=[log_operation],
+    bulk_delete=[admin_only],
+)
+```
+
+### Core Attributes
+
+| Attribute            | Type                             | Default | Description                                      |
+| -------------------- | -------------------------------- | ------- | ------------------------------------------------ |
+| `bulk_operations`    | `list[Literal["create", "update", "delete"]]` | `[]`    | Which bulk operations to enable                  |
+| `bulk_create_docs`   | `str`                            | `"Create multiple objects in a single request."`  | Bulk create endpoint description                 |
+| `bulk_update_docs`   | `str`                            | `"Update multiple objects in a single request."`  | Bulk update endpoint description                 |
+| `bulk_delete_docs`   | `str`                            | `"Delete multiple objects in a single request."`  | Bulk delete endpoint description                 |
 
 ## :material-filter: List Filtering
 
@@ -612,6 +756,9 @@ Available decorator fields:
 - `retrieve`: Decorators for retrieve endpoint
 - `update`: Decorators for update endpoint
 - `delete`: Decorators for delete endpoint
+- `bulk_create`: Decorators for bulk create endpoint
+- `bulk_update`: Decorators for bulk update endpoint
+- `bulk_delete`: Decorators for bulk delete endpoint
 
 ## :material-hook: Overridable Hooks
 
@@ -681,6 +828,12 @@ Note: prefix and tags are optional. If omitted, the base path is inferred from t
 @api.viewset(model=User)
 class ReadOnlyUserViewSet(APIViewSet):
     disable = ["create", "update", "delete"]
+
+# Disable specific bulk operations
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    bulk_operations = ["create", "update", "delete"]
+    disable = ["bulk_delete"]  # Enable bulk create/update, disable bulk delete
 ```
 
 ## :material-shield-lock: Authentication Example

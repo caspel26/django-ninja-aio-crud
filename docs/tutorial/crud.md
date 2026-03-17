@@ -17,6 +17,7 @@ Build a complete REST API with automatic CRUD operations using <code>APIViewSet<
 - :material-view-grid: How to create a basic ViewSet
 - :material-auto-fix: Understanding auto-generated endpoints
 - :material-filter: Customizing query parameters
+- :material-content-copy: Enabling bulk operations
 - :material-pencil-plus: Adding custom endpoints
 - :material-web: Working with request context
 - :material-alert-circle: Handling errors
@@ -529,6 +530,98 @@ class ArticleViewSet(APIViewSet):
         }
 ```
 
+## :material-content-copy: Bulk Operations
+
+Need to create, update, or delete multiple objects at once? Enable bulk operations:
+
+```python
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    bulk_operations = ["create", "update", "delete"]
+```
+
+This adds three new endpoints to your API:
+
+| Method   | Endpoint              | Description                    | Request Body              | Response              |
+| -------- | --------------------- | ------------------------------ | ------------------------- | --------------------- |
+| `POST`   | `/api/articles/bulk/`  | Create multiple articles       | `[{...}, {...}]`          | `200 BulkResultSchema` |
+| `PATCH`  | `/api/articles/bulk/`  | Update multiple articles       | `[{id, ...}, {id, ...}]`  | `200 BulkResultSchema` |
+| `DELETE` | `/api/articles/bulk/`  | Delete multiple articles       | `{"ids": [1, 2, 3]}`     | `200 BulkResultSchema` |
+
+Bulk operations use **partial success** semantics — each item is processed independently. Successful items are committed while failures are collected in the response without affecting other items.
+
+### Response Format
+
+All bulk endpoints return a `BulkResultSchema`:
+
+```json
+{
+  "success": {
+    "count": 2,
+    "details": [1, 3]
+  },
+  "errors": {
+    "count": 1,
+    "details": [{"error": "Not found."}]
+  }
+}
+```
+
+- **`success.details`** contains the primary keys of successfully processed objects.
+- **`errors.details`** contains error details for each failed item.
+
+### Bulk Create
+
+Send a list of objects to create them all in one request:
+
+```bash
+curl -X POST http://localhost:8000/api/article/bulk/ \
+  -H "Content-Type: application/json" \
+  -d '[
+    {"title": "Article 1", "content": "Content 1", "author": 1},
+    {"title": "Article 2", "content": "Content 2", "author": 1},
+    {"title": "Article 3", "content": "Content 3", "author": 2}
+  ]'
+```
+
+### Bulk Update
+
+Send a list of objects with their primary key and the fields to update:
+
+```bash
+curl -X PATCH http://localhost:8000/api/article/bulk/ \
+  -H "Content-Type: application/json" \
+  -d '[
+    {"id": 1, "title": "Updated Title 1"},
+    {"id": 2, "title": "Updated Title 2", "is_published": true}
+  ]'
+```
+
+### Bulk Delete
+
+Send a list of primary keys to delete. This operation is **optimized** — it uses a single database query to delete all existing objects instead of deleting them one by one:
+
+```bash
+curl -X DELETE http://localhost:8000/api/article/bulk/ \
+  -H "Content-Type: application/json" \
+  -d '{"ids": [1, 2, 3]}'
+```
+
+### Selective Bulk Operations
+
+You can enable only the operations you need:
+
+```python
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    bulk_operations = ["create"]  # Only bulk create
+```
+
+!!! tip
+    Bulk operations reuse your existing `schema_in` and `schema_update` schemas, so all validations and hooks (like `custom_actions` and `post_create`) are applied per item.
+
+---
+
 ## :material-eye-off: Disabling Endpoints
 
 Disable specific CRUD operations:
@@ -853,6 +946,7 @@ Now that you have CRUD operations set up, let's add authentication!
 - :material-check: Creating custom endpoints
 - :material-check: Working with pagination
 - :material-check: Handling errors properly
+- :material-check: Using bulk operations
 - :material-check: Customizing responses
 
 </div>
