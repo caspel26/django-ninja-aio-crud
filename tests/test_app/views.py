@@ -75,6 +75,24 @@ class TestModelSerializerBulkAPI(GenericAPIViewSet):
     bulk_operations = ["create", "update", "delete"]
 
 
+class TestModelSerializerOrderingAPI(GenericAPIViewSet):
+    model = models.TestModelSerializer
+    ordering_fields = ["name", "id"]
+    default_ordering = "-id"
+
+
+class TestModelSerializerOrderingWithFiltersAPI(
+    GenericAPIViewSet,
+    mixins.IcontainsFilterViewSetMixin,
+):
+    model = models.TestModelSerializer
+    ordering_fields = ["name", "id"]
+    default_ordering = "-id"
+    query_params = {
+        "name": (str, None),
+    }
+
+
 class TestModelSerializerReverseForeignKeyAPI(GenericAPIViewSet):
     model = models.TestModelSerializerReverseForeignKey
 
