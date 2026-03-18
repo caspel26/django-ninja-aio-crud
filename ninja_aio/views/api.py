@@ -291,6 +291,8 @@ class APIViewSet(API, Generic[ModelT]):
     bulk_create_docs = "Create multiple objects in a single request."
     bulk_update_docs = "Update multiple objects in a single request."
     bulk_delete_docs = "Delete multiple objects in a single request."
+    ordering_fields: list[str] = []
+    default_ordering: str | list[str] = []
 
     def __init__(
         self,
@@ -529,8 +531,42 @@ class APIViewSet(API, Generic[ModelT]):
     def _generate_filters_schema(self):
         """
         Build filters schema from query_params definition.
+        Includes an 'ordering' field when ordering_fields is configured.
         """
-        return self._generate_schema(self.query_params, "FiltersSchema")
+        fields = dict(self.query_params)
+        if self.ordering_fields:
+            fields["ordering"] = (str, None)
+        return self._generate_schema(fields, "FiltersSchema")
+
+    def _apply_ordering(self, queryset: QuerySet, ordering_value: str | None) -> QuerySet:
+        """
+        Apply ordering to the queryset based on ordering_fields configuration.
+
+        Parses a comma-separated ordering string, validates each field against
+        ordering_fields, and applies valid fields via queryset.order_by().
+        Falls back to default_ordering when no valid fields are provided.
+        """
+        if not self.ordering_fields:
+            return queryset
+
+        if ordering_value:
+            valid = []
+            for field in ordering_value.split(","):
+                field = field.strip()
+                if not field:
+                    continue
+                bare = field.lstrip("-")
+                if bare in self.ordering_fields:
+                    valid.append(field)
+            if valid:
+                return queryset.order_by(*valid)
+
+        if self.default_ordering:
+            if isinstance(self.default_ordering, str):
+                return queryset.order_by(self.default_ordering)
+            return queryset.order_by(*self.default_ordering)
+
+        return queryset
 
     def _get_pk(self, data: Schema):
         """
@@ -641,7 +677,17 @@ class APIViewSet(API, Generic[ModelT]):
                 is_for="read",
             )
             if filters is not None:
-                qs = await self.query_params_handler(qs, filters.model_dump())
+                filters_dict = filters.model_dump()
+                ordering_value = (
+                    filters_dict.pop("ordering", None)
+                    if self.ordering_fields
+                    else None
+                )
+                if filters_dict:
+                    qs = await self.query_params_handler(qs, filters_dict)
+                qs = self._apply_ordering(qs, ordering_value)
+            elif self.ordering_fields:
+                qs = self._apply_ordering(qs, None)
             return Status(
                 200,
                 await self.model_util.list_read_s(

@@ -262,6 +262,8 @@ class ArticleViewSet(APIViewSet):
 | `bulk_create_docs`          | `str`                         | `"Create multiple objects in a single request."`   | Bulk create endpoint description                                        |
 | `bulk_update_docs`          | `str`                         | `"Update multiple objects in a single request."`   | Bulk update endpoint description                                        |
 | `bulk_delete_docs`          | `str`                         | `"Delete multiple objects in a single request."`   | Bulk delete endpoint description                                        |
+| `ordering_fields`           | `list[str]`                   | `[]`                                               | Fields allowed for ordering (empty = disabled)                          |
+| `default_ordering`          | `str \| list[str]`            | `[]`                                               | Default ordering when no `?ordering` param is provided                  |
 
 ### :material-tag: Verbose Name Resolution
 
@@ -531,6 +533,66 @@ extra_decorators = DecoratorsSchema(
 | `bulk_create_docs`   | `str`                            | `"Create multiple objects in a single request."`  | Bulk create endpoint description                 |
 | `bulk_update_docs`   | `str`                            | `"Update multiple objects in a single request."`  | Bulk update endpoint description                 |
 | `bulk_delete_docs`   | `str`                            | `"Delete multiple objects in a single request."`  | Bulk delete endpoint description                 |
+
+## :material-sort: Ordering
+
+Add native ordering support to the list endpoint with `ordering_fields` and `default_ordering`:
+
+```python
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    ordering_fields = ["created_at", "title", "views"]
+    default_ordering = "-created_at"
+```
+
+This automatically adds an `ordering` query parameter to the list endpoint:
+
+```bash
+# Single field ascending
+GET /api/article/?ordering=title
+
+# Single field descending
+GET /api/article/?ordering=-title
+
+# Multiple fields (comma-separated)
+GET /api/article/?ordering=-views,title
+
+# No ordering param → default_ordering applied
+GET /api/article/
+```
+
+### How It Works
+
+- When `ordering_fields` is set, an `ordering` query parameter is automatically added to the filters schema.
+- The `ordering` value is popped from the filters dict **before** `query_params_handler` runs, so existing filter mixins never see it.
+- Each field in the comma-separated value is validated against `ordering_fields`. Invalid fields are silently ignored.
+- Both `field` (ascending) and `-field` (descending) are valid if `field` is in `ordering_fields`.
+- If no valid fields remain, `default_ordering` is applied as fallback.
+- `default_ordering` accepts a single string (`"-created_at"`) or a list (`["-created_at", "title"]`).
+- When `ordering_fields` is empty (default), the feature is completely disabled — no query parameter is added.
+
+### Ordering with Filters
+
+Ordering works seamlessly with existing `query_params` and filter mixins:
+
+```python
+@api.viewset(model=Article)
+class ArticleViewSet(
+    APIViewSet,
+    IcontainsFilterViewSetMixin,
+):
+    ordering_fields = ["title", "created_at"]
+    default_ordering = "-created_at"
+    query_params = {
+        "title": (str, None),
+        "is_published": (bool, None),
+    }
+```
+
+```bash
+# Filter + ordering combined
+GET /api/article/?title=django&ordering=-created_at
+```
 
 ## :material-filter: List Filtering
 

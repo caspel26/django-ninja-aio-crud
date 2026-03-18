@@ -503,37 +503,16 @@ GET /api/article/?page=2&page_size=50
 
 ## :material-sort: Ordering
 
-Add ordering to list endpoint:
+Add native ordering to the list endpoint with `ordering_fields` and `default_ordering`:
 
 ```python
 @api.viewset(model=Article)
 class ArticleViewSet(APIViewSet):
-    query_params = {
-        "is_published": (bool, None),
-        "ordering": (str, "-created_at"),  # Default: newest first
-    }
-
-    async def query_params_handler(self, queryset, filters):
-        # Apply published filter
-        if filters.get("is_published") is not None:
-            queryset = queryset.filter(is_published=filters["is_published"])
-
-        # Apply ordering
-        ordering = filters.get("ordering", "-created_at")
-
-        # Validate ordering field
-        valid_fields = [
-            "created_at", "-created_at",
-            "title", "-title",
-            "views", "-views",
-            "published_at", "-published_at"
-        ]
-
-        if ordering in valid_fields:
-            queryset = queryset.order_by(ordering)
-
-        return queryset
+    ordering_fields = ["created_at", "title", "views", "published_at"]
+    default_ordering = "-created_at"  # Newest first by default
 ```
+
+That's it! The framework automatically adds an `ordering` query parameter to the list endpoint and validates fields.
 
 **Usage:**
 
@@ -550,12 +529,15 @@ GET /api/article/?ordering=title
 # By title Z-A
 GET /api/article/?ordering=-title
 
-# Most viewed
-GET /api/article/?ordering=-views
+# Multiple fields (comma-separated)
+GET /api/article/?ordering=-views,title
 
-# Recently published
-GET /api/article/?ordering=-published_at
+# Combined with filters
+GET /api/article/?ordering=-created_at&is_published=true
 ```
+
+!!! tip
+    Invalid field names are silently ignored. If all requested fields are invalid, `default_ordering` is applied.
 
 ---
 
