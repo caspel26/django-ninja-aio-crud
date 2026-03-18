@@ -262,6 +262,8 @@ class ArticleViewSet(APIViewSet):
 | `bulk_create_docs`          | `str`                         | `"Create multiple objects in a single request."`   | Bulk create endpoint description                                        |
 | `bulk_update_docs`          | `str`                         | `"Update multiple objects in a single request."`   | Bulk update endpoint description                                        |
 | `bulk_delete_docs`          | `str`                         | `"Delete multiple objects in a single request."`   | Bulk delete endpoint description                                        |
+| `ordering_fields`           | `list[str]`                   | `[]`                                               | Fields allowed for ordering (empty = disabled)                          |
+| `default_ordering`          | `str \| list[str]`            | `[]`                                               | Default ordering when no `?ordering` param is provided                  |
 
 ### :material-tag: Verbose Name Resolution
 
