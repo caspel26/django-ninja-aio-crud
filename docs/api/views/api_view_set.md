@@ -24,9 +24,9 @@ Notes:
   - When True (default, for backward compatibility), retrieve and POST paths includes a trailing slash into CRUD: `/{base}/{pk}/`.
   - When False, retrieve and post paths is generated without a trailing slash: `/{base}/{pk}`.
 
-## :material-star: Recommended: `@action` Decorator (DRF-style)
+## :material-star: Recommended: `@action` Decorator
 
-The `@action` decorator is the recommended way to add custom endpoints to your ViewSet. It provides a DRF-style API with automatic URL generation, auth inheritance, detail/list distinction, and full OpenAPI metadata support.
+The `@action` decorator is the recommended way to add custom endpoints to your ViewSet. It provides automatic URL generation, auth inheritance, detail/list distinction, and full OpenAPI metadata support.
 
 ```python
 from ninja_aio.decorators import action

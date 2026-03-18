@@ -8,7 +8,7 @@ Django Ninja AIO provides decorator utilities for composing view behavior and at
 
     ---
 
-    DRF-style custom actions for ViewSets
+    Custom actions for ViewSets
 
 -   :material-layers:{ .lg .middle } **`decorate_view`**
 
@@ -38,9 +38,9 @@ Django Ninja AIO provides decorator utilities for composing view behavior and at
 
 ---
 
-## :material-flash: `@action` (DRF-style custom actions)
+## :material-flash: `@action` (custom actions)
 
-DRF-style decorator for adding custom endpoints to ViewSets. Supports detail/list actions, multiple HTTP methods, auth inheritance, and full OpenAPI metadata.
+Decorator for adding custom endpoints to ViewSets. Supports detail/list actions, multiple HTTP methods, auth inheritance, and full OpenAPI metadata.
 
 ```python
 from ninja_aio.decorators import action
@@ -90,7 +90,7 @@ from ninja_aio.decorators import action
 - Actions survive `disable=["all"]` — always registered
 - Multiple methods create separate routes: `methods=["get", "post"]`
 
-See [APIViewSet @action](api_view_set.md#action-decorator-drf-style) for full parameter reference.
+See [APIViewSet @action](api_view_set.md#action-decorator) for full parameter reference.
 
 ---
 

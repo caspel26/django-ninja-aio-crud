@@ -206,7 +206,7 @@ GET /api/article/?is_published=true&page=2&page_size=20
 
 ## :material-pencil-plus: Custom Endpoints (using `@api_get` / `@api_post`)
 
-Add custom endpoints beyond CRUD using method decorators. For a higher-level alternative with automatic URL generation, auth inheritance, and detail/list distinction, see [Custom Actions (DRF-style)](#custom-actions-drf-style) below.
+Add custom endpoints beyond CRUD using method decorators. For a higher-level alternative with automatic URL generation, auth inheritance, and detail/list distinction, see [Custom Actions](#custom-actions) below.
 
 ```python
 from ninja_aio.decorators import api_get, api_post
@@ -322,9 +322,9 @@ GET /api/article/popular/?limit=20
 
 ---
 
-## :material-star: Custom Actions (DRF-style)
+## :material-star: Custom Actions
 
-Use the `@action` decorator to add custom endpoints with a DRF-like API. Actions can operate on single instances (detail) or the collection (list):
+Use the `@action` decorator to add custom endpoints to your ViewSet. Actions can operate on single instances (detail) or the collection (list):
 
 ```python
 from ninja import Schema, Status
