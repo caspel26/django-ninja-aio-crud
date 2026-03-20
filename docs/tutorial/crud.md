@@ -683,6 +683,20 @@ class ArticleViewSet(APIViewSet):
 
 ---
 
+## :material-shield-check: Partial Update Validation
+
+By default, PATCH endpoints accept empty payloads. Enable validation to reject them:
+
+```python
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    require_update_fields = True
+```
+
+Empty PATCH requests will return a `400` error: `"No fields provided for update."`. This also applies to bulk updates — empty items are collected as errors in partial success responses.
+
+---
+
 ## :material-eye-off: Disabling Endpoints
 
 Disable specific CRUD operations:
