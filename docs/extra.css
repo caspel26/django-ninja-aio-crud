@@ -1041,6 +1041,108 @@
   100% { transform: scale(1); }
 }
 
+/* CTA buttons hover glow + lift */
+.md-typeset .md-button {
+  transition: transform 0.25s ease, box-shadow 0.25s ease, background-color 0.25s ease;
+}
+
+.md-typeset .md-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(124, 77, 255, 0.35);
+}
+
+.md-typeset .md-button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(124, 77, 255, 0.2);
+}
+
+/* Table row highlight on hover */
+.md-typeset table:not(.highlighttable) tbody tr {
+  transition: background-color 0.2s ease;
+}
+
+.md-typeset table:not(.highlighttable) tbody tr:hover {
+  background-color: var(--md-code-bg-color);
+}
+
+/* Copy button success feedback */
+@keyframes copy-success {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+
+.md-clipboard--inline::after,
+.md-clipboard::after {
+  transition: opacity 0.2s ease;
+}
+
+button[data-clipboard-target].md-clipboard:focus,
+button[data-clipboard-target].md-clipboard:hover {
+  transition: color 0.2s ease;
+}
+
+/* Anchor heading flash when navigated via hash link */
+@keyframes heading-flash {
+  0% { background-color: rgba(124, 77, 255, 0.2); }
+  100% { background-color: transparent; }
+}
+
+.md-typeset [id]:target {
+  animation: heading-flash 1.5s ease-out;
+  border-radius: 0.2rem;
+}
+
+/* Smooth page fade transition with navigation.instant */
+.md-content {
+  animation: page-fade-in 0.25s ease-out;
+}
+
+@keyframes page-fade-in {
+  from { opacity: 0.6; }
+  to { opacity: 1; }
+}
+
+/* TOC active item animated indicator */
+.md-nav__link--active {
+  transition: color 0.2s ease, border-color 0.2s ease;
+  border-left: 2px solid var(--md-primary-fg-color) !important;
+  padding-left: 0.4rem;
+}
+
+.md-sidebar--secondary .md-nav__link {
+  transition: color 0.2s ease, padding-left 0.2s ease, border-left 0.2s ease;
+  border-left: 2px solid transparent;
+}
+
+.md-sidebar--secondary .md-nav__link:hover {
+  border-left-color: var(--md-primary-fg-color--light);
+  padding-left: 0.4rem;
+}
+
+/* Nav tabs underline slide */
+.md-tabs__link {
+  position: relative;
+  transition: color 0.2s ease;
+}
+
+.md-tabs__link::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 0;
+  height: 2px;
+  background: var(--md-accent-fg-color);
+  transition: width 0.3s ease, left 0.3s ease;
+}
+
+.md-tabs__link:hover::after,
+.md-tabs__link--active::after {
+  width: 100%;
+  left: 0;
+}
+
 /* Reduce motion for accessibility */
 @media (prefers-reduced-motion: reduce) {
   .md-typeset .hero,
@@ -1049,13 +1151,20 @@
   .badges,
   .cta-buttons,
   .mermaid,
-  .grid.cards > ul > li {
+  .grid.cards > ul > li,
+  .md-content,
+  .md-typeset [id]:target {
     animation: none;
   }
 
   .md-typeset .highlight,
   .md-typeset details,
-  .md-header {
+  .md-header,
+  .md-typeset .md-button,
+  .md-typeset table tbody tr,
+  .md-tabs__link,
+  .md-tabs__link::after,
+  .md-sidebar--secondary .md-nav__link {
     transition: none;
     animation: none;
   }
