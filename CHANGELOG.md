@@ -1,5 +1,278 @@
 # 📋 Release Notes
 
+## 🏷️ [v2.27.0] - 2026-03-18
+
+---
+
+### ✨ New Features
+
+#### ⚡ `@action` Decorator for Custom ViewSet Endpoints
+> `ninja_aio/decorators/actions.py`, `ninja_aio/views/api.py`
+
+Add custom endpoints to any `APIViewSet` using the `@action` decorator. Actions support detail (single instance) and list (collection) modes, multiple HTTP methods, auth inheritance, custom decorators, and full OpenAPI metadata.
+
+```python
+from ninja import Schema, Status
+from ninja_aio.decorators import action
+
+class CountSchema(Schema):
+    count: int
+
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    # Detail action: operates on a single instance
+    @action(detail=True, methods=["post"], url_path="activate")
+    async def activate(self, request, pk):
+        obj = await self.model_util.get_object(request, pk)
+        obj.is_active = True
+        await obj.asave()
+        return Status(200, {"message": "activated"})
+
+    # List action: operates on the collection
+    @action(detail=False, methods=["get"], url_path="count", response=CountSchema)
+    async def count(self, request):
+        total = await self.model.objects.acount()
+        return {"count": total}
+```
+
+**Key features:**
+
+| Feature | Description |
+|---|---|
+| 🎯 `detail=True` | Auto-adds `{pk}` to URL, renamed to match model PK field |
+| 🔗 `url_path` | Auto-generated from method name (`_` → `-`) if not provided |
+| 🔐 Auth inheritance | `auth=NOT_SET` inherits from viewset per-verb auth |
+| 🛡️ Survives `disable=["all"]` | Actions are always registered, even when CRUD is disabled |
+| 🔄 Multiple methods | `methods=["get", "post"]` creates separate routes |
+| 🎨 Decorators | `decorators=[aatomic]` applies custom wrappers |
+
+---
+
+#### 📦 Bulk Operations (Create, Update, Delete)
+> `ninja_aio/models/utils.py`, `ninja_aio/views/api.py`, `ninja_aio/schemas/api.py`
+
+Opt-in bulk endpoints for creating, updating, or deleting multiple objects in a single request with **partial success** semantics.
+
+```python
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    bulk_operations = ["create", "update", "delete"]
+```
+
+**Generated endpoints:**
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/{base}/bulk/` | Bulk create |
+| `PATCH` | `/{base}/bulk/` | Bulk update |
+| `DELETE` | `/{base}/bulk/` | Bulk delete |
+
+**Response format** — `BulkResultSchema`:
+
+```json
+{
+  "success": { "count": 2, "details": [1, 3] },
+  "errors": { "count": 1, "details": [{"error": "Not found."}] }
+}
+```
+
+**Design decisions:**
+
+- ✅ **Partial success** — each item is processed independently; failures don't affect other items
+- ✅ **PKs only** — `success.details` returns primary keys, not serialized objects
+- ✅ **Optimized bulk delete** — single `DELETE ... WHERE pk IN (...)` query
+- ✅ **Per-item hooks** — `parse_input_data()`, `custom_actions()`, `post_create()` called per item
+- ✅ **Per-verb auth** — `post_auth` for create, `patch_auth` for update, `delete_auth` for delete
+
+**New schemas:**
+
+| Schema | Description |
+|---|---|
+| `BulkDetailSchema` | `{count: int, details: list}` |
+| `BulkResultSchema` | `{success: BulkDetailSchema, errors: BulkDetailSchema}` |
+
+**Refactored `ModelUtil` methods:**
+
+| Method | Description |
+|---|---|
+| `_create_instance()` | Extracted from `create_s()` — creates object + runs hooks, returns model instance |
+| `_update_instance()` | Extracted from `update_s()` — updates object + runs hooks, returns model instance |
+| `bulk_create_s()` | Creates multiple objects, returns `(created_pks, error_details)` |
+| `bulk_update_s()` | Updates multiple objects, returns `(updated_pks, error_details)` |
+| `bulk_delete_s()` | Deletes multiple objects (single query), returns `(deleted_pks, error_details)` |
+| `_format_bulk_error()` | Static helper for error formatting |
+
+---
+
+#### 🔀 Native Ordering / Sorting
+> `ninja_aio/views/api.py`
+
+Add native ordering to the list endpoint with two new `APIViewSet` attributes:
+
+```python
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    ordering_fields = ["created_at", "title", "views"]
+    default_ordering = "-created_at"
+```
+
+**How it works:**
+
+- 📌 Automatically adds an `ordering` query parameter to the filters schema
+- ✅ Validates each field against `ordering_fields` (invalid fields silently ignored)
+- 🔄 Supports ascending (`field`), descending (`-field`), and multi-field (`-views,title`)
+- 📦 `default_ordering` accepts a string or list; applied when no valid `?ordering` is provided
+- 🛡️ `ordering` is popped from filters before `query_params_handler` runs — no interference with filter mixins
+- ⚡ Completely disabled when `ordering_fields` is empty (default)
+
+**New `APIViewSet` attributes:**
+
+| Attribute | Type | Default | Description |
+|---|---|---|---|
+| `ordering_fields` | `list[str]` | `[]` | Fields allowed for ordering |
+| `default_ordering` | `str \| list[str]` | `[]` | Default ordering when no `?ordering` param |
+
+---
+
+### 🔧 Improvements
+
+#### 🏷️ `disable` Attribute Extended for Bulk Operations
+> `ninja_aio/views/api.py`, `ninja_aio/types.py`
+
+The `disable` attribute now supports bulk operation values:
+
+| Value | Description |
+|---|---|
+| `bulk_create` | Disable bulk create endpoint |
+| `bulk_update` | Disable bulk update endpoint |
+| `bulk_delete` | Disable bulk delete endpoint |
+
+#### 🎨 `DecoratorsSchema` Extended for Bulk Operations
+> `ninja_aio/schemas/helpers.py`
+
+Three new fields added to `DecoratorsSchema`:
+
+| Field | Description |
+|---|---|
+| `bulk_create` | Decorators for bulk create endpoint |
+| `bulk_update` | Decorators for bulk update endpoint |
+| `bulk_delete` | Decorators for bulk delete endpoint |
+
+---
+
+#### 🚀 Batch Queryset Serialization — Up to 94% Faster
+> `ninja_aio/models/utils.py`
+
+Queryset serialization has been fundamentally optimized. Previously, each object in a queryset was serialized via an individual `sync_to_async(schema.from_orm)(obj)` call, creating N event loop context switches for N objects. Now, the entire queryset is serialized in a **single `sync_to_async` call** via the new `_bump_queryset_from_schema()` method.
+
+**Before (per-object):**
+```python
+# N sync_to_async calls — one per object
+[await self._bump_object_from_schema(obj, schema) async for obj in instance]
+```
+
+**After (batched):**
+```python
+# 1 sync_to_async call — entire queryset serialized at once
+async def _bump_queryset_from_schema(self, queryset, schema):
+    def _serialize_all():
+        return [schema.from_orm(obj).model_dump() for obj in queryset]
+    return await sync_to_async(_serialize_all)()
+```
+
+**Benchmark results:**
+
+| Metric | Before | After | Improvement |
+|---|---|---|---|
+| ⏱️ Bulk serialization (500 objects) | 21.80ms | 1.35ms | **-93.8%** |
+| ⏱️ Bulk serialization (100 objects) | 6.03ms | 0.49ms | **-92.0%** |
+| ⏱️ List endpoint (100 records) | 5.14ms | 0.82ms | **-84.0%** |
+| 🔄 `sync_to_async` overhead | 4975% | 102% | **~50x reduction** |
+| 📊 Per-object overhead | 0.119ms | 0.001ms | **119x less** |
+
+**Scalability at 17k records:**
+
+| Metric | Before | After |
+|---|---|---|
+| ⏱️ `list_read_s` (17k records) | 1.217s | 0.077s |
+| 📊 Throughput | ~0.07ms/obj | ~0.005ms/obj |
+
+Both `_read_s()` and `_serialize_queryset()` now use `_bump_queryset_from_schema()` for list serialization. Single-object serialization via `_bump_object_from_schema()` remains unchanged.
+
+---
+
+#### 🔗 Set-Based M2M Membership Validation
+> `ninja_aio/helpers/api.py`
+
+M2M add/remove validation now uses a **set of PKs** instead of a list of full model instances for membership checks.
+
+**Before:**
+```python
+# O(n) list — loads all related objects with select_related
+rel_objs = [rel_obj async for rel_obj in related_manager.select_related().all()]
+# O(n) membership check per PK
+if remove ^ (rel_obj in rel_objs):
+```
+
+**After:**
+```python
+# O(n) set — loads only PKs, no select_related overhead
+rel_obj_pks = {rel_obj.pk async for rel_obj in related_manager.all()}
+# O(1) membership check per PK
+if remove ^ (rel_obj.pk in rel_obj_pks):
+```
+
+**Two optimizations combined:**
+- 🔍 **O(1) membership checks** — `set` lookup instead of `list` scan
+- 📦 **No `select_related()`** — only PKs are needed, not full related objects
+
+---
+
+### 📖 Documentation
+
+- 📝 `docs/api/views/api_view_set.md` — Added `@action` decorator section (recommended), bulk operations section, ordering section, updated Core Attributes table with new attributes
+- 📝 `docs/api/views/decorators.md` — Added `@action` card and full reference with code examples
+- 📝 `docs/tutorial/crud.md` — Added Custom Actions tutorial, Bulk Operations tutorial, rewrote Ordering section for native support, renamed `@api_get`/`@api_post` section as alternative
+- 📝 `TODO.md` — Marked bulk operations, custom actions, and ordering as completed; renumbered remaining tasks (35 total)
+
+---
+
+### 🧪 Tests
+
+#### `ActionRegistrationTestCase` — 5 tests
+
+#### `ActionExecutionTestCase` — 4 tests
+
+#### `ActionDisableTestCase` — 2 tests
+
+#### `ActionAuthTestCase` — 2 tests
+
+#### `BulkCreateTestCase` — 5 tests, `BulkUpdateTestCase` — 5 tests, `BulkDeleteTestCase` — 6 tests
+
+#### `OrderingTestCase` — 10 tests
+
+#### `OrderingDisabledTestCase` — 2 tests
+
+#### `OrderingWithFiltersTestCase` — 2 tests
+
+#### `OrderingDefaultListTestCase` — 4 tests
+
+---
+
+### 🎯 Summary
+
+Version 2.27.0 introduces three major features — **`@action` decorator**, **bulk operations**, and **native ordering** — alongside a **major performance optimization** that makes serialization up to 94% faster for large datasets.
+
+**Key benefits:**
+- ⚡ **`@action` decorator** — add custom endpoints with auth inheritance, detail/list distinction, and auto URL generation
+- 📦 **Bulk operations** — create, update, and delete multiple objects in a single request with optimized bulk delete
+- 🔀 **Native ordering** — two-attribute configuration (`ordering_fields`, `default_ordering`) replaces manual `query_params_handler` ordering logic
+- 🚀 **Up to 94% faster serialization** — batch `sync_to_async` eliminates per-object overhead; 17k records in 0.077s (down from 1.2s)
+- 🔗 **O(1) M2M validation** — set-based PK membership checks replace O(n) list scans
+- 🧩 **Composable** — all features work seamlessly with existing filter mixins, pagination, and decorators
+
+---
+
 ## 🏷️ [v2.26.0] - 2026-03-13
 
 ---
@@ -131,7 +404,7 @@ Version 2.26.0 introduces **`NinjaAIOMeta`** for model-level framework configura
 - 📦 **Explicit status codes** — All views return `Status(code, data)` instead of raw tuples
 - 🐛 **Bug fix** — `not_found_name` now works correctly via `NinjaAIOMeta` (was dead code via `model._meta`)
 - 🔧 **Wider compatibility** — Support for Django Ninja <1.7.0 and joserfc <1.5.0
-- ✅ **100% coverage** — all 1888 source lines covered
+- ✅ **100% coverage** — all 1888 source lines covered by tests
 
 ---
 
