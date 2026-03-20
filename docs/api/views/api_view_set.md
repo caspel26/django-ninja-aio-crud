@@ -24,6 +24,33 @@ Notes:
   - When True (default, for backward compatibility), retrieve and POST paths includes a trailing slash into CRUD: `/{base}/{pk}/`.
   - When False, retrieve and post paths is generated without a trailing slash: `/{base}/{pk}`.
 
+## :material-transit-connection-variant: Request Lifecycle
+
+```mermaid
+graph TD
+    A[Incoming Request] --> B{Auth Check}
+    B -->|Fail| X[401 Unauthorized]
+    B -->|Pass| C{Route Match}
+    C -->|List| D[Apply Filters]
+    C -->|Create/Update| E[Parse & Validate Schema]
+    C -->|Delete| F[Lookup Object]
+    D --> G[Apply Ordering]
+    G --> H[Paginate QuerySet]
+    H --> I[Serialize Response]
+    E --> J[Run Hooks & Save]
+    J --> I
+    F --> K[Delete & Return 204]
+    I --> L[JSON Response]
+
+    style A fill:#7c4dff,stroke:#7c4dff,color:#fff
+    style B fill:#ff6d00,stroke:#ff6d00,color:#fff
+    style X fill:#d50000,stroke:#d50000,color:#fff
+    style L fill:#00c853,stroke:#00c853,color:#fff
+    style K fill:#00c853,stroke:#00c853,color:#fff
+```
+
+---
+
 ## :material-star: Recommended: `@action` Decorator
 
 The `@action` decorator is the recommended way to add custom endpoints to your ViewSet. It provides automatic URL generation, auth inheritance, detail/list distinction, and full OpenAPI metadata support.
@@ -554,40 +581,40 @@ Each item in a bulk request is processed independently. If an item fails (valida
 - Failed items appear in `errors.details` with the error message.
 - The response always returns HTTP `200` with the combined result.
 
-### Performance
+??? info "Performance"
 
-- **Bulk Delete** is optimized to use a single database query (`DELETE ... WHERE pk IN (...)`) instead of deleting objects one by one.
-- **Bulk Create** and **Bulk Update** process items individually to preserve `save()` validations and hooks.
+    - **Bulk Delete** is optimized to use a single database query (`DELETE ... WHERE pk IN (...)`) instead of deleting objects one by one.
+    - **Bulk Create** and **Bulk Update** process items individually to preserve `save()` validations and hooks.
 
-### Authentication
+??? info "Authentication"
 
-Bulk endpoints inherit per-verb authentication:
+    Bulk endpoints inherit per-verb authentication:
 
-| Bulk Operation | Auth Source    |
-| -------------- | ------------- |
-| Bulk Create    | `post_auth`   |
-| Bulk Update    | `patch_auth`  |
-| Bulk Delete    | `delete_auth` |
+    | Bulk Operation | Auth Source    |
+    | -------------- | ------------- |
+    | Bulk Create    | `post_auth`   |
+    | Bulk Update    | `patch_auth`  |
+    | Bulk Delete    | `delete_auth` |
 
-### Hooks and Validators
+??? info "Hooks and Validators"
 
-Bulk operations call the same hooks as single-item operations, **per item**:
+    Bulk operations call the same hooks as single-item operations, **per item**:
 
-- `parse_input_data()` — field validation, FK resolution, base64 decoding
-- `custom_actions()` — custom field processing (create, update)
-- `post_create()` — post-creation hook (create only)
+    - `parse_input_data()` — field validation, FK resolution, base64 decoding
+    - `custom_actions()` — custom field processing (create, update)
+    - `post_create()` — post-creation hook (create only)
 
-### Extra Decorators
+??? example "Extra Decorators"
 
-Apply custom decorators to bulk endpoints via `extra_decorators`:
+    Apply custom decorators to bulk endpoints via `extra_decorators`:
 
-```python
-extra_decorators = DecoratorsSchema(
-    bulk_create=[rate_limit],
-    bulk_update=[log_operation],
-    bulk_delete=[admin_only],
-)
-```
+    ```python
+    extra_decorators = DecoratorsSchema(
+        bulk_create=[rate_limit],
+        bulk_update=[log_operation],
+        bulk_delete=[admin_only],
+    )
+    ```
 
 ### Core Attributes
 

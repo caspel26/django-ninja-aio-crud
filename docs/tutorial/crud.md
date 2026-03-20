@@ -43,17 +43,21 @@ from ninja_aio.views import APIViewSet
 from .models import Article
 
 # Create API instance
-api = NinjaAIO(
+api = NinjaAIO(  # (1)!
     title="Blog API",
     version="1.0.0",
     description="A simple blog API built with Django Ninja AIO"
 )
 
 
-@api.viewset(model=Article)
+@api.viewset(model=Article)  # (2)!
 class ArticleViewSet(APIViewSet):
-    pass
+    pass  # (3)!
 ```
+
+1. `NinjaAIO` extends `NinjaAPI` with ORJSON rendering and built-in exception handling
+2. Registers the model and auto-generates all CRUD routes on the API router
+3. Zero configuration — endpoints, schemas, pagination, and OpenAPI docs are all automatic
 
 That's it! You now have a complete CRUD API with 5 endpoints.
 
@@ -73,6 +77,20 @@ urlpatterns = [
 ]
 ```
 
+### What Happens Under the Hood
+
+```mermaid
+graph LR
+    A[Article Model] -->|"ReadSerializer<br/>CreateSerializer<br/>UpdateSerializer"| B[Pydantic Schemas]
+    B --> C[APIViewSet]
+    C -->|auto-generates| D["5 async endpoints<br/>+ OpenAPI docs<br/>+ pagination"]
+
+    style A fill:#7c4dff,stroke:#7c4dff,color:#fff
+    style B fill:#651fff,stroke:#651fff,color:#fff
+    style C fill:#536dfe,stroke:#536dfe,color:#fff
+    style D fill:#448aff,stroke:#448aff,color:#fff
+```
+
 ### Auto-Generated Endpoints
 
 The ViewSet automatically generates these endpoints:
@@ -84,6 +102,31 @@ The ViewSet automatically generates these endpoints:
 | `GET`    | `/api/article/{id}`  | Retrieve single article       | None                 | Article data                       |
 | `PATCH`  | `/api/article/{id}/` | Update article                | Partial article data | Updated article                    |
 | `DELETE` | `/api/article/{id}/` | Delete article                | None                 | None (204)                         |
+
+??? example "Example error responses"
+
+    **404 — Object not found:**
+    ```json
+    {"error": "article not found."}
+    ```
+
+    **400 — Validation error (missing required field):**
+    ```json
+    {
+      "detail": [
+        {
+          "type": "missing",
+          "loc": ["body", "data", "title"],
+          "msg": "Field required"
+        }
+      ]
+    }
+    ```
+
+    **401 — Unauthorized (when auth is configured):**
+    ```json
+    {"detail": "Unauthorized"}
+    ```
 
 ### Test Your API
 
@@ -146,14 +189,14 @@ Let's add filtering to the Article list endpoint:
 ```python
 @api.viewset(model=Article)
 class ArticleViewSet(APIViewSet):
-    query_params = {
+    query_params = {  # (1)!
         "is_published": (bool, None),
         "author": (int, None),
         "category": (int, None),
         "search": (str, None),
     }
 
-    async def query_params_handler(self, queryset, filters):
+    async def query_params_handler(self, queryset, filters):  # (2)!
         # Filter by published status
         if filters.get("is_published") is not None:
             queryset = queryset.filter(is_published=filters["is_published"])
@@ -175,8 +218,12 @@ class ArticleViewSet(APIViewSet):
                 Q(content__icontains=search_term)
             )
 
-        return queryset
+        return queryset  # (3)!
 ```
+
+1. Each entry is `"param_name": (type, default)` — a Pydantic schema is built at startup for OpenAPI docs and validation
+2. Called automatically on `GET /api/article/?param=value` — receives the filtered dict (only non-default values)
+3. Always return the queryset — the framework handles pagination and serialization
 
 ### Using Query Parameters
 

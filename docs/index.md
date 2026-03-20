@@ -162,6 +162,33 @@ Traditional Django REST development requires separate serializer classes, manual
 
 ---
 
+## :material-sitemap: How It Works
+
+```mermaid
+graph LR
+    A[Django Model] --> B[ModelSerializer<br/>or Serializer]
+    B --> C[APIViewSet]
+    C --> D[REST API Endpoints]
+
+    D --> E["<b>GET</b> /items/"]
+    D --> F["<b>POST</b> /items/"]
+    D --> G["<b>GET</b> /items/{id}/"]
+    D --> H["<b>PATCH</b> /items/{id}/"]
+    D --> I["<b>DELETE</b> /items/{id}/"]
+
+    style A fill:#7c4dff,stroke:#7c4dff,color:#fff
+    style B fill:#651fff,stroke:#651fff,color:#fff
+    style C fill:#536dfe,stroke:#536dfe,color:#fff
+    style D fill:#448aff,stroke:#448aff,color:#fff
+    style E fill:#b388ff,stroke:#7c4dff,color:#1a1a2e
+    style F fill:#b388ff,stroke:#7c4dff,color:#1a1a2e
+    style G fill:#b388ff,stroke:#7c4dff,color:#1a1a2e
+    style H fill:#b388ff,stroke:#7c4dff,color:#1a1a2e
+    style I fill:#b388ff,stroke:#7c4dff,color:#1a1a2e
+```
+
+---
+
 ## :material-book-open-variant: Documentation
 
 <div class="grid cards" markdown>
