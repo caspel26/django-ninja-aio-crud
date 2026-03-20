@@ -369,24 +369,6 @@ Brief summary of documentation changes. Do NOT list every CSS class or inline st
 
 ---
 
-### Tests
-
-#### `TestClassName` — N tests
-
-**Category:**
-
-| Test | Verifies |
-|---|---|
-| `test_name` | What it verifies |
-
-**New test fixtures:**
-
-| File | Addition |
-|---|---|
-| `tests/test_app/models.py` | `ModelName` — brief description |
-
----
-
 ### Summary
 
 Brief paragraph summarizing the release. Then:
@@ -399,7 +381,8 @@ Brief paragraph summarizing the release. Then:
 - **Always overwrite `CHANGELOG.md`** — Every time a changelog is generated, overwrite the existing `CHANGELOG.md` file at the project root. Do not create a new file or append to it.
 - **Use emojis** — Decorate section headers, sub-headers, bullet points, and table entries with contextual emojis (e.g., ✨ New Features, 🔧 Improvements, 🧪 Tests, ✅/❌ for pass/fail tests, 🎯 Summary)
 
-- **Group by category**: New Features, Improvements, Documentation, Tests, Summary
+- **Do NOT include a Tests section** — Skip detailed test listings entirely. A brief mention of test count can go in the Summary if relevant.
+- **Group by category**: New Features, Improvements, Documentation, Summary
 - **Use `> path/to/file`** blockquotes to indicate which file a change belongs to
 - **Include code examples** for new user-facing API features
 - **Use tables** for listing tests, methods, file changes, and mappings
