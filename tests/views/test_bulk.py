@@ -587,3 +587,90 @@ class BulkResponseFieldsMultiTestCase(TestCase):
 
         count = await self.model.objects.acount()
         self.assertEqual(count, 0)
+
+
+@tag("bulk", "require_update_fields")
+class RequireUpdateFieldsTestCase(TestCase):
+    """Test that empty PATCH payloads are rejected when require_update_fields=True."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.namespace = "require_update_fields_test"
+        cls.model = models.TestModelWithValidators
+        cls.api = NinjaAIO(urls_namespace=cls.namespace)
+
+        class RequireFieldsViewSet(views.GenericAPIViewSet):
+            model = models.TestModelWithValidators
+            bulk_operations = ["create", "update", "delete"]
+            require_update_fields = True
+
+        cls.viewset = RequireFieldsViewSet()
+        cls.viewset.api = cls.api
+        cls.viewset.add_views_to_route()
+        cls.test_util = ModelUtil(cls.model)
+        cls.pk_att = cls.model._meta.pk.attname
+        cls.path = cls.test_util.verbose_name_path_resolver()
+        cls.request = Request(cls.path)
+
+    @property
+    def patch_request(self):
+        return self.request.patch()
+
+    async def test_update_rejects_empty_payload(self):
+        """PATCH with no update fields raises SerializeError."""
+        obj = await self.model.objects.acreate(name="orig", description="desc")
+        empty_data = self.viewset.schema_update()
+
+        view = self.viewset.update_view()
+        pk_schema = self.viewset.path_schema(**{self.pk_att: obj.pk})
+        with self.assertRaises(SerializeError):
+            await view(self.patch_request, empty_data, pk_schema)
+
+    async def test_update_accepts_valid_payload(self):
+        """PATCH with at least one field succeeds."""
+        obj = await self.model.objects.acreate(name="orig", description="desc")
+        data = self.viewset.schema_update(description="updated")
+
+        view = self.viewset.update_view()
+        pk_schema = self.viewset.path_schema(**{self.pk_att: obj.pk})
+        result = await view(self.patch_request, data, pk_schema)
+
+        self.assertEqual(result.status_code, 200)
+        await obj.arefresh_from_db()
+        self.assertEqual(obj.description, "updated")
+
+    async def test_bulk_update_rejects_empty_payload(self):
+        """bulk_update_s with empty update schema collects error when require_fields=True."""
+        obj = await self.model.objects.acreate(name="orig", description="desc")
+
+        # schema_update() with no args — all fields default to None
+        empty_data = self.viewset.schema_update()
+        success, errors = await self.viewset.model_util.bulk_update_s(
+            self.patch_request, [(obj.pk, empty_data)], require_fields=True
+        )
+
+        self.assertEqual(len(success), 0)
+        self.assertEqual(len(errors), 1)
+        self.assertIn("No fields provided", errors[0]["error"])
+
+    async def test_bulk_update_mixed_empty_and_valid(self):
+        """bulk_update_s with one valid and one empty item returns partial success."""
+        await self.model.objects.all().adelete()
+
+        obj1 = await self.model.objects.acreate(name="aaa", description="d1")
+        obj2 = await self.model.objects.acreate(name="bbb", description="d2")
+
+        valid_data = self.viewset.schema_update(description="updated")
+        empty_data = self.viewset.schema_update()
+
+        success, errors = await self.viewset.model_util.bulk_update_s(
+            self.patch_request,
+            [(obj1.pk, valid_data), (obj2.pk, empty_data)],
+            require_fields=True,
+        )
+
+        self.assertEqual(len(success), 1)
+        self.assertEqual(len(errors), 1)
+
+        await obj1.arefresh_from_db()
+        self.assertEqual(obj1.description, "updated")

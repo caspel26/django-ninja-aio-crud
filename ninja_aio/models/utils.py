@@ -1263,7 +1263,11 @@ class ModelUtil(Generic[ModelT]):
         )
 
     async def _update_instance(
-        self, request: HttpRequest, data: Schema, pk: int | str
+        self,
+        request: HttpRequest,
+        data: Schema,
+        pk: int | str,
+        require_fields: bool = False,
     ):
         """
         Update an existing instance and run hooks.
@@ -1278,6 +1282,8 @@ class ModelUtil(Generic[ModelT]):
             Input update schema instance.
         pk : int | str
             Primary key of target object.
+        require_fields : bool
+            When True, raises SerializeError if no fields are provided.
 
         Returns
         -------
@@ -1287,6 +1293,8 @@ class ModelUtil(Generic[ModelT]):
         logger.info(f"Updating {self.model.__name__} (pk={pk})")
         obj = await self.get_object(request, pk, is_for="read")
         payload, customs = await self.parse_input_data(request, data)
+        if require_fields and not payload and not customs:
+            raise SerializeError("No fields provided for update.")
         for k, v in payload.items():
             if v is not None:
                 setattr(obj, k, v)
@@ -1301,7 +1309,12 @@ class ModelUtil(Generic[ModelT]):
         return obj
 
     async def update_s(
-        self, request: HttpRequest, data: Schema, pk: int | str, obj_schema: Schema
+        self,
+        request: HttpRequest,
+        data: Schema,
+        pk: int | str,
+        obj_schema: Schema,
+        require_fields: bool = False,
     ):
         """
         Update an existing instance and return serialized output.
@@ -1315,13 +1328,15 @@ class ModelUtil(Generic[ModelT]):
             Primary key of target object.
         obj_schema : Schema
             Read schema class for output.
+        require_fields : bool
+            When True, raises SerializeError if no fields are provided.
 
         Returns
         -------
         dict
             Serialized updated object.
         """
-        obj = await self._update_instance(request, data, pk)
+        obj = await self._update_instance(request, data, pk, require_fields)
         # FK instances from parse_input_data are already attached to obj
         # Only refresh reverse relations since they might have changed
         updated_object = await self._prefetch_reverse_relations_on_instance(
@@ -1419,6 +1434,7 @@ class ModelUtil(Generic[ModelT]):
         request: HttpRequest,
         data_list: list[tuple[int | str, Schema]],
         detail_extractor: callable = None,
+        require_fields: bool = False,
     ):
         """
         Update multiple instances with partial success semantics.
@@ -1434,6 +1450,8 @@ class ModelUtil(Generic[ModelT]):
         detail_extractor : callable, optional
             Function that extracts detail info from a model instance.
             Defaults to returning the PK.
+        require_fields : bool
+            When True, raises SerializeError if no fields are provided.
 
         Returns
         -------
@@ -1447,7 +1465,9 @@ class ModelUtil(Generic[ModelT]):
 
         for pk, data in data_list:
             try:
-                obj = await self._update_instance(request, data, pk)
+                obj = await self._update_instance(
+                    request, data, pk, require_fields
+                )
                 success_details.append(extractor(obj))
             except (SerializeError, NotFoundError) as e:
                 error_details.append(self._format_bulk_error(e))

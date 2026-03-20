@@ -265,6 +265,7 @@ class ArticleViewSet(APIViewSet):
 | `bulk_delete_docs`          | `str`                         | `"Delete multiple objects in a single request."`   | Bulk delete endpoint description                                        |
 | `ordering_fields`           | `list[str]`                   | `[]`                                               | Fields allowed for ordering (empty = disabled)                          |
 | `default_ordering`          | `str \| list[str]`            | `[]`                                               | Default ordering when no `?ordering` param is provided                  |
+| `require_update_fields`     | `bool`                        | `False`                                            | Reject PATCH with empty payload (`SerializeError`)                      |
 
 ### :material-tag: Verbose Name Resolution
 
@@ -394,6 +395,22 @@ class ArticleViewSet(APIViewSet):
 Endpoints behavior:
 - `GET /articles/` returns `[{"id": 1, "title": "...", "summary": "..."}, ...]`
 - `GET /articles/1` returns `{"id": 1, "title": "...", "summary": "...", "content": "...", "author": {...}, "tags": [...]}`
+
+## :material-shield-check: Partial Update Validation
+
+By default, PATCH endpoints accept empty payloads silently (no fields updated, but `save()` is still called). Enable `require_update_fields` to reject empty updates:
+
+```python
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    require_update_fields = True
+```
+
+When enabled, a PATCH request with no update fields raises a `SerializeError` with message `"No fields provided for update."` (HTTP 400).
+
+This applies to both single update and bulk update operations. In bulk updates, empty items are collected as errors without affecting other items (partial success semantics).
+
+---
 
 ## :material-content-copy: Bulk Operations
 
