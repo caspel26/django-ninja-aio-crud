@@ -259,6 +259,7 @@ class ArticleViewSet(APIViewSet):
 | `model_verbose_name`        | `str`                         | `""`                                               | Override model verbose name for display                                 |
 | `model_verbose_name_plural` | `str`                         | `""`                                               | Override model verbose name plural for display                          |
 | `bulk_operations`           | `list[Literal["create", "update", "delete"]]` | `[]`                          | Bulk operations to enable (opt-in)                                      |
+| `bulk_response_fields`      | `list[str] \| str \| None`    | `None`                                             | Field(s) returned in bulk success details (`None` = PK)                 |
 | `bulk_create_docs`          | `str`                         | `"Create multiple objects in a single request."`   | Bulk create endpoint description                                        |
 | `bulk_update_docs`          | `str`                         | `"Update multiple objects in a single request."`   | Bulk update endpoint description                                        |
 | `bulk_delete_docs`          | `str`                         | `"Delete multiple objects in a single request."`   | Bulk delete endpoint description                                        |
@@ -431,8 +432,54 @@ All bulk endpoints return a `BulkResultSchema` with **partial success** semantic
 }
 ```
 
-- **`success.details`** — list of primary keys of successfully processed objects.
+- **`success.details`** — list of primary keys of successfully processed objects (default). Customizable via `bulk_response_fields`.
 - **`errors.details`** — list of error detail dicts for each failed item.
+
+### Custom Response Fields
+
+By default, `success.details` contains primary keys. Use `bulk_response_fields` to return different field(s):
+
+**Single field** — returns a flat list of values:
+
+```python
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    bulk_operations = ["create", "update", "delete"]
+    bulk_response_fields = "title"
+```
+
+```json
+{
+  "success": {
+    "count": 2,
+    "details": ["Article 1", "Article 2"]
+  }
+}
+```
+
+**Multiple fields** — returns a list of dicts:
+
+```python
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    bulk_operations = ["create", "update", "delete"]
+    bulk_response_fields = ["id", "title"]
+```
+
+```json
+{
+  "success": {
+    "count": 2,
+    "details": [
+      {"id": 1, "title": "Article 1"},
+      {"id": 2, "title": "Article 2"}
+    ]
+  }
+}
+```
+
+!!! note
+    For bulk delete, the requested fields are fetched **before** deletion so they can be included in the response.
 
 ### Request Formats
 
@@ -527,12 +574,13 @@ extra_decorators = DecoratorsSchema(
 
 ### Core Attributes
 
-| Attribute            | Type                             | Default | Description                                      |
-| -------------------- | -------------------------------- | ------- | ------------------------------------------------ |
-| `bulk_operations`    | `list[Literal["create", "update", "delete"]]` | `[]`    | Which bulk operations to enable                  |
-| `bulk_create_docs`   | `str`                            | `"Create multiple objects in a single request."`  | Bulk create endpoint description                 |
-| `bulk_update_docs`   | `str`                            | `"Update multiple objects in a single request."`  | Bulk update endpoint description                 |
-| `bulk_delete_docs`   | `str`                            | `"Delete multiple objects in a single request."`  | Bulk delete endpoint description                 |
+| Attribute              | Type                             | Default | Description                                      |
+| ---------------------- | -------------------------------- | ------- | ------------------------------------------------ |
+| `bulk_operations`      | `list[Literal["create", "update", "delete"]]` | `[]`    | Which bulk operations to enable                  |
+| `bulk_response_fields` | `list[str] \| str \| None`       | `None`  | Field(s) returned in success details (`None` = PK) |
+| `bulk_create_docs`     | `str`                            | `"Create multiple objects in a single request."`  | Bulk create endpoint description                 |
+| `bulk_update_docs`     | `str`                            | `"Update multiple objects in a single request."`  | Bulk update endpoint description                 |
+| `bulk_delete_docs`     | `str`                            | `"Delete multiple objects in a single request."`  | Bulk delete endpoint description                 |
 
 ## :material-sort: Ordering
 

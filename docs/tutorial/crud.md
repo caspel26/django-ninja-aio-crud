@@ -615,7 +615,7 @@ All bulk endpoints return a `BulkResultSchema`:
 }
 ```
 
-- **`success.details`** contains the primary keys of successfully processed objects.
+- **`success.details`** contains the primary keys of successfully processed objects (default). Customizable via `bulk_response_fields`.
 - **`errors.details`** contains error details for each failed item.
 
 ### Bulk Create
@@ -653,6 +653,19 @@ Send a list of primary keys to delete. This operation is **optimized** — it us
 curl -X DELETE http://localhost:8000/api/article/bulk/ \
   -H "Content-Type: application/json" \
   -d '{"ids": [1, 2, 3]}'
+```
+
+### Custom Response Fields
+
+By default, `success.details` returns primary keys. Use `bulk_response_fields` to customize what's returned:
+
+```python
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    bulk_operations = ["create", "update", "delete"]
+    bulk_response_fields = "title"  # Returns ["Article 1", "Article 2"]
+    # Or return multiple fields as dicts:
+    # bulk_response_fields = ["id", "title"]  # Returns [{"id": 1, "title": "..."}, ...]
 ```
 
 ### Selective Bulk Operations
