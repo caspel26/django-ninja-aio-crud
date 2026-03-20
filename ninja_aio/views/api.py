@@ -295,6 +295,7 @@ class APIViewSet(API, Generic[ModelT]):
     bulk_delete_docs = "Delete multiple objects in a single request."
     ordering_fields: list[str] = []
     default_ordering: str | list[str] = []
+    require_update_fields: bool = False
 
     def __init__(
         self,
@@ -757,7 +758,11 @@ class APIViewSet(API, Generic[ModelT]):
             return Status(
                 200,
                 await self.model_util.update_s(
-                    request, data, self._get_pk(pk), self.schema_out
+                    request,
+                    data,
+                    self._get_pk(pk),
+                    self.schema_out,
+                    self.require_update_fields,
                 ),
             )
 
@@ -897,7 +902,10 @@ class APIViewSet(API, Generic[ModelT]):
                 update_data = self.schema_update(**update_fields)
                 data_list.append((pk, update_data))
             success, errors = await self.model_util.bulk_update_s(
-                request, data_list, self._get_bulk_detail_extractor()
+                request,
+                data_list,
+                self._get_bulk_detail_extractor(),
+                self.require_update_fields,
             )
             return Status(
                 200,
