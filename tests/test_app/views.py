@@ -137,6 +137,24 @@ class TestModelBulkAPI(GenericAPIViewSet):
     bulk_operations = ["create", "update", "delete"]
 
 
+class TestModelBulkSingleFieldAPI(GenericAPIViewSet):
+    model = models.TestModel
+    schema_in = schema.TestModelSchemaIn
+    schema_out = schema.TestModelSchemaOut
+    schema_update = schema.TestModelSchemaPatch
+    bulk_operations = ["create", "update", "delete"]
+    bulk_response_fields = "name"
+
+
+class TestModelBulkMultiFieldAPI(GenericAPIViewSet):
+    model = models.TestModel
+    schema_in = schema.TestModelSchemaIn
+    schema_out = schema.TestModelSchemaOut
+    schema_update = schema.TestModelSchemaPatch
+    bulk_operations = ["create", "update", "delete"]
+    bulk_response_fields = ["id", "name"]
+
+
 class TestModelReverseForeignKeyAPI(GenericAPIViewSet):
     model = models.TestModelReverseForeignKey
     schema_in = schema.TestModelReverseForeignKeySchemaIn

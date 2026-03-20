@@ -408,3 +408,182 @@ class BulkOperationsSelectiveTestCase(TestCase):
         self.assertIn("create", bulk_views)
         self.assertNotIn("update", bulk_views)
         self.assertNotIn("delete", bulk_views)
+
+
+@tag("bulk", "bulk_response_fields")
+class BulkResponseFieldsSingleTestCase(TestCase):
+    """Test bulk operations with bulk_response_fields set to a single field name."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.namespace = "bulk_single_field_test"
+        cls.model = models.TestModel
+        cls.api = NinjaAIO(urls_namespace=cls.namespace)
+        cls.viewset = views.TestModelBulkSingleFieldAPI()
+        cls.viewset.api = cls.api
+        cls.viewset.add_views_to_route()
+        cls.test_util = ModelUtil(cls.model)
+        cls.pk_att = cls.model._meta.pk.attname
+        cls.path = cls.test_util.verbose_name_path_resolver()
+        cls.request = Request(cls.path)
+
+    @property
+    def post_request(self):
+        return self.request.post()
+
+    @property
+    def patch_request(self):
+        return self.request.patch()
+
+    @property
+    def delete_request(self):
+        return self.request.delete()
+
+    async def test_bulk_create_returns_single_field(self):
+        """Bulk create returns the configured field value instead of PK."""
+        await self.model.objects.all().adelete()
+
+        items = [
+            schema.TestModelSchemaIn(name="field_1", description="desc_1"),
+            schema.TestModelSchemaIn(name="field_2", description="desc_2"),
+        ]
+
+        view = self.viewset.bulk_create_view()
+        result = await view(self.post_request, items)
+
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(result.value["success"]["count"], 2)
+        details = result.value["success"]["details"]
+        self.assertEqual(details, ["field_1", "field_2"])
+
+    async def test_bulk_update_returns_single_field(self):
+        """Bulk update returns the configured field value instead of PK."""
+        await self.model.objects.all().adelete()
+
+        obj1 = await self.model.objects.acreate(name="upd_1", description="d1")
+        obj2 = await self.model.objects.acreate(name="upd_2", description="d2")
+
+        update_items = [
+            self.viewset.bulk_update_schema(id=obj1.pk, description="new_d1"),
+            self.viewset.bulk_update_schema(id=obj2.pk, description="new_d2"),
+        ]
+
+        view = self.viewset.bulk_update_view()
+        result = await view(self.patch_request, update_items)
+
+        self.assertEqual(result.status_code, 200)
+        details = result.value["success"]["details"]
+        self.assertEqual(details, ["upd_1", "upd_2"])
+
+    async def test_bulk_delete_returns_single_field(self):
+        """Bulk delete returns the configured field value instead of PK."""
+        await self.model.objects.all().adelete()
+
+        obj1 = await self.model.objects.acreate(name="del_1", description="d1")
+        obj2 = await self.model.objects.acreate(name="del_2", description="d2")
+
+        delete_data = self.viewset.bulk_delete_schema(ids=[obj1.pk, obj2.pk])
+
+        view = self.viewset.bulk_delete_view()
+        result = await view(self.delete_request, delete_data)
+
+        self.assertEqual(result.status_code, 200)
+        details = result.value["success"]["details"]
+        self.assertEqual(sorted(details), ["del_1", "del_2"])
+
+        count = await self.model.objects.acount()
+        self.assertEqual(count, 0)
+
+
+@tag("bulk", "bulk_response_fields")
+class BulkResponseFieldsMultiTestCase(TestCase):
+    """Test bulk operations with bulk_response_fields set to a list of fields."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.namespace = "bulk_multi_field_test"
+        cls.model = models.TestModel
+        cls.api = NinjaAIO(urls_namespace=cls.namespace)
+        cls.viewset = views.TestModelBulkMultiFieldAPI()
+        cls.viewset.api = cls.api
+        cls.viewset.add_views_to_route()
+        cls.test_util = ModelUtil(cls.model)
+        cls.pk_att = cls.model._meta.pk.attname
+        cls.path = cls.test_util.verbose_name_path_resolver()
+        cls.request = Request(cls.path)
+
+    @property
+    def post_request(self):
+        return self.request.post()
+
+    @property
+    def patch_request(self):
+        return self.request.patch()
+
+    @property
+    def delete_request(self):
+        return self.request.delete()
+
+    async def test_bulk_create_returns_multi_fields(self):
+        """Bulk create returns dicts with configured fields."""
+        await self.model.objects.all().adelete()
+
+        items = [
+            schema.TestModelSchemaIn(name="multi_1", description="desc_1"),
+            schema.TestModelSchemaIn(name="multi_2", description="desc_2"),
+        ]
+
+        view = self.viewset.bulk_create_view()
+        result = await view(self.post_request, items)
+
+        self.assertEqual(result.status_code, 200)
+        details = result.value["success"]["details"]
+        self.assertEqual(len(details), 2)
+        for detail in details:
+            self.assertIn("id", detail)
+            self.assertIn("name", detail)
+            self.assertIsInstance(detail, dict)
+
+        names = [d["name"] for d in details]
+        self.assertEqual(names, ["multi_1", "multi_2"])
+
+    async def test_bulk_update_returns_multi_fields(self):
+        """Bulk update returns dicts with configured fields."""
+        await self.model.objects.all().adelete()
+
+        obj1 = await self.model.objects.acreate(name="upd_multi", description="d1")
+
+        update_items = [
+            self.viewset.bulk_update_schema(id=obj1.pk, description="new_d1"),
+        ]
+
+        view = self.viewset.bulk_update_view()
+        result = await view(self.patch_request, update_items)
+
+        self.assertEqual(result.status_code, 200)
+        details = result.value["success"]["details"]
+        self.assertEqual(len(details), 1)
+        self.assertEqual(details[0]["id"], obj1.pk)
+        self.assertEqual(details[0]["name"], "upd_multi")
+
+    async def test_bulk_delete_returns_multi_fields(self):
+        """Bulk delete returns dicts with configured fields."""
+        await self.model.objects.all().adelete()
+
+        obj1 = await self.model.objects.acreate(name="del_1", description="d1")
+        obj2 = await self.model.objects.acreate(name="del_2", description="d2")
+
+        delete_data = self.viewset.bulk_delete_schema(ids=[obj1.pk, obj2.pk])
+
+        view = self.viewset.bulk_delete_view()
+        result = await view(self.delete_request, delete_data)
+
+        self.assertEqual(result.status_code, 200)
+        details = result.value["success"]["details"]
+        self.assertEqual(len(details), 2)
+        for detail in details:
+            self.assertIn("id", detail)
+            self.assertIn("name", detail)
+
+        count = await self.model.objects.acount()
+        self.assertEqual(count, 0)
