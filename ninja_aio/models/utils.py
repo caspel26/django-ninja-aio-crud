@@ -1369,34 +1369,40 @@ class ModelUtil(Generic[ModelT]):
         return {"error": str(exc)}
 
     async def bulk_create_s(
-        self, request: HttpRequest, data_list: list[Schema]
+        self,
+        request: HttpRequest,
+        data_list: list[Schema],
+        detail_extractor: callable = None,
     ):
         """
         Create multiple instances with partial success semantics.
 
         Each item is processed independently. Failures are collected without
-        affecting other items. Returns PKs of created objects instead of
-        serialized output.
+        affecting other items.
 
         Parameters
         ----------
         request : HttpRequest
         data_list : list[Schema]
             List of input schema instances.
+        detail_extractor : callable, optional
+            Function that extracts detail info from a model instance.
+            Defaults to returning the PK.
 
         Returns
         -------
-        tuple[list[int | str], list[dict]]
-            (created_pks, error_details)
+        tuple[list, list[dict]]
+            (success_details, error_details)
         """
         logger.info(f"Bulk creating {len(data_list)} {self.model.__name__} instances")
+        extractor = detail_extractor or (lambda obj: obj.pk)
         success_details = []
         error_details = []
 
         for data in data_list:
             try:
                 obj = await self._create_instance(request, data)
-                success_details.append(obj.pk)
+                success_details.append(extractor(obj))
             except (SerializeError, NotFoundError) as e:
                 error_details.append(self._format_bulk_error(e))
             except Exception as e:
@@ -1412,33 +1418,37 @@ class ModelUtil(Generic[ModelT]):
         self,
         request: HttpRequest,
         data_list: list[tuple[int | str, Schema]],
+        detail_extractor: callable = None,
     ):
         """
         Update multiple instances with partial success semantics.
 
         Each item is processed independently. Failures are collected without
-        affecting other items. Returns PKs of updated objects instead of
-        serialized output.
+        affecting other items.
 
         Parameters
         ----------
         request : HttpRequest
         data_list : list[tuple[int | str, Schema]]
             List of (pk, update_schema_instance) tuples.
+        detail_extractor : callable, optional
+            Function that extracts detail info from a model instance.
+            Defaults to returning the PK.
 
         Returns
         -------
-        tuple[list[int | str], list[dict]]
-            (updated_pks, error_details)
+        tuple[list, list[dict]]
+            (success_details, error_details)
         """
         logger.info(f"Bulk updating {len(data_list)} {self.model.__name__} instances")
+        extractor = detail_extractor or (lambda obj: obj.pk)
         success_details = []
         error_details = []
 
         for pk, data in data_list:
             try:
-                await self._update_instance(request, data, pk)
-                success_details.append(pk)
+                obj = await self._update_instance(request, data, pk)
+                success_details.append(extractor(obj))
             except (SerializeError, NotFoundError) as e:
                 error_details.append(self._format_bulk_error(e))
             except Exception as e:
@@ -1450,7 +1460,12 @@ class ModelUtil(Generic[ModelT]):
         )
         return success_details, error_details
 
-    async def bulk_delete_s(self, request: HttpRequest, pks: list[int | str]):
+    async def bulk_delete_s(
+        self,
+        request: HttpRequest,
+        pks: list[int | str],
+        detail_fields: list[str] | None = None,
+    ):
         """
         Delete multiple instances with partial success and optimized queries.
 
@@ -1462,27 +1477,47 @@ class ModelUtil(Generic[ModelT]):
         request : HttpRequest
         pks : list[int | str]
             List of primary keys.
+        detail_fields : list[str], optional
+            Field names to include in success details. When provided, queries
+            field values before deletion. Defaults to returning PKs only.
 
         Returns
         -------
-        tuple[list[int | str], list[dict]]
-            (deleted_pks, error_details)
+        tuple[list, list[dict]]
+            (success_details, error_details)
         """
         logger.info(f"Bulk deleting {len(pks)} {self.model.__name__} instances")
         if not pks:
             return [], []
 
-        deleted_pks = []
         error_details = []
 
         # Single query: get base queryset respecting queryset_request hooks
         qs = await self.get_objects(request, is_for="read")
-        # Single query: find which PKs exist
-        existing_pks = set()
-        async for pk_val in qs.filter(
-            **{f"{self.model_pk_name}__in": pks}
-        ).values_list(self.model_pk_name, flat=True):
-            existing_pks.add(pk_val)
+        matched_qs = qs.filter(**{f"{self.model_pk_name}__in": pks})
+
+        if detail_fields:
+            # Fetch requested fields before deletion
+            fields_with_pk = list(
+                dict.fromkeys([self.model_pk_name] + detail_fields)
+            )
+            detail_map = {}
+            async for row in matched_qs.values(*fields_with_pk):
+                pk_val = row[self.model_pk_name]
+                if len(detail_fields) == 1:
+                    detail_map[pk_val] = row[detail_fields[0]]
+                else:
+                    detail_map[pk_val] = {
+                        f: row[f] for f in detail_fields
+                    }
+            existing_pks = set(detail_map.keys())
+        else:
+            # Default: track PKs only
+            existing_pks = set()
+            async for pk_val in matched_qs.values_list(
+                self.model_pk_name, flat=True
+            ):
+                existing_pks.add(pk_val)
 
         # Report missing PKs as errors (reuse NotFoundError format)
         for pk in pks:
@@ -1490,14 +1525,20 @@ class ModelUtil(Generic[ModelT]):
                 error_details.append(NotFoundError(self.model).error)
 
         # Single query: delete all existing objects
+        success_details = []
         if existing_pks:
             await qs.filter(
                 **{f"{self.model_pk_name}__in": existing_pks}
             ).adelete()
-            deleted_pks = [pk for pk in pks if pk in existing_pks]
+            if detail_fields:
+                success_details = [
+                    detail_map[pk] for pk in pks if pk in existing_pks
+                ]
+            else:
+                success_details = [pk for pk in pks if pk in existing_pks]
 
         logger.debug(
             f"Bulk delete {self.model.__name__}: "
-            f"{len(deleted_pks)} deleted, {len(error_details)} errors"
+            f"{len(success_details)} deleted, {len(error_details)} errors"
         )
-        return deleted_pks, error_details
+        return success_details, error_details

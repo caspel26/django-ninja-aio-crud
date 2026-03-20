@@ -247,6 +247,7 @@ class APIViewSet(API, Generic[ModelT]):
         disable: List of view type strings: 'create','list','retrieve','update','delete','all'.
         api_route_path: Base path; auto-resolved from verbose name if empty.
         list_docs / create_docs / retrieve_docs / update_docs / delete_docs: Endpoint descriptions.
+        bulk_response_fields: Field(s) returned in bulk success details. None=PK (default), str=single field, list[str]=dict of fields.
         m2m_relations: List of M2MRelationSchema describing related model, related_name, custom path, auth, filters.
         m2m_add / m2m_remove / m2m_get: Enable add/remove/get M2M operations.
         m2m_auth: Auth list for all M2M endpoints unless overridden per relation.
@@ -288,6 +289,7 @@ class APIViewSet(API, Generic[ModelT]):
     model_verbose_name: str = ""
     model_verbose_name_plural: str = ""
     bulk_operations: list[type[BULK_TYPES]] = []
+    bulk_response_fields: list[str] | str | None = None
     bulk_create_docs = "Create multiple objects in a single request."
     bulk_update_docs = "Update multiple objects in a single request."
     bulk_delete_docs = "Delete multiple objects in a single request."
@@ -781,6 +783,34 @@ class APIViewSet(API, Generic[ModelT]):
 
         return delete
 
+    def _get_bulk_detail_extractor(self):
+        """
+        Return a callable that extracts detail info from a model instance
+        based on bulk_response_fields configuration.
+
+        Returns None when default PK behavior should be used.
+        """
+        fields = self.bulk_response_fields
+        if fields is None:
+            return None
+        if isinstance(fields, str):
+            return lambda obj: getattr(obj, fields)
+        return lambda obj: {f: getattr(obj, f) for f in fields}
+
+    def _get_bulk_detail_fields(self) -> list[str] | None:
+        """
+        Return the list of field names for bulk delete detail extraction.
+
+        bulk_delete_s doesn't have model instances, so it needs field names
+        to query with values() before deletion.
+        """
+        fields = self.bulk_response_fields
+        if fields is None:
+            return None
+        if isinstance(fields, str):
+            return [fields]
+        return fields
+
     def _generate_bulk_update_schema(self) -> Schema | None:
         """
         Dynamically build a schema combining the PK field (required) with update fields.
@@ -823,7 +853,7 @@ class APIViewSet(API, Generic[ModelT]):
             request: HttpRequest, data: List[self.schema_in]  # type: ignore
         ):
             success, errors = await self.model_util.bulk_create_s(
-                request, data
+                request, data, self._get_bulk_detail_extractor()
             )
             return Status(
                 200,
@@ -867,7 +897,7 @@ class APIViewSet(API, Generic[ModelT]):
                 update_data = self.schema_update(**update_fields)
                 data_list.append((pk, update_data))
             success, errors = await self.model_util.bulk_update_s(
-                request, data_list
+                request, data_list, self._get_bulk_detail_extractor()
             )
             return Status(
                 200,
@@ -898,7 +928,7 @@ class APIViewSet(API, Generic[ModelT]):
             request: HttpRequest, data: self.bulk_delete_schema  # type: ignore
         ):
             deleted_pks, errors = await self.model_util.bulk_delete_s(
-                request, data.ids
+                request, data.ids, self._get_bulk_detail_fields()
             )
             return Status(
                 200,
