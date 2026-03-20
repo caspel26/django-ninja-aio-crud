@@ -38,9 +38,11 @@
 | **Auto Schemas** | Pydantic generation | Automatic read/create/update schemas from `ModelSerializer` |
 | **Dynamic Query Params** | Runtime schemas | Built with `pydantic.create_model` for flexible filtering |
 | **Per-method Auth** | Granular control | `auth`, `get_auth`, `post_auth`, etc. |
-| **Async Pagination** | Customizable | Fully async, pluggable pagination classes |
+| **Async Pagination** | Customizable | `PageNumberPagination`, `CursorPagination`, or custom — DB-level slicing |
 | **M2M Relations** | Add/remove/list | Endpoints via `M2MRelationSchema` with filtering support |
 | **Reverse Relations** | Nested serialization | Automatic handling of reverse FK and M2M |
+| **Bulk Operations** | Create/update/delete | Opt-in bulk endpoints with partial success semantics and configurable response fields |
+| **Custom Actions** | `@action` decorator | Detail and list actions with auth inheritance, custom decorators, and auto URL generation |
 | **Lifecycle Hooks** | Extensible | `before_save`, `after_save`, `custom_actions`, `on_delete`, and more |
 | **Schema Validators** | Pydantic validators | `@field_validator` and `@model_validator` on serializer classes |
 | **ORJSON Renderer** | Performance | Built-in fast JSON rendering via `NinjaAIO` |
@@ -221,6 +223,37 @@ Available on every save/delete cycle:
 
 ## Custom Endpoints
 
+### Option A: `@action` Decorator (recommended)
+
+```python
+from ninja import Schema, Status
+from ninja_aio.decorators import action
+
+class StatsSchema(Schema):
+    total: int
+
+@api.viewset(Book)
+class BookViewSet(APIViewSet):
+    @action(detail=False, methods=["get"], url_path="stats", response=StatsSchema)
+    async def stats(self, request):
+        total = await Book.objects.acount()
+        return {"total": total}
+
+    @action(detail=True, methods=["post"], url_path="publish")
+    async def publish(self, request, pk):
+        book = await self.model_util.get_object(request, pk)
+        book.published = True
+        await book.asave()
+        return Status(200, {"message": "published"})
+```
+
+```
+GET  /book/stats/       → {"total": 42}
+POST /book/{pk}/publish/ → {"message": "published"}
+```
+
+### Option B: operations Decorators
+
 ```python
 from ninja_aio.decorators import api_get
 
@@ -234,12 +267,29 @@ class BookViewSet(APIViewSet):
 
 ---
 
+## Bulk Operations
+
+```python
+@api.viewset(Book)
+class BookViewSet(APIViewSet):
+    bulk_operations = ["create", "update", "delete"]
+    bulk_response_fields = "title"  # Optional: return titles instead of PKs
+```
+
+```
+POST   /book/bulk/  body: [{...}, {...}]         → {"success": {"count": 2, "details": ["Book 1", "Book 2"]}}
+PATCH  /book/bulk/  body: [{id, ...}, {id, ...}] → {"success": {"count": 2, "details": ["Updated 1", "Updated 2"]}}
+DELETE /book/bulk/  body: {"ids": [1, 2]}         → {"success": {"count": 2, "details": ["Book 1", "Book 2"]}}
+```
+
+---
+
 ## Pagination
 
 Default: `PageNumberPagination`. Override per ViewSet:
 
 ```python
-from ninja.pagination import PageNumberPagination
+from ninja.pagination import PageNumberPagination, CursorPagination
 
 class LargePagination(PageNumberPagination):
     page_size = 50
@@ -248,6 +298,8 @@ class LargePagination(PageNumberPagination):
 @api.viewset(Book)
 class BookViewSet(APIViewSet):
     pagination_class = LargePagination
+    # Or use cursor-based pagination for large datasets:
+    # pagination_class = CursorPagination
 ```
 
 ---
