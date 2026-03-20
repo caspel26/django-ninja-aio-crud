@@ -288,7 +288,7 @@ class ManyToManyAPI:
         Uses per-PK query handler if available, else falls back to ModelUtil lookup by pk.
         """
         errors, objs_detail, objs = [], [], []
-        rel_objs = [rel_obj async for rel_obj in related_manager.select_related().all()]
+        rel_obj_pks = {rel_obj.pk async for rel_obj in related_manager.all()}
         rel_model_name = related_model._meta.verbose_name.capitalize()
         for obj_pk in objs_pks:
             if query_handler := self._get_query_handler(related_name):
@@ -309,7 +309,7 @@ class ManyToManyAPI:
                 logger.debug(f"M2M check: {rel_model_name} with pk {obj_pk} not found")
                 errors.append(f"{rel_model_name} with pk {obj_pk} not found.")
                 continue
-            if remove ^ (rel_obj in rel_objs):
+            if remove ^ (rel_obj.pk in rel_obj_pks):
                 logger.debug(
                     f"M2M check: {rel_model_name} with pk {obj_pk}"
                     f" is {'not ' if remove else ''}in {self.related_model_util.model_name}"

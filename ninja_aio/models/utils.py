@@ -764,6 +764,16 @@ class ModelUtil(Generic[ModelT]):
         """Convert model instance to dict using Pydantic schema."""
         return (await sync_to_async(schema.from_orm)(obj)).model_dump()
 
+    async def _bump_queryset_from_schema(
+        self, queryset: models.QuerySet[ModelT], schema: Schema
+    ) -> list[dict]:
+        """Convert a queryset to a list of dicts using Pydantic schema in a single sync_to_async call."""
+
+        def _serialize_all():
+            return [schema.from_orm(obj).model_dump() for obj in queryset]
+
+        return await sync_to_async(_serialize_all)()
+
     async def _prefetch_reverse_relations_on_instance(
         self,
         obj: ModelT,
@@ -863,7 +873,7 @@ class ModelUtil(Generic[ModelT]):
     ):
         """Serialize a queryset of objects."""
         objs = await self.get_objects(request, query_data=query_data, is_for=is_for)
-        return [await self._bump_object_from_schema(obj, schema) async for obj in objs]
+        return await self._bump_queryset_from_schema(objs, schema)
 
     async def _serialize_single_object(
         self,
@@ -1133,10 +1143,7 @@ class ModelUtil(Generic[ModelT]):
 
         if instance is not None:
             if isinstance(instance, models.QuerySet):
-                return [
-                    await self._bump_object_from_schema(obj, schema)
-                    async for obj in instance
-                ]
+                return await self._bump_queryset_from_schema(instance, schema)
             return await self._bump_object_from_schema(instance, schema)
 
         self._validate_read_params(request, query_data)
