@@ -4,7 +4,7 @@ from typing import Generic, List, TypeVar
 
 from ninja import NinjaAPI, Router, Schema, Path, Query, Status
 from ninja.constants import NOT_SET
-from ninja.pagination import paginate, AsyncPaginationBase, PageNumberPagination
+from ninja.pagination import AsyncPaginationBase, PageNumberPagination
 from django.http import HttpRequest
 from django.db.models import Model, QuerySet
 from django.conf import settings
@@ -541,6 +541,45 @@ class APIViewSet(API, Generic[ModelT]):
             fields["ordering"] = (str, None)
         return self._generate_schema(fields, "FiltersSchema")
 
+    async def _apply_list_filters(
+        self,
+        qs: QuerySet,
+        filters: Schema | None,
+    ) -> QuerySet:
+        """
+        Apply query-param filters and ordering to a queryset.
+
+        Returns the filtered and ordered queryset.
+        """
+        if filters is not None:
+            filters_dict = filters.model_dump()
+            ordering_value = (
+                filters_dict.pop("ordering", None) if self.ordering_fields else None
+            )
+            if filters_dict:
+                qs = await self.query_params_handler(qs, filters_dict)
+            qs = self._apply_ordering(qs, ordering_value)
+        elif self.ordering_fields:
+            qs = self._apply_ordering(qs, None)
+        return qs
+
+    @staticmethod
+    def _get_page_params(
+        paginator: AsyncPaginationBase, pagination_input: Schema
+    ) -> tuple[int, int]:
+        """
+        Extract (offset, page_size) from any pagination class input.
+        """
+        if hasattr(pagination_input, "page"):
+            page_size = paginator._get_page_size(
+                getattr(pagination_input, "page_size", None)
+            )
+            offset = (pagination_input.page - 1) * page_size
+        else:
+            page_size = getattr(pagination_input, "limit", 100)
+            offset = getattr(pagination_input, "offset", 0)
+        return offset, page_size
+
     def _apply_ordering(self, queryset: QuerySet, ordering_value: str | None) -> QuerySet:
         """
         Apply ordering to the queryset based on ordering_fields configuration.
@@ -653,7 +692,21 @@ class APIViewSet(API, Generic[ModelT]):
     def list_view(self):
         """
         Register list endpoint with pagination and optional filters.
+
+        Pagination is applied before serialization: only page_size objects are
+        fetched and serialized instead of the entire queryset. The COUNT query
+        uses .values(pk) to avoid unnecessary JOINs from select_related.
         """
+        _paginator = self.pagination_class()
+        _pk_name = self.model_util.model_pk_name
+        _input_class = self.pagination_class.Input
+        _default_pagination = _input_class()
+        _paginated_schema = create_model(
+            f"Paginated{self.schema_out.__name__}",
+            __base__=Schema,
+            items=(List[self.schema_out], ...),
+            count=(int, ...),
+        )
 
         @self.router.get(
             self.get_path,
@@ -661,42 +714,40 @@ class APIViewSet(API, Generic[ModelT]):
             summary=f"List {self.model_verbose_name_plural}",
             description=self.list_docs,
             response={
-                200: List[self.schema_out],
+                200: _paginated_schema,
                 self.error_codes: GenericMessageSchema,
             },
         )
         @decorate_view(
-            paginate(self.pagination_class),
             unique_view(self, plural=True),
             *self.extra_decorators.list,
         )
         async def list(
             request: HttpRequest,
             filters: Query[self.filters_schema] = None,  # type: ignore
+            ninja_pagination: _input_class = Query(_default_pagination),  # type: ignore
         ):
+            if not isinstance(ninja_pagination, _input_class):
+                ninja_pagination = _default_pagination
+
             qs = await self.model_util.get_objects(
                 request,
                 query_data=self._get_query_data(),
                 is_for="read",
             )
-            if filters is not None:
-                filters_dict = filters.model_dump()
-                ordering_value = (
-                    filters_dict.pop("ordering", None)
-                    if self.ordering_fields
-                    else None
-                )
-                if filters_dict:
-                    qs = await self.query_params_handler(qs, filters_dict)
-                qs = self._apply_ordering(qs, ordering_value)
-            elif self.ordering_fields:
-                qs = self._apply_ordering(qs, None)
-            return Status(
-                200,
-                await self.model_util.list_read_s(
-                    self.schema_out, request, qs, is_for="read"
-                ),
+            qs = await self._apply_list_filters(qs, filters)
+
+            count = await qs.values(_pk_name).acount()
+
+            offset, page_size = self._get_page_params(
+                _paginator, ninja_pagination
             )
+            sliced_qs = qs[offset : offset + page_size]
+
+            items = await self.model_util.list_read_s(
+                self.schema_out, request, sliced_qs, is_for="read"
+            )
+            return Status(200, {"items": items, "count": count})
 
         return list
 
@@ -955,6 +1006,34 @@ class APIViewSet(API, Generic[ModelT]):
         """
         pass
 
+    def _resolve_action_path(
+        self, name: str, config: ActionConfig
+    ) -> tuple[str, str]:
+        """
+        Resolve url_path and full route path for an action.
+
+        Returns
+        -------
+        tuple[str, str]
+            (url_path, route_path)
+        """
+        url_path = (
+            config.url_path if config.url_path is not None else name.replace("_", "-")
+        )
+        if config.detail:
+            return url_path, f"{self.get_path_retrieve}/{url_path}"
+        return url_path, url_path
+
+    def _rename_pk_param(self, handler: callable) -> None:
+        """Rename the generic 'pk' parameter to the model's actual PK name."""
+        pk_name = self.model_util.model_pk_name
+        sig = inspect.signature(handler)
+        params = [
+            p.replace(name=pk_name) if p.name == "pk" else p
+            for p in sig.parameters.values()
+        ]
+        handler.__signature__ = sig.replace(parameters=params)
+
     def _register_single_action(
         self, name: str, method: callable, config: ActionConfig
     ) -> None:
@@ -964,24 +1043,15 @@ class APIViewSet(API, Generic[ModelT]):
         For each HTTP method in config.methods, resolves the URL path,
         auth, and decorators, then registers the handler on the router.
         """
-        url_path = config.url_path if config.url_path is not None else name.replace(
-            "_", "-"
-        )
+        _, path = self._resolve_action_path(name, config)
 
         for http_method in config.methods:
             factory = ApiMethodFactory(http_method)
-
-            if config.detail:
-                path = f"{self.get_path_retrieve}/{url_path}"
-            else:
-                path = url_path
-
             auth = (
                 config.auth
                 if config.auth is not NOT_SET
                 else self._auth_view(http_method)
             )
-
             summary = config.summary or (
                 f"{http_method.upper()} {name.replace('_', ' ').title()}"
                 f" {self.model_verbose_name}"
@@ -991,15 +1061,7 @@ class APIViewSet(API, Generic[ModelT]):
             factory._apply_metadata(handler, method)
 
             if config.detail:
-                pk_name = self.model_util.model_pk_name
-                sig = inspect.signature(handler)
-                params = []
-                for p in sig.parameters.values():
-                    if p.name == "pk":
-                        params.append(p.replace(name=pk_name))
-                    else:
-                        params.append(p)
-                handler.__signature__ = sig.replace(parameters=params)
+                self._rename_pk_param(handler)
 
             handler.__name__ = f"{name}_{http_method}_{self.model_util.model_name}"
 
@@ -1007,8 +1069,7 @@ class APIViewSet(API, Generic[ModelT]):
                 for dec in reversed(config.decorators):
                     handler = dec(handler)
 
-            route_adder = getattr(self.router, http_method)
-            route_adder(
+            getattr(self.router, http_method)(
                 path=path,
                 auth=auth,
                 throttle=config.throttle,
