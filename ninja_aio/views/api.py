@@ -1,5 +1,6 @@
 import inspect
 import logging
+from collections.abc import Callable
 from typing import Generic, List, TypeVar
 
 from ninja import NinjaAPI, Router, Schema, Path, Query, Status
@@ -90,8 +91,8 @@ class API:
                 method._api_register(self)
         return self.router
 
-    def add_views_to_route(self) -> Router:
-        return self.api.add_router(f"{self.api_route_path}", self._add_views())
+    def add_views_to_route(self) -> None:
+        self.api.add_router(f"{self.api_route_path}", self._add_views())
 
 
 class APIView(API):
@@ -144,7 +145,7 @@ class APIView(API):
         self.router = Router(tags=self.router_tags)
         self.error_codes = ERROR_CODES
 
-    def _add_views(self):
+    def _add_views(self) -> Router:
         super()._add_views()
         self.views()
         return self.router
@@ -360,7 +361,7 @@ class APIViewSet(API, Generic[ModelT]):
         )
 
     @property
-    def _crud_views(self):
+    def _crud_views(self) -> dict[str, tuple[Schema | None, Callable]]:
         """
         Mapping of CRUD operation name to (response schema, view factory).
         """
@@ -373,7 +374,7 @@ class APIViewSet(API, Generic[ModelT]):
         }
 
     @property
-    def _bulk_views(self):
+    def _bulk_views(self) -> dict[str, tuple[Schema | None, Callable]]:
         """
         Mapping of bulk operation name to (schema, view factory).
         Only operations listed in bulk_operations are included.
@@ -385,13 +386,13 @@ class APIViewSet(API, Generic[ModelT]):
         }
         return {k: v for k, v in mapping.items() if k in self.bulk_operations}
 
-    def _check_relations_filters(self, filter: str):
+    def _check_relations_filters(self, filter: str) -> bool:
         return filter in getattr(self, "relations_filters_fields", [])
 
-    def _check_match_cases_filters(self, filter: str):
+    def _check_match_cases_filters(self, filter: str) -> bool:
         return filter in getattr(self, "filters_match_cases_fields", [])
 
-    def _is_special_filter(self, filter: str):
+    def _is_special_filter(self, filter: str) -> bool:
         return self._check_relations_filters(filter) or self._check_match_cases_filters(
             filter
         )
@@ -408,7 +409,7 @@ class APIViewSet(API, Generic[ModelT]):
         """
         return part in VALID_DJANGO_LOOKUPS
 
-    def _get_related_model(self, field):
+    def _get_related_model(self, field: Model) -> type[Model] | None:
         """
         Extract the related model from a field if it exists.
 
@@ -494,7 +495,7 @@ class APIViewSet(API, Generic[ModelT]):
 
         return True
 
-    def _auth_view(self, view_type: str):
+    def _auth_view(self, view_type: str) -> list | None:
         """
         Resolve auth for a specific HTTP verb; falls back to self.auth if NOT_SET.
         """
@@ -531,7 +532,7 @@ class APIViewSet(API, Generic[ModelT]):
             {self.model_util.model_pk_name: self.model_util.pk_field_type}, "PathSchema"
         )
 
-    def _generate_filters_schema(self):
+    def _generate_filters_schema(self) -> Schema:
         """
         Build filters schema from query_params definition.
         Includes an 'ordering' field when ordering_fields is configured.
@@ -610,7 +611,7 @@ class APIViewSet(API, Generic[ModelT]):
 
         return queryset
 
-    def _get_pk(self, data: Schema):
+    def _get_pk(self, data: Schema) -> int | str:
         """
         Extract pk from a path schema instance.
         """
@@ -626,7 +627,7 @@ class APIViewSet(API, Generic[ModelT]):
             else self.model.query_util.read_config
         )
 
-    def get_schemas(self):
+    def get_schemas(self) -> tuple[Schema | None, Schema | None, Schema | None, Schema | None]:
         """
         Compute and return (schema_out, schema_detail, schema_in, schema_update).
 
@@ -661,7 +662,7 @@ class APIViewSet(API, Generic[ModelT]):
 
     async def query_params_handler(
         self, queryset: QuerySet[ModelSerializer], filters: dict
-    ):
+    ) -> QuerySet:
         """
         Override to apply custom filtering logic for list_view.
         filters is already validated and dumped.
@@ -669,7 +670,7 @@ class APIViewSet(API, Generic[ModelT]):
         """
         return queryset
 
-    def create_view(self):
+    def create_view(self) -> Callable:
         """
         Register create endpoint.
         """
@@ -689,7 +690,7 @@ class APIViewSet(API, Generic[ModelT]):
 
         return create
 
-    def list_view(self):
+    def list_view(self) -> Callable:
         """
         Register list endpoint with pagination and optional filters.
 
@@ -751,14 +752,14 @@ class APIViewSet(API, Generic[ModelT]):
 
         return list
 
-    def _get_retrieve_schema(self) -> Schema:
+    def _get_retrieve_schema(self) -> type[Schema]:
         """
         Return the schema to use for retrieve endpoint.
         Uses schema_detail if available, otherwise falls back to schema_out.
         """
         return self.schema_detail or self.schema_out
 
-    def retrieve_view(self):
+    def retrieve_view(self) -> Callable:
         """
         Register retrieve endpoint.
         """
@@ -788,7 +789,7 @@ class APIViewSet(API, Generic[ModelT]):
 
         return retrieve
 
-    def update_view(self):
+    def update_view(self) -> Callable:
         """
         Register update endpoint.
         """
@@ -819,7 +820,7 @@ class APIViewSet(API, Generic[ModelT]):
 
         return update
 
-    def delete_view(self):
+    def delete_view(self) -> Callable:
         """
         Register delete endpoint.
         """
@@ -839,7 +840,7 @@ class APIViewSet(API, Generic[ModelT]):
 
         return delete
 
-    def _get_bulk_detail_extractor(self):
+    def _get_bulk_detail_extractor(self) -> Callable | None:
         """
         Return a callable that extracts detail info from a model instance
         based on bulk_response_fields configuration.
@@ -890,7 +891,7 @@ class APIViewSet(API, Generic[ModelT]):
             ids=(List[pk_python_type], ...),
         )
 
-    def bulk_create_view(self):
+    def bulk_create_view(self) -> Callable:
         """
         Register bulk create endpoint.
         """
@@ -921,7 +922,7 @@ class APIViewSet(API, Generic[ModelT]):
 
         return bulk_create
 
-    def bulk_update_view(self):
+    def bulk_update_view(self) -> Callable:
         """
         Register bulk update endpoint.
         """
@@ -968,7 +969,7 @@ class APIViewSet(API, Generic[ModelT]):
 
         return bulk_update
 
-    def bulk_delete_view(self):
+    def bulk_delete_view(self) -> Callable:
         """
         Register bulk delete endpoint.
         """
@@ -1024,7 +1025,7 @@ class APIViewSet(API, Generic[ModelT]):
             return url_path, f"{self.get_path_retrieve}/{url_path}"
         return url_path, url_path
 
-    def _rename_pk_param(self, handler: callable) -> None:
+    def _rename_pk_param(self, handler: Callable) -> None:
         """Rename the generic 'pk' parameter to the model's actual PK name."""
         pk_name = self.model_util.model_pk_name
         sig = inspect.signature(handler)
@@ -1035,7 +1036,7 @@ class APIViewSet(API, Generic[ModelT]):
         handler.__signature__ = sig.replace(parameters=params)
 
     def _register_single_action(
-        self, name: str, method: callable, config: ActionConfig
+        self, name: str, method: Callable, config: ActionConfig
     ) -> None:
         """
         Register a single @action-decorated method on the router.
@@ -1099,7 +1100,7 @@ class APIViewSet(API, Generic[ModelT]):
                 continue
             self._register_single_action(name, method, config)
 
-    def _set_additional_views(self):
+    def _set_additional_views(self) -> Router:
         self.views()
         self._register_actions()
         if self.m2m_api is not None:
@@ -1116,7 +1117,7 @@ class APIViewSet(API, Generic[ModelT]):
                 )
         return self.router
 
-    def _add_views(self):
+    def _add_views(self) -> Router:
         """
         Register CRUD (unless disabled), bulk, custom views, and M2M endpoints.
         If 'all' in disable only CRUD is skipped; bulk + M2M + custom still added.
