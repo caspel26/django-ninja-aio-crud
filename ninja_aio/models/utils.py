@@ -1142,7 +1142,7 @@ class ModelUtil(Generic[ModelT]):
             raise SerializeError({"schema": "must be provided"}, 400)
 
         if instance is not None:
-            if isinstance(instance, models.QuerySet):
+            if isinstance(instance, (models.QuerySet, list)):
                 return await self._bump_queryset_from_schema(instance, schema)
             return await self._bump_object_from_schema(instance, schema)
 
@@ -1480,12 +1480,59 @@ class ModelUtil(Generic[ModelT]):
         )
         return success_details, error_details
 
+    async def _resolve_existing_pks(
+        self,
+        matched_qs: models.QuerySet,
+        detail_fields: list[str] | None,
+    ) -> tuple[set, dict]:
+        """
+        Identify which PKs exist and optionally collect detail field values.
+
+        Returns
+        -------
+        tuple[set, dict]
+            (existing_pks, detail_map). detail_map is empty when detail_fields
+            is None.
+        """
+        if not detail_fields:
+            existing_pks: set = set()
+            async for pk_val in matched_qs.values_list(
+                self.model_pk_name, flat=True
+            ):
+                existing_pks.add(pk_val)
+            return existing_pks, {}
+
+        fields_with_pk = list(
+            dict.fromkeys([self.model_pk_name] + detail_fields)
+        )
+        detail_map: dict = {}
+        single_field = len(detail_fields) == 1
+        async for row in matched_qs.values(*fields_with_pk):
+            pk_val = row[self.model_pk_name]
+            detail_map[pk_val] = (
+                row[detail_fields[0]]
+                if single_field
+                else {f: row[f] for f in detail_fields}
+            )
+        return set(detail_map.keys()), detail_map
+
+    def _build_success_details(
+        self,
+        pks: list[int | str],
+        existing_pks: set,
+        detail_map: dict,
+    ) -> list:
+        """Build ordered success details from existing PKs."""
+        if detail_map:
+            return [detail_map[pk] for pk in pks if pk in existing_pks]
+        return [pk for pk in pks if pk in existing_pks]
+
     async def bulk_delete_s(
         self,
         request: HttpRequest,
         pks: list[int | str],
         detail_fields: list[str] | None = None,
-    ):
+    ) -> tuple[list, list[dict]]:
         """
         Delete multiple instances with partial success and optimized queries.
 
@@ -1510,52 +1557,27 @@ class ModelUtil(Generic[ModelT]):
         if not pks:
             return [], []
 
-        error_details = []
-
-        # Single query: get base queryset respecting queryset_request hooks
         qs = await self.get_objects(request, is_for="read")
         matched_qs = qs.filter(**{f"{self.model_pk_name}__in": pks})
 
-        if detail_fields:
-            # Fetch requested fields before deletion
-            fields_with_pk = list(
-                dict.fromkeys([self.model_pk_name] + detail_fields)
-            )
-            detail_map = {}
-            async for row in matched_qs.values(*fields_with_pk):
-                pk_val = row[self.model_pk_name]
-                if len(detail_fields) == 1:
-                    detail_map[pk_val] = row[detail_fields[0]]
-                else:
-                    detail_map[pk_val] = {
-                        f: row[f] for f in detail_fields
-                    }
-            existing_pks = set(detail_map.keys())
-        else:
-            # Default: track PKs only
-            existing_pks = set()
-            async for pk_val in matched_qs.values_list(
-                self.model_pk_name, flat=True
-            ):
-                existing_pks.add(pk_val)
+        existing_pks, detail_map = await self._resolve_existing_pks(
+            matched_qs, detail_fields
+        )
 
-        # Report missing PKs as errors (reuse NotFoundError format)
-        for pk in pks:
-            if pk not in existing_pks:
-                error_details.append(NotFoundError(self.model).error)
+        error_details = [
+            NotFoundError(self.model).error
+            for pk in pks
+            if pk not in existing_pks
+        ]
 
-        # Single query: delete all existing objects
-        success_details = []
+        success_details: list = []
         if existing_pks:
             await qs.filter(
                 **{f"{self.model_pk_name}__in": existing_pks}
             ).adelete()
-            if detail_fields:
-                success_details = [
-                    detail_map[pk] for pk in pks if pk in existing_pks
-                ]
-            else:
-                success_details = [pk for pk in pks if pk in existing_pks]
+            success_details = self._build_success_details(
+                pks, existing_pks, detail_map
+            )
 
         logger.debug(
             f"Bulk delete {self.model.__name__}: "
