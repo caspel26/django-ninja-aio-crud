@@ -496,23 +496,26 @@ class PermissionViewSetMixin(APIViewSet[ModelT]):
         return queryset
 
 
+    @staticmethod
+    def _deny(operation: str) -> None:
+        """Raise ForbiddenError for the given operation."""
+        raise ForbiddenError(
+            details=f"Permission denied for operation: {operation}"
+        )
+
     async def on_before_operation(
         self, request: HttpRequest, operation: str
     ) -> None:
         """Check has_permission; raise ForbiddenError if denied."""
         if not await self.has_permission(request, operation):
-            raise ForbiddenError(
-                details=f"Permission denied for operation: {operation}"
-            )
+            self._deny(operation)
 
     async def on_before_object_operation(
         self, request: HttpRequest, operation: str, obj: ModelT
     ) -> None:
         """Check has_object_permission; raise ForbiddenError if denied."""
         if not await self.has_object_permission(request, operation, obj):
-            raise ForbiddenError(
-                details=f"Permission denied for operation: {operation}"
-            )
+            self._deny(operation)
 
     def on_list_queryset(
         self, request: HttpRequest, queryset: QuerySet
