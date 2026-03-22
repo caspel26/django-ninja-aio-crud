@@ -1,8 +1,10 @@
 from typing import TypeVar
 
-from django.db.models import Model, Q
+from django.db.models import Model, QuerySet, Q
+from django.http import HttpRequest
 
 from ninja_aio.views.api import APIViewSet
+from ninja_aio.exceptions import ForbiddenError
 from ninja_aio.schemas import RelationFilterSchema, MatchCaseFilterSchema
 
 # TypeVar for generic model typing in mixins
@@ -438,3 +440,132 @@ class MatchCaseFilterViewSetMixin(APIViewSet[ModelT]):
             )
             base_qs = self._apply_case_filter(base_qs, case_filter)
         return base_qs
+
+
+class PermissionViewSetMixin(APIViewSet[ModelT]):
+    """
+    Mixin adding async permission checks to all CRUD operations.
+
+    Provides three overridable hooks:
+
+    - ``has_permission(request, operation)`` — view-level check executed
+      before any DB query. Return ``False`` to deny (raises 403).
+    - ``has_object_permission(request, operation, obj)`` — object-level
+      check executed after fetching the instance but before mutation.
+      Only called for retrieve / update / delete. Return ``False`` to deny.
+    - ``get_permission_queryset(request, queryset)`` — row-level filtering
+      for list views. Return a filtered queryset to restrict visible rows.
+
+    All hooks default to *allow-all* so the mixin is safe to add without
+    immediately locking out any operations.
+
+    Usage::
+
+        class BookAPI(PermissionViewSetMixin, APIViewSet):
+            model = Book
+
+            async def has_permission(self, request, operation):
+                if operation in ("create", "update", "delete"):
+                    return request.auth.is_staff
+                return True
+
+            async def has_object_permission(self, request, operation, obj):
+                return obj.owner_id == request.auth.id
+
+    The mixin works with filter mixins, bulk views, and ``@action``
+    endpoints. Permission is checked using the action name as the
+    ``operation`` string for custom actions.
+    """
+
+    _has_object_hooks = True
+
+    async def has_permission(
+        self, request: HttpRequest, operation: str
+    ) -> bool:
+        """View-level permission check. Override for custom logic."""
+        return True
+
+    async def has_object_permission(
+        self, request: HttpRequest, operation: str, obj: ModelT
+    ) -> bool:
+        """Object-level permission check. Override for custom logic."""
+        return True
+
+    def get_permission_queryset(
+        self, request: HttpRequest, queryset: QuerySet
+    ) -> QuerySet:
+        """Row-level filtering for list views. Override to restrict visible rows."""
+        return queryset
+
+
+    @staticmethod
+    def _deny(operation: str) -> None:
+        """Raise ForbiddenError for the given operation."""
+        raise ForbiddenError(
+            details=f"Permission denied for operation: {operation}"
+        )
+
+    async def on_before_operation(
+        self, request: HttpRequest, operation: str
+    ) -> None:
+        """Check has_permission; raise ForbiddenError if denied."""
+        if not await self.has_permission(request, operation):
+            self._deny(operation)
+
+    async def on_before_object_operation(
+        self, request: HttpRequest, operation: str, obj: ModelT
+    ) -> None:
+        """Check has_object_permission; raise ForbiddenError if denied."""
+        if not await self.has_object_permission(request, operation, obj):
+            self._deny(operation)
+
+    def on_list_queryset(
+        self, request: HttpRequest, queryset: QuerySet
+    ) -> QuerySet:
+        """Delegate to get_permission_queryset for row-level filtering."""
+        return self.get_permission_queryset(request, queryset)
+
+
+class RoleBasedPermissionMixin(PermissionViewSetMixin[ModelT]):
+    """
+    Permission mixin using a role-to-operations mapping.
+
+    Maps user roles to lists of allowed operations. The role is read from
+    ``request.auth`` using the attribute named by ``role_attribute``.
+
+    Usage::
+
+        class BookAPI(RoleBasedPermissionMixin, APIViewSet):
+            model = Book
+            permission_roles = {
+                "admin": ["create", "list", "retrieve", "update", "delete"],
+                "editor": ["create", "list", "retrieve", "update"],
+                "reader": ["list", "retrieve"],
+            }
+            role_attribute = "role"  # default
+
+    When ``permission_roles`` is empty, all operations are allowed (opt-in).
+    When ``request.auth`` is ``None`` or the role attribute is missing,
+    all operations are denied.
+    """
+
+    permission_roles: dict[str, list[str]] = {}
+    role_attribute: str = "role"
+
+    async def has_permission(
+        self, request: HttpRequest, operation: str
+    ) -> bool:
+        """Check if the user's role allows the requested operation."""
+        if not self.permission_roles:
+            return True
+        auth = getattr(request, "auth", None)
+        if auth is None:
+            return False
+        role = (
+            auth.get(self.role_attribute)
+            if isinstance(auth, dict)
+            else getattr(auth, self.role_attribute, None)
+        )
+        if role is None:
+            return False
+        return operation in self.permission_roles.get(role, [])

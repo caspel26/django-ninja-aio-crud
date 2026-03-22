@@ -1,3 +1,4 @@
+import functools
 import inspect
 import logging
 from collections.abc import Callable
@@ -35,7 +36,7 @@ from ninja_aio.models import serializers
 
 logger = logging.getLogger("ninja_aio.views")
 
-ERROR_CODES = frozenset({400, 401, 404})
+ERROR_CODES = frozenset({400, 401, 403, 404})
 
 # TypeVar for generic model typing in ViewSets
 ModelT = TypeVar("ModelT", bound=Model)
@@ -670,6 +671,41 @@ class APIViewSet(API, Generic[ModelT]):
         """
         return queryset
 
+    async def on_before_operation(self, request: HttpRequest, operation: str) -> None:
+        """Hook called before every CRUD/bulk/@action view. Override for view-level checks."""
+
+    async def on_before_object_operation(self, request: HttpRequest, operation: str, obj: ModelT) -> None:
+        """Hook called after fetch, before mutation (retrieve/update/delete). Override for object-level checks."""
+
+    def on_list_queryset(self, request: HttpRequest, queryset: QuerySet) -> QuerySet:
+        """Hook to filter the list queryset before pagination. Override for row-level filtering."""
+        return queryset
+
+    _has_object_hooks: bool = False
+    """Set to True by mixins that override on_before_object_operation."""
+
+    async def _run_object_hooks(
+        self,
+        request: HttpRequest,
+        operation: str,
+        pk: int | str,
+        is_for: str | None = None,
+    ) -> ModelT | None:
+        """
+        Run view-level and object-level hooks, returning the fetched object.
+
+        Combines on_before_operation, get_object, and on_before_object_operation
+        into a single call used by retrieve, update, and delete views.
+        Skips the object fetch when no object-level hooks are registered
+        (avoids a redundant query when update_s/delete_s will fetch again).
+        """
+        await self.on_before_operation(request, operation)
+        if not self._has_object_hooks:
+            return None
+        obj = await self.model_util.get_object(request, pk, is_for=is_for)
+        await self.on_before_object_operation(request, operation, obj)
+        return obj
+
     def create_view(self) -> Callable:
         """
         Register create endpoint.
@@ -684,6 +720,7 @@ class APIViewSet(API, Generic[ModelT]):
         )
         @decorate_view(aatomic, unique_view(self), *self.extra_decorators.create)
         async def create(request: HttpRequest, data: self.schema_in):  # type: ignore
+            await self.on_before_operation(request, "create")
             return Status(
                 201, await self.model_util.create_s(request, data, self.schema_out)
             )
@@ -731,11 +768,14 @@ class APIViewSet(API, Generic[ModelT]):
             if not isinstance(ninja_pagination, _input_class):
                 ninja_pagination = _default_pagination
 
+            await self.on_before_operation(request, "list")
+
             qs = await self.model_util.get_objects(
                 request,
                 query_data=self._get_query_data(),
                 is_for="read",
             )
+            qs = self.on_list_queryset(request, qs)
             qs = await self._apply_list_filters(qs, filters)
 
             count = await qs.values(_pk_name).acount()
@@ -774,6 +814,16 @@ class APIViewSet(API, Generic[ModelT]):
         )
         @decorate_view(unique_view(self), *self.extra_decorators.retrieve)
         async def retrieve(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
+            _pk = self._get_pk(pk)
+            _is_for = "detail" if self.schema_detail else "read"
+            obj = await self._run_object_hooks(
+                request, "retrieve", _pk, is_for=_is_for,
+            )
+            if obj is not None:
+                return Status(
+                    200,
+                    await self.model_util.read_s(retrieve_schema, request, obj),
+                )
             query_data = self._get_query_data()
             return Status(
                 200,
@@ -781,9 +831,9 @@ class APIViewSet(API, Generic[ModelT]):
                     retrieve_schema,
                     request,
                     query_data=QuerySchema(
-                        getters={"pk": self._get_pk(pk)}, **query_data.model_dump()
+                        getters={"pk": _pk}, **query_data.model_dump()
                     ),
-                    is_for="detail" if self.schema_detail else "read",
+                    is_for=_is_for,
                 ),
             )
 
@@ -807,12 +857,14 @@ class APIViewSet(API, Generic[ModelT]):
             data: self.schema_update,  # type: ignore
             pk: Path[self.path_schema],  # type: ignore
         ):
+            _pk = self._get_pk(pk)
+            await self._run_object_hooks(request, "update", _pk)
             return Status(
                 200,
                 await self.model_util.update_s(
                     request,
                     data,
-                    self._get_pk(pk),
+                    _pk,
                     self.schema_out,
                     self.require_update_fields,
                 ),
@@ -834,11 +886,21 @@ class APIViewSet(API, Generic[ModelT]):
         )
         @decorate_view(aatomic, unique_view(self), *self.extra_decorators.delete)
         async def delete(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
+            _pk = self._get_pk(pk)
+            await self._run_object_hooks(request, "delete", _pk)
             return Status(
-                204, await self.model_util.delete_s(request, self._get_pk(pk))
+                204, await self.model_util.delete_s(request, _pk)
             )
 
         return delete
+
+    @staticmethod
+    def _bulk_result(success: list, errors: list) -> dict:
+        """Format bulk operation result into standard response structure."""
+        return {
+            "success": {"count": len(success), "details": success},
+            "errors": {"count": len(errors), "details": errors},
+        }
 
     def _get_bulk_detail_extractor(self) -> Callable | None:
         """
@@ -909,16 +971,11 @@ class APIViewSet(API, Generic[ModelT]):
         async def bulk_create(
             request: HttpRequest, data: List[self.schema_in]  # type: ignore
         ):
+            await self.on_before_operation(request, "bulk_create")
             success, errors = await self.model_util.bulk_create_s(
                 request, data, self._get_bulk_detail_extractor()
             )
-            return Status(
-                200,
-                {
-                    "success": {"count": len(success), "details": success},
-                    "errors": {"count": len(errors), "details": errors},
-                },
-            )
+            return Status(200, self._bulk_result(success, errors))
 
         return bulk_create
 
@@ -945,6 +1002,7 @@ class APIViewSet(API, Generic[ModelT]):
             request: HttpRequest,
             data: List[self.bulk_update_schema],  # type: ignore
         ):
+            await self.on_before_operation(request, "bulk_update")
             data_list = []
             for item in data:
                 pk = getattr(item, pk_name)
@@ -959,13 +1017,7 @@ class APIViewSet(API, Generic[ModelT]):
                 self._get_bulk_detail_extractor(),
                 self.require_update_fields,
             )
-            return Status(
-                200,
-                {
-                    "success": {"count": len(success), "details": success},
-                    "errors": {"count": len(errors), "details": errors},
-                },
-            )
+            return Status(200, self._bulk_result(success, errors))
 
         return bulk_update
 
@@ -987,16 +1039,11 @@ class APIViewSet(API, Generic[ModelT]):
         async def bulk_delete(
             request: HttpRequest, data: self.bulk_delete_schema  # type: ignore
         ):
+            await self.on_before_operation(request, "bulk_delete")
             deleted_pks, errors = await self.model_util.bulk_delete_s(
                 request, data.ids, self._get_bulk_detail_fields()
             )
-            return Status(
-                200,
-                {
-                    "success": {"count": len(deleted_pks), "details": deleted_pks},
-                    "errors": {"count": len(errors), "details": errors},
-                },
-            )
+            return Status(200, self._bulk_result(deleted_pks, errors))
 
         return bulk_delete
 
@@ -1060,6 +1107,23 @@ class APIViewSet(API, Generic[ModelT]):
 
             handler = factory._build_handler(self, method)
             factory._apply_metadata(handler, method)
+
+            # Wrap handler with on_before_operation hook
+            original_handler = handler
+
+            @functools.wraps(original_handler)
+            async def hooked_handler(
+                *args,
+                _action_name=name,
+                _viewset=self,
+                _orig=original_handler,
+                **kwargs,
+            ):
+                request = args[0] if args else kwargs.get("request")
+                await _viewset.on_before_operation(request, _action_name)
+                return await _orig(*args, **kwargs)
+
+            handler = hooked_handler
 
             if config.detail:
                 self._rename_pk_param(handler)

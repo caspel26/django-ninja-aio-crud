@@ -1,6 +1,7 @@
 import datetime
 
 from django.db.models import Q
+from ninja_aio.decorators.actions import action
 from ninja_aio.views import mixins
 from ninja_aio.schemas import (
     RelationFilterSchema,
@@ -351,3 +352,61 @@ class TestModelSerializerMatchCaseQExcludeFilterAPI(
             ),
         ),
     ]
+
+
+# ==========================================================
+#                  PERMISSION MIXIN APIS
+# ==========================================================
+
+
+class PermissionTestAPI(GenericAPIViewSet, mixins.PermissionViewSetMixin):
+    """ViewSet using PermissionViewSetMixin with controllable permission via request attrs."""
+
+    model = models.TestModelSerializer
+
+    async def has_permission(self, request, operation):
+        return getattr(request, "_allow", True)
+
+    async def has_object_permission(self, request, operation, obj):
+        return getattr(request, "_allow_obj", True)
+
+    def get_permission_queryset(self, request, queryset):
+        if getattr(request, "_filter_qs", False):
+            return queryset.none()
+        return queryset
+
+
+class RoleBasedPermissionTestAPI(
+    GenericAPIViewSet, mixins.RoleBasedPermissionMixin
+):
+    """ViewSet using RoleBasedPermissionMixin with role-to-operations mapping."""
+
+    model = models.TestModelSerializer
+    permission_roles = {
+        "admin": [
+            "create", "list", "retrieve", "update", "delete",
+            "bulk_create", "bulk_update", "bulk_delete", "custom_action",
+        ],
+        "editor": ["create", "list", "retrieve", "update"],
+        "reader": ["list", "retrieve"],
+    }
+
+    bulk_operations = ["create", "update", "delete"]
+
+    @action(detail=False, methods=["post"])
+    async def custom_action(self, request):
+        return {"status": "ok"}
+
+
+class PermissionWithFilterTestAPI(
+    mixins.PermissionViewSetMixin,
+    mixins.IcontainsFilterViewSetMixin,
+    GenericAPIViewSet,
+):
+    """ViewSet combining permission and filter mixins."""
+
+    model = models.TestModelSerializer
+    query_params = {"name": (str, None)}
+
+    async def has_permission(self, request, operation):
+        return getattr(request, "_allow", True)
