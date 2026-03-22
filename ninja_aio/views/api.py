@@ -895,6 +895,14 @@ class APIViewSet(API, Generic[ModelT]):
 
         return delete
 
+    @staticmethod
+    def _bulk_result(success: list, errors: list) -> dict:
+        """Format bulk operation result into standard response structure."""
+        return {
+            "success": {"count": len(success), "details": success},
+            "errors": {"count": len(errors), "details": errors},
+        }
+
     def _get_bulk_detail_extractor(self) -> Callable | None:
         """
         Return a callable that extracts detail info from a model instance
@@ -968,13 +976,7 @@ class APIViewSet(API, Generic[ModelT]):
             success, errors = await self.model_util.bulk_create_s(
                 request, data, self._get_bulk_detail_extractor()
             )
-            return Status(
-                200,
-                {
-                    "success": {"count": len(success), "details": success},
-                    "errors": {"count": len(errors), "details": errors},
-                },
-            )
+            return Status(200, self._bulk_result(success, errors))
 
         return bulk_create
 
@@ -1016,13 +1018,7 @@ class APIViewSet(API, Generic[ModelT]):
                 self._get_bulk_detail_extractor(),
                 self.require_update_fields,
             )
-            return Status(
-                200,
-                {
-                    "success": {"count": len(success), "details": success},
-                    "errors": {"count": len(errors), "details": errors},
-                },
-            )
+            return Status(200, self._bulk_result(success, errors))
 
         return bulk_update
 
@@ -1048,13 +1044,7 @@ class APIViewSet(API, Generic[ModelT]):
             deleted_pks, errors = await self.model_util.bulk_delete_s(
                 request, data.ids, self._get_bulk_detail_fields()
             )
-            return Status(
-                200,
-                {
-                    "success": {"count": len(deleted_pks), "details": deleted_pks},
-                    "errors": {"count": len(errors), "details": errors},
-                },
-            )
+            return Status(200, self._bulk_result(deleted_pks, errors))
 
         return bulk_delete
 
