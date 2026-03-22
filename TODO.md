@@ -28,7 +28,6 @@
 | 6 | Aggregation endpoints | `views/mixins.py` | Add `AggregationViewSetMixin` — COUNT, SUM, AVG, MIN, MAX on list views for dashboard/analytics use cases without downloading all data. |
 | 7 | ETag / Conditional requests | `views/api.py`, `helpers/` | Support HTTP caching with `ETag`, `If-None-Match`, `If-Modified-Since` on retrieve/list to reduce traffic and DB load. |
 | 8 | Multi-tenancy mixin | `views/mixins.py`, `models/` | Add `TenantViewSetMixin` — automatic tenant filtering on all queries based on header or JWT claim. Essential for SaaS. |
-| 36 | Granular permission system | `views/mixins.py`, `views/api.py` | Add `PermissionViewSetMixin` with `has_permission(request)` and `has_object_permission(request, obj)` hooks. Add `RoleBasedPermission` mapping roles to allowed operations (`{"admin": ["create", "update", "delete"], "reader": ["list", "retrieve"]}`). |
 | 37 | Auto-generate Django Admin from ModelSerializer | `admin.py` (new) | Add `ModelSerializer.as_admin()` and `@admin_registered` decorator — auto-generate `ModelAdmin` with `list_display`, `search_fields`, `list_filter` derived from `ReadSerializer` config. Zero extra boilerplate. |
 | 38 | Webhook mixin | `views/mixins.py` | Add `WebhookViewSetMixin` — async HTTP POST to configured URLs on CRUD events (`on_create`, `on_update`, `on_delete`). Configurable per-event, with retry and timeout. Essential for SaaS integrations. |
 
@@ -85,7 +84,6 @@
 |---|------|-------------|
 | 24 | Streaming responses | Support for streaming large datasets (CSV export, file downloads). |
 | 25 | WebSocket / SSE | Real-time update support beyond REST. |
-| 26 | Scope-based permissions | Row-level security, field-level permissions, scope-based access control. |
 | 27 | Audit trail mixin | Built-in `created_by`, `modified_by`, change history tracking. |
 
 ### Infrastructure
