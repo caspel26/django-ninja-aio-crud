@@ -297,6 +297,137 @@ This enables:
 - `GET /articles?is_featured=true` → `queryset.filter(Q(status="published") & Q(priority__gte=5))`
 - `GET /articles?is_featured=false` → `queryset.exclude(Q(status="published") & Q(priority__gte=5))`
 
+---
+
+## PermissionViewSetMixin
+
+Adds async permission checks to **all** CRUD operations (create, list, retrieve, update, delete), bulk operations, and `@action` endpoints.
+
+### Hooks
+
+| Hook | When called | Default |
+|------|-------------|---------|
+| `has_permission(request, operation)` | Before any DB query (view-level) | `True` |
+| `has_object_permission(request, operation, obj)` | After fetching object, before mutation (retrieve/update/delete only) | `True` |
+| `get_permission_queryset(request, queryset)` | On list views, filters the queryset for row-level visibility | Returns queryset unchanged |
+
+When either `has_permission` or `has_object_permission` returns `False`, a `ForbiddenError` (HTTP 403) is raised.
+
+### Basic usage
+
+```python
+from ninja_aio.views.mixins import PermissionViewSetMixin
+from ninja_aio.views import APIViewSet
+
+class ArticleAPI(PermissionViewSetMixin, APIViewSet):
+    model = Article
+
+    async def has_permission(self, request, operation):
+        # Only staff can create/update/delete
+        if operation in ("create", "update", "delete"):
+            return getattr(request.auth, "is_staff", False)
+        return True
+
+    async def has_object_permission(self, request, operation, obj):
+        # Users can only modify their own articles
+        if operation in ("update", "delete"):
+            return obj.author_id == request.auth.id
+        return True
+
+    def get_permission_queryset(self, request, queryset):
+        # Non-staff users only see published articles
+        if not getattr(request.auth, "is_staff", False):
+            return queryset.filter(status="published")
+        return queryset
+```
+
+### Operation names
+
+| View | Operation string |
+|------|-----------------|
+| `create_view` | `"create"` |
+| `list_view` | `"list"` |
+| `retrieve_view` | `"retrieve"` |
+| `update_view` | `"update"` |
+| `delete_view` | `"delete"` |
+| `bulk_create_view` | `"bulk_create"` |
+| `bulk_update_view` | `"bulk_update"` |
+| `bulk_delete_view` | `"bulk_delete"` |
+| `@action(name="publish")` | `"publish"` |
+
+### Composing with filter mixins
+
+Permission and filter mixins work together without conflict:
+
+```python
+class ArticleAPI(
+    PermissionViewSetMixin,
+    IcontainsFilterViewSetMixin,
+    APIViewSet,
+):
+    model = Article
+    query_params = {"title": (str, None)}
+
+    async def has_permission(self, request, operation):
+        return request.auth is not None
+```
+
+---
+
+## RoleBasedPermissionMixin
+
+Concrete subclass of `PermissionViewSetMixin` that maps user roles to allowed operations. Reads the role from `request.auth` using a configurable attribute name.
+
+### Attributes
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `permission_roles` | `dict[str, list[str]]` | `{}` | Role → allowed operations mapping. Empty = allow all. |
+| `role_attribute` | `str` | `"role"` | Attribute name on `request.auth` containing the role string. |
+
+### Usage
+
+```python
+from ninja_aio.views.mixins import RoleBasedPermissionMixin
+from ninja_aio.views import APIViewSet
+
+class BookAPI(RoleBasedPermissionMixin, APIViewSet):
+    model = Book
+    permission_roles = {
+        "admin": ["create", "list", "retrieve", "update", "delete",
+                  "bulk_create", "bulk_update", "bulk_delete"],
+        "editor": ["create", "list", "retrieve", "update"],
+        "reader": ["list", "retrieve"],
+    }
+    role_attribute = "role"  # reads request.auth.role
+```
+
+### Behavior
+
+- **Empty `permission_roles`**: All operations allowed (opt-in model).
+- **`request.auth` is `None`**: All operations denied.
+- **Role attribute missing**: All operations denied.
+- **Dict auth support**: Works with both object-style (`request.auth.role`) and dict-style (`request.auth["role"]`) auth objects.
+
+### Custom role source
+
+Override `has_permission` for complex role resolution (e.g., Django groups, multiple roles):
+
+```python
+class GroupBasedAPI(PermissionViewSetMixin, APIViewSet):
+    model = Document
+
+    async def has_permission(self, request, operation):
+        user = request.auth
+        if user is None:
+            return False
+        user_groups = set(user.groups.values_list("name", flat=True))
+        required = {"admin"} if operation in ("delete",) else {"admin", "editor"}
+        return bool(user_groups & required)
+```
+
+---
+
 ## Tips
 
 - Align `query_params` types with expected filter values; prefer Pydantic `date`/`datetime` for date filters so values implement `isoformat`.

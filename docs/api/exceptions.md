@@ -13,6 +13,7 @@ from ninja_aio.exceptions import (
     BaseException,
     SerializeError,
     AuthError,
+    ForbiddenError,
     NotFoundError,
     PydanticValidationError,
 )
@@ -78,6 +79,45 @@ Raised when authentication or authorization fails. Inherits from `BaseException`
 
 ```python
 raise AuthError("Unauthorized", 401)
+```
+
+---
+
+### `ForbiddenError`
+
+Raised when a user lacks permission for the requested operation. Always returns HTTP 403.
+
+```python
+class ForbiddenError(BaseException):
+    status_code = 403
+    error = "forbidden"
+```
+
+**Constructor:**
+
+```python
+ForbiddenError(
+    error: str | dict | None = None,
+    details: str | None = None,
+)
+```
+
+Used by `PermissionViewSetMixin` and `RoleBasedPermissionMixin` when `has_permission` or `has_object_permission` returns `False`.
+
+```python
+from ninja_aio.exceptions import ForbiddenError
+
+# Default
+raise ForbiddenError()
+# {"error": "forbidden"}
+
+# With details
+raise ForbiddenError(details="Permission denied for operation: delete")
+# {"error": "forbidden", "details": "Permission denied for operation: delete"}
+
+# Custom error
+raise ForbiddenError(error={"field": "not allowed"})
+# {"field": "not allowed"}
 ```
 
 ---
