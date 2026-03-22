@@ -1428,6 +1428,19 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
         cls.util = ModelUtil(cls)
         cls.query_util = QueryUtil(cls)
 
+    @classmethod
+    def as_admin(cls, **overrides) -> type:
+        """Generate a ModelAdmin class from this ModelSerializer's config.
+
+        Any keyword argument overrides the auto-generated value::
+
+            admin.site.register(Book, Book.as_admin(list_per_page=50))
+        """
+        # Lazy import to avoid circular dependency
+        from ninja_aio.admin import model_admin_factory
+
+        return model_admin_factory(cls, **overrides)
+
     class Meta:
         abstract = True
 
