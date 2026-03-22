@@ -34,6 +34,44 @@ def _find_view(router, path, method):
     return None
 
 
+class _PermissionTestBase(TestCase):
+    """Shared setup for permission test cases."""
+
+    namespace: str = ""
+    viewset_class = None
+
+    @classmethod
+    def _init_viewset(cls, namespace, viewset_instance):
+        cls.api = NinjaAIO(urls_namespace=namespace)
+        cls.viewset = viewset_instance
+        cls.viewset.api = cls.api
+        cls.viewset.add_views_to_route()
+        cls.model = models.TestModelSerializer
+        cls.test_util = ModelUtil(cls.model)
+        cls.request = Request("/test/")
+        cls.schema_in = cls.model.generate_create_s()
+        cls.schema_out = cls.model.generate_read_s()
+        cls.schema_update = cls.model.generate_update_s()
+
+    @classmethod
+    def _locate_views(cls):
+        cls.create_view = _find_view(cls.viewset.router, "/", "POST")
+        cls.list_view = _find_view(cls.viewset.router, "", "GET")
+        cls.retrieve_view = _find_view(cls.viewset.router, "{id}", "GET")
+        cls.update_view = _find_view(cls.viewset.router, "{id}/", "PATCH")
+        cls.delete_view = _find_view(cls.viewset.router, "{id}/", "DELETE")
+
+    def _create_instance(self):
+        return async_to_sync(self.test_util.create_s)(
+            self.request.post(),
+            self.schema_in(name="perm_test", description="perm_test_desc"),
+            self.schema_out,
+        )
+
+    def _pk_schema(self, pk):
+        return self.viewset.path_schema(id=pk)
+
+
 # ---------------------------------------------------------------------------
 #  ForbiddenError tests
 # ---------------------------------------------------------------------------
@@ -68,37 +106,13 @@ class ForbiddenErrorTestCase(TestCase):
 
 
 @tag("viewset", "permissions")
-class PermissionViewSetMixinTestCase(TestCase):
+class PermissionViewSetMixinTestCase(_PermissionTestBase):
     """Test PermissionViewSetMixin hooks on all CRUD operations."""
 
     @classmethod
     def setUpTestData(cls):
-        cls.api = NinjaAIO(urls_namespace="perm_test")
-        cls.viewset = views.PermissionTestAPI()
-        cls.viewset.api = cls.api
-        cls.viewset.add_views_to_route()
-        cls.model = models.TestModelSerializer
-        cls.test_util = ModelUtil(cls.model)
-        cls.request = Request("/test/")
-        cls.schema_in = cls.model.generate_create_s()
-        cls.schema_out = cls.model.generate_read_s()
-        cls.schema_update = cls.model.generate_update_s()
-        # Pre-locate views
-        cls.create_view = _find_view(cls.viewset.router, "/", "POST")
-        cls.list_view = _find_view(cls.viewset.router, "", "GET")
-        cls.retrieve_view = _find_view(cls.viewset.router, "{id}", "GET")
-        cls.update_view = _find_view(cls.viewset.router, "{id}/", "PATCH")
-        cls.delete_view = _find_view(cls.viewset.router, "{id}/", "DELETE")
-
-    def _create_instance(self):
-        return async_to_sync(self.test_util.create_s)(
-            self.request.post(),
-            self.schema_in(name="perm_test", description="perm_test_desc"),
-            self.schema_out,
-        )
-
-    def _pk_schema(self, pk):
-        return self.viewset.path_schema(id=pk)
+        cls._init_viewset("perm_test", views.PermissionTestAPI())
+        cls._locate_views()
 
     # -- Default (allow all) --------------------------------------------------
 
@@ -202,38 +216,15 @@ class PermissionViewSetMixinTestCase(TestCase):
 
 
 @tag("viewset", "permissions")
-class RoleBasedPermissionMixinTestCase(TestCase):
+class RoleBasedPermissionMixinTestCase(_PermissionTestBase):
     """Test RoleBasedPermissionMixin role-to-operations mapping."""
 
     @classmethod
     def setUpTestData(cls):
-        cls.api = NinjaAIO(urls_namespace="role_test")
-        cls.viewset = views.RoleBasedPermissionTestAPI()
-        cls.viewset.api = cls.api
-        cls.viewset.add_views_to_route()
-        cls.model = models.TestModelSerializer
-        cls.test_util = ModelUtil(cls.model)
-        cls.request = Request("/test/")
-        cls.schema_in = cls.model.generate_create_s()
-        cls.schema_out = cls.model.generate_read_s()
-        cls.schema_update = cls.model.generate_update_s()
-        cls.create_view = _find_view(cls.viewset.router, "/", "POST")
-        cls.list_view = _find_view(cls.viewset.router, "", "GET")
-        cls.retrieve_view = _find_view(cls.viewset.router, "{id}", "GET")
-        cls.update_view = _find_view(cls.viewset.router, "{id}/", "PATCH")
-        cls.delete_view = _find_view(cls.viewset.router, "{id}/", "DELETE")
+        cls._init_viewset("role_test", views.RoleBasedPermissionTestAPI())
+        cls._locate_views()
         cls.bulk_create_view = _find_view(cls.viewset.router, "bulk/", "POST")
         cls.bulk_delete_view = _find_view(cls.viewset.router, "bulk/", "DELETE")
-
-    def _create_instance(self):
-        return async_to_sync(self.test_util.create_s)(
-            self.request.post(),
-            self.schema_in(name="role_test", description="role_test_desc"),
-            self.schema_out,
-        )
-
-    def _pk_schema(self, pk):
-        return self.viewset.path_schema(id=pk)
 
     def _req_with_role(self, method="get", role=None):
         req = getattr(self.request, method)()
@@ -457,20 +448,12 @@ class RoleBasedPermissionMixinTestCase(TestCase):
 
 
 @tag("viewset", "permissions")
-class PermissionWithFilterMixinTestCase(TestCase):
+class PermissionWithFilterMixinTestCase(_PermissionTestBase):
     """Test that PermissionViewSetMixin composes with filter mixins."""
 
     @classmethod
     def setUpTestData(cls):
-        cls.api = NinjaAIO(urls_namespace="perm_filter_test")
-        cls.viewset = views.PermissionWithFilterTestAPI()
-        cls.viewset.api = cls.api
-        cls.viewset.add_views_to_route()
-        cls.model = models.TestModelSerializer
-        cls.test_util = ModelUtil(cls.model)
-        cls.request = Request("/test/")
-        cls.schema_in = cls.model.generate_create_s()
-        cls.schema_out = cls.model.generate_read_s()
+        cls._init_viewset("perm_filter_test", views.PermissionWithFilterTestAPI())
         cls.list_view = _find_view(cls.viewset.router, "", "GET")
 
     def test_list_allowed_with_filter_mixin(self):
