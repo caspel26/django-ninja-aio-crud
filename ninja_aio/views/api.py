@@ -13,7 +13,7 @@ from django.conf import settings
 from django.core.exceptions import FieldDoesNotExist
 from pydantic import create_model
 
-from ninja_aio.schemas.helpers import ModelQuerySetSchema, DecoratorsSchema
+from ninja_aio.schemas.helpers import ModelQuerySetSchema, QuerySchema, DecoratorsSchema
 
 from ninja_aio.models import ModelSerializer, ModelUtil
 from ninja_aio.schemas import (
@@ -681,20 +681,27 @@ class APIViewSet(API, Generic[ModelT]):
         """Hook to filter the list queryset before pagination. Override for row-level filtering."""
         return queryset
 
+    _has_object_hooks: bool = False
+    """Set to True by mixins that override on_before_object_operation."""
+
     async def _run_object_hooks(
         self,
         request: HttpRequest,
         operation: str,
         pk: int | str,
         is_for: str | None = None,
-    ) -> ModelT:
+    ) -> ModelT | None:
         """
         Run view-level and object-level hooks, returning the fetched object.
 
         Combines on_before_operation, get_object, and on_before_object_operation
         into a single call used by retrieve, update, and delete views.
+        Skips the object fetch when no object-level hooks are registered
+        (avoids a redundant query when update_s/delete_s will fetch again).
         """
         await self.on_before_operation(request, operation)
+        if not self._has_object_hooks:
+            return None
         obj = await self.model_util.get_object(request, pk, is_for=is_for)
         await self.on_before_object_operation(request, operation, obj)
         return obj
@@ -807,13 +814,27 @@ class APIViewSet(API, Generic[ModelT]):
         )
         @decorate_view(unique_view(self), *self.extra_decorators.retrieve)
         async def retrieve(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
+            _pk = self._get_pk(pk)
+            _is_for = "detail" if self.schema_detail else "read"
             obj = await self._run_object_hooks(
-                request, "retrieve", self._get_pk(pk),
-                is_for="detail" if self.schema_detail else "read",
+                request, "retrieve", _pk, is_for=_is_for,
             )
+            if obj is not None:
+                return Status(
+                    200,
+                    await self.model_util.read_s(retrieve_schema, request, obj),
+                )
+            query_data = self._get_query_data()
             return Status(
                 200,
-                await self.model_util.read_s(retrieve_schema, request, obj),
+                await self.model_util.read_s(
+                    retrieve_schema,
+                    request,
+                    query_data=QuerySchema(
+                        getters={"pk": _pk}, **query_data.model_dump()
+                    ),
+                    is_for=_is_for,
+                ),
             )
 
         return retrieve
@@ -1090,12 +1111,11 @@ class APIViewSet(API, Generic[ModelT]):
             # Wrap handler with on_before_operation hook
             original_handler = handler
             viewset = self
-            action_name = name
 
             @functools.wraps(original_handler)
-            async def hooked_handler(*args, **kwargs):
+            async def hooked_handler(*args, _action_name=name, **kwargs):
                 request = args[0] if args else kwargs.get("request")
-                await viewset.on_before_operation(request, action_name)
+                await viewset.on_before_operation(request, _action_name)
                 return await original_handler(*args, **kwargs)
 
             handler = hooked_handler

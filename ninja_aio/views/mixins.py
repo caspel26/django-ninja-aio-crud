@@ -477,6 +477,8 @@ class PermissionViewSetMixin(APIViewSet[ModelT]):
     ``operation`` string for custom actions.
     """
 
+    _has_object_hooks = True
+
     async def has_permission(
         self, request: HttpRequest, operation: str
     ) -> bool:
