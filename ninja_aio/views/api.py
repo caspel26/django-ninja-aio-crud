@@ -35,7 +35,7 @@ from ninja_aio.models import serializers
 
 logger = logging.getLogger("ninja_aio.views")
 
-ERROR_CODES = frozenset({400, 401, 404})
+ERROR_CODES = frozenset({400, 401, 403, 404})
 
 # TypeVar for generic model typing in ViewSets
 ModelT = TypeVar("ModelT", bound=Model)
