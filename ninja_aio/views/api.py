@@ -671,36 +671,14 @@ class APIViewSet(API, Generic[ModelT]):
         """
         return queryset
 
-    async def on_before_operation(
-        self, request: HttpRequest, operation: str
-    ) -> None:
-        """
-        Hook called at the start of every CRUD, bulk, and @action view.
+    async def on_before_operation(self, request: HttpRequest, operation: str) -> None:
+        """Hook called before every CRUD/bulk/@action view. Override for view-level checks."""
 
-        Override to add view-level checks (e.g., permissions).
-        Raise an exception to abort the operation.
-        """
+    async def on_before_object_operation(self, request: HttpRequest, operation: str, obj: ModelT) -> None:
+        """Hook called after fetch, before mutation (retrieve/update/delete). Override for object-level checks."""
 
-    async def on_before_object_operation(
-        self, request: HttpRequest, operation: str, obj: ModelT
-    ) -> None:
-        """
-        Hook called after fetching an object but before mutation.
-
-        Only called for retrieve, update, and delete — NOT for list views
-        (use ``on_list_queryset`` for row-level filtering instead).
-        Raise an exception to abort the operation.
-        """
-
-    def on_list_queryset(
-        self, request: HttpRequest, queryset: QuerySet
-    ) -> QuerySet:
-        """
-        Hook to filter the list queryset before pagination.
-
-        Override for row-level visibility filtering.
-        Returns the (possibly filtered) queryset.
-        """
+    def on_list_queryset(self, request: HttpRequest, queryset: QuerySet) -> QuerySet:
+        """Hook to filter the list queryset before pagination. Override for row-level filtering."""
         return queryset
 
     async def _run_object_hooks(
