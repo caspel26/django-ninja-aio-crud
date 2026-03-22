@@ -1110,13 +1110,18 @@ class APIViewSet(API, Generic[ModelT]):
 
             # Wrap handler with on_before_operation hook
             original_handler = handler
-            viewset = self
 
             @functools.wraps(original_handler)
-            async def hooked_handler(*args, _action_name=name, **kwargs):
+            async def hooked_handler(
+                *args,
+                _action_name=name,
+                _viewset=self,
+                _orig=original_handler,
+                **kwargs,
+            ):
                 request = args[0] if args else kwargs.get("request")
-                await viewset.on_before_operation(request, _action_name)
-                return await original_handler(*args, **kwargs)
+                await _viewset.on_before_operation(request, _action_name)
+                return await _orig(*args, **kwargs)
 
             handler = hooked_handler
 
