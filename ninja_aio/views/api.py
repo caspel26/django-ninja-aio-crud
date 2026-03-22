@@ -1,3 +1,4 @@
+import functools
 import inspect
 import logging
 from collections.abc import Callable
@@ -12,7 +13,7 @@ from django.conf import settings
 from django.core.exceptions import FieldDoesNotExist
 from pydantic import create_model
 
-from ninja_aio.schemas.helpers import ModelQuerySetSchema, QuerySchema, DecoratorsSchema
+from ninja_aio.schemas.helpers import ModelQuerySetSchema, DecoratorsSchema
 
 from ninja_aio.models import ModelSerializer, ModelUtil
 from ninja_aio.schemas import (
@@ -670,6 +671,38 @@ class APIViewSet(API, Generic[ModelT]):
         """
         return queryset
 
+    async def on_before_operation(
+        self, request: HttpRequest, operation: str
+    ) -> None:
+        """
+        Hook called at the start of every CRUD, bulk, and @action view.
+
+        Override to add view-level checks (e.g., permissions).
+        Raise an exception to abort the operation.
+        """
+
+    async def on_before_object_operation(
+        self, request: HttpRequest, operation: str, obj: ModelT
+    ) -> None:
+        """
+        Hook called after fetching an object but before mutation.
+
+        Only called for retrieve, update, and delete — NOT for list views
+        (use ``on_list_queryset`` for row-level filtering instead).
+        Raise an exception to abort the operation.
+        """
+
+    def on_list_queryset(
+        self, request: HttpRequest, queryset: QuerySet
+    ) -> QuerySet:
+        """
+        Hook to filter the list queryset before pagination.
+
+        Override for row-level visibility filtering.
+        Returns the (possibly filtered) queryset.
+        """
+        return queryset
+
     def create_view(self) -> Callable:
         """
         Register create endpoint.
@@ -684,6 +717,7 @@ class APIViewSet(API, Generic[ModelT]):
         )
         @decorate_view(aatomic, unique_view(self), *self.extra_decorators.create)
         async def create(request: HttpRequest, data: self.schema_in):  # type: ignore
+            await self.on_before_operation(request, "create")
             return Status(
                 201, await self.model_util.create_s(request, data, self.schema_out)
             )
@@ -731,11 +765,14 @@ class APIViewSet(API, Generic[ModelT]):
             if not isinstance(ninja_pagination, _input_class):
                 ninja_pagination = _default_pagination
 
+            await self.on_before_operation(request, "list")
+
             qs = await self.model_util.get_objects(
                 request,
                 query_data=self._get_query_data(),
                 is_for="read",
             )
+            qs = self.on_list_queryset(request, qs)
             qs = await self._apply_list_filters(qs, filters)
 
             count = await qs.values(_pk_name).acount()
@@ -774,17 +811,15 @@ class APIViewSet(API, Generic[ModelT]):
         )
         @decorate_view(unique_view(self), *self.extra_decorators.retrieve)
         async def retrieve(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
-            query_data = self._get_query_data()
+            await self.on_before_operation(request, "retrieve")
+            _is_for = "detail" if self.schema_detail else "read"
+            obj = await self.model_util.get_object(
+                request, self._get_pk(pk), is_for=_is_for
+            )
+            await self.on_before_object_operation(request, "retrieve", obj)
             return Status(
                 200,
-                await self.model_util.read_s(
-                    retrieve_schema,
-                    request,
-                    query_data=QuerySchema(
-                        getters={"pk": self._get_pk(pk)}, **query_data.model_dump()
-                    ),
-                    is_for="detail" if self.schema_detail else "read",
-                ),
+                await self.model_util.read_s(retrieve_schema, request, obj),
             )
 
         return retrieve
@@ -807,12 +842,16 @@ class APIViewSet(API, Generic[ModelT]):
             data: self.schema_update,  # type: ignore
             pk: Path[self.path_schema],  # type: ignore
         ):
+            await self.on_before_operation(request, "update")
+            _pk = self._get_pk(pk)
+            obj = await self.model_util.get_object(request, _pk)
+            await self.on_before_object_operation(request, "update", obj)
             return Status(
                 200,
                 await self.model_util.update_s(
                     request,
                     data,
-                    self._get_pk(pk),
+                    _pk,
                     self.schema_out,
                     self.require_update_fields,
                 ),
@@ -834,8 +873,12 @@ class APIViewSet(API, Generic[ModelT]):
         )
         @decorate_view(aatomic, unique_view(self), *self.extra_decorators.delete)
         async def delete(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
+            await self.on_before_operation(request, "delete")
+            _pk = self._get_pk(pk)
+            obj = await self.model_util.get_object(request, _pk)
+            await self.on_before_object_operation(request, "delete", obj)
             return Status(
-                204, await self.model_util.delete_s(request, self._get_pk(pk))
+                204, await self.model_util.delete_s(request, _pk)
             )
 
         return delete
@@ -909,6 +952,7 @@ class APIViewSet(API, Generic[ModelT]):
         async def bulk_create(
             request: HttpRequest, data: List[self.schema_in]  # type: ignore
         ):
+            await self.on_before_operation(request, "bulk_create")
             success, errors = await self.model_util.bulk_create_s(
                 request, data, self._get_bulk_detail_extractor()
             )
@@ -945,6 +989,7 @@ class APIViewSet(API, Generic[ModelT]):
             request: HttpRequest,
             data: List[self.bulk_update_schema],  # type: ignore
         ):
+            await self.on_before_operation(request, "bulk_update")
             data_list = []
             for item in data:
                 pk = getattr(item, pk_name)
@@ -987,6 +1032,7 @@ class APIViewSet(API, Generic[ModelT]):
         async def bulk_delete(
             request: HttpRequest, data: self.bulk_delete_schema  # type: ignore
         ):
+            await self.on_before_operation(request, "bulk_delete")
             deleted_pks, errors = await self.model_util.bulk_delete_s(
                 request, data.ids, self._get_bulk_detail_fields()
             )
@@ -1060,6 +1106,19 @@ class APIViewSet(API, Generic[ModelT]):
 
             handler = factory._build_handler(self, method)
             factory._apply_metadata(handler, method)
+
+            # Wrap handler with on_before_operation hook
+            original_handler = handler
+            viewset = self
+            action_name = name
+
+            @functools.wraps(original_handler)
+            async def hooked_handler(*args, **kwargs):
+                request = args[0] if args else kwargs.get("request")
+                await viewset.on_before_operation(request, action_name)
+                return await original_handler(*args, **kwargs)
+
+            handler = hooked_handler
 
             if config.detail:
                 self._rename_pk_param(handler)
