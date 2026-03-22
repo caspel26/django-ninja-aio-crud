@@ -1,6 +1,7 @@
 import datetime
 
 from django.db.models import Q
+from ninja_aio.decorators.actions import action
 from ninja_aio.views import mixins
 from ninja_aio.schemas import (
     RelationFilterSchema,
@@ -384,13 +385,17 @@ class RoleBasedPermissionTestAPI(
     permission_roles = {
         "admin": [
             "create", "list", "retrieve", "update", "delete",
-            "bulk_create", "bulk_update", "bulk_delete",
+            "bulk_create", "bulk_update", "bulk_delete", "custom_action",
         ],
         "editor": ["create", "list", "retrieve", "update"],
         "reader": ["list", "retrieve"],
     }
 
     bulk_operations = ["create", "update", "delete"]
+
+    @action(detail=False, methods=["post"])
+    async def custom_action(self, request):
+        return {"status": "ok"}
 
 
 class PermissionWithFilterTestAPI(
