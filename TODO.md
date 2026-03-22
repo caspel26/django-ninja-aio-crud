@@ -13,6 +13,7 @@
 | 3 | ~~Bulk operations~~ | `models/utils.py`, `views/api.py` | — | Added `bulk_create_view`, `bulk_update_view`, `bulk_delete_view` with partial success semantics, `BulkResultSchema` response, and optimized bulk delete. |
 | 4 | ~~Custom actions decorator~~ | `decorators/actions.py`, `views/api.py` | — | `@action` decorator for `APIViewSet` — detail/list actions, multi-method, auth inheritance, custom decorators, OpenAPI metadata. |
 | 5 | ~~Ordering / sorting~~ | `views/api.py` | — | Native `ordering_fields` and `default_ordering` attributes with automatic query parameter generation, field validation, and multi-field support. |
+| 6 | ~~Granular permission system~~ | `views/mixins.py`, `exceptions.py` | — | `PermissionViewSetMixin` with `has_permission`, `has_object_permission`, `get_permission_queryset` hooks. `RoleBasedPermissionMixin` with declarative role-to-operations mapping. `ForbiddenError` (HTTP 403). 100% test coverage (44 tests). |
 
 ---
 
