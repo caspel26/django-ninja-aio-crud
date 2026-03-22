@@ -82,6 +82,25 @@ class NotFoundError(BaseException):
         )
 
 
+class ForbiddenError(BaseException):
+    """Raised when a user lacks permission for the requested operation (HTTP 403)."""
+
+    status_code = 403
+    error = "forbidden"
+
+    def __init__(
+        self,
+        error: str | dict | None = None,
+        details: str | None = None,
+    ) -> None:
+        """Build a forbidden error with optional custom message."""
+        super().__init__(
+            error=error or {"error": self.error},
+            status_code=self.status_code,
+            details=details,
+        )
+
+
 class PydanticValidationError(BaseException):
     """Wrapper for pydantic ValidationError to normalize the API error response."""
 
