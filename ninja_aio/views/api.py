@@ -703,6 +703,24 @@ class APIViewSet(API, Generic[ModelT]):
         """
         return queryset
 
+    async def _run_object_hooks(
+        self,
+        request: HttpRequest,
+        operation: str,
+        pk: int | str,
+        is_for: str | None = None,
+    ) -> ModelT:
+        """
+        Run view-level and object-level hooks, returning the fetched object.
+
+        Combines on_before_operation, get_object, and on_before_object_operation
+        into a single call used by retrieve, update, and delete views.
+        """
+        await self.on_before_operation(request, operation)
+        obj = await self.model_util.get_object(request, pk, is_for=is_for)
+        await self.on_before_object_operation(request, operation, obj)
+        return obj
+
     def create_view(self) -> Callable:
         """
         Register create endpoint.
@@ -811,12 +829,10 @@ class APIViewSet(API, Generic[ModelT]):
         )
         @decorate_view(unique_view(self), *self.extra_decorators.retrieve)
         async def retrieve(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
-            await self.on_before_operation(request, "retrieve")
-            _is_for = "detail" if self.schema_detail else "read"
-            obj = await self.model_util.get_object(
-                request, self._get_pk(pk), is_for=_is_for
+            obj = await self._run_object_hooks(
+                request, "retrieve", self._get_pk(pk),
+                is_for="detail" if self.schema_detail else "read",
             )
-            await self.on_before_object_operation(request, "retrieve", obj)
             return Status(
                 200,
                 await self.model_util.read_s(retrieve_schema, request, obj),
@@ -842,10 +858,8 @@ class APIViewSet(API, Generic[ModelT]):
             data: self.schema_update,  # type: ignore
             pk: Path[self.path_schema],  # type: ignore
         ):
-            await self.on_before_operation(request, "update")
             _pk = self._get_pk(pk)
-            obj = await self.model_util.get_object(request, _pk)
-            await self.on_before_object_operation(request, "update", obj)
+            await self._run_object_hooks(request, "update", _pk)
             return Status(
                 200,
                 await self.model_util.update_s(
@@ -873,10 +887,8 @@ class APIViewSet(API, Generic[ModelT]):
         )
         @decorate_view(aatomic, unique_view(self), *self.extra_decorators.delete)
         async def delete(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
-            await self.on_before_operation(request, "delete")
             _pk = self._get_pk(pk)
-            obj = await self.model_util.get_object(request, _pk)
-            await self.on_before_object_operation(request, "delete", obj)
+            await self._run_object_hooks(request, "delete", _pk)
             return Status(
                 204, await self.model_util.delete_s(request, _pk)
             )
