@@ -1,5 +1,278 @@
 # 📋 Release Notes
 
+## 🏷️ [v2.28.0] - 2026-03-23
+
+---
+
+### ✨ New Features
+
+#### 🔐 Permission System with Operation Hooks
+> `ninja_aio/views/mixins.py`, `ninja_aio/views/api.py`, `ninja_aio/exceptions.py`
+
+A three-level permission system built on overridable operation hooks. Permissions are checked at **view-level** (before any DB query), **object-level** (after fetch, before mutation), and **row-level** (filters list queryset).
+
+```python
+from ninja_aio.views import APIViewSet
+from ninja_aio.views.mixins import PermissionViewSetMixin
+
+class ArticleAPI(PermissionViewSetMixin, APIViewSet):
+    model = Article
+
+    async def has_permission(self, request, operation):
+        """View-level: deny non-staff from writing."""
+        if operation in ("create", "update", "delete"):
+            return request.auth.is_staff
+        return True
+
+    async def has_object_permission(self, request, operation, obj):
+        """Object-level: only owners can modify."""
+        return obj.owner_id == request.auth.id
+
+    def get_permission_queryset(self, request, queryset):
+        """Row-level: users only see their own articles."""
+        return queryset.filter(owner=request.auth)
+```
+
+**`PermissionViewSetMixin` hooks:**
+
+| Hook | When | Raises |
+|---|---|---|
+| 🛡️ `has_permission(request, operation)` | Before any DB query | `ForbiddenError` (403) |
+| 🔒 `has_object_permission(request, operation, obj)` | After fetch, before mutation | `ForbiddenError` (403) |
+| 🔍 `get_permission_queryset(request, queryset)` | Before pagination in list view | Filters rows silently |
+
+**`RoleBasedPermissionMixin` — declarative role mapping:**
+
+```python
+from ninja_aio.views.mixins import RoleBasedPermissionMixin
+
+class ArticleAPI(RoleBasedPermissionMixin, APIViewSet):
+    model = Article
+    permission_roles = {
+        "admin": ["create", "list", "retrieve", "update", "delete"],
+        "editor": ["create", "list", "retrieve", "update"],
+        "reader": ["list", "retrieve"],
+    }
+    role_attribute = "role"  # reads from request.auth.role
+```
+
+**New exception:**
+
+```python
+from ninja_aio.exceptions import ForbiddenError
+
+raise ForbiddenError(details="Permission denied for operation: delete")
+# → 403 {"message": "forbidden", "details": "Permission denied for operation: delete"}
+```
+
+---
+
+#### 🏗️ Operation Hooks on `APIViewSet`
+> `ninja_aio/views/api.py`
+
+Three overridable hooks executed at different stages of CRUD, bulk, and `@action` operations. These form the foundation of the permission system but can be used independently for logging, auditing, or custom validation.
+
+```python
+class ArticleAPI(APIViewSet):
+    model = Article
+
+    async def on_before_operation(self, request, operation):
+        """Called before every operation (create, list, retrieve, update, delete, bulk_*, @action)."""
+        logger.info(f"User {request.auth.id} performing {operation}")
+
+    async def on_before_object_operation(self, request, operation, obj):
+        """Called after fetch, before mutation (retrieve, update, delete)."""
+        if obj.is_locked and operation in ("update", "delete"):
+            raise ForbiddenError(details="Object is locked")
+
+    def on_list_queryset(self, request, queryset):
+        """Called after filters/ordering, before pagination."""
+        return queryset.filter(is_published=True)
+```
+
+| Hook | Applies to |
+|---|---|
+| `on_before_operation` | All CRUD + bulk + `@action` endpoints |
+| `on_before_object_operation` | `retrieve`, `update`, `delete` (single-object endpoints) |
+| `on_list_queryset` | `list` endpoint only |
+
+---
+
+#### 🏛️ Auto Django Admin Generation
+> `ninja_aio/admin.py`, `ninja_aio/models/serializers.py`
+
+Generate Django `ModelAdmin` classes automatically from `ModelSerializer` field configuration. Admin `list_display`, `search_fields`, `list_filter`, and `readonly_fields` are derived intelligently from serializer inner classes.
+
+**Option 1 — `@register_admin` decorator:**
+
+```python
+from ninja_aio import register_admin
+from ninja_aio.models import ModelSerializer
+
+@register_admin
+class Book(ModelSerializer):
+    class Meta:
+        model = BookModel
+
+    class ReadSerializer:
+        fields = ["title", "author", "published_at", "is_active"]
+
+    class UpdateSerializer:
+        fields = ["title", "author"]
+```
+
+**Option 2 — `as_admin()` class method:**
+
+```python
+from django.contrib import admin
+
+admin.site.register(BookModel, Book.as_admin(list_per_page=50))
+```
+
+**Option 3 — `model_admin_factory()` function:**
+
+```python
+from ninja_aio.admin import model_admin_factory
+
+AdminClass = model_admin_factory(BookModel, list_per_page=50)
+admin.site.register(BookModel, AdminClass)
+```
+
+**Field classification logic:**
+
+| Field Type | `list_display` | `search_fields` | `list_filter` | `readonly_fields` |
+|---|---|---|---|---|
+| 📝 CharField, TextField, SlugField, EmailField, URLField | ✅ | ✅ | ❌ | If not in UpdateSerializer |
+| ☑️ BooleanField | ✅ | ❌ | ✅ | If not in UpdateSerializer |
+| 📅 DateField, DateTimeField | ✅ | ❌ | ✅ | If not in UpdateSerializer |
+| 🔗 ForeignKey, OneToOneField | ✅ | ❌ | ✅ | If not in UpdateSerializer |
+| 🔀 ManyToManyField | ❌ | ❌ | ✅ | ❌ |
+
+---
+
+#### 📋 Configurable Bulk Response Fields
+> `ninja_aio/views/api.py`, `ninja_aio/models/utils.py`
+
+New `bulk_response_fields` attribute on `APIViewSet` controls what fields are returned in bulk operation success details instead of PKs only.
+
+```python
+class ArticleAPI(APIViewSet):
+    model = Article
+    bulk_operations = ["create", "update", "delete"]
+
+    # Option 1: Single field value
+    bulk_response_fields = "slug"
+    # → {"success": {"count": 2, "details": ["my-article", "other-article"]}}
+
+    # Option 2: Multiple fields as dicts
+    bulk_response_fields = ["id", "slug", "title"]
+    # → {"success": {"count": 2, "details": [
+    #     {"id": 1, "slug": "my-article", "title": "My Article"},
+    #     {"id": 2, "slug": "other-article", "title": "Other Article"}
+    # ]}}
+
+    # Option 3: Default (None) — PK only (backward compatible)
+    bulk_response_fields = None
+    # → {"success": {"count": 2, "details": [1, 2]}}
+```
+
+Works with all three bulk operations. For `bulk_delete`, field values are fetched before deletion.
+
+---
+
+#### ✅ Require Update Fields Validation
+> `ninja_aio/views/api.py`, `ninja_aio/models/utils.py`
+
+New `require_update_fields` attribute rejects empty PATCH requests (all-`None` payloads).
+
+```python
+class ArticleAPI(APIViewSet):
+    model = Article
+    require_update_fields = True
+
+# PATCH /articles/1 {} → 400 {"message": "No fields provided for update."}
+# PATCH /articles/1 {"title": "New"} → 200 OK
+```
+
+Also applies to bulk update operations.
+
+---
+
+### 🔧 Improvements
+
+#### ⚡ List View Returns QuerySet Directly — Native `CursorPagination` Support
+> `ninja_aio/views/api.py`, `ninja_aio/helpers/api.py`
+
+`list_view` and M2M `get_related` now return the QuerySet directly to `@paginate` instead of serializing all objects first via `list_read_s`. This means:
+
+- ✅ **`CursorPagination` works natively** — receives a real QuerySet for `.order_by()` and `.filter()`
+- ⚡ **Only the current page is fetched from DB** — pagination slices at the database level
+- ⚡ **Only page_size objects are serialized** — Django Ninja handles serialization after pagination
+
+```python
+from ninja.pagination import CursorPagination
+
+class ArticleAPI(APIViewSet):
+    model = Article
+    pagination_class = CursorPagination  # ← just works now
+```
+
+**Performance with 17k records:** `list_view` time is constant regardless of total dataset size (ratio 17k/1k ≈ 1.0x).
+
+---
+
+#### 🔢 403 Error Code Added to `ERROR_CODES`
+> `ninja_aio/views/api.py`
+
+`ERROR_CODES` extended from `{400, 401, 404}` to `{400, 401, 403, 404}`. All endpoints now advertise `403 Forbidden` responses in OpenAPI schema.
+
+---
+
+#### 🏷️ Comprehensive Type Annotations
+> `ninja_aio/views/api.py`
+
+Explicit return type annotations added to all `APIViewSet` public methods and properties:
+
+| Method | Return Type |
+|---|---|
+| `add_views_to_route()` | `None` |
+| `get_schemas()` | `tuple[Schema \| None, ...]` |
+| `create_view()`, `list_view()`, etc. | `Callable` |
+| `_crud_views`, `_bulk_views` | `dict[str, tuple[Schema \| None, Callable]]` |
+| `query_params_handler()` | `QuerySet` |
+
+---
+
+### 📖 Documentation
+
+- ✨ **Mermaid architecture diagrams** — interactive flowcharts on home page (Request → Auth → Filter → Paginate → Serialize → Response), tutorial CRUD page, and APIViewSet reference
+- 🎨 **CSS animations** — hero fade-in, code block hover glow, card entrance animations, table row highlights, Mermaid diagram slide-in, scroll progress bar, CTA button lift+glow, anchor heading flash, page transitions, TOC active indicator, nav tab underline slide
+- 📝 **Code annotations** — annotated examples in Quick Start and CRUD tutorial pages using Material for MkDocs annotations syntax
+- 📦 **Collapsible sections** — advanced examples wrapped in `<details>` for cleaner reading flow
+- 🔐 **Permissions guide** — new tutorial page covering `PermissionViewSetMixin`, `RoleBasedPermissionMixin`, and `ForbiddenError`
+- 🏛️ **Auto Admin guide** — new tutorial page with `@register_admin` decorator, `as_admin()`, and field classification
+- 📋 **Bulk response fields** — documented in APIViewSet reference and CRUD tutorial
+- ✅ **Require update fields** — documented in APIViewSet reference
+- 📦 **README updated** — added bulk operations and `@action` decorator examples
+
+---
+
+### 🎯 Summary
+
+Version 2.28.0 introduces a **three-level permission system**, **auto Django admin generation**, and **configurable bulk response fields**, alongside a critical optimization that returns QuerySets directly from list views enabling native **cursor-based pagination** support.
+
+**Key benefits:**
+- 🔐 **Permission system** — view-level, object-level, and row-level permission checks with `PermissionViewSetMixin` and `RoleBasedPermissionMixin`
+- 🏗️ **Operation hooks** — `on_before_operation`, `on_before_object_operation`, `on_list_queryset` for custom logic at every stage
+- 🏛️ **Auto admin** — `@register_admin` generates `ModelAdmin` from serializer config with intelligent field classification
+- 📋 **Bulk response fields** — `bulk_response_fields` attribute returns custom fields instead of PKs only
+- ⚡ **Native cursor pagination** — list views return QuerySets directly, enabling `CursorPagination` and DB-level slicing
+- ✅ **Require update fields** — `require_update_fields = True` rejects empty PATCH requests
+- 🎨 **Rich documentation** — Mermaid diagrams, CSS animations, code annotations, and collapsible sections
+- ✅ **100% coverage** — all source lines covered across 804 tests
+
+---
+
 ## 🏷️ [v2.27.0] - 2026-03-18
 
 ---
@@ -230,32 +503,10 @@ if remove ^ (rel_obj.pk in rel_obj_pks):
 
 ### 📖 Documentation
 
-- 📝 `docs/api/views/api_view_set.md` — Added `@action` decorator section (recommended), bulk operations section, ordering section, updated Core Attributes table with new attributes
+- 📝 `docs/api/views/api_view_set.md` — Added `@action` decorator section (recommended), bulk operations section, ordering section, permissions section, updated Core Attributes table with new attributes
 - 📝 `docs/api/views/decorators.md` — Added `@action` card and full reference with code examples
 - 📝 `docs/tutorial/crud.md` — Added Custom Actions tutorial, Bulk Operations tutorial, rewrote Ordering section for native support, renamed `@api_get`/`@api_post` section as alternative
-- 📝 `TODO.md` — Marked bulk operations, custom actions, and ordering as completed; renumbered remaining tasks (35 total)
-
----
-
-### 🧪 Tests
-
-#### `ActionRegistrationTestCase` — 5 tests
-
-#### `ActionExecutionTestCase` — 4 tests
-
-#### `ActionDisableTestCase` — 2 tests
-
-#### `ActionAuthTestCase` — 2 tests
-
-#### `BulkCreateTestCase` — 5 tests, `BulkUpdateTestCase` — 5 tests, `BulkDeleteTestCase` — 6 tests
-
-#### `OrderingTestCase` — 10 tests
-
-#### `OrderingDisabledTestCase` — 2 tests
-
-#### `OrderingWithFiltersTestCase` — 2 tests
-
-#### `OrderingDefaultListTestCase` — 4 tests
+- 📝 `TODO.md` — Marked bulk operations, custom actions, and ordering as completed; renumbered remaining tasks
 
 ---
 
@@ -370,28 +621,6 @@ The previous `not_found_name` feature checked `model._meta.not_found_name`, but 
 - 📝 `docs/api/models/model_util.md` — Added `NinjaAIOMeta` tip to `verbose_name_path_resolver()`
 - 📝 `docs/api/models/model_serializer.md` — Added `NinjaAIOMeta` example to `verbose_name_path_resolver()`
 - 🔄 `.github/workflows/docs.yml` — Added version `2.26` option
-
----
-
-### 🧪 Tests
-
-#### `NinjaAIOMetaVerboseNameTestCase` — 7 tests
-
-#### `GetNinjaAIOMetaAttrTestCase` — 4 tests
-
-#### Updated test fixtures
-
-| File | Change |
-|---|---|
-| `tests/test_app/models.py` | `TestModelWithNinjaAIOMeta` — full NinjaAIOMeta with all 3 attributes |
-| `tests/test_app/models.py` | `TestModelWithPartialNinjaAIOMeta` — only `not_found_name` set |
-| `tests/test_exceptions.py` | Replaced `_meta` monkey-patching with NinjaAIOMeta models |
-| `tests/core/test_exceptions_api.py` | Replaced `_meta` monkey-patching with NinjaAIOMeta models |
-| `tests/generics/views.py` | Updated all view tests for `Status` object returns |
-| `tests/helpers/test_many_to_many_api.py` | Updated all M2M tests for `Status` object returns |
-| `tests/views/test_views.py` | Updated route name assertions for Django Ninja compatibility |
-
-**Coverage:** 100% across all 1888 statements in `ninja_aio/` (744 tests, 0 failures)
 
 ---
 
@@ -512,41 +741,6 @@ Fixed incorrect `return super().__init__(...)` in `NotFoundError.__init__` when 
 
 ---
 
-### 🧪 Tests
-
-#### `LRUCacheTestCase` — 10 tests
-
-#### `M2MQueryHandlerTestCase` — 1 test
-
-#### `M2MNotFoundTestCase` — 1 test
-
-#### `M2MAsyncQueryParamsHandlerTestCase` — 1 test
-
-#### `SchemaOverridesNonFunctionTestCase` — 1 test
-
-#### `CircularReferenceDetectionTestCase` — 1 test
-
-#### `ModelSerializerGetModelConfigNoneTestCase` — 1 test
-
-#### `SerializerGetModelConfigUnknownTypeTestCase` — 1 test
-
-#### `SerializerGetDumpSchemaTestCase` — 2 tests
-
-#### `PrefetchWithForwardRelsTestCase` — 1 test
-
-#### `MatchCaseFilterInvalidFieldTestCase` — 1 test
-
-**New test helpers:**
-
-| File | Addition |
-|---|---|
-| `tests/helpers/test_many_to_many_api.py` | `TestM2MWithQueryHandlerViewSet` — ViewSet with custom M2M `query_handler` |
-| `tests/helpers/test_many_to_many_api.py` | `TestM2MWithAsyncQueryParamsHandlerViewSet` — ViewSet with async `query_params_handler` |
-
-**Coverage:** 100% across all 1878 statements in `ninja_aio/` (734 tests, 0 failures)
-
----
-
 ### 🎯 Summary
 
 Version 2.25.0 adds **comprehensive debug logging** across the entire framework and replaces the unbounded relation cache with a **bounded LRU cache** to prevent memory growth in long-running processes. The release also achieves **100% code coverage** with 21 new tests targeting previously uncovered edge cases.
@@ -629,71 +823,6 @@ Internal `_resolve_instance(instance)` method centralizes instance resolution lo
 
 - `docs/api/models/serializers.md` — added **Instance Binding** section; updated all method signatures and code examples to the new parameter order; added `save` and `update` examples; added migration warning admonitions.
 - `docs/tutorial/serializer.md` — added **Instance Binding** tutorial section covering constructor binding, attribute assignment, instance replacement, priority rules, and error behaviour; updated learning objectives and checklist.
-
----
-
-### 🧪 Tests
-
-#### `SerializerInstanceBindingTestCase` — 18 tests
-> `tests/test_serializers.py`
-
-**Constructor & attribute assignment:**
-
-| Test | Verifies |
-|---|---|
-| `test_init_without_instance_sets_none` | ✅ `Serializer()` → `self.instance` is `None` |
-| `test_init_with_instance_stores_it` | ✅ `Serializer(instance=obj)` stores the instance |
-| `test_instance_attribute_assignment` | ✅ `serializer.instance = obj` works after construction |
-| `test_instance_attribute_can_be_replaced` | ✅ `self.instance` can be replaced with a different object |
-
-**`_resolve_instance`:**
-
-| Test | Verifies |
-|---|---|
-| `test_resolve_instance_prefers_explicit_arg` | ✅ explicit arg beats `self.instance` |
-| `test_resolve_instance_falls_back_to_bound` | ✅ `None` arg falls back to `self.instance` |
-| `test_resolve_instance_raises_when_none` | ✅ raises `ValueError` when both are `None` |
-
-**`save()`:**
-
-| Test | Verifies |
-|---|---|
-| `test_save_uses_bound_instance` | ✅ `save()` persists `self.instance` |
-| `test_save_raises_without_instance` | ✅ raises `ValueError` with no instance |
-
-**`update()`:**
-
-| Test | Verifies |
-|---|---|
-| `test_update_uses_bound_instance` | ✅ `update(payload)` applies to `self.instance` |
-| `test_update_explicit_instance_overrides_bound` | ✅ explicit arg takes priority |
-| `test_update_raises_without_instance` | ✅ raises `ValueError` with no instance |
-
-**`model_dump()`:**
-
-| Test | Verifies |
-|---|---|
-| `test_model_dump_uses_bound_instance` | ✅ `model_dump()` serializes `self.instance` |
-| `test_model_dump_explicit_instance_overrides_bound` | ✅ explicit arg takes priority |
-| `test_model_dump_raises_without_instance` | ✅ raises `ValueError` with no instance |
-
-**`has_changed()`:**
-
-| Test | Verifies |
-|---|---|
-| `test_has_changed_uses_bound_instance` | ✅ `has_changed(field)` checks `self.instance` |
-| `test_has_changed_explicit_instance_overrides_bound` | ✅ explicit arg takes priority |
-| `test_has_changed_raises_without_instance` | ✅ raises `ValueError` with no instance |
-
-**`ahas_changed()`:**
-
-| Test | Verifies |
-|---|---|
-| `test_ahas_changed_uses_bound_instance` | ✅ async `ahas_changed(field)` checks `self.instance` |
-| `test_ahas_changed_explicit_instance_overrides_bound` | ✅ explicit arg takes priority |
-| `test_ahas_changed_raises_without_instance` | ✅ raises `ValueError` with no instance |
-
-**Updated existing tests** — adjusted `update`, `has_changed`, and `ahas_changed` call sites to the new parameter order.
 
 ---
 
