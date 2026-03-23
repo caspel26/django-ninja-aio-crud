@@ -193,7 +193,7 @@ raise NotFoundError(BlogPost)
 # {"error": "blog_post"}
 ```
 
-`NinjaAIOMeta` also supports `verbose_name` and `verbose_name_plural` for overriding API display names and route paths. See the [APIViewSet](../views/api_view_set.md) documentation for details.
+`NinjaAIOMeta` also supports `verbose_name` and `verbose_name_plural` for overriding API display names and route paths. See the [APIViewSet](views/api_view_set.md) documentation for details.
 
 **Resolution order:**
 
