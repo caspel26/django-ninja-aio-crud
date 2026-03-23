@@ -1,9 +1,12 @@
+import functools
+import inspect
 import logging
+from collections.abc import Callable
 from typing import Generic, List, TypeVar
 
 from ninja import NinjaAPI, Router, Schema, Path, Query, Status
 from ninja.constants import NOT_SET
-from ninja.pagination import paginate, AsyncPaginationBase, PageNumberPagination
+from ninja.pagination import AsyncPaginationBase, PageNumberPagination
 from django.http import HttpRequest
 from django.db.models import Model, QuerySet
 from django.conf import settings
@@ -16,20 +19,24 @@ from ninja_aio.models import ModelSerializer, ModelUtil
 from ninja_aio.schemas import (
     GenericMessageSchema,
     M2MRelationSchema,
+    BulkResultSchema,
 )
 from ninja_aio.helpers.api import ManyToManyAPI
 from ninja_aio.types import (
     ModelSerializerMeta,
     VIEW_TYPES,
+    BULK_TYPES,
     VALID_DJANGO_LOOKUPS,
     get_ninja_aio_meta_attr,
 )
 from ninja_aio.decorators import unique_view, decorate_view, aatomic
+from ninja_aio.decorators.actions import ActionConfig
+from ninja_aio.factory import ApiMethodFactory
 from ninja_aio.models import serializers
 
 logger = logging.getLogger("ninja_aio.views")
 
-ERROR_CODES = frozenset({400, 401, 404})
+ERROR_CODES = frozenset({400, 401, 403, 404})
 
 # TypeVar for generic model typing in ViewSets
 ModelT = TypeVar("ModelT", bound=Model)
@@ -85,8 +92,8 @@ class API:
                 method._api_register(self)
         return self.router
 
-    def add_views_to_route(self) -> Router:
-        return self.api.add_router(f"{self.api_route_path}", self._add_views())
+    def add_views_to_route(self) -> None:
+        self.api.add_router(f"{self.api_route_path}", self._add_views())
 
 
 class APIView(API):
@@ -139,7 +146,7 @@ class APIView(API):
         self.router = Router(tags=self.router_tags)
         self.error_codes = ERROR_CODES
 
-    def _add_views(self):
+    def _add_views(self) -> Router:
         super()._add_views()
         self.views()
         return self.router
@@ -242,6 +249,7 @@ class APIViewSet(API, Generic[ModelT]):
         disable: List of view type strings: 'create','list','retrieve','update','delete','all'.
         api_route_path: Base path; auto-resolved from verbose name if empty.
         list_docs / create_docs / retrieve_docs / update_docs / delete_docs: Endpoint descriptions.
+        bulk_response_fields: Field(s) returned in bulk success details. None=PK (default), str=single field, list[str]=dict of fields.
         m2m_relations: List of M2MRelationSchema describing related model, related_name, custom path, auth, filters.
         m2m_add / m2m_remove / m2m_get: Enable add/remove/get M2M operations.
         m2m_auth: Auth list for all M2M endpoints unless overridden per relation.
@@ -282,6 +290,14 @@ class APIViewSet(API, Generic[ModelT]):
     extra_decorators: DecoratorsSchema = DecoratorsSchema()
     model_verbose_name: str = ""
     model_verbose_name_plural: str = ""
+    bulk_operations: list[type[BULK_TYPES]] = []
+    bulk_response_fields: list[str] | str | None = None
+    bulk_create_docs = "Create multiple objects in a single request."
+    bulk_update_docs = "Update multiple objects in a single request."
+    bulk_delete_docs = "Delete multiple objects in a single request."
+    ordering_fields: list[str] = []
+    default_ordering: str | list[str] = []
+    require_update_fields: bool = False
 
     def __init__(
         self,
@@ -333,6 +349,9 @@ class APIViewSet(API, Generic[ModelT]):
             or prefix
             or self.model_util.verbose_name_path_resolver()
         )
+        self.bulk_path = "bulk/" if self.append_slash else "bulk"
+        self.bulk_update_schema = self._generate_bulk_update_schema()
+        self.bulk_delete_schema = self._generate_bulk_delete_schema()
         self.m2m_api = (
             None
             if not self.m2m_relations
@@ -343,7 +362,7 @@ class APIViewSet(API, Generic[ModelT]):
         )
 
     @property
-    def _crud_views(self):
+    def _crud_views(self) -> dict[str, tuple[Schema | None, Callable]]:
         """
         Mapping of CRUD operation name to (response schema, view factory).
         """
@@ -355,13 +374,26 @@ class APIViewSet(API, Generic[ModelT]):
             "delete": (None, self.delete_view),
         }
 
-    def _check_relations_filters(self, filter: str):
+    @property
+    def _bulk_views(self) -> dict[str, tuple[Schema | None, Callable]]:
+        """
+        Mapping of bulk operation name to (schema, view factory).
+        Only operations listed in bulk_operations are included.
+        """
+        mapping = {
+            "create": (self.schema_in, self.bulk_create_view),
+            "update": (self.bulk_update_schema, self.bulk_update_view),
+            "delete": (None, self.bulk_delete_view),
+        }
+        return {k: v for k, v in mapping.items() if k in self.bulk_operations}
+
+    def _check_relations_filters(self, filter: str) -> bool:
         return filter in getattr(self, "relations_filters_fields", [])
 
-    def _check_match_cases_filters(self, filter: str):
+    def _check_match_cases_filters(self, filter: str) -> bool:
         return filter in getattr(self, "filters_match_cases_fields", [])
 
-    def _is_special_filter(self, filter: str):
+    def _is_special_filter(self, filter: str) -> bool:
         return self._check_relations_filters(filter) or self._check_match_cases_filters(
             filter
         )
@@ -378,7 +410,7 @@ class APIViewSet(API, Generic[ModelT]):
         """
         return part in VALID_DJANGO_LOOKUPS
 
-    def _get_related_model(self, field):
+    def _get_related_model(self, field: Model) -> type[Model] | None:
         """
         Extract the related model from a field if it exists.
 
@@ -464,7 +496,7 @@ class APIViewSet(API, Generic[ModelT]):
 
         return True
 
-    def _auth_view(self, view_type: str):
+    def _auth_view(self, view_type: str) -> list | None:
         """
         Resolve auth for a specific HTTP verb; falls back to self.auth if NOT_SET.
         """
@@ -501,13 +533,86 @@ class APIViewSet(API, Generic[ModelT]):
             {self.model_util.model_pk_name: self.model_util.pk_field_type}, "PathSchema"
         )
 
-    def _generate_filters_schema(self):
+    def _generate_filters_schema(self) -> Schema:
         """
         Build filters schema from query_params definition.
+        Includes an 'ordering' field when ordering_fields is configured.
         """
-        return self._generate_schema(self.query_params, "FiltersSchema")
+        fields = dict(self.query_params)
+        if self.ordering_fields:
+            fields["ordering"] = (str, None)
+        return self._generate_schema(fields, "FiltersSchema")
 
-    def _get_pk(self, data: Schema):
+    async def _apply_list_filters(
+        self,
+        qs: QuerySet,
+        filters: Schema | None,
+    ) -> QuerySet:
+        """
+        Apply query-param filters and ordering to a queryset.
+
+        Returns the filtered and ordered queryset.
+        """
+        if filters is not None:
+            filters_dict = filters.model_dump()
+            ordering_value = (
+                filters_dict.pop("ordering", None) if self.ordering_fields else None
+            )
+            if filters_dict:
+                qs = await self.query_params_handler(qs, filters_dict)
+            qs = self._apply_ordering(qs, ordering_value)
+        elif self.ordering_fields:
+            qs = self._apply_ordering(qs, None)
+        return qs
+
+    @staticmethod
+    def _get_page_params(
+        paginator: AsyncPaginationBase, pagination_input: Schema
+    ) -> tuple[int, int]:
+        """
+        Extract (offset, page_size) from any pagination class input.
+        """
+        if hasattr(pagination_input, "page"):
+            page_size = paginator._get_page_size(
+                getattr(pagination_input, "page_size", None)
+            )
+            offset = (pagination_input.page - 1) * page_size
+        else:
+            page_size = getattr(pagination_input, "limit", 100)
+            offset = getattr(pagination_input, "offset", 0)
+        return offset, page_size
+
+    def _apply_ordering(self, queryset: QuerySet, ordering_value: str | None) -> QuerySet:
+        """
+        Apply ordering to the queryset based on ordering_fields configuration.
+
+        Parses a comma-separated ordering string, validates each field against
+        ordering_fields, and applies valid fields via queryset.order_by().
+        Falls back to default_ordering when no valid fields are provided.
+        """
+        if not self.ordering_fields:
+            return queryset
+
+        if ordering_value:
+            valid = []
+            for field in ordering_value.split(","):
+                field = field.strip()
+                if not field:
+                    continue
+                bare = field.lstrip("-")
+                if bare in self.ordering_fields:
+                    valid.append(field)
+            if valid:
+                return queryset.order_by(*valid)
+
+        if self.default_ordering:
+            if isinstance(self.default_ordering, str):
+                return queryset.order_by(self.default_ordering)
+            return queryset.order_by(*self.default_ordering)
+
+        return queryset
+
+    def _get_pk(self, data: Schema) -> int | str:
         """
         Extract pk from a path schema instance.
         """
@@ -523,7 +628,7 @@ class APIViewSet(API, Generic[ModelT]):
             else self.model.query_util.read_config
         )
 
-    def get_schemas(self):
+    def get_schemas(self) -> tuple[Schema | None, Schema | None, Schema | None, Schema | None]:
         """
         Compute and return (schema_out, schema_detail, schema_in, schema_update).
 
@@ -558,7 +663,7 @@ class APIViewSet(API, Generic[ModelT]):
 
     async def query_params_handler(
         self, queryset: QuerySet[ModelSerializer], filters: dict
-    ):
+    ) -> QuerySet:
         """
         Override to apply custom filtering logic for list_view.
         filters is already validated and dumped.
@@ -566,7 +671,42 @@ class APIViewSet(API, Generic[ModelT]):
         """
         return queryset
 
-    def create_view(self):
+    async def on_before_operation(self, request: HttpRequest, operation: str) -> None:
+        """Hook called before every CRUD/bulk/@action view. Override for view-level checks."""
+
+    async def on_before_object_operation(self, request: HttpRequest, operation: str, obj: ModelT) -> None:
+        """Hook called after fetch, before mutation (retrieve/update/delete). Override for object-level checks."""
+
+    def on_list_queryset(self, request: HttpRequest, queryset: QuerySet) -> QuerySet:
+        """Hook to filter the list queryset before pagination. Override for row-level filtering."""
+        return queryset
+
+    _has_object_hooks: bool = False
+    """Set to True by mixins that override on_before_object_operation."""
+
+    async def _run_object_hooks(
+        self,
+        request: HttpRequest,
+        operation: str,
+        pk: int | str,
+        is_for: str | None = None,
+    ) -> ModelT | None:
+        """
+        Run view-level and object-level hooks, returning the fetched object.
+
+        Combines on_before_operation, get_object, and on_before_object_operation
+        into a single call used by retrieve, update, and delete views.
+        Skips the object fetch when no object-level hooks are registered
+        (avoids a redundant query when update_s/delete_s will fetch again).
+        """
+        await self.on_before_operation(request, operation)
+        if not self._has_object_hooks:
+            return None
+        obj = await self.model_util.get_object(request, pk, is_for=is_for)
+        await self.on_before_object_operation(request, operation, obj)
+        return obj
+
+    def create_view(self) -> Callable:
         """
         Register create endpoint.
         """
@@ -580,16 +720,31 @@ class APIViewSet(API, Generic[ModelT]):
         )
         @decorate_view(aatomic, unique_view(self), *self.extra_decorators.create)
         async def create(request: HttpRequest, data: self.schema_in):  # type: ignore
+            await self.on_before_operation(request, "create")
             return Status(
                 201, await self.model_util.create_s(request, data, self.schema_out)
             )
 
         return create
 
-    def list_view(self):
+    def list_view(self) -> Callable:
         """
         Register list endpoint with pagination and optional filters.
+
+        Pagination is applied before serialization: only page_size objects are
+        fetched and serialized instead of the entire queryset. The COUNT query
+        uses .values(pk) to avoid unnecessary JOINs from select_related.
         """
+        _paginator = self.pagination_class()
+        _pk_name = self.model_util.model_pk_name
+        _input_class = self.pagination_class.Input
+        _default_pagination = _input_class()
+        _paginated_schema = create_model(
+            f"Paginated{self.schema_out.__name__}",
+            __base__=Schema,
+            items=(List[self.schema_out], ...),
+            count=(int, ...),
+        )
 
         @self.router.get(
             self.get_path,
@@ -597,43 +752,54 @@ class APIViewSet(API, Generic[ModelT]):
             summary=f"List {self.model_verbose_name_plural}",
             description=self.list_docs,
             response={
-                200: List[self.schema_out],
+                200: _paginated_schema,
                 self.error_codes: GenericMessageSchema,
             },
         )
         @decorate_view(
-            paginate(self.pagination_class),
             unique_view(self, plural=True),
             *self.extra_decorators.list,
         )
         async def list(
             request: HttpRequest,
             filters: Query[self.filters_schema] = None,  # type: ignore
+            ninja_pagination: _input_class = Query(_default_pagination),  # type: ignore
         ):
+            if not isinstance(ninja_pagination, _input_class):
+                ninja_pagination = _default_pagination
+
+            await self.on_before_operation(request, "list")
+
             qs = await self.model_util.get_objects(
                 request,
                 query_data=self._get_query_data(),
                 is_for="read",
             )
-            if filters is not None:
-                qs = await self.query_params_handler(qs, filters.model_dump())
-            return Status(
-                200,
-                await self.model_util.list_read_s(
-                    self.schema_out, request, qs, is_for="read"
-                ),
+            qs = self.on_list_queryset(request, qs)
+            qs = await self._apply_list_filters(qs, filters)
+
+            count = await qs.values(_pk_name).acount()
+
+            offset, page_size = self._get_page_params(
+                _paginator, ninja_pagination
             )
+            sliced_qs = qs[offset : offset + page_size]
+
+            items = await self.model_util.list_read_s(
+                self.schema_out, request, sliced_qs, is_for="read"
+            )
+            return Status(200, {"items": items, "count": count})
 
         return list
 
-    def _get_retrieve_schema(self) -> Schema:
+    def _get_retrieve_schema(self) -> type[Schema]:
         """
         Return the schema to use for retrieve endpoint.
         Uses schema_detail if available, otherwise falls back to schema_out.
         """
         return self.schema_detail or self.schema_out
 
-    def retrieve_view(self):
+    def retrieve_view(self) -> Callable:
         """
         Register retrieve endpoint.
         """
@@ -648,6 +814,16 @@ class APIViewSet(API, Generic[ModelT]):
         )
         @decorate_view(unique_view(self), *self.extra_decorators.retrieve)
         async def retrieve(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
+            _pk = self._get_pk(pk)
+            _is_for = "detail" if self.schema_detail else "read"
+            obj = await self._run_object_hooks(
+                request, "retrieve", _pk, is_for=_is_for,
+            )
+            if obj is not None:
+                return Status(
+                    200,
+                    await self.model_util.read_s(retrieve_schema, request, obj),
+                )
             query_data = self._get_query_data()
             return Status(
                 200,
@@ -655,15 +831,15 @@ class APIViewSet(API, Generic[ModelT]):
                     retrieve_schema,
                     request,
                     query_data=QuerySchema(
-                        getters={"pk": self._get_pk(pk)}, **query_data.model_dump()
+                        getters={"pk": _pk}, **query_data.model_dump()
                     ),
-                    is_for="detail" if self.schema_detail else "read",
+                    is_for=_is_for,
                 ),
             )
 
         return retrieve
 
-    def update_view(self):
+    def update_view(self) -> Callable:
         """
         Register update endpoint.
         """
@@ -681,16 +857,22 @@ class APIViewSet(API, Generic[ModelT]):
             data: self.schema_update,  # type: ignore
             pk: Path[self.path_schema],  # type: ignore
         ):
+            _pk = self._get_pk(pk)
+            await self._run_object_hooks(request, "update", _pk)
             return Status(
                 200,
                 await self.model_util.update_s(
-                    request, data, self._get_pk(pk), self.schema_out
+                    request,
+                    data,
+                    _pk,
+                    self.schema_out,
+                    self.require_update_fields,
                 ),
             )
 
         return update
 
-    def delete_view(self):
+    def delete_view(self) -> Callable:
         """
         Register delete endpoint.
         """
@@ -704,11 +886,166 @@ class APIViewSet(API, Generic[ModelT]):
         )
         @decorate_view(aatomic, unique_view(self), *self.extra_decorators.delete)
         async def delete(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
+            _pk = self._get_pk(pk)
+            await self._run_object_hooks(request, "delete", _pk)
             return Status(
-                204, await self.model_util.delete_s(request, self._get_pk(pk))
+                204, await self.model_util.delete_s(request, _pk)
             )
 
         return delete
+
+    @staticmethod
+    def _bulk_result(success: list, errors: list) -> dict:
+        """Format bulk operation result into standard response structure."""
+        return {
+            "success": {"count": len(success), "details": success},
+            "errors": {"count": len(errors), "details": errors},
+        }
+
+    def _get_bulk_detail_extractor(self) -> Callable | None:
+        """
+        Return a callable that extracts detail info from a model instance
+        based on bulk_response_fields configuration.
+
+        Returns None when default PK behavior should be used.
+        """
+        fields = self.bulk_response_fields
+        if fields is None:
+            return None
+        if isinstance(fields, str):
+            return lambda obj: getattr(obj, fields)
+        return lambda obj: {f: getattr(obj, f) for f in fields}
+
+    def _get_bulk_detail_fields(self) -> list[str] | None:
+        """
+        Return the list of field names for bulk delete detail extraction.
+
+        bulk_delete_s doesn't have model instances, so it needs field names
+        to query with values() before deletion.
+        """
+        fields = self.bulk_response_fields
+        if fields is None:
+            return None
+        if isinstance(fields, str):
+            return [fields]
+        return fields
+
+    def _generate_bulk_update_schema(self) -> Schema | None:
+        """
+        Dynamically build a schema combining the PK field (required) with update fields.
+        Returns None if schema_update is not available.
+        """
+        if self.schema_update is None:
+            return None
+        return create_model(
+            f"{self.model_util.model_name}BulkUpdateSchema",
+            __base__=self.schema_update,
+            **{self.model_util.model_pk_name: (self.model_util.pk_field_type, ...)},
+        )
+
+    def _generate_bulk_delete_schema(self) -> Schema:
+        """
+        Dynamically build a schema with a list of PK values for bulk deletion.
+        """
+        pk_python_type = self.model_util.pk_field_type
+        return create_model(
+            f"{self.model_util.model_name}BulkDeleteSchema",
+            ids=(List[pk_python_type], ...),
+        )
+
+    def bulk_create_view(self) -> Callable:
+        """
+        Register bulk create endpoint.
+        """
+
+        @self.router.post(
+            self.bulk_path,
+            auth=self.post_view_auth(),
+            summary=f"Bulk Create {self.model_verbose_name_plural}",
+            description=self.bulk_create_docs,
+            response={200: BulkResultSchema, self.error_codes: GenericMessageSchema},
+        )
+        @decorate_view(
+            unique_view(self, plural=True), *self.extra_decorators.bulk_create
+        )
+        async def bulk_create(
+            request: HttpRequest, data: List[self.schema_in]  # type: ignore
+        ):
+            await self.on_before_operation(request, "bulk_create")
+            success, errors = await self.model_util.bulk_create_s(
+                request, data, self._get_bulk_detail_extractor()
+            )
+            return Status(200, self._bulk_result(success, errors))
+
+        return bulk_create
+
+    def bulk_update_view(self) -> Callable:
+        """
+        Register bulk update endpoint.
+        """
+        pk_name = self.model_util.model_pk_name
+
+        @self.router.patch(
+            self.bulk_path,
+            auth=self.patch_view_auth(),
+            summary=f"Bulk Update {self.model_verbose_name_plural}",
+            description=self.bulk_update_docs,
+            response={
+                200: BulkResultSchema,
+                self.error_codes: GenericMessageSchema,
+            },
+        )
+        @decorate_view(
+            unique_view(self, plural=True), *self.extra_decorators.bulk_update
+        )
+        async def bulk_update(
+            request: HttpRequest,
+            data: List[self.bulk_update_schema],  # type: ignore
+        ):
+            await self.on_before_operation(request, "bulk_update")
+            data_list = []
+            for item in data:
+                pk = getattr(item, pk_name)
+                update_fields = {
+                    k: v for k, v in item.model_dump().items() if k != pk_name
+                }
+                update_data = self.schema_update(**update_fields)
+                data_list.append((pk, update_data))
+            success, errors = await self.model_util.bulk_update_s(
+                request,
+                data_list,
+                self._get_bulk_detail_extractor(),
+                self.require_update_fields,
+            )
+            return Status(200, self._bulk_result(success, errors))
+
+        return bulk_update
+
+    def bulk_delete_view(self) -> Callable:
+        """
+        Register bulk delete endpoint.
+        """
+
+        @self.router.delete(
+            self.bulk_path,
+            auth=self.delete_view_auth(),
+            summary=f"Bulk Delete {self.model_verbose_name_plural}",
+            description=self.bulk_delete_docs,
+            response={200: BulkResultSchema, self.error_codes: GenericMessageSchema},
+        )
+        @decorate_view(
+            unique_view(self, plural=True), *self.extra_decorators.bulk_delete
+        )
+        async def bulk_delete(
+            request: HttpRequest, data: self.bulk_delete_schema  # type: ignore
+        ):
+            await self.on_before_operation(request, "bulk_delete")
+            deleted_pks, errors = await self.model_util.bulk_delete_s(
+                request, data.ids, self._get_bulk_detail_fields()
+            )
+            return Status(200, self._bulk_result(deleted_pks, errors))
+
+        return bulk_delete
 
     def views(self):
         """
@@ -717,29 +1054,150 @@ class APIViewSet(API, Generic[ModelT]):
         """
         pass
 
-    def _set_additional_views(self):
+    def _resolve_action_path(
+        self, name: str, config: ActionConfig
+    ) -> tuple[str, str]:
+        """
+        Resolve url_path and full route path for an action.
+
+        Returns
+        -------
+        tuple[str, str]
+            (url_path, route_path)
+        """
+        url_path = (
+            config.url_path if config.url_path is not None else name.replace("_", "-")
+        )
+        if config.detail:
+            return url_path, f"{self.get_path_retrieve}/{url_path}"
+        return url_path, url_path
+
+    def _rename_pk_param(self, handler: Callable) -> None:
+        """Rename the generic 'pk' parameter to the model's actual PK name."""
+        pk_name = self.model_util.model_pk_name
+        sig = inspect.signature(handler)
+        params = [
+            p.replace(name=pk_name) if p.name == "pk" else p
+            for p in sig.parameters.values()
+        ]
+        handler.__signature__ = sig.replace(parameters=params)
+
+    def _register_single_action(
+        self, name: str, method: Callable, config: ActionConfig
+    ) -> None:
+        """
+        Register a single @action-decorated method on the router.
+
+        For each HTTP method in config.methods, resolves the URL path,
+        auth, and decorators, then registers the handler on the router.
+        """
+        _, path = self._resolve_action_path(name, config)
+
+        for http_method in config.methods:
+            factory = ApiMethodFactory(http_method)
+            auth = (
+                config.auth
+                if config.auth is not NOT_SET
+                else self._auth_view(http_method)
+            )
+            summary = config.summary or (
+                f"{http_method.upper()} {name.replace('_', ' ').title()}"
+                f" {self.model_verbose_name}"
+            )
+
+            handler = factory._build_handler(self, method)
+            factory._apply_metadata(handler, method)
+
+            # Wrap handler with on_before_operation hook
+            original_handler = handler
+
+            @functools.wraps(original_handler)
+            async def hooked_handler(
+                *args,
+                _action_name=name,
+                _viewset=self,
+                _orig=original_handler,
+                **kwargs,
+            ):
+                request = args[0] if args else kwargs.get("request")
+                await _viewset.on_before_operation(request, _action_name)
+                return await _orig(*args, **kwargs)
+
+            handler = hooked_handler
+
+            if config.detail:
+                self._rename_pk_param(handler)
+
+            handler.__name__ = f"{name}_{http_method}_{self.model_util.model_name}"
+
+            if config.decorators:
+                for dec in reversed(config.decorators):
+                    handler = dec(handler)
+
+            getattr(self.router, http_method)(
+                path=path,
+                auth=auth,
+                throttle=config.throttle,
+                response=config.response,
+                summary=summary,
+                description=config.description,
+                tags=config.tags,
+                deprecated=config.deprecated,
+                url_name=config.url_name,
+                include_in_schema=config.include_in_schema,
+                openapi_extra=config.openapi_extra,
+            )(handler)
+
+            logger.debug(
+                f"Registered action {http_method.upper()} {path} "
+                f"for {self.model.__name__}"
+            )
+
+    def _register_actions(self) -> None:
+        """Discover and register @action-decorated methods on the router."""
+        for name in dir(self.__class__):
+            method = getattr(self.__class__, name, None)
+            if method is None:
+                continue
+            config = getattr(method, "_action_config", None)
+            if config is None:
+                continue
+            self._register_single_action(name, method, config)
+
+    def _set_additional_views(self) -> Router:
         self.views()
+        self._register_actions()
         if self.m2m_api is not None:
             self.m2m_api._add_views()
+
+        for bulk_type, (schema, view) in self._bulk_views.items():
+            bulk_key = f"bulk_{bulk_type}"
+            if bulk_key not in self.disable and (
+                schema is not None or bulk_type == "delete"
+            ):
+                view()
+                logger.debug(
+                    f"Registered bulk_{bulk_type} view for {self.model.__name__}"
+                )
         return self.router
 
-    def _add_views(self):
+    def _add_views(self) -> Router:
         """
-        Register CRUD (unless disabled), custom views, and M2M endpoints.
-        If 'all' in disable only CRUD is skipped; M2M + custom still added.
+        Register CRUD (unless disabled), bulk, custom views, and M2M endpoints.
+        If 'all' in disable only CRUD is skipped; bulk + M2M + custom still added.
         """
         super()._add_views()
         if "all" in self.disable:
             logger.debug(f"All CRUD views disabled for {self.model.__name__}")
             return self._set_additional_views()
-
         for views_type, (schema, view) in self._crud_views.items():
             if views_type not in self.disable and (
                 schema is not None or views_type == "delete"
             ):
                 view()
-                logger.debug(f"Registered {views_type} view for {self.model.__name__}")
-
+                logger.debug(
+                    f"Registered {views_type} view for {self.model.__name__}"
+                )
         return self._set_additional_views()
 
 

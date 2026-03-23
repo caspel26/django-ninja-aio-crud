@@ -19,6 +19,7 @@ nav:
     - 'Step 2: Create CRUD Views': tutorial/crud.md
     - 'Step 3: Add Authentication': tutorial/authentication.md
     - 'Step 4: Add Filtering & Pagination': tutorial/filtering.md
+    - 'Step 5: Add Permissions': tutorial/permissions.md
   - API Reference:
     - Type Hints & Type Safety: api/type_hints.md
     - Views:
@@ -31,6 +32,7 @@ nav:
       - ModelUtil: api/models/model_util.md
       - Serializer (Meta-driven): api/models/serializers.md
       - Validators: api/models/validators.md
+    - Auto Admin: api/admin.md
     - Authentication: api/authentication.md
     - Exceptions: api/exceptions.md
     - Pagination: api/pagination.md
@@ -157,7 +159,11 @@ markdown_extensions:
       auto_title: true
   - pymdownx.inlinehilite
   - pymdownx.snippets
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.details
   - pymdownx.tabbed:
       alternate_style: true

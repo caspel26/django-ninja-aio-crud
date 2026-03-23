@@ -1,6 +1,7 @@
 import datetime
 
 from django.db.models import Q
+from ninja_aio.decorators.actions import action
 from ninja_aio.views import mixins
 from ninja_aio.schemas import (
     RelationFilterSchema,
@@ -70,6 +71,29 @@ class TestModelSerializerLessEqualMixinAPI(
     }
 
 
+class TestModelSerializerBulkAPI(GenericAPIViewSet):
+    model = models.TestModelSerializer
+    bulk_operations = ["create", "update", "delete"]
+
+
+class TestModelSerializerOrderingAPI(GenericAPIViewSet):
+    model = models.TestModelSerializer
+    ordering_fields = ["name", "id"]
+    default_ordering = "-id"
+
+
+class TestModelSerializerOrderingWithFiltersAPI(
+    GenericAPIViewSet,
+    mixins.IcontainsFilterViewSetMixin,
+):
+    model = models.TestModelSerializer
+    ordering_fields = ["name", "id"]
+    default_ordering = "-id"
+    query_params = {
+        "name": (str, None),
+    }
+
+
 class TestModelSerializerReverseForeignKeyAPI(GenericAPIViewSet):
     model = models.TestModelSerializerReverseForeignKey
 
@@ -104,6 +128,32 @@ class TestModelAPI(GenericAPIViewSet):
     schema_in = schema.TestModelSchemaIn
     schema_out = schema.TestModelSchemaOut
     schema_update = schema.TestModelSchemaPatch
+
+
+class TestModelBulkAPI(GenericAPIViewSet):
+    model = models.TestModel
+    schema_in = schema.TestModelSchemaIn
+    schema_out = schema.TestModelSchemaOut
+    schema_update = schema.TestModelSchemaPatch
+    bulk_operations = ["create", "update", "delete"]
+
+
+class TestModelBulkSingleFieldAPI(GenericAPIViewSet):
+    model = models.TestModel
+    schema_in = schema.TestModelSchemaIn
+    schema_out = schema.TestModelSchemaOut
+    schema_update = schema.TestModelSchemaPatch
+    bulk_operations = ["create", "update", "delete"]
+    bulk_response_fields = "name"
+
+
+class TestModelBulkMultiFieldAPI(GenericAPIViewSet):
+    model = models.TestModel
+    schema_in = schema.TestModelSchemaIn
+    schema_out = schema.TestModelSchemaOut
+    schema_update = schema.TestModelSchemaPatch
+    bulk_operations = ["create", "update", "delete"]
+    bulk_response_fields = ["id", "name"]
 
 
 class TestModelReverseForeignKeyAPI(GenericAPIViewSet):
@@ -302,3 +352,61 @@ class TestModelSerializerMatchCaseQExcludeFilterAPI(
             ),
         ),
     ]
+
+
+# ==========================================================
+#                  PERMISSION MIXIN APIS
+# ==========================================================
+
+
+class PermissionTestAPI(GenericAPIViewSet, mixins.PermissionViewSetMixin):
+    """ViewSet using PermissionViewSetMixin with controllable permission via request attrs."""
+
+    model = models.TestModelSerializer
+
+    async def has_permission(self, request, operation):
+        return getattr(request, "_allow", True)
+
+    async def has_object_permission(self, request, operation, obj):
+        return getattr(request, "_allow_obj", True)
+
+    def get_permission_queryset(self, request, queryset):
+        if getattr(request, "_filter_qs", False):
+            return queryset.none()
+        return queryset
+
+
+class RoleBasedPermissionTestAPI(
+    GenericAPIViewSet, mixins.RoleBasedPermissionMixin
+):
+    """ViewSet using RoleBasedPermissionMixin with role-to-operations mapping."""
+
+    model = models.TestModelSerializer
+    permission_roles = {
+        "admin": [
+            "create", "list", "retrieve", "update", "delete",
+            "bulk_create", "bulk_update", "bulk_delete", "custom_action",
+        ],
+        "editor": ["create", "list", "retrieve", "update"],
+        "reader": ["list", "retrieve"],
+    }
+
+    bulk_operations = ["create", "update", "delete"]
+
+    @action(detail=False, methods=["post"])
+    async def custom_action(self, request):
+        return {"status": "ok"}
+
+
+class PermissionWithFilterTestAPI(
+    mixins.PermissionViewSetMixin,
+    mixins.IcontainsFilterViewSetMixin,
+    GenericAPIViewSet,
+):
+    """ViewSet combining permission and filter mixins."""
+
+    model = models.TestModelSerializer
+    query_params = {"name": (str, None)}
+
+    async def has_permission(self, request, operation):
+        return getattr(request, "_allow", True)

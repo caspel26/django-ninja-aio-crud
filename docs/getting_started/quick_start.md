@@ -15,26 +15,31 @@ from django.db import models
 from ninja_aio.models import ModelSerializer
 
 
-class Article(ModelSerializer):
+class Article(ModelSerializer):  # (1)!
     title = models.CharField(max_length=200)
     content = models.TextField()
     is_published = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
-    class ReadSerializer:
+    class ReadSerializer:  # (2)!
         fields = ["id", "title", "content", "is_published", "created_at"]
 
-    class CreateSerializer:
+    class CreateSerializer:  # (3)!
         fields = ["title", "content"]
         optionals = [("is_published", bool)]
 
-    class UpdateSerializer:
+    class UpdateSerializer:  # (4)!
         optionals = [
             ("title", str),
             ("content", str),
             ("is_published", bool),
         ]
 ```
+
+1. Inherit from `ModelSerializer` instead of `models.Model` — enables auto schema generation
+2. **ReadSerializer** — defines which fields appear in GET responses (list, retrieve, update)
+3. **CreateSerializer** — defines required and optional fields for POST requests
+4. **UpdateSerializer** — all fields are optional for PATCH (partial update)
 
 ### 2. Create Your ViewSet
 
@@ -46,13 +51,17 @@ from ninja_aio import NinjaAIO
 from ninja_aio.views import APIViewSet
 from .models import Article
 
-api = NinjaAIO(title="My Blog API", version="1.0.0")
+api = NinjaAIO(title="My Blog API", version="1.0.0")  # (1)!
 
 
-@api.viewset(model=Article)
+@api.viewset(model=Article)  # (2)!
 class ArticleViewSet(APIViewSet):
-    pass
+    pass  # (3)!
 ```
+
+1. `NinjaAIO` extends Django Ninja's `NinjaAPI` with built-in ORJSON rendering and exception handling
+2. `@api.viewset` registers the model and auto-generates all CRUD routes
+3. No configuration needed — schemas, pagination, and routes are auto-generated from the model's inner serializer classes
 
 ### 3. Configure URLs
 

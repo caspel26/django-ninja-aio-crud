@@ -4,6 +4,12 @@ Django Ninja AIO provides decorator utilities for composing view behavior and at
 
 <div class="grid cards" markdown>
 
+-   :material-flash:{ .lg .middle } **`@action`**
+
+    ---
+
+    Custom actions for ViewSets
+
 -   :material-layers:{ .lg .middle } **`decorate_view`**
 
     ---
@@ -29,6 +35,62 @@ Django Ninja AIO provides decorator utilities for composing view behavior and at
     Endpoint decorators with built-in decorator support
 
 </div>
+
+---
+
+## :material-flash: `@action` (custom actions)
+
+Decorator for adding custom endpoints to ViewSets. Supports detail/list actions, multiple HTTP methods, auth inheritance, and full OpenAPI metadata.
+
+```python
+from ninja_aio.decorators import action
+```
+
+=== "Detail action"
+
+    ```python
+    @action(detail=True, methods=["post"], url_path="activate")
+    async def activate(self, request, pk):
+        obj = await self.model_util.get_object(request, pk)
+        obj.is_active = True
+        await obj.asave()
+        return Status(200, {"message": "activated"})
+    ```
+
+=== "List action"
+
+    ```python
+    @action(detail=False, methods=["get"], url_path="count", response=CountSchema)
+    async def count(self, request):
+        total = await self.model.objects.acount()
+        return {"count": total}
+    ```
+
+=== "With decorators"
+
+    ```python
+    @action(detail=False, methods=["post"], url_path="batch", decorators=[aatomic])
+    async def batch(self, request):
+        ...
+    ```
+
+=== "Public override"
+
+    ```python
+    @action(detail=False, methods=["get"], url_path="public", auth=None)
+    async def public_endpoint(self, request):
+        return {"message": "no auth required"}
+    ```
+
+**Key features:**
+
+- `detail=True` auto-adds `{pk}` to URL, renamed to match model PK field
+- `url_path` defaults to method name with `_` → `-`
+- `auth=NOT_SET` inherits from viewset per-verb auth
+- Actions survive `disable=["all"]` — always registered
+- Multiple methods create separate routes: `methods=["get", "post"]`
+
+See [APIViewSet @action](api_view_set.md#action-decorator) for full parameter reference.
 
 ---
 

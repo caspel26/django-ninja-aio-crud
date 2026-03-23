@@ -764,6 +764,16 @@ class ModelUtil(Generic[ModelT]):
         """Convert model instance to dict using Pydantic schema."""
         return (await sync_to_async(schema.from_orm)(obj)).model_dump()
 
+    async def _bump_queryset_from_schema(
+        self, queryset: models.QuerySet[ModelT], schema: Schema
+    ) -> list[dict]:
+        """Convert a queryset to a list of dicts using Pydantic schema in a single sync_to_async call."""
+
+        def _serialize_all():
+            return [schema.from_orm(obj).model_dump() for obj in queryset]
+
+        return await sync_to_async(_serialize_all)()
+
     async def _prefetch_reverse_relations_on_instance(
         self,
         obj: ModelT,
@@ -863,7 +873,7 @@ class ModelUtil(Generic[ModelT]):
     ):
         """Serialize a queryset of objects."""
         objs = await self.get_objects(request, query_data=query_data, is_for=is_for)
-        return [await self._bump_object_from_schema(obj, schema) async for obj in objs]
+        return await self._bump_queryset_from_schema(objs, schema)
 
     async def _serialize_single_object(
         self,
@@ -1036,11 +1046,45 @@ class ModelUtil(Generic[ModelT]):
 
         return new_payload, customs
 
+    async def _create_instance(self, request: HttpRequest, data: Schema):
+        """
+        Create a new instance and run hooks.
+
+        Handles input parsing, object creation, and custom_actions/post_create
+        hooks. Does not serialize the output.
+
+        Parameters
+        ----------
+        request : HttpRequest
+        data : Schema
+            Input schema instance.
+
+        Returns
+        -------
+        ModelT
+            The created model instance.
+        """
+        logger.info(f"Creating {self.model.__name__}")
+        payload, customs = await self.parse_input_data(request, data)
+        # Create object and keep the full instance (FK instances already attached from parse_input_data)
+        obj = (
+            await self.model.objects.acreate(**payload)
+            if not self.with_serializer
+            else await self.serializer.create(payload)
+        )
+        logger.debug(f"Created {self.model.__name__} (pk={obj.pk})")
+        if isinstance(self.model, ModelSerializerMeta):
+            await asyncio.gather(obj.custom_actions(customs), obj.post_create())
+        if self.with_serializer:
+            await asyncio.gather(
+                self.serializer.custom_actions(customs, obj),
+                self.serializer.post_create(obj),
+            )
+        return obj
+
     async def create_s(self, request: HttpRequest, data: Schema, obj_schema: Schema):
         """
         Create a new instance and return serialized output.
-
-        Applies custom_actions + post_create hooks if available.
 
         Parameters
         ----------
@@ -1055,24 +1099,9 @@ class ModelUtil(Generic[ModelT]):
         dict
             Serialized created object.
         """
-        logger.info(f"Creating {self.model.__name__}")
-        payload, customs = await self.parse_input_data(request, data)
-        # Create object and keep the full instance (FK instances already attached from parse_input_data)
-        obj = (
-            await self.model.objects.acreate(**payload)
-            if not self.with_serializer
-            else await self.serializer.create(payload)
-        )
-        logger.debug(f"Created {self.model.__name__} (pk={obj.pk})")
+        obj = await self._create_instance(request, data)
         # Only prefetch reverse relations (forward FKs already loaded)
         obj = await self._prefetch_reverse_relations_on_instance(obj, is_for="read")
-        if isinstance(self.model, ModelSerializerMeta):
-            await asyncio.gather(obj.custom_actions(customs), obj.post_create())
-        if self.with_serializer:
-            await asyncio.gather(
-                self.serializer.custom_actions(customs, obj),
-                self.serializer.post_create(obj),
-            )
         return await self.read_s(obj_schema, request, obj)
 
     async def _read_s(
@@ -1113,11 +1142,8 @@ class ModelUtil(Generic[ModelT]):
             raise SerializeError({"schema": "must be provided"}, 400)
 
         if instance is not None:
-            if isinstance(instance, models.QuerySet):
-                return [
-                    await self._bump_object_from_schema(obj, schema)
-                    async for obj in instance
-                ]
+            if isinstance(instance, (models.QuerySet, list)):
+                return await self._bump_queryset_from_schema(instance, schema)
             return await self._bump_object_from_schema(instance, schema)
 
         self._validate_read_params(request, query_data)
@@ -1236,13 +1262,18 @@ class ModelUtil(Generic[ModelT]):
             is_for,
         )
 
-    async def update_s(
-        self, request: HttpRequest, data: Schema, pk: int | str, obj_schema: Schema
+    async def _update_instance(
+        self,
+        request: HttpRequest,
+        data: Schema,
+        pk: int | str,
+        require_fields: bool = False,
     ):
         """
-        Update an existing instance and return serialized output.
+        Update an existing instance and run hooks.
 
-        Only non-null fields are applied to the instance.
+        Handles input parsing, field assignment, custom_actions hooks, and
+        saving. Does not serialize the output.
 
         Parameters
         ----------
@@ -1251,17 +1282,19 @@ class ModelUtil(Generic[ModelT]):
             Input update schema instance.
         pk : int | str
             Primary key of target object.
-        obj_schema : Schema
-            Read schema class for output.
+        require_fields : bool
+            When True, raises SerializeError if no fields are provided.
 
         Returns
         -------
-        dict
-            Serialized updated object.
+        ModelT
+            The updated model instance.
         """
         logger.info(f"Updating {self.model.__name__} (pk={pk})")
         obj = await self.get_object(request, pk, is_for="read")
         payload, customs = await self.parse_input_data(request, data)
+        if require_fields and not payload and not customs:
+            raise SerializeError("No fields provided for update.")
         for k, v in payload.items():
             if v is not None:
                 setattr(obj, k, v)
@@ -1273,6 +1306,37 @@ class ModelUtil(Generic[ModelT]):
         else:
             await obj.asave()
         logger.debug(f"Updated {self.model.__name__} (pk={pk})")
+        return obj
+
+    async def update_s(
+        self,
+        request: HttpRequest,
+        data: Schema,
+        pk: int | str,
+        obj_schema: Schema,
+        require_fields: bool = False,
+    ):
+        """
+        Update an existing instance and return serialized output.
+
+        Parameters
+        ----------
+        request : HttpRequest
+        data : Schema
+            Input update schema instance.
+        pk : int | str
+            Primary key of target object.
+        obj_schema : Schema
+            Read schema class for output.
+        require_fields : bool
+            When True, raises SerializeError if no fields are provided.
+
+        Returns
+        -------
+        dict
+            Serialized updated object.
+        """
+        obj = await self._update_instance(request, data, pk, require_fields)
         # FK instances from parse_input_data are already attached to obj
         # Only refresh reverse relations since they might have changed
         updated_object = await self._prefetch_reverse_relations_on_instance(
@@ -1299,3 +1363,224 @@ class ModelUtil(Generic[ModelT]):
         await obj.adelete()
         logger.debug(f"Deleted {self.model.__name__} (pk={pk})")
         return None
+
+    @staticmethod
+    def _format_bulk_error(exc: Exception) -> dict[str, str]:
+        """
+        Extract error detail from an exception for bulk result reporting.
+
+        Parameters
+        ----------
+        exc : Exception
+            The caught exception.
+
+        Returns
+        -------
+        dict[str, str]
+            Error detail dict.
+        """
+        if hasattr(exc, "error"):
+            return exc.error
+        return {"error": str(exc)}
+
+    async def bulk_create_s(
+        self,
+        request: HttpRequest,
+        data_list: list[Schema],
+        detail_extractor: callable = None,
+    ):
+        """
+        Create multiple instances with partial success semantics.
+
+        Each item is processed independently. Failures are collected without
+        affecting other items.
+
+        Parameters
+        ----------
+        request : HttpRequest
+        data_list : list[Schema]
+            List of input schema instances.
+        detail_extractor : callable, optional
+            Function that extracts detail info from a model instance.
+            Defaults to returning the PK.
+
+        Returns
+        -------
+        tuple[list, list[dict]]
+            (success_details, error_details)
+        """
+        logger.info(f"Bulk creating {len(data_list)} {self.model.__name__} instances")
+        extractor = detail_extractor or (lambda obj: obj.pk)
+        success_details = []
+        error_details = []
+
+        for data in data_list:
+            try:
+                obj = await self._create_instance(request, data)
+                success_details.append(extractor(obj))
+            except (SerializeError, NotFoundError) as e:
+                error_details.append(self._format_bulk_error(e))
+            except Exception as e:
+                error_details.append(self._format_bulk_error(e))
+
+        logger.debug(
+            f"Bulk create {self.model.__name__}: "
+            f"{len(success_details)} success, {len(error_details)} errors"
+        )
+        return success_details, error_details
+
+    async def bulk_update_s(
+        self,
+        request: HttpRequest,
+        data_list: list[tuple[int | str, Schema]],
+        detail_extractor: callable = None,
+        require_fields: bool = False,
+    ):
+        """
+        Update multiple instances with partial success semantics.
+
+        Each item is processed independently. Failures are collected without
+        affecting other items.
+
+        Parameters
+        ----------
+        request : HttpRequest
+        data_list : list[tuple[int | str, Schema]]
+            List of (pk, update_schema_instance) tuples.
+        detail_extractor : callable, optional
+            Function that extracts detail info from a model instance.
+            Defaults to returning the PK.
+        require_fields : bool
+            When True, raises SerializeError if no fields are provided.
+
+        Returns
+        -------
+        tuple[list, list[dict]]
+            (success_details, error_details)
+        """
+        logger.info(f"Bulk updating {len(data_list)} {self.model.__name__} instances")
+        extractor = detail_extractor or (lambda obj: obj.pk)
+        success_details = []
+        error_details = []
+
+        for pk, data in data_list:
+            try:
+                obj = await self._update_instance(
+                    request, data, pk, require_fields
+                )
+                success_details.append(extractor(obj))
+            except (SerializeError, NotFoundError) as e:
+                error_details.append(self._format_bulk_error(e))
+            except Exception as e:
+                error_details.append(self._format_bulk_error(e))
+
+        logger.debug(
+            f"Bulk update {self.model.__name__}: "
+            f"{len(success_details)} success, {len(error_details)} errors"
+        )
+        return success_details, error_details
+
+    async def _resolve_existing_pks(
+        self,
+        matched_qs: models.QuerySet,
+        detail_fields: list[str] | None,
+    ) -> tuple[set, dict]:
+        """
+        Identify which PKs exist and optionally collect detail field values.
+
+        Returns
+        -------
+        tuple[set, dict]
+            (existing_pks, detail_map). detail_map is empty when detail_fields
+            is None.
+        """
+        if not detail_fields:
+            existing_pks: set = set()
+            async for pk_val in matched_qs.values_list(
+                self.model_pk_name, flat=True
+            ):
+                existing_pks.add(pk_val)
+            return existing_pks, {}
+
+        fields_with_pk = list(
+            dict.fromkeys([self.model_pk_name] + detail_fields)
+        )
+        detail_map: dict = {}
+        single_field = len(detail_fields) == 1
+        async for row in matched_qs.values(*fields_with_pk):
+            pk_val = row[self.model_pk_name]
+            detail_map[pk_val] = (
+                row[detail_fields[0]]
+                if single_field
+                else {f: row[f] for f in detail_fields}
+            )
+        return set(detail_map.keys()), detail_map
+
+    def _build_success_details(
+        self,
+        pks: list[int | str],
+        existing_pks: set,
+        detail_map: dict,
+    ) -> list:
+        """Build ordered success details from existing PKs."""
+        if detail_map:
+            return [detail_map[pk] for pk in pks if pk in existing_pks]
+        return [pk for pk in pks if pk in existing_pks]
+
+    async def bulk_delete_s(
+        self,
+        request: HttpRequest,
+        pks: list[int | str],
+        detail_fields: list[str] | None = None,
+    ) -> tuple[list, list[dict]]:
+        """
+        Delete multiple instances with partial success and optimized queries.
+
+        Uses a single query to identify existing PKs and a single query to delete them.
+        Missing PKs are reported as errors.
+
+        Parameters
+        ----------
+        request : HttpRequest
+        pks : list[int | str]
+            List of primary keys.
+        detail_fields : list[str], optional
+            Field names to include in success details. When provided, queries
+            field values before deletion. Defaults to returning PKs only.
+
+        Returns
+        -------
+        tuple[list, list[dict]]
+            (success_details, error_details)
+        """
+        logger.info(f"Bulk deleting {len(pks)} {self.model.__name__} instances")
+        if not pks:
+            return [], []
+
+        qs = await self.get_objects(request, is_for="read")
+        matched_qs = qs.filter(**{f"{self.model_pk_name}__in": pks})
+
+        existing_pks, detail_map = await self._resolve_existing_pks(
+            matched_qs, detail_fields
+        )
+
+        error_details = [
+            NotFoundError(self.model).error
+            for pk in pks
+            if pk not in existing_pks
+        ]
+
+        success_details: list = []
+        if existing_pks:
+            await qs.filter(
+                **{f"{self.model_pk_name}__in": existing_pks}
+            ).adelete()
+            success_details = self._build_success_details(
+                pks, existing_pks, detail_map
+            )
+
+        logger.debug(
+            f"Bulk delete {self.model.__name__}: "
+            f"{len(success_details)} deleted, {len(error_details)} errors"
+        )
+        return success_details, error_details

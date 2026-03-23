@@ -17,6 +17,7 @@ Build a complete REST API with automatic CRUD operations using <code>APIViewSet<
 - :material-view-grid: How to create a basic ViewSet
 - :material-auto-fix: Understanding auto-generated endpoints
 - :material-filter: Customizing query parameters
+- :material-content-copy: Enabling bulk operations
 - :material-pencil-plus: Adding custom endpoints
 - :material-web: Working with request context
 - :material-alert-circle: Handling errors
@@ -42,17 +43,21 @@ from ninja_aio.views import APIViewSet
 from .models import Article
 
 # Create API instance
-api = NinjaAIO(
+api = NinjaAIO(  # (1)!
     title="Blog API",
     version="1.0.0",
     description="A simple blog API built with Django Ninja AIO"
 )
 
 
-@api.viewset(model=Article)
+@api.viewset(model=Article)  # (2)!
 class ArticleViewSet(APIViewSet):
-    pass
+    pass  # (3)!
 ```
+
+1. `NinjaAIO` extends `NinjaAPI` with ORJSON rendering and built-in exception handling
+2. Registers the model and auto-generates all CRUD routes on the API router
+3. Zero configuration — endpoints, schemas, pagination, and OpenAPI docs are all automatic
 
 That's it! You now have a complete CRUD API with 5 endpoints.
 
@@ -72,6 +77,20 @@ urlpatterns = [
 ]
 ```
 
+### What Happens Under the Hood
+
+```mermaid
+graph LR
+    A[Article Model] -->|"ReadSerializer<br/>CreateSerializer<br/>UpdateSerializer"| B[Pydantic Schemas]
+    B --> C[APIViewSet]
+    C -->|auto-generates| D["5 async endpoints<br/>+ OpenAPI docs<br/>+ pagination"]
+
+    style A fill:#7c4dff,stroke:#7c4dff,color:#fff
+    style B fill:#651fff,stroke:#651fff,color:#fff
+    style C fill:#536dfe,stroke:#536dfe,color:#fff
+    style D fill:#448aff,stroke:#448aff,color:#fff
+```
+
 ### Auto-Generated Endpoints
 
 The ViewSet automatically generates these endpoints:
@@ -83,6 +102,31 @@ The ViewSet automatically generates these endpoints:
 | `GET`    | `/api/article/{id}`  | Retrieve single article       | None                 | Article data                       |
 | `PATCH`  | `/api/article/{id}/` | Update article                | Partial article data | Updated article                    |
 | `DELETE` | `/api/article/{id}/` | Delete article                | None                 | None (204)                         |
+
+??? example "Example error responses"
+
+    **404 — Object not found:**
+    ```json
+    {"error": "article not found."}
+    ```
+
+    **400 — Validation error (missing required field):**
+    ```json
+    {
+      "detail": [
+        {
+          "type": "missing",
+          "loc": ["body", "data", "title"],
+          "msg": "Field required"
+        }
+      ]
+    }
+    ```
+
+    **401 — Unauthorized (when auth is configured):**
+    ```json
+    {"detail": "Unauthorized"}
+    ```
 
 ### Test Your API
 
@@ -145,14 +189,14 @@ Let's add filtering to the Article list endpoint:
 ```python
 @api.viewset(model=Article)
 class ArticleViewSet(APIViewSet):
-    query_params = {
+    query_params = {  # (1)!
         "is_published": (bool, None),
         "author": (int, None),
         "category": (int, None),
         "search": (str, None),
     }
 
-    async def query_params_handler(self, queryset, filters):
+    async def query_params_handler(self, queryset, filters):  # (2)!
         # Filter by published status
         if filters.get("is_published") is not None:
             queryset = queryset.filter(is_published=filters["is_published"])
@@ -174,8 +218,12 @@ class ArticleViewSet(APIViewSet):
                 Q(content__icontains=search_term)
             )
 
-        return queryset
+        return queryset  # (3)!
 ```
+
+1. Each entry is `"param_name": (type, default)` — a Pydantic schema is built at startup for OpenAPI docs and validation
+2. Called automatically on `GET /api/article/?param=value` — receives the filtered dict (only non-default values)
+3. Always return the queryset — the framework handles pagination and serialization
 
 ### Using Query Parameters
 
@@ -203,9 +251,9 @@ GET /api/article/?is_published=true&page=2&page_size=20
 
 ---
 
-## :material-pencil-plus: Custom Endpoints
+## :material-pencil-plus: Custom Endpoints (using `@api_get` / `@api_post`)
 
-Add custom endpoints beyond CRUD:
+Add custom endpoints beyond CRUD using method decorators. For a higher-level alternative with automatic URL generation, auth inheritance, and detail/list distinction, see [Custom Actions](#custom-actions) below.
 
 ```python
 from ninja_aio.decorators import api_get, api_post
@@ -318,6 +366,72 @@ GET /api/article/popular/
 # Get top 20
 GET /api/article/popular/?limit=20
 ```
+
+---
+
+## :material-star: Custom Actions
+
+Use the `@action` decorator to add custom endpoints to your ViewSet. Actions can operate on single instances (detail) or the collection (list):
+
+```python
+from ninja import Schema, Status
+from ninja_aio.views import APIViewSet
+from ninja_aio.decorators import action
+from .models import Article
+
+
+class CountSchema(Schema):
+    count: int
+
+
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    # Detail action: operates on a single article
+    @action(detail=True, methods=["post"], url_path="activate")
+    async def activate(self, request, pk):
+        obj = await self.model_util.get_object(request, pk)
+        obj.is_active = True
+        await obj.asave()
+        return Status(200, {"message": "activated"})
+
+    # List action: operates on the collection
+    @action(detail=False, methods=["get"], url_path="count", response=CountSchema)
+    async def count(self, request):
+        total = await self.model.objects.acount()
+        return {"count": total}
+
+    # Action with request body
+    @action(detail=False, methods=["post"], url_path="import")
+    async def import_articles(self, request, data: ArticleImportSchema):
+        return Status(200, {"message": f"imported {len(data.items)} articles"})
+
+    # Auto url_path from method name (underscores → hyphens)
+    @action(detail=False, methods=["get"])
+    async def recent_published(self, request):
+        return {"message": "recent"}
+```
+
+This generates:
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/article/{id}/activate` | Activate a single article |
+| `GET` | `/api/article/count` | Count all articles |
+| `POST` | `/api/article/import` | Import articles |
+| `GET` | `/api/article/recent-published` | Recent published (auto path) |
+
+### Key differences from `@api_get` / `@api_post`
+
+| Feature | `@action` | `@api_get` / `@api_post` |
+|---------|-----------|--------------------------|
+| Detail actions (with pk) | `detail=True` auto-adds `{pk}` | Manual `/{pk}/path` |
+| Multiple methods | `methods=["get", "post"]` | One decorator per method |
+| Auth inheritance | Inherits from viewset per-verb auth | Manual `auth=` |
+| URL path | Auto-generated from method name | Manual path required |
+| OpenAPI metadata | `summary`, `description`, `tags`, `deprecated` | Same via kwargs |
+
+!!! tip
+    Actions are **not affected** by `disable = ["all"]` — they are always registered, even when all CRUD endpoints are disabled.
 
 ---
 
@@ -436,37 +550,16 @@ GET /api/article/?page=2&page_size=50
 
 ## :material-sort: Ordering
 
-Add ordering to list endpoint:
+Add native ordering to the list endpoint with `ordering_fields` and `default_ordering`:
 
 ```python
 @api.viewset(model=Article)
 class ArticleViewSet(APIViewSet):
-    query_params = {
-        "is_published": (bool, None),
-        "ordering": (str, "-created_at"),  # Default: newest first
-    }
-
-    async def query_params_handler(self, queryset, filters):
-        # Apply published filter
-        if filters.get("is_published") is not None:
-            queryset = queryset.filter(is_published=filters["is_published"])
-
-        # Apply ordering
-        ordering = filters.get("ordering", "-created_at")
-
-        # Validate ordering field
-        valid_fields = [
-            "created_at", "-created_at",
-            "title", "-title",
-            "views", "-views",
-            "published_at", "-published_at"
-        ]
-
-        if ordering in valid_fields:
-            queryset = queryset.order_by(ordering)
-
-        return queryset
+    ordering_fields = ["created_at", "title", "views", "published_at"]
+    default_ordering = "-created_at"  # Newest first by default
 ```
+
+That's it! The framework automatically adds an `ordering` query parameter to the list endpoint and validates fields.
 
 **Usage:**
 
@@ -483,12 +576,15 @@ GET /api/article/?ordering=title
 # By title Z-A
 GET /api/article/?ordering=-title
 
-# Most viewed
-GET /api/article/?ordering=-views
+# Multiple fields (comma-separated)
+GET /api/article/?ordering=-views,title
 
-# Recently published
-GET /api/article/?ordering=-published_at
+# Combined with filters
+GET /api/article/?ordering=-created_at&is_published=true
 ```
+
+!!! tip
+    Invalid field names are silently ignored. If all requested fields are invalid, `default_ordering` is applied.
 
 ---
 
@@ -528,6 +624,125 @@ class ArticleViewSet(APIViewSet):
             "published_at": article.published_at
         }
 ```
+
+## :material-content-copy: Bulk Operations
+
+Need to create, update, or delete multiple objects at once? Enable bulk operations:
+
+```python
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    bulk_operations = ["create", "update", "delete"]
+```
+
+This adds three new endpoints to your API:
+
+| Method   | Endpoint              | Description                    | Request Body              | Response              |
+| -------- | --------------------- | ------------------------------ | ------------------------- | --------------------- |
+| `POST`   | `/api/articles/bulk/`  | Create multiple articles       | `[{...}, {...}]`          | `200 BulkResultSchema` |
+| `PATCH`  | `/api/articles/bulk/`  | Update multiple articles       | `[{id, ...}, {id, ...}]`  | `200 BulkResultSchema` |
+| `DELETE` | `/api/articles/bulk/`  | Delete multiple articles       | `{"ids": [1, 2, 3]}`     | `200 BulkResultSchema` |
+
+Bulk operations use **partial success** semantics — each item is processed independently. Successful items are committed while failures are collected in the response without affecting other items.
+
+### Response Format
+
+All bulk endpoints return a `BulkResultSchema`:
+
+```json
+{
+  "success": {
+    "count": 2,
+    "details": [1, 3]
+  },
+  "errors": {
+    "count": 1,
+    "details": [{"error": "Not found."}]
+  }
+}
+```
+
+- **`success.details`** contains the primary keys of successfully processed objects (default). Customizable via `bulk_response_fields`.
+- **`errors.details`** contains error details for each failed item.
+
+### Bulk Create
+
+Send a list of objects to create them all in one request:
+
+```bash
+curl -X POST http://localhost:8000/api/article/bulk/ \
+  -H "Content-Type: application/json" \
+  -d '[
+    {"title": "Article 1", "content": "Content 1", "author": 1},
+    {"title": "Article 2", "content": "Content 2", "author": 1},
+    {"title": "Article 3", "content": "Content 3", "author": 2}
+  ]'
+```
+
+### Bulk Update
+
+Send a list of objects with their primary key and the fields to update:
+
+```bash
+curl -X PATCH http://localhost:8000/api/article/bulk/ \
+  -H "Content-Type: application/json" \
+  -d '[
+    {"id": 1, "title": "Updated Title 1"},
+    {"id": 2, "title": "Updated Title 2", "is_published": true}
+  ]'
+```
+
+### Bulk Delete
+
+Send a list of primary keys to delete. This operation is **optimized** — it uses a single database query to delete all existing objects instead of deleting them one by one:
+
+```bash
+curl -X DELETE http://localhost:8000/api/article/bulk/ \
+  -H "Content-Type: application/json" \
+  -d '{"ids": [1, 2, 3]}'
+```
+
+### Custom Response Fields
+
+By default, `success.details` returns primary keys. Use `bulk_response_fields` to customize what's returned:
+
+```python
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    bulk_operations = ["create", "update", "delete"]
+    bulk_response_fields = "title"  # Returns ["Article 1", "Article 2"]
+    # Or return multiple fields as dicts:
+    # bulk_response_fields = ["id", "title"]  # Returns [{"id": 1, "title": "..."}, ...]
+```
+
+### Selective Bulk Operations
+
+You can enable only the operations you need:
+
+```python
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    bulk_operations = ["create"]  # Only bulk create
+```
+
+!!! tip
+    Bulk operations reuse your existing `schema_in` and `schema_update` schemas, so all validations and hooks (like `custom_actions` and `post_create`) are applied per item.
+
+---
+
+## :material-shield-check: Partial Update Validation
+
+By default, PATCH endpoints accept empty payloads. Enable validation to reject them:
+
+```python
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    require_update_fields = True
+```
+
+Empty PATCH requests will return a `400` error: `"No fields provided for update."`. This also applies to bulk updates — empty items are collected as errors in partial success responses.
+
+---
 
 ## :material-eye-off: Disabling Endpoints
 
@@ -853,6 +1068,7 @@ Now that you have CRUD operations set up, let's add authentication!
 - :material-check: Creating custom endpoints
 - :material-check: Working with pagination
 - :material-check: Handling errors properly
+- :material-check: Using bulk operations
 - :material-check: Customizing responses
 
 </div>

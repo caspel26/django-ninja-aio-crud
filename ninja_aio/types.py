@@ -7,7 +7,18 @@ from typing import TypeAlias
 S_TYPES = Literal["read", "detail", "create", "update"]
 F_TYPES = Literal["fields", "customs", "optionals", "excludes"]
 SCHEMA_TYPES = Literal["In", "Out", "Detail", "Patch", "Related"]
-VIEW_TYPES = Literal["list", "retrieve", "create", "update", "delete", "all"]
+VIEW_TYPES = Literal[
+    "list",
+    "retrieve",
+    "create",
+    "update",
+    "delete",
+    "bulk_create",
+    "bulk_update",
+    "bulk_delete",
+    "all",
+]
+BULK_TYPES = Literal["create", "update", "delete"]
 JwtKeys: TypeAlias = jwk.RSAKey | jwk.ECKey | jwk.OctKey
 
 # Django ORM field lookup suffixes for QuerySet filtering

@@ -24,9 +24,177 @@ Notes:
   - When True (default, for backward compatibility), retrieve and POST paths includes a trailing slash into CRUD: `/{base}/{pk}/`.
   - When False, retrieve and post paths is generated without a trailing slash: `/{base}/{pk}`.
 
-## :material-star: Recommended: Decorator-based extra endpoints
+## :material-transit-connection-variant: Request Lifecycle
 
-Use class method decorators to add non-CRUD endpoints to your ViewSet. This is the preferred way to extend a ViewSet with custom routes. The decorators lazily bind instance methods to the router and ensure correct OpenAPI signatures (no `self` in parameters).
+```mermaid
+graph TD
+    A[Incoming Request] --> B{Auth Check}
+    B -->|Fail| X[401 Unauthorized]
+    B -->|Pass| C{Route Match}
+    C -->|List| D[Apply Filters]
+    C -->|Create/Update| E[Parse & Validate Schema]
+    C -->|Delete| F[Lookup Object]
+    D --> G[Apply Ordering]
+    G --> H[Paginate QuerySet]
+    H --> I[Serialize Response]
+    E --> J[Run Hooks & Save]
+    J --> I
+    F --> K[Delete & Return 204]
+    I --> L[JSON Response]
+
+    style A fill:#7c4dff,stroke:#7c4dff,color:#fff
+    style B fill:#ff6d00,stroke:#ff6d00,color:#fff
+    style X fill:#d50000,stroke:#d50000,color:#fff
+    style L fill:#00c853,stroke:#00c853,color:#fff
+    style K fill:#00c853,stroke:#00c853,color:#fff
+```
+
+---
+
+## :material-star: Recommended: `@action` Decorator
+
+The `@action` decorator is the recommended way to add custom endpoints to your ViewSet. It provides automatic URL generation, auth inheritance, detail/list distinction, and full OpenAPI metadata support.
+
+```python
+from ninja_aio.decorators import action
+```
+
+### Basic Usage
+
+```python
+from ninja import Schema, Status
+from ninja_aio.decorators import action
+
+class CountSchema(Schema):
+    count: int
+
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    @action(detail=True, methods=["post"], url_path="activate")
+    async def activate(self, request, pk):
+        obj = await self.model_util.get_object(request, pk)
+        obj.is_active = True
+        await obj.asave()
+        return Status(200, {"message": "activated"})
+
+    @action(detail=False, methods=["get"], url_path="count", response=CountSchema)
+    async def count(self, request):
+        total = await self.model.objects.acount()
+        return {"count": total}
+```
+
+### Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `detail` | `bool` | — (required) | `True` = instance action (`/{pk}/path`), `False` = collection action |
+| `methods` | `list[str]` | `["get"]` | HTTP methods to register |
+| `url_path` | `str \| None` | `None` | Custom URL segment. Defaults to method name with `_` → `-` |
+| `url_name` | `str \| None` | `None` | Django URL name for reverse resolution |
+| `auth` | `Any` | `NOT_SET` | Auth override. `NOT_SET` inherits from viewset per-verb auth |
+| `response` | `Any` | `NOT_SET` | Response schema. `NOT_SET` lets Django Ninja infer it |
+| `summary` | `str \| None` | `None` | OpenAPI summary (auto-generated if None) |
+| `description` | `str \| None` | `None` | OpenAPI description |
+| `tags` | `list[str] \| None` | `None` | OpenAPI tags (inherits from viewset if None) |
+| `deprecated` | `bool \| None` | `None` | Mark as deprecated in OpenAPI |
+| `decorators` | `list[Callable] \| None` | `None` | Additional decorators to apply |
+| `throttle` | `BaseThrottle \| list[BaseThrottle]` | `NOT_SET` | Throttle configuration |
+| `include_in_schema` | `bool` | `True` | Whether to include in OpenAPI schema |
+| `openapi_extra` | `dict \| None` | `None` | Additional OpenAPI metadata |
+
+### Detail vs List Actions
+
+**Detail actions** (`detail=True`) operate on a single instance. The `pk` parameter is automatically added to the URL and renamed to match the model's primary key field name:
+
+```python
+@action(detail=True, methods=["post"], url_path="publish")
+async def publish(self, request, pk):
+    # URL: /article/{id}/publish
+    obj = await self.model_util.get_object(request, pk)
+    ...
+```
+
+**List actions** (`detail=False`) operate on the collection:
+
+```python
+@action(detail=False, methods=["get"], url_path="stats")
+async def stats(self, request):
+    # URL: /article/stats
+    ...
+```
+
+### Multiple HTTP Methods
+
+Register the same action for multiple HTTP methods:
+
+```python
+@action(detail=True, methods=["get", "post"], url_path="toggle")
+async def toggle(self, request, pk):
+    # Registers both GET and POST on /article/{id}/toggle
+    ...
+```
+
+### Auth Inheritance
+
+Actions inherit authentication from the viewset by default:
+
+```python
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    auth = [JWTAuth()]
+
+    # Inherits JWTAuth from viewset
+    @action(detail=False, methods=["get"], url_path="protected")
+    async def protected(self, request):
+        ...
+
+    # Override: make public
+    @action(detail=False, methods=["get"], url_path="public", auth=None)
+    async def public(self, request):
+        ...
+```
+
+### Custom Decorators
+
+Apply additional decorators to action handlers:
+
+```python
+from ninja_aio.decorators import aatomic
+
+@action(detail=False, methods=["post"], url_path="batch-op", decorators=[aatomic])
+async def batch_operation(self, request):
+    # Wrapped in atomic transaction
+    ...
+```
+
+### URL Path Auto-Generation
+
+When `url_path` is not provided, the method name is used with underscores replaced by hyphens:
+
+```python
+@action(detail=False, methods=["get"])
+async def my_custom_endpoint(self, request):
+    # URL: /article/my-custom-endpoint
+    ...
+```
+
+### Actions and `disable`
+
+Actions are **not affected** by `disable = ["all"]`. Custom actions are always registered even when all CRUD endpoints are disabled:
+
+```python
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    disable = ["all"]  # No CRUD endpoints
+
+    @action(detail=False, methods=["get"], url_path="health")
+    async def health(self, request):
+        return {"status": "ok"}  # Still registered
+```
+
+## :material-factory: Alternative: `@api_get` / `@api_post` decorators
+
+Class method decorators for adding custom endpoints. These provide direct control over the path and HTTP method, but without the automatic features of `@action` (no auto `{pk}`, no auth inheritance, no auto URL path).
 
 Available decorators (from `ninja_aio.decorators`):
 
@@ -71,7 +239,7 @@ Notes:
 
 ## :material-history: Legacy: views() method (still supported)
 
-The previous pattern of injecting endpoints inside `views()` is still supported, but the decorator-based approach above is now recommended.
+The previous pattern of injecting endpoints inside `views()` is still supported, but the `@action` and `@api_*` approaches above are now recommended.
 
 ```python
 class ArticleViewSet(APIViewSet):
@@ -105,7 +273,7 @@ class ArticleViewSet(APIViewSet):
 | `schema_update`             | `Schema \| None`              | `None` (auto)                                      | Update input schema override                                            |
 | `pagination_class`          | `type[AsyncPaginationBase]`   | `PageNumberPagination`                             | Pagination strategy                                                     |
 | `query_params`              | `dict[str, tuple[type, ...]]` | `{}`                                               | List endpoint filters definition                                        |
-| `disable`                   | `list[type[VIEW_TYPES]]`      | `[]`                                               | Disable CRUD views (`create`,`list`,`retrieve`,`update`,`delete`,`all`) |
+| `disable`                   | `list[type[VIEW_TYPES]]`      | `[]`                                               | Disable views (`create`,`list`,`retrieve`,`update`,`delete`,`bulk_create`,`bulk_update`,`bulk_delete`,`all`) |
 | `api_route_path`            | `str`                         | `""`                                               | Base route segment                                                      |
 | `list_docs`                 | `str`                         | `"List all objects."`                              | List endpoint description                                               |
 | `create_docs`               | `str`                         | `"Create a new object."`                           | Create endpoint description                                             |
@@ -114,9 +282,17 @@ class ArticleViewSet(APIViewSet):
 | `delete_docs`               | `str`                         | `"Delete an object by its primary key."`           | Delete endpoint description                                             |
 | `m2m_relations`             | `list[M2MRelationSchema]`     | `[]`                                               | M2M relation configs                                                    |
 | `m2m_auth`                  | `list \| None`                | `NOT_SET`                                          | Default auth for all M2M endpoints (overridden per relation if set)     |
-| `extra_decorators`          | `DecoratorsSchema`            | `DecoratorsSchema()`                               | Custom decorators for CRUD operations                                   |
+| `extra_decorators`          | `DecoratorsSchema`            | `DecoratorsSchema()`                               | Custom decorators for CRUD and bulk operations                          |
 | `model_verbose_name`        | `str`                         | `""`                                               | Override model verbose name for display                                 |
 | `model_verbose_name_plural` | `str`                         | `""`                                               | Override model verbose name plural for display                          |
+| `bulk_operations`           | `list[Literal["create", "update", "delete"]]` | `[]`                          | Bulk operations to enable (opt-in)                                      |
+| `bulk_response_fields`      | `list[str] \| str \| None`    | `None`                                             | Field(s) returned in bulk success details (`None` = PK)                 |
+| `bulk_create_docs`          | `str`                         | `"Create multiple objects in a single request."`   | Bulk create endpoint description                                        |
+| `bulk_update_docs`          | `str`                         | `"Update multiple objects in a single request."`   | Bulk update endpoint description                                        |
+| `bulk_delete_docs`          | `str`                         | `"Delete multiple objects in a single request."`   | Bulk delete endpoint description                                        |
+| `ordering_fields`           | `list[str]`                   | `[]`                                               | Fields allowed for ordering (empty = disabled)                          |
+| `default_ordering`          | `str \| list[str]`            | `[]`                                               | Default ordering when no `?ordering` param is provided                  |
+| `require_update_fields`     | `bool`                        | `False`                                            | Reject PATCH with empty payload (`SerializeError`)                      |
 
 ### :material-tag: Verbose Name Resolution
 
@@ -246,6 +422,269 @@ class ArticleViewSet(APIViewSet):
 Endpoints behavior:
 - `GET /articles/` returns `[{"id": 1, "title": "...", "summary": "..."}, ...]`
 - `GET /articles/1` returns `{"id": 1, "title": "...", "summary": "...", "content": "...", "author": {...}, "tags": [...]}`
+
+## :material-shield-check: Partial Update Validation
+
+By default, PATCH endpoints accept empty payloads silently (no fields updated, but `save()` is still called). Enable `require_update_fields` to reject empty updates:
+
+```python
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    require_update_fields = True
+```
+
+When enabled, a PATCH request with no update fields raises a `SerializeError` with message `"No fields provided for update."` (HTTP 400).
+
+This applies to both single update and bulk update operations. In bulk updates, empty items are collected as errors without affecting other items (partial success semantics).
+
+---
+
+## :material-content-copy: Bulk Operations
+
+Bulk operations allow creating, updating, or deleting multiple objects in a single request. They are **opt-in** — no bulk endpoints are registered unless explicitly enabled via `bulk_operations`.
+
+### Enabling Bulk Operations
+
+```python
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    bulk_operations = ["create", "update", "delete"]
+```
+
+### Generated Bulk Endpoints
+
+| Method | Path             | Summary       | Response                  |
+| ------ | ---------------- | ------------- | ------------------------- |
+| POST   | `/{base}/bulk/`  | Bulk Create   | `200 BulkResultSchema`    |
+| PATCH  | `/{base}/bulk/`  | Bulk Update   | `200 BulkResultSchema`    |
+| DELETE | `/{base}/bulk/`  | Bulk Delete   | `200 BulkResultSchema`    |
+
+### Response Format
+
+All bulk endpoints return a `BulkResultSchema` with **partial success** semantics — each item is processed independently, and failures don't affect other items:
+
+```json
+{
+  "success": {
+    "count": 2,
+    "details": [1, 3]
+  },
+  "errors": {
+    "count": 1,
+    "details": [{"error": "Not found."}]
+  }
+}
+```
+
+- **`success.details`** — list of primary keys of successfully processed objects (default). Customizable via `bulk_response_fields`.
+- **`errors.details`** — list of error detail dicts for each failed item.
+
+### Custom Response Fields
+
+By default, `success.details` contains primary keys. Use `bulk_response_fields` to return different field(s):
+
+**Single field** — returns a flat list of values:
+
+```python
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    bulk_operations = ["create", "update", "delete"]
+    bulk_response_fields = "title"
+```
+
+```json
+{
+  "success": {
+    "count": 2,
+    "details": ["Article 1", "Article 2"]
+  }
+}
+```
+
+**Multiple fields** — returns a list of dicts:
+
+```python
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    bulk_operations = ["create", "update", "delete"]
+    bulk_response_fields = ["id", "title"]
+```
+
+```json
+{
+  "success": {
+    "count": 2,
+    "details": [
+      {"id": 1, "title": "Article 1"},
+      {"id": 2, "title": "Article 2"}
+    ]
+  }
+}
+```
+
+!!! note
+    For bulk delete, the requested fields are fetched **before** deletion so they can be included in the response.
+
+### Request Formats
+
+**Bulk Create** — request body is `List[schema_in]`:
+
+```json
+[
+  {"title": "Article 1", "content": "..."},
+  {"title": "Article 2", "content": "..."}
+]
+```
+
+**Bulk Update** — request body is a list of objects with the PK field (required) plus update fields. A dynamic schema is generated combining the PK field with `schema_update`:
+
+```json
+[
+  {"id": 1, "title": "Updated Title"},
+  {"id": 2, "content": "Updated Content"}
+]
+```
+
+**Bulk Delete** — request body contains a list of PK values:
+
+```json
+{"ids": [1, 2, 3]}
+```
+
+### Selective Enablement
+
+Enable only specific operations:
+
+```python
+bulk_operations = ["create"]          # Only bulk create
+bulk_operations = ["create", "delete"]  # Create and delete, no update
+```
+
+### Disabling Individual Bulk Views
+
+Bulk views can also be disabled via the `disable` attribute:
+
+```python
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    bulk_operations = ["create", "update", "delete"]
+    disable = ["bulk_update"]  # Disable only bulk update
+```
+
+Valid disable values: `bulk_create`, `bulk_update`, `bulk_delete`.
+
+### Partial Success Semantics
+
+Each item in a bulk request is processed independently. If an item fails (validation error, not found, etc.), the error is collected in the response but other items continue processing normally. This means:
+
+- Successful items are committed to the database immediately.
+- Failed items appear in `errors.details` with the error message.
+- The response always returns HTTP `200` with the combined result.
+
+??? info "Performance"
+
+    - **Bulk Delete** is optimized to use a single database query (`DELETE ... WHERE pk IN (...)`) instead of deleting objects one by one.
+    - **Bulk Create** and **Bulk Update** process items individually to preserve `save()` validations and hooks.
+
+??? info "Authentication"
+
+    Bulk endpoints inherit per-verb authentication:
+
+    | Bulk Operation | Auth Source    |
+    | -------------- | ------------- |
+    | Bulk Create    | `post_auth`   |
+    | Bulk Update    | `patch_auth`  |
+    | Bulk Delete    | `delete_auth` |
+
+??? info "Hooks and Validators"
+
+    Bulk operations call the same hooks as single-item operations, **per item**:
+
+    - `parse_input_data()` — field validation, FK resolution, base64 decoding
+    - `custom_actions()` — custom field processing (create, update)
+    - `post_create()` — post-creation hook (create only)
+
+??? example "Extra Decorators"
+
+    Apply custom decorators to bulk endpoints via `extra_decorators`:
+
+    ```python
+    extra_decorators = DecoratorsSchema(
+        bulk_create=[rate_limit],
+        bulk_update=[log_operation],
+        bulk_delete=[admin_only],
+    )
+    ```
+
+### Core Attributes
+
+| Attribute              | Type                             | Default | Description                                      |
+| ---------------------- | -------------------------------- | ------- | ------------------------------------------------ |
+| `bulk_operations`      | `list[Literal["create", "update", "delete"]]` | `[]`    | Which bulk operations to enable                  |
+| `bulk_response_fields` | `list[str] \| str \| None`       | `None`  | Field(s) returned in success details (`None` = PK) |
+| `bulk_create_docs`     | `str`                            | `"Create multiple objects in a single request."`  | Bulk create endpoint description                 |
+| `bulk_update_docs`     | `str`                            | `"Update multiple objects in a single request."`  | Bulk update endpoint description                 |
+| `bulk_delete_docs`     | `str`                            | `"Delete multiple objects in a single request."`  | Bulk delete endpoint description                 |
+
+## :material-sort: Ordering
+
+Add native ordering support to the list endpoint with `ordering_fields` and `default_ordering`:
+
+```python
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    ordering_fields = ["created_at", "title", "views"]
+    default_ordering = "-created_at"
+```
+
+This automatically adds an `ordering` query parameter to the list endpoint:
+
+```bash
+# Single field ascending
+GET /api/article/?ordering=title
+
+# Single field descending
+GET /api/article/?ordering=-title
+
+# Multiple fields (comma-separated)
+GET /api/article/?ordering=-views,title
+
+# No ordering param → default_ordering applied
+GET /api/article/
+```
+
+### How It Works
+
+- When `ordering_fields` is set, an `ordering` query parameter is automatically added to the filters schema.
+- The `ordering` value is popped from the filters dict **before** `query_params_handler` runs, so existing filter mixins never see it.
+- Each field in the comma-separated value is validated against `ordering_fields`. Invalid fields are silently ignored.
+- Both `field` (ascending) and `-field` (descending) are valid if `field` is in `ordering_fields`.
+- If no valid fields remain, `default_ordering` is applied as fallback.
+- `default_ordering` accepts a single string (`"-created_at"`) or a list (`["-created_at", "title"]`).
+- When `ordering_fields` is empty (default), the feature is completely disabled — no query parameter is added.
+
+### Ordering with Filters
+
+Ordering works seamlessly with existing `query_params` and filter mixins:
+
+```python
+@api.viewset(model=Article)
+class ArticleViewSet(
+    APIViewSet,
+    IcontainsFilterViewSetMixin,
+):
+    ordering_fields = ["title", "created_at"]
+    default_ordering = "-created_at"
+    query_params = {
+        "title": (str, None),
+        "is_published": (bool, None),
+    }
+```
+
+```bash
+# Filter + ordering combined
+GET /api/article/?title=django&ordering=-created_at
+```
 
 ## :material-filter: List Filtering
 
@@ -612,6 +1051,9 @@ Available decorator fields:
 - `retrieve`: Decorators for retrieve endpoint
 - `update`: Decorators for update endpoint
 - `delete`: Decorators for delete endpoint
+- `bulk_create`: Decorators for bulk create endpoint
+- `bulk_update`: Decorators for bulk update endpoint
+- `bulk_delete`: Decorators for bulk delete endpoint
 
 ## :material-hook: Overridable Hooks
 
@@ -681,6 +1123,12 @@ Note: prefix and tags are optional. If omitted, the base path is inferred from t
 @api.viewset(model=User)
 class ReadOnlyUserViewSet(APIViewSet):
     disable = ["create", "update", "delete"]
+
+# Disable specific bulk operations
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    bulk_operations = ["create", "update", "delete"]
+    disable = ["bulk_delete"]  # Enable bulk create/update, disable bulk delete
 ```
 
 ## :material-shield-lock: Authentication Example
