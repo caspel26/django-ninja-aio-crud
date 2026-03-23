@@ -47,6 +47,8 @@
 | 23 | Draft/Publish pattern | `views/mixins.py` | `DraftPublishViewSetMixin` — draft/published state management. |
 | 24 | Webhook mixin | `views/mixins.py` | Async HTTP POST to configured URLs on CRUD events with retry. |
 | 25 | Nested validation error paths | `exceptions.py` | Full field paths for nested object validation failures. |
+| 26 | Auto-form generation | `forms.py` (new) | Generate Django Forms from `schema_in` — server-side rendering with HTMX/Alpine.js without duplicating schema definitions. Template tag `{% ninja_form "articles" "create" %}`. |
+| 27 | Admin API dashboard widget | `admin.py`, `templates/` | Django admin widget showing API stats: registered endpoints, request counts, recent errors. Cockpit view for teams using admin panel alongside APIs. |
 
 ---
 
@@ -54,9 +56,9 @@
 
 | # | Task | Description |
 |---|------|-------------|
-| 26 | Metrics / instrumentation hooks | Optional hook points for Prometheus, StatsD — operation counts, latencies. |
-| 27 | Read operation caching | `@cache_query` decorator with configurable TTL and invalidation. |
-| 28 | Batch transaction endpoint | `POST /batch` executing multiple CRUD operations in a single atomic transaction. |
-| 29 | Rate limiting per-viewset | Granular throttling per endpoint beyond global NinjaAIO throttling. |
-| 30 | Health check endpoint | Auto-generated `/health` with DB connectivity check. |
-| 31 | Async savepoint management | Expose savepoints in `AsyncAtomicContextManager`. |
+| 28 | Metrics / instrumentation hooks | Optional hook points for Prometheus, StatsD — operation counts, latencies. |
+| 29 | Read operation caching | `@cache_query` decorator with configurable TTL and invalidation. |
+| 30 | Batch transaction endpoint | `POST /batch` executing multiple CRUD operations in a single atomic transaction. |
+| 31 | Rate limiting per-viewset | Granular throttling per endpoint beyond global NinjaAIO throttling. |
+| 32 | Health check endpoint | Auto-generated `/health` with DB connectivity check. |
+| 33 | Async savepoint management | Expose savepoints in `AsyncAtomicContextManager`. |
