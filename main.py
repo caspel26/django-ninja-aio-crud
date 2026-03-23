@@ -1,15 +1,17 @@
 from __future__ import annotations
-import subprocess
+
 import re
+import subprocess
 from datetime import datetime
 from html import escape
-import json
-import urllib.request
-import os
+from pathlib import Path
+
 from markdown import markdown
-import ssl
 
 SEMVER_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$")
+CHANGELOG_HEADER_RE = re.compile(
+    r"^##\s+.*?\[v?(\d+\.\d+\.\d+)\]\s*-\s*(\d{4}-\d{2}-\d{2})"
+)
 
 _MD_EXTENSIONS = [
     "tables",
@@ -28,9 +30,13 @@ def _render_md(text: str) -> str:
     """Render Markdown text to HTML with GitHub-flavoured extensions."""
     if not text:
         return ""
-    return markdown(text, extensions=_MD_EXTENSIONS, extension_configs=_MD_EXTENSION_CONFIGS)
+    return markdown(
+        text, extensions=_MD_EXTENSIONS, extension_configs=_MD_EXTENSION_CONFIGS
+    )
+
+
 REPO_SLUG = "caspel26/django-ninja-aio-crud"
-_RELEASES_CACHE = None
+_CHANGELOG_CACHE: dict[str, dict] | None = None
 
 
 def _run(cmd: list[str]) -> str:
@@ -40,41 +46,71 @@ def _run(cmd: list[str]) -> str:
         return ""
 
 
-def _fetch_all_releases() -> dict[str, str]:
+def _parse_changelog() -> dict[str, dict]:
     """
-    Fetch all GitHub releases once and return a dict {tag_name: body}.
+    Parse CHANGELOG.md and return a dict {tag: {"body": ..., "date": ...}}.
+
+    Expects headers like: ## [vX.Y.Z] - YYYY-MM-DD
+    Content between headers is captured as the body.
     """
-    url = f"https://api.github.com/repos/{REPO_SLUG}/releases"
-    req = urllib.request.Request(url)
-
-    token = os.environ.get("GITHUB_TOKEN")
-    ssl_context = ssl._create_unverified_context()
-    if token:
-        req.add_header("Authorization", f"Bearer {token}")
-
-    try:
-        with urllib.request.urlopen(req, context=ssl_context) as response:
-            data = json.loads(response.read().decode())
-            return {
-                release["tag_name"]: release.get("body", "").strip() for release in data
-            }
-    except Exception as e:
-        print("Failed to fetch GitHub releases:", e)
+    changelog_path = Path(__file__).parent / "CHANGELOG.md"
+    if not changelog_path.exists():
         return {}
+
+    text = changelog_path.read_text(encoding="utf-8")
+    entries: dict[str, dict] = {}
+    current_tag = None
+    current_date = None
+    current_lines: list[str] = []
+
+    for line in text.splitlines():
+        match = CHANGELOG_HEADER_RE.match(line)
+        if match:
+            # Save previous entry
+            if current_tag:
+                body = "\n".join(current_lines).strip()
+                entries[current_tag] = {"body": body, "date": current_date}
+
+            version = match.group(1)
+            current_tag = f"v{version}"
+            current_date = match.group(2)
+            current_lines = []
+        elif current_tag is not None:
+            current_lines.append(line)
+
+    # Save last entry
+    if current_tag:
+        body = "\n".join(current_lines).strip()
+        entries[current_tag] = {"body": body, "date": current_date}
+
+    return entries
+
+
+def _get_changelog() -> dict[str, dict]:
+    global _CHANGELOG_CACHE
+    if _CHANGELOG_CACHE is None:
+        _CHANGELOG_CACHE = _parse_changelog()
+    return _CHANGELOG_CACHE
 
 
 def _get_release_notes(tag: str) -> str:
-    global _RELEASES_CACHE
-    if _RELEASES_CACHE is None:
-        _RELEASES_CACHE = _fetch_all_releases()
-    return _RELEASES_CACHE.get(tag, "")
+    entry = _get_changelog().get(tag)
+    return entry["body"] if entry else ""
 
+
+def _get_release_date(tag: str) -> str:
+    entry = _get_changelog().get(tag)
+    return entry["date"] if entry else ""
 
 
 def _get_tags() -> list[str]:
-    raw = _run(["git", "tag", "--list"])
-    tags = [t for t in raw.splitlines() if t]
-    semver_tags = [t for t in tags if SEMVER_RE.match(t)]
+    """Get version tags from CHANGELOG.md (primary) with git tags as fallback."""
+    changelog = _get_changelog()
+    if changelog:
+        tags = list(changelog.keys())
+    else:
+        raw = _run(["git", "tag", "--list"])
+        tags = [t for t in raw.splitlines() if t and SEMVER_RE.match(t)]
 
     def sort_key(t: str):
         m = SEMVER_RE.match(t)
@@ -82,11 +118,15 @@ def _get_tags() -> list[str]:
             return (0, 0, 0)
         return tuple(int(x) for x in m.groups())
 
-    semver_tags.sort(key=sort_key, reverse=True)  # newest first
-    return semver_tags
+    tags.sort(key=sort_key, reverse=True)
+    return tags
 
 
 def _tag_date(tag: str) -> str:
+    """Get date for a tag — from CHANGELOG first, git fallback."""
+    date = _get_release_date(tag)
+    if date:
+        return date
     lines = _run(["git", "show", "-s", "--format=%aI", tag]).splitlines()
     return lines[-1] if lines else ""
 
@@ -113,8 +153,7 @@ def generate_release_table() -> str:
         return (
             '<div class="admonition info">'
             '<p class="admonition-title">No Releases Yet</p>'
-            "<p>No git tags found. Create one with:</p>"
-            "<pre><code>git tag -a v0.1.0 -m &quot;Release v0.1.0&quot; &amp;&amp; git push --tags</code></pre>"
+            "<p>No releases found in CHANGELOG.md.</p>"
             "</div>"
         )
 
@@ -254,7 +293,6 @@ def generate_release_table() -> str:
 
 
 def generate_full_changelog() -> str:
-    # NEWEST -> OLDEST (removed reversal)
     tags = _get_tags()
     if not tags:
         return "No versions yet."
