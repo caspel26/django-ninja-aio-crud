@@ -744,26 +744,6 @@ class ModelUtil(Generic[ModelT]):
             logger.warning(f"Failed to decode binary field '{k}' for {self.model.__name__}: {exc}")
             raise SerializeError({k: ". ".join(exc.args)}, 400)
 
-    async def _resolve_fk(
-        self,
-        request: HttpRequest,
-        payload: dict,
-        k: str,
-        v: Any,
-        field_obj: models.Field,
-    ) -> None:
-        """Resolve foreign key ID to model instance in place."""
-        if not isinstance(field_obj, models.ForeignKey):
-            return
-        if v is None:
-            # None is valid for nullable FKs, leave as is
-            return
-        rel_model = field_obj.related_model
-        logger.debug(f"Resolving FK '{k}' -> {rel_model.__name__} (pk={v}) for {self.model.__name__}")
-        rel_util = ModelUtil(rel_model)
-        rel = await rel_util.get_object(request, v, with_qs_request=False)
-        payload[k] = rel
-
     async def _bump_object_from_schema(self, obj: ModelT, schema: Schema) -> dict:
         """Convert model instance to dict using Pydantic schema."""
         return (await sync_to_async(schema.from_orm)(obj)).model_dump()
@@ -952,6 +932,10 @@ class ModelUtil(Generic[ModelT]):
         """
         Process payload fields: decode binary and resolve foreign keys.
 
+        Binary fields are decoded in-place. FK fields are resolved in batched
+        queries grouped by target model — one query per distinct related model
+        instead of one query per FK field.
+
         Parameters
         ----------
         request : HttpRequest
@@ -968,16 +952,41 @@ class ModelUtil(Generic[ModelT]):
         field_names = [k for k, _ in fields_to_process]
         field_objs = await sync_to_async(self._resolve_field_objects)(field_names)
 
-        # Decode binary fields (synchronous, must be sequential)
+        # Single pass: decode binary fields and collect FK fields to resolve
+        # fk_by_model: {related_model: [(field_name, pk_value), ...]}
+        fk_by_model: dict[type, list[tuple[str, Any]]] = {}
         for (k, v), field_obj in zip(fields_to_process, field_objs):
             self._decode_binary(payload, k, v, field_obj)
+            if isinstance(field_obj, models.ForeignKey) and v is not None:
+                rel_model = field_obj.related_model
+                fk_by_model.setdefault(rel_model, []).append((k, v))
 
-        # Resolve all FK fields in parallel
-        fk_tasks = [
-            self._resolve_fk(request, payload, k, v, field_obj)
-            for (k, v), field_obj in zip(fields_to_process, field_objs)
-        ]
-        await asyncio.gather(*fk_tasks)
+        if not fk_by_model:
+            return
+
+        # Batch resolve: one query per distinct related model
+        for rel_model, fk_fields in fk_by_model.items():
+            pk_values = [v for _, v in fk_fields]
+            pk_name = rel_model._meta.pk.attname
+            resolved = {}
+            async for obj in rel_model.objects.filter(
+                **{f"{pk_name}__in": pk_values}
+            ):
+                resolved[obj.pk] = obj
+
+            for field_name, pk_value in fk_fields:
+                obj = resolved.get(pk_value)
+                if obj is None:
+                    logger.debug(
+                        f"FK '{field_name}' -> {rel_model.__name__} "
+                        f"(pk={pk_value}) not found for {self.model.__name__}"
+                    )
+                    raise NotFoundError(rel_model)
+                payload[field_name] = obj
+                logger.debug(
+                    f"Resolved FK '{field_name}' -> {rel_model.__name__} "
+                    f"(pk={pk_value}) for {self.model.__name__}"
+                )
 
     async def parse_input_data(self, request: HttpRequest, data: Schema):
         """
