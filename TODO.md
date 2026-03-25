@@ -28,6 +28,7 @@
 | 18 | ~~Performance: cached_property~~ | `models/utils.py` | v2.29.0 | `pk_field_type`, `model_fields`, `model_name`, `model_pk_name` computed once. |
 | 19 | ~~Performance: no .copy() on cache~~ | `models/utils.py` | v2.29.0 | Removed redundant list copies on cache hit/miss. |
 | 20 | ~~Performance: getattr vs model_dump~~ | `views/api.py` | v2.29.0 | `_get_pk` uses direct attribute access instead of full schema serialization. |
+| 21 | ~~Multi-field search~~ | `views/mixins.py` | v2.29.0 | `SearchViewSetMixin` — `?search=` across configurable fields with OR logic, composable with all filter mixins. |
 
 ---
 
@@ -51,24 +52,23 @@
 
 | # | Task | File(s) | Description |
 |---|------|---------|-------------|
-| 30 | Simple multi-field search | `views/mixins.py` | `SearchViewSetMixin` — `?search=john` searches across configurable fields with `icontains`. Works on all DBs. |
-| 31 | Idempotency keys | `decorators/`, `views/api.py` | `Idempotency-Key` header on POST — cache response, return cached on retry. Prevents double-creation for payments/orders. |
-| 32 | NinjaAIO theme/branding | `api.py` | Custom logo, colors, title on Swagger UI via `NinjaAIO(logo_url=..., theme_color=...)`. |
-| 33 | API Explorer in Django Admin | `admin.py`, `templates/` | Embedded API tester in admin panel — browse endpoints, send requests, see responses. Swagger-like but inside admin. |
-| 34 | Admin validator sync | `admin.py`, `forms.py` | Admin forms auto-use `CreateSerializer`/`UpdateSerializer` Pydantic validators. Single source of truth for validation. |
-| 35 | Admin audit log | `admin.py`, `models/` | Unified audit log for API + admin actions. Same table, same format — who changed what, from where. |
-| 36 | Admin dashboard widget | `admin.py`, `templates/` | Home widget showing model counts, recent changes, API stats. Zero config. |
-| 37 | Field-level read permissions | `models/serializers.py` | Show/hide fields in ReadSerializer based on user role. |
-| 38 | Optimistic locking | `models/utils.py` | Version field for concurrency control on updates. |
-| 39 | Bulk M2M set replacement | `helpers/api.py` | "Replace entire set" operation alongside add/remove on M2M endpoints. |
-| 40 | Nested resource routing | `views/api.py`, `helpers/` | `/authors/{id}/books/` with full CRUD on sub-resources. |
-| 41 | Export mixin | `views/mixins.py` | `ExportViewSetMixin` — CSV/JSON export of filtered querysets. |
-| 42 | Audit trail mixin | `views/mixins.py` | Auto-log create/update/delete to audit table with `created_by`, `changed_fields`, `timestamp`. |
-| 43 | Draft/Publish pattern | `views/mixins.py` | `DraftPublishViewSetMixin` — draft/published state management. |
-| 44 | Webhook mixin | `views/mixins.py` | Async HTTP POST to configured URLs on CRUD events with retry. |
-| 45 | Nested validation error paths | `exceptions.py` | Full field paths for nested object validation failures. |
-| 46 | Auto-form generation | `forms.py` (new) | Generate Django Forms from `schema_in` — server-side rendering with HTMX/Alpine.js. Template tag `{% ninja_form "articles" "create" %}`. |
-| 47 | Response compression | `api.py`, `middleware/` | Auto GZip/Brotli for large responses. Configurable threshold. |
+| 30 | Idempotency keys | `decorators/`, `views/api.py` | `Idempotency-Key` header on POST — cache response, return cached on retry. Prevents double-creation for payments/orders. |
+| 31 | NinjaAIO theme/branding | `api.py` | Custom logo, colors, title on Swagger UI via `NinjaAIO(logo_url=..., theme_color=...)`. |
+| 32 | API Explorer in Django Admin | `admin.py`, `templates/` | Embedded API tester in admin panel — browse endpoints, send requests, see responses. Swagger-like but inside admin. |
+| 33 | Admin validator sync | `admin.py`, `forms.py` | Admin forms auto-use `CreateSerializer`/`UpdateSerializer` Pydantic validators. Single source of truth for validation. |
+| 34 | Admin audit log | `admin.py`, `models/` | Unified audit log for API + admin actions. Same table, same format — who changed what, from where. |
+| 35 | Admin dashboard widget | `admin.py`, `templates/` | Home widget showing model counts, recent changes, API stats. Zero config. |
+| 36 | Field-level read permissions | `models/serializers.py` | Show/hide fields in ReadSerializer based on user role. |
+| 37 | Optimistic locking | `models/utils.py` | Version field for concurrency control on updates. |
+| 38 | Bulk M2M set replacement | `helpers/api.py` | "Replace entire set" operation alongside add/remove on M2M endpoints. |
+| 39 | Nested resource routing | `views/api.py`, `helpers/` | `/authors/{id}/books/` with full CRUD on sub-resources. |
+| 40 | Export mixin | `views/mixins.py` | `ExportViewSetMixin` — CSV/JSON export of filtered querysets. |
+| 41 | Audit trail mixin | `views/mixins.py` | Auto-log create/update/delete to audit table with `created_by`, `changed_fields`, `timestamp`. |
+| 42 | Draft/Publish pattern | `views/mixins.py` | `DraftPublishViewSetMixin` — draft/published state management. |
+| 43 | Webhook mixin | `views/mixins.py` | Async HTTP POST to configured URLs on CRUD events with retry. |
+| 44 | Nested validation error paths | `exceptions.py` | Full field paths for nested object validation failures. |
+| 45 | Auto-form generation | `forms.py` (new) | Generate Django Forms from `schema_in` — server-side rendering with HTMX/Alpine.js. Template tag `{% ninja_form "articles" "create" %}`. |
+| 46 | Response compression | `api.py`, `middleware/` | Auto GZip/Brotli for large responses. Configurable threshold. |
 
 ---
 
@@ -76,9 +76,9 @@
 
 | # | Task | Description |
 |---|------|-------------|
-| 48 | Metrics / instrumentation hooks | Optional hook points for Prometheus, StatsD — operation counts, latencies. |
-| 49 | Read operation caching | `@cache_query` decorator with configurable TTL and invalidation. |
-| 50 | Batch transaction endpoint | `POST /batch` executing multiple CRUD operations in a single atomic transaction. |
-| 51 | Rate limiting per-viewset | Granular throttling per endpoint beyond global NinjaAIO throttling. |
-| 52 | Health check endpoint | Auto-generated `/health` with DB connectivity check. |
-| 53 | Async savepoint management | Expose savepoints in `AsyncAtomicContextManager`. |
+| 47 | Metrics / instrumentation hooks | Optional hook points for Prometheus, StatsD — operation counts, latencies. |
+| 48 | Read operation caching | `@cache_query` decorator with configurable TTL and invalidation. |
+| 49 | Batch transaction endpoint | `POST /batch` executing multiple CRUD operations in a single atomic transaction. |
+| 50 | Rate limiting per-viewset | Granular throttling per endpoint beyond global NinjaAIO throttling. |
+| 51 | Health check endpoint | Auto-generated `/health` with DB connectivity check. |
+| 52 | Async savepoint management | Expose savepoints in `AsyncAtomicContextManager`. |
