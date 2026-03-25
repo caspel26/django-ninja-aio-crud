@@ -923,6 +923,56 @@ class ModelUtil(Generic[ModelT]):
         }
         return skip_keys
 
+    def _collect_fk_fields(
+        self,
+        payload: dict,
+        fields_to_process: list[tuple[str, Any]],
+        field_objs: list[models.Field],
+    ) -> dict[type, list[tuple[str, Any]]]:
+        """
+        Decode binary fields and group FK fields by target model.
+
+        Returns a dict mapping each related model to the list of
+        (field_name, pk_value) pairs that reference it.
+        """
+        fk_by_model: dict[type, list[tuple[str, Any]]] = {}
+        for (k, v), field_obj in zip(fields_to_process, field_objs):
+            self._decode_binary(payload, k, v, field_obj)
+            if isinstance(field_obj, models.ForeignKey) and v is not None:
+                fk_by_model.setdefault(field_obj.related_model, []).append((k, v))
+        return fk_by_model
+
+    async def _batch_resolve_fks(
+        self, payload: dict, fk_by_model: dict[type, list[tuple[str, Any]]]
+    ) -> None:
+        """
+        Resolve FK references with one query per distinct related model.
+
+        Mutates *payload* in place, replacing PK values with model instances.
+        Raises NotFoundError if any referenced PK does not exist.
+        """
+        for rel_model, fk_fields in fk_by_model.items():
+            pk_values = [v for _, v in fk_fields]
+            pk_name = rel_model._meta.pk.attname
+            resolved = {
+                obj.pk: obj
+                async for obj in rel_model.objects.filter(
+                    **{f"{pk_name}__in": pk_values}
+                )
+            }
+            for field_name, pk_value in fk_fields:
+                if pk_value not in resolved:
+                    logger.debug(
+                        f"FK '{field_name}' -> {rel_model.__name__} "
+                        f"(pk={pk_value}) not found for {self.model.__name__}"
+                    )
+                    raise NotFoundError(rel_model)
+                payload[field_name] = resolved[pk_value]
+                logger.debug(
+                    f"Resolved FK '{field_name}' -> {rel_model.__name__} "
+                    f"(pk={pk_value}) for {self.model.__name__}"
+                )
+
     async def _process_payload_fields(
         self,
         request: HttpRequest,
@@ -948,45 +998,12 @@ class ModelUtil(Generic[ModelT]):
         if not fields_to_process:
             return
 
-        # Fetch all field objects in a single sync_to_async call
         field_names = [k for k, _ in fields_to_process]
         field_objs = await sync_to_async(self._resolve_field_objects)(field_names)
+        fk_by_model = self._collect_fk_fields(payload, fields_to_process, field_objs)
 
-        # Single pass: decode binary fields and collect FK fields to resolve
-        # fk_by_model: {related_model: [(field_name, pk_value), ...]}
-        fk_by_model: dict[type, list[tuple[str, Any]]] = {}
-        for (k, v), field_obj in zip(fields_to_process, field_objs):
-            self._decode_binary(payload, k, v, field_obj)
-            if isinstance(field_obj, models.ForeignKey) and v is not None:
-                rel_model = field_obj.related_model
-                fk_by_model.setdefault(rel_model, []).append((k, v))
-
-        if not fk_by_model:
-            return
-
-        # Batch resolve: one query per distinct related model
-        for rel_model, fk_fields in fk_by_model.items():
-            pk_values = [v for _, v in fk_fields]
-            pk_name = rel_model._meta.pk.attname
-            resolved = {}
-            async for obj in rel_model.objects.filter(
-                **{f"{pk_name}__in": pk_values}
-            ):
-                resolved[obj.pk] = obj
-
-            for field_name, pk_value in fk_fields:
-                obj = resolved.get(pk_value)
-                if obj is None:
-                    logger.debug(
-                        f"FK '{field_name}' -> {rel_model.__name__} "
-                        f"(pk={pk_value}) not found for {self.model.__name__}"
-                    )
-                    raise NotFoundError(rel_model)
-                payload[field_name] = obj
-                logger.debug(
-                    f"Resolved FK '{field_name}' -> {rel_model.__name__} "
-                    f"(pk={pk_value}) for {self.model.__name__}"
-                )
+        if fk_by_model:
+            await self._batch_resolve_fks(payload, fk_by_model)
 
     async def parse_input_data(self, request: HttpRequest, data: Schema):
         """
