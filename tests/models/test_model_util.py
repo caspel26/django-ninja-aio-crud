@@ -371,3 +371,20 @@ class GetNinjaAIOMetaAttrTestCase(TestCase):
             models.TestModelSerializer, "not_found_name", default="fallback"
         )
         self.assertEqual(result, "fallback")
+
+
+@tag("model_util")
+class AgetAttrTestCase(TestCase):
+    """Test the async getattr utility function."""
+
+    async def test_agetattr_existing_attribute(self):
+        from ninja_aio.models.utils import agetattr
+
+        result = await agetattr(models.TestModel, "__name__")
+        self.assertEqual(result, "TestModel")
+
+    async def test_agetattr_missing_with_default(self):
+        from ninja_aio.models.utils import agetattr
+
+        result = await agetattr(models.TestModel, "nonexistent", "fallback")
+        self.assertEqual(result, "fallback")

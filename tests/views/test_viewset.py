@@ -1311,3 +1311,76 @@ class MatchCaseFilterInvalidFieldTestCase(TestCase):
         )
         # All filter fields are invalid, so no filtering should occur
         self.assertEqual(await res.acount(), 2)
+
+
+@tag("pagination")
+class LimitOffsetPaginationTestCase(TestCase):
+    """Test list_view with LimitOffsetPagination to cover the else branch."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from ninja.pagination import LimitOffsetPagination
+        from tests.generics.views import GenericAPIViewSet
+        from tests.generics.request import Request
+
+        cls.namespace = "limit_offset_test"
+        cls.model = models.TestModel
+        cls.api = NinjaAIO(urls_namespace=cls.namespace)
+
+        class LimitOffsetViewSet(GenericAPIViewSet):
+            model = models.TestModel
+            schema_in = schema.TestModelSchemaIn
+            schema_out = schema.TestModelSchemaOut
+            schema_update = schema.TestModelSchemaPatch
+            pagination_class = LimitOffsetPagination
+
+        cls.viewset = LimitOffsetViewSet()
+        cls.viewset.api = cls.api
+        cls.viewset.add_views_to_route()
+        cls.request = Request(ModelUtil(cls.model).verbose_name_path_resolver())
+
+    async def test_list_with_limit_offset(self):
+        """List view works with LimitOffsetPagination."""
+        await self.model.objects.all().adelete()
+        for i in range(5):
+            await self.model.objects.acreate(name=f"item_{i}", description="d")
+
+        view = self.viewset.list_view()
+        result = await view(self.request.get())
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(result.value["count"], 5)
+
+
+@tag("batch_fk")
+class BatchFKResolutionTestCase(TestCase):
+    """Test batch FK resolution with multi-FK model."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from tests.generics.request import Request
+
+        cls.namespace = "batch_fk_test"
+        cls.model = models.PerfArticle
+        cls.api = NinjaAIO(urls_namespace=cls.namespace)
+        cls.viewset = views.PerfArticleAPI()
+        cls.viewset.api = cls.api
+        cls.viewset.add_views_to_route()
+        cls.request = Request("perf-articles")
+
+        cls.author = models.PerfAuthor.objects.create(name="author")
+        cls.category = models.PerfCategory.objects.create(name="cat")
+        cls.publisher = models.PerfPublisher.objects.create(name="pub")
+
+    async def test_create_with_nonexistent_fk_raises(self):
+        """Create with a nonexistent FK PK raises NotFoundError."""
+        from ninja_aio.exceptions import NotFoundError
+
+        view = self.viewset.create_view()
+        data = schema.PerfArticleSchemaIn(
+            title="test",
+            author=self.author.pk,
+            category=99999,  # does not exist
+            publisher=self.publisher.pk,
+        )
+        with self.assertRaises(NotFoundError):
+            await view(self.request.post(), data)

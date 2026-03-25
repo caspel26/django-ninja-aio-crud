@@ -616,7 +616,7 @@ class APIViewSet(API, Generic[ModelT]):
         """
         Extract pk from a path schema instance.
         """
-        return data.model_dump()[self.model_util.model_pk_name]
+        return getattr(data, self.model_util.model_pk_name)
 
     def _get_query_data(self) -> ModelQuerySetSchema:
         """
@@ -732,11 +732,9 @@ class APIViewSet(API, Generic[ModelT]):
         Register list endpoint with pagination and optional filters.
 
         Pagination is applied before serialization: only page_size objects are
-        fetched and serialized instead of the entire queryset. The COUNT query
-        uses .values(pk) to avoid unnecessary JOINs from select_related.
+        fetched and serialized instead of the entire queryset.
         """
         _paginator = self.pagination_class()
-        _pk_name = self.model_util.model_pk_name
         _input_class = self.pagination_class.Input
         _default_pagination = _input_class()
         _paginated_schema = create_model(
@@ -778,7 +776,7 @@ class APIViewSet(API, Generic[ModelT]):
             qs = self.on_list_queryset(request, qs)
             qs = await self._apply_list_filters(qs, filters)
 
-            count = await qs.values(_pk_name).acount()
+            count = await qs.acount()
 
             offset, page_size = self._get_page_params(
                 _paginator, ninja_pagination

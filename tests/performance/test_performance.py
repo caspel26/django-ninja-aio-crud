@@ -480,3 +480,131 @@ class FilterPerformanceTest(PerformanceMixin, TestCase):
 
         stats = self._benchmark_async(filter_view)
         self._record("combined_filters", stats)
+
+
+# ---------------------------------------------------------------------------
+# Realistic Scale Benchmarks
+# ---------------------------------------------------------------------------
+
+
+@tag("performance")
+class MultiFKPerformanceTest(PerformanceMixin, TestCase):
+    """Benchmark create/update with multiple FK relations (3 FKs per object)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from tests.test_app.views import PerfArticleAPI
+
+        cls.api = NinjaAIO(urls_namespace="perf_multi_fk")
+        cls.viewset = PerfArticleAPI(
+            api=cls.api, prefix="perf-articles", tags=["perf"]
+        )
+        cls.viewset.add_views_to_route()
+        cls.request = Request("perf-articles")
+
+        # Create FK targets
+        cls.authors = models.PerfAuthor.objects.bulk_create(
+            [models.PerfAuthor(name=f"author_{i}") for i in range(10)]
+        )
+        cls.categories = models.PerfCategory.objects.bulk_create(
+            [models.PerfCategory(name=f"cat_{i}") for i in range(10)]
+        )
+        cls.publishers = models.PerfPublisher.objects.bulk_create(
+            [models.PerfPublisher(name=f"pub_{i}") for i in range(10)]
+        )
+
+    def test_create_with_3_fks(self):
+        """Benchmark create with 3 FK fields (batch resolution)."""
+        view = self.viewset.create_view()
+        schema_in = self.viewset.schema_in
+        counter = [0]
+
+        async def create():
+            counter[0] += 1
+            i = counter[0] % 10
+            data = schema_in(
+                title=f"article_{counter[0]}",
+                author=self.authors[i].pk,
+                category=self.categories[i].pk,
+                publisher=self.publishers[i].pk,
+            )
+            await view(self.request.post(), data)
+
+        stats = self._benchmark_async(create, iterations=50)
+        self._record("create_3fk", stats)
+
+    def test_bulk_create_with_3_fks(self):
+        """Benchmark bulk create with 3 FK fields (50 objects)."""
+        view = self.viewset.bulk_create_view()
+        schema_in = self.viewset.schema_in
+
+        items = [
+            schema_in(
+                title=f"bulk_article_{i}",
+                author=self.authors[i % 10].pk,
+                category=self.categories[i % 10].pk,
+                publisher=self.publishers[i % 10].pk,
+            )
+            for i in range(50)
+        ]
+
+        async def bulk_create():
+            await view(self.request.post(), items)
+
+        stats = self._benchmark_async(bulk_create, iterations=10)
+        self._record("bulk_create_50x3fk", stats)
+
+
+@tag("performance")
+class LargeListPerformanceTest(PerformanceMixin, TestCase):
+    """Benchmark list operations with realistic dataset sizes."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.api = NinjaAIO(urls_namespace="perf_large_list")
+        cls.viewset = TestModelSerializerAPI(
+            api=cls.api, prefix="test-model-serializers", tags=["perf"]
+        )
+        cls.viewset.add_views_to_route()
+        cls.request = Request("test-model-serializers")
+
+        models.TestModelSerializer.objects.bulk_create(
+            [
+                models.TestModelSerializer(
+                    name=f"large_{i}", description=f"desc_{i}"
+                )
+                for i in range(1000)
+            ]
+        )
+
+    def test_list_1000_page_20(self):
+        """List 1000 records, page size 20."""
+        view = self.viewset.list_view()
+        pagination = self.viewset.pagination_class.Input(page=1, page_size=20)
+        filters = self.viewset.filters_schema()
+
+        async def list_view():
+            await view(
+                self.request.get(),
+                ninja_pagination=pagination,
+                filters=filters,
+            )
+
+        stats = self._benchmark_async(list_view)
+        self._record("list_1000_page20", stats)
+
+    def test_list_1000_page_100(self):
+        """List 1000 records, page size 100."""
+        view = self.viewset.list_view()
+        pagination = self.viewset.pagination_class.Input(page=1, page_size=100)
+        filters = self.viewset.filters_schema()
+
+        async def list_view():
+            await view(
+                self.request.get(),
+                ninja_pagination=pagination,
+                filters=filters,
+            )
+
+        stats = self._benchmark_async(list_view)
+        self._record("list_1000_page100", stats)

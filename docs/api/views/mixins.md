@@ -428,6 +428,53 @@ class GroupBasedAPI(PermissionViewSetMixin, APIViewSet):
 
 ---
 
+## SoftDeleteViewSetMixin
+
+Replaces hard deletes with a boolean flag. Soft-deleted records are excluded from list and single-object endpoints. Provides restore and permanent delete endpoints.
+
+- **Behavior:** `DELETE /{pk}/` sets `soft_delete_field=True` instead of removing the row. List/retrieve/update return 404 for soft-deleted records.
+- **Extra endpoints:** `POST /{pk}/restore` (un-delete), `DELETE /{pk}/hard-delete` (permanent).
+- **Validation:** Raises `ImproperlyConfigured` at init if the model lacks the configured field.
+
+| Attribute | Type | Default | Description |
+|---|---|---|---|
+| `soft_delete_field` | `str` | `"is_deleted"` | Name of the `BooleanField` on the model |
+| `include_deleted` | `bool` | `False` | If `True`, soft-deleted records are visible everywhere |
+
+```python
+from ninja_aio.views.mixins import SoftDeleteViewSetMixin
+from ninja_aio.views import APIViewSet
+
+class ArticleAPI(SoftDeleteViewSetMixin, APIViewSet):
+    model = Article  # must have is_deleted = BooleanField(default=False)
+    bulk_operations = ["create", "update", "delete"]  # bulk delete is also soft
+```
+
+Custom field name and admin view:
+
+```python
+class ArticleAdminAPI(SoftDeleteViewSetMixin, APIViewSet):
+    model = Article
+    soft_delete_field = "deleted"  # custom field name
+    include_deleted = True         # admin sees everything
+```
+
+Composability — put `SoftDeleteViewSetMixin` first:
+
+```python
+class ArticleAPI(
+    SoftDeleteViewSetMixin,
+    PermissionViewSetMixin,
+    IcontainsFilterViewSetMixin,
+    APIViewSet,
+):
+    model = Article
+```
+
+[:octicons-arrow-right-24: Full tutorial](../../tutorial/soft_delete.md)
+
+---
+
 ## Tips
 
 - Align `query_params` types with expected filter values; prefer Pydantic `date`/`datetime` for date filters so values implement `isoformat`.

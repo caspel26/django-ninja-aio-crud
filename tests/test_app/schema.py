@@ -71,3 +71,23 @@ class SumSchemaIn(Schema):
 
 class SumSchemaOut(Schema):
     result: int
+
+
+# Performance benchmark schemas
+class PerfArticleSchemaIn(Schema):
+    title: str
+    author: int
+    category: int
+    publisher: int
+
+
+class PerfArticleSchemaOut(Schema):
+    id: int
+    title: str
+    author_id: int
+    category_id: int
+    publisher_id: int
+
+
+class PerfArticleSchemaPatch(Schema):
+    title: str

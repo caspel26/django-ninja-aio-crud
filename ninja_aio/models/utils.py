@@ -2,6 +2,7 @@ import asyncio
 import base64
 import logging
 from collections import OrderedDict
+from functools import cached_property
 from typing import Any, Generic, Literal, TypeVar
 
 from ninja import Schema
@@ -9,7 +10,7 @@ from ninja.orm import fields
 from ninja.errors import ConfigError
 
 from django.db import models
-from django.db.models import Q
+from django.db.models import Q, aprefetch_related_objects
 from django.http import HttpRequest
 from django.core.exceptions import ObjectDoesNotExist
 from asgiref.sync import sync_to_async
@@ -201,7 +202,7 @@ class ModelUtil(Generic[ModelT]):
         """
         return self.serializer_class is not None
 
-    @property
+    @cached_property
     def pk_field_type(self):
         """
         Python type corresponding to the model's primary key field.
@@ -256,7 +257,7 @@ class ModelUtil(Generic[ModelT]):
         """
         return self._get_serializable_field_names("detail")
 
-    @property
+    @cached_property
     def model_fields(self):
         """
         Raw model field names (including forward relations).
@@ -267,7 +268,7 @@ class ModelUtil(Generic[ModelT]):
         """
         return [field.name for field in self.model._meta.get_fields()]
 
-    @property
+    @cached_property
     def model_name(self) -> str:
         """
         Django internal model name.
@@ -278,7 +279,7 @@ class ModelUtil(Generic[ModelT]):
         """
         return self.model._meta.model_name
 
-    @property
+    @cached_property
     def model_pk_name(self) -> str:
         """
         Primary key attribute name (attname).
@@ -646,19 +647,19 @@ class ModelUtil(Generic[ModelT]):
             Relation attribute names.
         """
         # Check cache first (performance optimization)
-        cache_key = (self.model, str(self.serializer_class), is_for)
+        cache_key = (id(self.model), id(self.serializer_class), is_for)
         cached = self._relation_cache.get(cache_key)
         if cached is not None:
             logger.debug(f"Reverse relations cache hit for {self.model.__name__} (is_for={is_for})")
-            return cached.copy()
+            return cached
 
-        reverse_rels = self._get_read_optimizations(is_for).prefetch_related.copy()
-        if reverse_rels:
-            # Cache and return
-            self._relation_cache.set(cache_key, reverse_rels)
-            logger.debug(f"Reverse relations from config for {self.model.__name__}: {reverse_rels}")
-            return reverse_rels
+        config_rels = self._get_read_optimizations(is_for).prefetch_related
+        if config_rels:
+            self._relation_cache.set(cache_key, config_rels)
+            logger.debug(f"Reverse relations from config for {self.model.__name__}: {config_rels}")
+            return config_rels
 
+        reverse_rels = []
         serializable_fields = self._get_serializable_field_names(is_for)
         for f in serializable_fields:
             field_obj = getattr(self.model, f)
@@ -696,19 +697,19 @@ class ModelUtil(Generic[ModelT]):
             Relation attribute names.
         """
         # Check cache first (performance optimization)
-        cache_key = (self.model, str(self.serializer_class) + "_select", is_for)
+        cache_key = (id(self.model), id(self.serializer_class), "select", is_for)
         cached = self._relation_cache.get(cache_key)
         if cached is not None:
             logger.debug(f"Select related cache hit for {self.model.__name__} (is_for={is_for})")
-            return cached.copy()
+            return cached
 
-        select_rels = self._get_read_optimizations(is_for).select_related.copy()
-        if select_rels:
-            # Cache and return
-            self._relation_cache.set(cache_key, select_rels)
-            logger.debug(f"Select related from config for {self.model.__name__}: {select_rels}")
-            return select_rels
+        config_rels = self._get_read_optimizations(is_for).select_related
+        if config_rels:
+            self._relation_cache.set(cache_key, config_rels)
+            logger.debug(f"Select related from config for {self.model.__name__}: {config_rels}")
+            return config_rels
 
+        select_rels = []
         serializable_fields = self._get_serializable_field_names(is_for)
         for f in serializable_fields:
             field_obj = getattr(self.model, f)
@@ -723,9 +724,13 @@ class ModelUtil(Generic[ModelT]):
         logger.debug(f"Select related discovered for {self.model.__name__}: {select_rels}")
         return select_rels
 
-    async def _get_field(self, k: str) -> models.Field:
-        """Get Django field object for a given field name."""
-        return (await agetattr(self.model, k)).field
+    def _resolve_field_objects(self, field_names: list[str]) -> list[models.Field]:
+        """Resolve Django field objects for a list of field names (sync)."""
+        return [getattr(self.model, k).field for k in field_names]
+
+    def _serialize_queryset_sync(self, queryset, schema: Schema) -> list[dict]:
+        """Serialize a queryset to a list of dicts using Pydantic schema (sync)."""
+        return [schema.from_orm(obj).model_dump() for obj in queryset]
 
     def _decode_binary(
         self, payload: dict, k: str, v: Any, field_obj: models.Field
@@ -740,26 +745,6 @@ class ModelUtil(Generic[ModelT]):
             logger.warning(f"Failed to decode binary field '{k}' for {self.model.__name__}: {exc}")
             raise SerializeError({k: ". ".join(exc.args)}, 400)
 
-    async def _resolve_fk(
-        self,
-        request: HttpRequest,
-        payload: dict,
-        k: str,
-        v: Any,
-        field_obj: models.Field,
-    ) -> None:
-        """Resolve foreign key ID to model instance in place."""
-        if not isinstance(field_obj, models.ForeignKey):
-            return
-        if v is None:
-            # None is valid for nullable FKs, leave as is
-            return
-        rel_model = field_obj.related_model
-        logger.debug(f"Resolving FK '{k}' -> {rel_model.__name__} (pk={v}) for {self.model.__name__}")
-        rel_util = ModelUtil(rel_model)
-        rel = await rel_util.get_object(request, v, with_qs_request=False)
-        payload[k] = rel
-
     async def _bump_object_from_schema(self, obj: ModelT, schema: Schema) -> dict:
         """Convert model instance to dict using Pydantic schema."""
         return (await sync_to_async(schema.from_orm)(obj)).model_dump()
@@ -769,10 +754,7 @@ class ModelUtil(Generic[ModelT]):
     ) -> list[dict]:
         """Convert a queryset to a list of dicts using Pydantic schema in a single sync_to_async call."""
 
-        def _serialize_all():
-            return [schema.from_orm(obj).model_dump() for obj in queryset]
-
-        return await sync_to_async(_serialize_all)()
+        return await sync_to_async(self._serialize_queryset_sync)(queryset, schema)
 
     async def _prefetch_reverse_relations_on_instance(
         self,
@@ -785,6 +767,10 @@ class ModelUtil(Generic[ModelT]):
         This is used to load reverse relations (reverse FK, reverse O2O, M2M)
         on an instance that already has forward FKs loaded.
 
+        Uses ``aprefetch_related_objects`` to apply prefetch directly on the
+        instance without refetching it from the database, preserving any
+        forward FK data already in memory.
+
         Parameters
         ----------
         obj : ModelT
@@ -796,29 +782,13 @@ class ModelUtil(Generic[ModelT]):
         -------
         ModelT
             The same instance with reverse relations prefetched.
-
-        Notes
-        -----
-        When reverse relations exist, we must refetch the instance to apply
-        prefetch_related. To avoid losing forward FK data, we also apply
-        select_related for forward FKs that should already be in memory.
         """
         reverse_rels = self.get_reverse_relations(is_for)
         if not reverse_rels:
-            # No reverse relations to load - return original instance with FK cache intact
             return obj
 
-        # Must refetch to apply prefetch_related
-        # Also include select_related to keep forward FKs loaded
-        forward_rels = self.get_select_relateds(is_for)
-        pk_filter = {self.model_pk_name: obj.pk}
-        queryset = self.model.objects.filter(**pk_filter)
-
-        if forward_rels:
-            queryset = queryset.select_related(*forward_rels)
-        queryset = queryset.prefetch_related(*reverse_rels)
-
-        return await queryset.aget()
+        await aprefetch_related_objects([obj], *reverse_rels)
+        return obj
 
     def _validate_read_params(
         self, request: HttpRequest, query_data: QuerySchema
@@ -954,6 +924,21 @@ class ModelUtil(Generic[ModelT]):
         }
         return skip_keys
 
+    async def _resolve_fk(
+        self,
+        payload: dict,
+        k: str,
+        v: Any,
+        field_obj: models.ForeignKey,
+    ) -> None:
+        """Resolve foreign key ID to model instance in place."""
+        rel_model = field_obj.related_model
+        logger.debug(f"Resolving FK '{k}' -> {rel_model.__name__} (pk={v}) for {self.model.__name__}")
+        try:
+            payload[k] = await rel_model.objects.aget(pk=v)
+        except rel_model.DoesNotExist:
+            raise NotFoundError(rel_model)
+
     async def _process_payload_fields(
         self,
         request: HttpRequest,
@@ -962,6 +947,9 @@ class ModelUtil(Generic[ModelT]):
     ) -> None:
         """
         Process payload fields: decode binary and resolve foreign keys.
+
+        Binary fields are decoded in-place. FK fields are resolved in
+        parallel via asyncio.gather.
 
         Parameters
         ----------
@@ -975,20 +963,18 @@ class ModelUtil(Generic[ModelT]):
         if not fields_to_process:
             return
 
-        # Fetch all field objects in parallel
-        field_tasks = [self._get_field(k) for k, _ in fields_to_process]
-        field_objs = await asyncio.gather(*field_tasks)
+        field_names = [k for k, _ in fields_to_process]
+        field_objs = await sync_to_async(self._resolve_field_objects)(field_names)
 
-        # Decode binary fields (synchronous, must be sequential)
+        # Single pass: decode binary + collect FK tasks
+        fk_tasks = []
         for (k, v), field_obj in zip(fields_to_process, field_objs):
             self._decode_binary(payload, k, v, field_obj)
+            if isinstance(field_obj, models.ForeignKey) and v is not None:
+                fk_tasks.append(self._resolve_fk(payload, k, v, field_obj))
 
-        # Resolve all FK fields in parallel
-        fk_tasks = [
-            self._resolve_fk(request, payload, k, v, field_obj)
-            for (k, v), field_obj in zip(fields_to_process, field_objs)
-        ]
-        await asyncio.gather(*fk_tasks)
+        if fk_tasks:
+            await asyncio.gather(*fk_tasks)
 
     async def parse_input_data(self, request: HttpRequest, data: Schema):
         """

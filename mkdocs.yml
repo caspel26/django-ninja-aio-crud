@@ -20,6 +20,7 @@ nav:
     - 'Step 3: Add Authentication': tutorial/authentication.md
     - 'Step 4: Add Filtering & Pagination': tutorial/filtering.md
     - 'Step 5: Add Permissions': tutorial/permissions.md
+    - 'Step 6: Soft Delete': tutorial/soft_delete.md
   - API Reference:
     - Type Hints & Type Safety: api/type_hints.md
     - Views:
