@@ -299,6 +299,47 @@ This enables:
 
 ---
 
+## SearchViewSetMixin
+
+Adds a `?search=` query parameter that searches across multiple model fields with case-insensitive substring matching (OR logic).
+
+- **Behavior:** A single `?search=term` searches all `search_fields` simultaneously with `__icontains`.
+- **Composability:** Works with all filter mixins — search narrows first, then field-specific filters apply.
+- **No-op:** When `search_fields` is empty, the mixin does nothing.
+
+| Attribute | Type | Default | Description |
+|---|---|---|---|
+| `search_fields` | `list[str]` | `[]` | Fields to search (supports `__` lookups like `author__name`) |
+| `search_param` | `str` | `"search"` | Query parameter name (e.g. `"q"` for `?q=django`) |
+
+```python
+from ninja_aio.views.mixins import SearchViewSetMixin
+from ninja_aio.views import APIViewSet
+
+class ArticleAPI(SearchViewSetMixin, APIViewSet):
+    model = Article
+    search_fields = ["title", "content", "author__name"]
+```
+
+```
+GET /articles/?search=django
+```
+
+Combined with filters:
+
+```python
+class ArticleAPI(SearchViewSetMixin, IcontainsFilterViewSetMixin, APIViewSet):
+    model = Article
+    search_fields = ["title", "content"]
+    query_params = {"category": (str, None)}
+```
+
+```
+GET /articles/?search=django&category=tutorial
+```
+
+---
+
 ## PermissionViewSetMixin
 
 Adds async permission checks to **all** CRUD operations (create, list, retrieve, update, delete), bulk operations, and `@action` endpoints.
