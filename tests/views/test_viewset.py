@@ -1349,3 +1349,38 @@ class LimitOffsetPaginationTestCase(TestCase):
         result = await view(self.request.get())
         self.assertEqual(result.status_code, 200)
         self.assertEqual(result.value["count"], 5)
+
+
+@tag("batch_fk")
+class BatchFKResolutionTestCase(TestCase):
+    """Test batch FK resolution with multi-FK model."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from tests.generics.request import Request
+
+        cls.namespace = "batch_fk_test"
+        cls.model = models.PerfArticle
+        cls.api = NinjaAIO(urls_namespace=cls.namespace)
+        cls.viewset = views.PerfArticleAPI()
+        cls.viewset.api = cls.api
+        cls.viewset.add_views_to_route()
+        cls.request = Request("perf-articles")
+
+        cls.author = models.PerfAuthor.objects.create(name="author")
+        cls.category = models.PerfCategory.objects.create(name="cat")
+        cls.publisher = models.PerfPublisher.objects.create(name="pub")
+
+    async def test_create_with_nonexistent_fk_raises(self):
+        """Create with a nonexistent FK PK raises NotFoundError."""
+        from ninja_aio.exceptions import NotFoundError
+
+        view = self.viewset.create_view()
+        data = schema.PerfArticleSchemaIn(
+            title="test",
+            author=self.author.pk,
+            category=99999,  # does not exist
+            publisher=self.publisher.pk,
+        )
+        with self.assertRaises(NotFoundError):
+            await view(self.request.post(), data)
