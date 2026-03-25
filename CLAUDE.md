@@ -42,16 +42,24 @@ To run tests without coverage:
 . ./.venv/bin/activate && python -m django test --settings=tests.test_settings
 ```
 
+To run tests **fast** (~3s instead of ~26s), excluding performance/scalability/comparison benchmarks:
+
+```sh
+. ./.venv/bin/activate && ./run-tests.sh
+```
+
+Use fast mode for quick verification during development. Use full coverage for final validation.
+
 ## Test-Driven Development Protocol
 
 **CRITICAL:** After implementing any code change, you MUST follow this protocol:
 
-1. **Run all tests** to verify nothing broke:
+1. **Run fast tests** to verify nothing broke (~3s):
    ```sh
-   . ./.venv/bin/activate && python -m django test --settings=tests.test_settings
+   . ./.venv/bin/activate && ./run-tests.sh
    ```
 
-2. **Check coverage** to identify uncovered lines:
+2. **After all changes are complete**, run full suite with coverage + performance:
    ```sh
    . ./.venv/bin/activate && coverage run -m django test --settings=tests.test_settings && coverage report
    ```
