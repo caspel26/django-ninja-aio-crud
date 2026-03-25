@@ -723,9 +723,13 @@ class ModelUtil(Generic[ModelT]):
         logger.debug(f"Select related discovered for {self.model.__name__}: {select_rels}")
         return select_rels
 
-    async def _get_field(self, k: str) -> models.Field:
-        """Get Django field object for a given field name."""
-        return (await agetattr(self.model, k)).field
+    def _resolve_field_objects(self, field_names: list[str]) -> list[models.Field]:
+        """Resolve Django field objects for a list of field names (sync)."""
+        return [getattr(self.model, k).field for k in field_names]
+
+    def _serialize_queryset_sync(self, queryset, schema: Schema) -> list[dict]:
+        """Serialize a queryset to a list of dicts using Pydantic schema (sync)."""
+        return [schema.from_orm(obj).model_dump() for obj in queryset]
 
     def _decode_binary(
         self, payload: dict, k: str, v: Any, field_obj: models.Field
@@ -769,10 +773,7 @@ class ModelUtil(Generic[ModelT]):
     ) -> list[dict]:
         """Convert a queryset to a list of dicts using Pydantic schema in a single sync_to_async call."""
 
-        def _serialize_all():
-            return [schema.from_orm(obj).model_dump() for obj in queryset]
-
-        return await sync_to_async(_serialize_all)()
+        return await sync_to_async(self._serialize_queryset_sync)(queryset, schema)
 
     async def _prefetch_reverse_relations_on_instance(
         self,
@@ -975,9 +976,9 @@ class ModelUtil(Generic[ModelT]):
         if not fields_to_process:
             return
 
-        # Fetch all field objects in parallel
-        field_tasks = [self._get_field(k) for k, _ in fields_to_process]
-        field_objs = await asyncio.gather(*field_tasks)
+        # Fetch all field objects in a single sync_to_async call
+        field_names = [k for k, _ in fields_to_process]
+        field_objs = await sync_to_async(self._resolve_field_objects)(field_names)
 
         # Decode binary fields (synchronous, must be sequential)
         for (k, v), field_obj in zip(fields_to_process, field_objs):
