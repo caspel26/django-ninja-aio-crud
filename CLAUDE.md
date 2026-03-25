@@ -397,3 +397,12 @@ Brief paragraph summarizing the release. Then:
 - **Keep docs/styling/config sections brief** — one-liner summaries for CSS, `main.py` template changes, and `mkdocs.yml` config. Do not enumerate individual CSS classes or JS functions
 - **Always include "Summary" section** with key benefits as bullet points
 - **Separate sections with `---`** horizontal rules
+
+### Release checklist
+
+When creating a new release, always:
+
+1. **Bump version** in `ninja_aio/__init__.py`
+2. **Write/overwrite `CHANGELOG.md`** following the structure above
+3. **Add the new version** to `.github/workflows/docs.yml` — both the `docs_version` and `delete_version` dropdown option lists (e.g., `- "2.29"`)
+4. **Update `TODO.md`** — mark completed tasks with version number
