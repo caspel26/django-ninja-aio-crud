@@ -651,15 +651,15 @@ class ModelUtil(Generic[ModelT]):
         cached = self._relation_cache.get(cache_key)
         if cached is not None:
             logger.debug(f"Reverse relations cache hit for {self.model.__name__} (is_for={is_for})")
-            return cached.copy()
+            return cached
 
-        reverse_rels = self._get_read_optimizations(is_for).prefetch_related.copy()
-        if reverse_rels:
-            # Cache and return
-            self._relation_cache.set(cache_key, reverse_rels)
-            logger.debug(f"Reverse relations from config for {self.model.__name__}: {reverse_rels}")
-            return reverse_rels
+        config_rels = self._get_read_optimizations(is_for).prefetch_related
+        if config_rels:
+            self._relation_cache.set(cache_key, config_rels)
+            logger.debug(f"Reverse relations from config for {self.model.__name__}: {config_rels}")
+            return config_rels
 
+        reverse_rels = []
         serializable_fields = self._get_serializable_field_names(is_for)
         for f in serializable_fields:
             field_obj = getattr(self.model, f)
@@ -701,15 +701,15 @@ class ModelUtil(Generic[ModelT]):
         cached = self._relation_cache.get(cache_key)
         if cached is not None:
             logger.debug(f"Select related cache hit for {self.model.__name__} (is_for={is_for})")
-            return cached.copy()
+            return cached
 
-        select_rels = self._get_read_optimizations(is_for).select_related.copy()
-        if select_rels:
-            # Cache and return
-            self._relation_cache.set(cache_key, select_rels)
-            logger.debug(f"Select related from config for {self.model.__name__}: {select_rels}")
-            return select_rels
+        config_rels = self._get_read_optimizations(is_for).select_related
+        if config_rels:
+            self._relation_cache.set(cache_key, config_rels)
+            logger.debug(f"Select related from config for {self.model.__name__}: {config_rels}")
+            return config_rels
 
+        select_rels = []
         serializable_fields = self._get_serializable_field_names(is_for)
         for f in serializable_fields:
             field_obj = getattr(self.model, f)
