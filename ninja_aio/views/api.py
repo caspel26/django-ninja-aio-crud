@@ -616,7 +616,7 @@ class APIViewSet(API, Generic[ModelT]):
         """
         Extract pk from a path schema instance.
         """
-        return data.model_dump()[self.model_util.model_pk_name]
+        return getattr(data, self.model_util.model_pk_name)
 
     def _get_query_data(self) -> ModelQuerySetSchema:
         """
