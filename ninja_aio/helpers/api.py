@@ -7,7 +7,6 @@ from ninja import Path, Query, Status
 from ninja.pagination import paginate
 from ninja_aio.decorators import unique_view, decorate_view
 from ninja_aio.models import ModelSerializer, ModelUtil
-from ninja_aio.schemas.helpers import ObjectsQuerySchema
 from ninja_aio.schemas import (
     GenericMessageSchema,
     M2MRelationSchema,
@@ -290,21 +289,26 @@ class ManyToManyAPI:
         errors, objs_detail, objs = [], [], []
         rel_obj_pks = {rel_obj.pk async for rel_obj in related_manager.all()}
         rel_model_name = related_model._meta.verbose_name.capitalize()
+        query_handler = self._get_query_handler(related_name)
+
+        if query_handler:
+            # Custom query handler: must validate per-PK (cannot batch)
+            resolved = {}
+            for obj_pk in objs_pks:
+                rel_obj = await (
+                    await query_handler(request, obj_pk, instance)
+                ).afirst()
+                resolved[obj_pk] = rel_obj
+        else:
+            # No custom handler: single batched query for all PKs
+            pk_name = related_model._meta.pk.attname
+            qs = await ModelUtil(related_model).get_objects(request)
+            resolved = {}
+            async for obj in qs.filter(**{f"{pk_name}__in": objs_pks}):
+                resolved[obj.pk] = obj
+
         for obj_pk in objs_pks:
-            if query_handler := self._get_query_handler(related_name):
-                rel_obj = await (
-                    await query_handler(
-                        request,
-                        obj_pk,
-                        instance,
-                    )
-                ).afirst()
-            else:
-                rel_obj = await (
-                    await ModelUtil(related_model).get_objects(
-                        request, query_data=ObjectsQuerySchema(filters={"pk": obj_pk})
-                    )
-                ).afirst()
+            rel_obj = resolved.get(obj_pk)
             if rel_obj is None:
                 logger.debug(f"M2M check: {rel_model_name} with pk {obj_pk} not found")
                 errors.append(f"{rel_model_name} with pk {obj_pk} not found.")
