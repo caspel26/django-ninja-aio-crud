@@ -342,3 +342,41 @@ class SoftDeleteCustomFieldTestCase(TestCase):
         view = self.viewset.list_view()
         result = await view(self.request.get())
         self.assertEqual(result.value["count"], 1)
+
+
+@tag("soft_delete")
+class SoftDeleteNoObjectHooksTestCase(TestCase):
+    """Test soft delete when _has_object_hooks is False (fallback path)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.namespace = "sd_no_hooks"
+        cls.model = models.SoftDeleteTestModel
+        cls.api = NinjaAIO(urls_namespace=cls.namespace)
+
+        class NoHooksAPI(SoftDeleteViewSetMixin, GenericAPIViewSet):
+            model = models.SoftDeleteTestModel
+            schema_in = schema.TestModelSchemaIn
+            schema_out = schema.TestModelSchemaOut
+            schema_update = schema.TestModelSchemaPatch
+            _has_object_hooks = False
+
+        cls.viewset = NoHooksAPI()
+        cls.viewset.api = cls.api
+        cls.viewset.add_views_to_route()
+        cls.pk_att = cls.model._meta.pk.attname
+        cls.request = Request(cls.viewset.model_util.verbose_name_path_resolver())
+
+    async def test_soft_delete_without_hooks(self):
+        """Soft delete works when _has_object_hooks is False (fallback fetch)."""
+        await self.model.objects.all().adelete()
+        obj = await self.model.objects.acreate(name="no_hooks", description="d")
+
+        view = self.viewset.delete_view()
+        result = await view(
+            self.request.delete(),
+            self.viewset.path_schema(**{self.pk_att: obj.pk}),
+        )
+        self.assertEqual(result.status_code, 204)
+        await obj.arefresh_from_db()
+        self.assertTrue(obj.is_deleted)
