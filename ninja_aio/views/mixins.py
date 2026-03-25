@@ -4,7 +4,8 @@ from typing import TypeVar
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Model, QuerySet, Q
 from django.http import HttpRequest
-from ninja import Path, Status
+from ninja import Path, Schema, Status
+from pydantic import create_model
 
 from ninja_aio.views.api import APIViewSet
 from ninja_aio.decorators import unique_view, decorate_view, aatomic
@@ -574,6 +575,55 @@ class RoleBasedPermissionMixin(PermissionViewSetMixin[ModelT]):
         if role is None:
             return False
         return operation in self.permission_roles.get(role, [])
+
+
+class SearchViewSetMixin(APIViewSet[ModelT]):
+    """
+    Mixin adding a ``?search=`` query parameter that searches across
+    multiple model fields with case-insensitive substring matching.
+
+    Configure ``search_fields`` with a list of field names (supports
+    double-underscore related lookups like ``author__name``).
+
+    Usage::
+
+        class ArticleAPI(SearchViewSetMixin, APIViewSet):
+            model = Article
+            search_fields = ["title", "content", "author__name"]
+
+    Request::
+
+        GET /articles/?search=django
+
+    The mixin automatically adds the ``search`` parameter to the filters
+    schema and applies an OR filter across all configured fields.
+    When ``search_fields`` is empty, the mixin is a no-op.
+    """
+
+    search_fields: list[str] = []
+    search_param: str = "search"
+
+    def _generate_filters_schema(self) -> Schema:
+        """Add search param to the filters schema when search_fields is configured."""
+        schema = super()._generate_filters_schema()
+        if not self.search_fields:
+            return schema
+        return create_model(
+            f"{self.model_util.model_name}FiltersSchema",
+            __base__=schema,
+            **{self.search_param: (str | None, None)},
+        )
+
+    async def _apply_list_filters(self, qs: QuerySet, filters=None) -> QuerySet:
+        """Extract search param and apply OR icontains filter before other filters."""
+        if filters is not None and self.search_fields:
+            search_value = getattr(filters, self.search_param, None)
+            if search_value:
+                search_q = Q()
+                for field in self.search_fields:
+                    search_q |= Q(**{f"{field}__icontains": search_value})
+                qs = qs.filter(search_q)
+        return await super()._apply_list_filters(qs, filters)
 
 
 class SoftDeleteViewSetMixin(APIViewSet[ModelT]):
