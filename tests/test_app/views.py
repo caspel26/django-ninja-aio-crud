@@ -452,6 +452,46 @@ class SoftDeleteIncludeDeletedTestAPI(
 
 
 # ==========================================================
+#                    SEARCH APIS
+# ==========================================================
+
+
+class SearchTestAPI(mixins.SearchViewSetMixin, GenericAPIViewSet):
+    """ViewSet with multi-field search."""
+
+    model = models.TestModel
+    schema_in = schema.TestModelSchemaIn
+    schema_out = schema.TestModelSchemaOut
+    schema_update = schema.TestModelSchemaPatch
+    search_fields = ["name", "description"]
+
+
+class SearchWithFiltersTestAPI(
+    mixins.SearchViewSetMixin,
+    mixins.IcontainsFilterViewSetMixin,
+    GenericAPIViewSet,
+):
+    """ViewSet combining search and filter mixins."""
+
+    model = models.TestModel
+    schema_in = schema.TestModelSchemaIn
+    schema_out = schema.TestModelSchemaOut
+    schema_update = schema.TestModelSchemaPatch
+    search_fields = ["name", "description"]
+    query_params = {"name": (str, None)}
+
+
+class SearchDisabledTestAPI(mixins.SearchViewSetMixin, GenericAPIViewSet):
+    """ViewSet with empty search_fields (no-op)."""
+
+    model = models.TestModel
+    schema_in = schema.TestModelSchemaIn
+    schema_out = schema.TestModelSchemaOut
+    schema_update = schema.TestModelSchemaPatch
+    search_fields = []
+
+
+# ==========================================================
 #              PERFORMANCE BENCHMARK APIS
 # ==========================================================
 
