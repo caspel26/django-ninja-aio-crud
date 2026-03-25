@@ -9,7 +9,7 @@ from ninja.orm import fields
 from ninja.errors import ConfigError
 
 from django.db import models
-from django.db.models import Q
+from django.db.models import Q, aprefetch_related_objects
 from django.http import HttpRequest
 from django.core.exceptions import ObjectDoesNotExist
 from asgiref.sync import sync_to_async
@@ -786,6 +786,10 @@ class ModelUtil(Generic[ModelT]):
         This is used to load reverse relations (reverse FK, reverse O2O, M2M)
         on an instance that already has forward FKs loaded.
 
+        Uses ``aprefetch_related_objects`` to apply prefetch directly on the
+        instance without refetching it from the database, preserving any
+        forward FK data already in memory.
+
         Parameters
         ----------
         obj : ModelT
@@ -797,29 +801,13 @@ class ModelUtil(Generic[ModelT]):
         -------
         ModelT
             The same instance with reverse relations prefetched.
-
-        Notes
-        -----
-        When reverse relations exist, we must refetch the instance to apply
-        prefetch_related. To avoid losing forward FK data, we also apply
-        select_related for forward FKs that should already be in memory.
         """
         reverse_rels = self.get_reverse_relations(is_for)
         if not reverse_rels:
-            # No reverse relations to load - return original instance with FK cache intact
             return obj
 
-        # Must refetch to apply prefetch_related
-        # Also include select_related to keep forward FKs loaded
-        forward_rels = self.get_select_relateds(is_for)
-        pk_filter = {self.model_pk_name: obj.pk}
-        queryset = self.model.objects.filter(**pk_filter)
-
-        if forward_rels:
-            queryset = queryset.select_related(*forward_rels)
-        queryset = queryset.prefetch_related(*reverse_rels)
-
-        return await queryset.aget()
+        await aprefetch_related_objects([obj], *reverse_rels)
+        return obj
 
     def _validate_read_params(
         self, request: HttpRequest, query_data: QuerySchema
