@@ -2,6 +2,7 @@ import asyncio
 import base64
 import logging
 from collections import OrderedDict
+from functools import cached_property
 from typing import Any, Generic, Literal, TypeVar
 
 from ninja import Schema
@@ -201,7 +202,7 @@ class ModelUtil(Generic[ModelT]):
         """
         return self.serializer_class is not None
 
-    @property
+    @cached_property
     def pk_field_type(self):
         """
         Python type corresponding to the model's primary key field.
@@ -256,7 +257,7 @@ class ModelUtil(Generic[ModelT]):
         """
         return self._get_serializable_field_names("detail")
 
-    @property
+    @cached_property
     def model_fields(self):
         """
         Raw model field names (including forward relations).
@@ -267,7 +268,7 @@ class ModelUtil(Generic[ModelT]):
         """
         return [field.name for field in self.model._meta.get_fields()]
 
-    @property
+    @cached_property
     def model_name(self) -> str:
         """
         Django internal model name.
@@ -278,7 +279,7 @@ class ModelUtil(Generic[ModelT]):
         """
         return self.model._meta.model_name
 
-    @property
+    @cached_property
     def model_pk_name(self) -> str:
         """
         Primary key attribute name (attname).
