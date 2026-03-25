@@ -1,11 +1,16 @@
+from collections.abc import Callable
 from typing import TypeVar
 
+from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Model, QuerySet, Q
 from django.http import HttpRequest
+from ninja import Path, Status
 
 from ninja_aio.views.api import APIViewSet
-from ninja_aio.exceptions import ForbiddenError
-from ninja_aio.schemas import RelationFilterSchema, MatchCaseFilterSchema
+from ninja_aio.decorators import unique_view, decorate_view, aatomic
+from ninja_aio.exceptions import ForbiddenError, NotFoundError
+from ninja_aio.schemas import GenericMessageSchema, RelationFilterSchema, MatchCaseFilterSchema
+from ninja_aio.schemas.api import BulkResultSchema
 
 # TypeVar for generic model typing in mixins
 ModelT = TypeVar("ModelT", bound=Model)
@@ -569,3 +574,186 @@ class RoleBasedPermissionMixin(PermissionViewSetMixin[ModelT]):
         if role is None:
             return False
         return operation in self.permission_roles.get(role, [])
+
+
+class SoftDeleteViewSetMixin(APIViewSet[ModelT]):
+    """
+    Mixin that replaces hard deletes with soft deletes.
+
+    Sets a boolean flag instead of removing the row from the database.
+    Soft-deleted records are automatically excluded from list and
+    single-object endpoints unless ``include_deleted`` is ``True``.
+
+    Two extra endpoints are registered via ``@action``:
+
+    - ``POST /{pk}/restore`` — un-delete a soft-deleted record.
+    - ``DELETE /{pk}/hard-delete`` — permanently remove a record.
+
+    Usage::
+
+        class ArticleAPI(SoftDeleteViewSetMixin, APIViewSet):
+            model = Article          # must have a BooleanField
+            soft_delete_field = "is_deleted"  # default
+            include_deleted = False           # True for admin views
+
+    The mixin validates at init time that the model has the configured
+    field; raises ``ImproperlyConfigured`` if missing.
+    """
+
+    soft_delete_field: str = "is_deleted"
+    include_deleted: bool = False
+
+    _has_object_hooks = True
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        try:
+            self.model._meta.get_field(self.soft_delete_field)
+        except Exception:
+            raise ImproperlyConfigured(
+                f"{self.model.__name__} does not have a "
+                f"'{self.soft_delete_field}' field. "
+                f"Add a BooleanField or set soft_delete_field to the correct name."
+            )
+
+    def on_list_queryset(
+        self, request: HttpRequest, queryset: QuerySet
+    ) -> QuerySet:
+        """Exclude soft-deleted records from list results."""
+        qs = super().on_list_queryset(request, queryset)
+        if not self.include_deleted:
+            qs = qs.filter(**{self.soft_delete_field: False})
+        return qs
+
+    async def on_before_object_operation(
+        self, request: HttpRequest, operation: str, obj: ModelT
+    ) -> None:
+        """Block retrieve/update on soft-deleted records (unless include_deleted)."""
+        await super().on_before_object_operation(request, operation, obj)
+        if (
+            not self.include_deleted
+            and operation in ("retrieve", "update")
+            and getattr(obj, self.soft_delete_field, False)
+        ):
+            raise NotFoundError(self.model)
+
+    def delete_view(self) -> Callable:
+        """
+        Override delete to soft-delete (set flag instead of removing row).
+        """
+
+        @self.router.delete(
+            self.path_retrieve,
+            auth=self.delete_view_auth(),
+            summary=f"Delete {self.model_verbose_name}",
+            description=self.delete_docs,
+            response={204: None, self.error_codes: GenericMessageSchema},
+        )
+        @decorate_view(aatomic, unique_view(self), *self.extra_decorators.delete)
+        async def delete(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
+            _pk = self._get_pk(pk)
+            obj = await self._run_object_hooks(request, "delete", _pk)
+            if obj is None:
+                obj = await self.model_util.get_object(request, _pk)
+            setattr(obj, self.soft_delete_field, True)
+            await obj.asave(update_fields=[self.soft_delete_field])
+            return Status(204, None)
+
+        return delete
+
+    def bulk_delete_view(self) -> Callable:
+        """
+        Override bulk delete to soft-delete all matching records.
+        """
+
+        @self.router.delete(
+            self.bulk_path,
+            auth=self.delete_view_auth(),
+            summary=f"Bulk Delete {self.model_verbose_name_plural}",
+            description=self.bulk_delete_docs,
+            response={200: BulkResultSchema, self.error_codes: GenericMessageSchema},
+        )
+        @decorate_view(
+            unique_view(self, plural=True), *self.extra_decorators.bulk_delete
+        )
+        async def bulk_delete(
+            request: HttpRequest, data: self.bulk_delete_schema  # type: ignore
+        ):
+            await self.on_before_operation(request, "bulk_delete")
+            pks = data.ids
+            if not pks:
+                return Status(200, self._bulk_result([], []))
+
+            qs = await self.model_util.get_objects(request, is_for="read")
+            matched_qs = qs.filter(
+                **{f"{self.model_util.model_pk_name}__in": pks}
+            )
+
+            existing_pks = set()
+            async for pk_val in matched_qs.values_list(
+                self.model_util.model_pk_name, flat=True
+            ):
+                existing_pks.add(pk_val)
+
+            error_details = []
+            for pk in pks:
+                if pk not in existing_pks:
+                    from ninja_aio.exceptions import NotFoundError as NFE
+
+                    error_details.append(NFE(self.model).error)
+
+            success_details = []
+            if existing_pks:
+                await qs.filter(
+                    **{f"{self.model_util.model_pk_name}__in": existing_pks}
+                ).aupdate(**{self.soft_delete_field: True})
+                success_details = [pk for pk in pks if pk in existing_pks]
+
+            return Status(200, self._bulk_result(success_details, error_details))
+
+        return bulk_delete
+
+    def views(self):
+        """Register restore and hard-delete endpoints."""
+        super().views()
+        self._register_restore_view()
+        self._register_hard_delete_view()
+
+    def _register_restore_view(self) -> None:
+        """POST /{pk}/restore — un-delete a soft-deleted record."""
+
+        @self.router.post(
+            f"{self.path_retrieve}/restore",
+            auth=self.patch_view_auth(),
+            summary=f"Restore {self.model_verbose_name}",
+            description=f"Restore a soft-deleted {self.model_verbose_name}.",
+            response={200: self.schema_out, self.error_codes: GenericMessageSchema},
+        )
+        @decorate_view(aatomic, unique_view(self))
+        async def restore(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
+            await self.on_before_operation(request, "restore")
+            _pk = self._get_pk(pk)
+            obj = await self.model_util.get_object(request, _pk)
+            setattr(obj, self.soft_delete_field, False)
+            await obj.asave(update_fields=[self.soft_delete_field])
+            return Status(
+                200,
+                await self.model_util.read_s(self.schema_out, request, obj),
+            )
+
+    def _register_hard_delete_view(self) -> None:
+        """DELETE /{pk}/hard-delete — permanently remove a record."""
+
+        @self.router.delete(
+            f"{self.path_retrieve}/hard-delete",
+            auth=self.delete_view_auth(),
+            summary=f"Hard Delete {self.model_verbose_name}",
+            description=f"Permanently delete a {self.model_verbose_name}.",
+            response={204: None, self.error_codes: GenericMessageSchema},
+        )
+        @decorate_view(aatomic, unique_view(self))
+        async def hard_delete(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
+            await self.on_before_operation(request, "hard_delete")
+            _pk = self._get_pk(pk)
+            await self.model_util.delete_s(request, _pk)
+            return Status(204, None)
