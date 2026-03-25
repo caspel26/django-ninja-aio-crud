@@ -605,3 +605,15 @@ class TestModelWithPartialNinjaAIOMeta(BaseTestModelSerializer):
 
     class NinjaAIOMeta:
         not_found_name = "partial_entity"
+
+
+class SoftDeleteTestModel(BaseTestModel):
+    """Model with soft delete support for testing."""
+
+    is_deleted = models.BooleanField(default=False)
+
+
+class SoftDeleteCustomFieldTestModel(BaseTestModel):
+    """Model with custom soft delete field name."""
+
+    deleted = models.BooleanField(default=False)

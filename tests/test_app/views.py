@@ -410,3 +410,42 @@ class PermissionWithFilterTestAPI(
 
     async def has_permission(self, request, operation):
         return getattr(request, "_allow", True)
+
+
+# ==========================================================
+#                    SOFT DELETE APIS
+# ==========================================================
+
+
+class SoftDeleteTestAPI(mixins.SoftDeleteViewSetMixin, GenericAPIViewSet):
+    """ViewSet with default soft delete (is_deleted field)."""
+
+    model = models.SoftDeleteTestModel
+    schema_in = schema.TestModelSchemaIn
+    schema_out = schema.TestModelSchemaOut
+    schema_update = schema.TestModelSchemaPatch
+    bulk_operations = ["create", "update", "delete"]
+
+
+class SoftDeleteCustomFieldTestAPI(
+    mixins.SoftDeleteViewSetMixin, GenericAPIViewSet
+):
+    """ViewSet with custom soft delete field name."""
+
+    model = models.SoftDeleteCustomFieldTestModel
+    schema_in = schema.TestModelSchemaIn
+    schema_out = schema.TestModelSchemaOut
+    schema_update = schema.TestModelSchemaPatch
+    soft_delete_field = "deleted"
+
+
+class SoftDeleteIncludeDeletedTestAPI(
+    mixins.SoftDeleteViewSetMixin, GenericAPIViewSet
+):
+    """ViewSet that includes soft-deleted records (admin view)."""
+
+    model = models.SoftDeleteTestModel
+    schema_in = schema.TestModelSchemaIn
+    schema_out = schema.TestModelSchemaOut
+    schema_update = schema.TestModelSchemaPatch
+    include_deleted = True
