@@ -1,5 +1,175 @@
 # 📋 Release Notes
 
+## 🏷️ [v2.29.0] - 2026-03-25
+
+---
+
+### ✨ New Features
+
+#### 🗑️ Soft Delete Mixin
+> `ninja_aio/views/mixins.py`
+
+`SoftDeleteViewSetMixin` replaces hard deletes with a boolean flag. Soft-deleted records are automatically excluded from list/retrieve/update. Provides restore and permanent delete endpoints.
+
+```python
+from ninja_aio.views.mixins import SoftDeleteViewSetMixin
+
+class ArticleAPI(SoftDeleteViewSetMixin, APIViewSet):
+    model = Article  # must have is_deleted = BooleanField(default=False)
+    bulk_operations = ["create", "update", "delete"]
+```
+
+**What changes:**
+
+| Endpoint | Without Mixin | With Mixin |
+|---|---|---|
+| `DELETE /{pk}/` | Row removed from DB | Sets `is_deleted=True` |
+| `DELETE /bulk/` | Rows removed from DB | Sets `is_deleted=True` on all |
+| `GET /` (list) | All records | Excludes `is_deleted=True` |
+| `GET /{pk}/` | Any record | 404 if `is_deleted=True` |
+| `PATCH /{pk}/` | Any record | 404 if `is_deleted=True` |
+| `POST /{pk}/restore` | — | ✨ Restores soft-deleted record |
+| `DELETE /{pk}/hard-delete` | — | ✨ Permanently removes record |
+
+**Configuration:**
+
+| Attribute | Type | Default | Description |
+|---|---|---|---|
+| `soft_delete_field` | `str` | `"is_deleted"` | Name of the `BooleanField` on the model |
+| `include_deleted` | `bool` | `False` | `True` for admin views — soft-deleted records are visible |
+
+**Composability:** Works with `PermissionViewSetMixin`, filter mixins, and `@action` endpoints. Put `SoftDeleteViewSetMixin` first in MRO.
+
+**Validation:** Raises `ImproperlyConfigured` at init if the model lacks the configured field.
+
+---
+
+#### 🔍 Multi-Field Search Mixin
+> `ninja_aio/views/mixins.py`
+
+`SearchViewSetMixin` adds a `?search=` query parameter that searches across multiple fields with case-insensitive substring matching (OR logic).
+
+```python
+from ninja_aio.views.mixins import SearchViewSetMixin
+
+class ArticleAPI(SearchViewSetMixin, APIViewSet):
+    model = Article
+    search_fields = ["title", "content", "author__name"]
+    search_param = "q"  # default: "search"
+```
+
+```
+GET /articles/?q=django
+```
+
+Searches `title`, `content`, and `author__name` simultaneously — returns any record where **at least one** field contains "django" (case-insensitive).
+
+**Configuration:**
+
+| Attribute | Type | Default | Description |
+|---|---|---|---|
+| `search_fields` | `list[str]` | `[]` | Fields to search (supports `__` lookups) |
+| `search_param` | `str` | `"search"` | Query parameter name |
+
+**Composability:** Works with all filter mixins — search narrows first, then field-specific filters apply:
+
+```python
+class ArticleAPI(SearchViewSetMixin, IcontainsFilterViewSetMixin, APIViewSet):
+    model = Article
+    search_fields = ["title", "content"]
+    query_params = {"category": (str, None)}
+# GET /articles/?search=django&category=tutorial
+```
+
+---
+
+### 🔧 Improvements
+
+#### ⚡ Performance Optimizations (8 fixes)
+
+**N+1 M2M batch query:**
+> `ninja_aio/helpers/api.py`
+
+M2M validation now resolves all PKs in a single `filter(pk__in=...)` query instead of per-PK queries. With 100 objects to validate: **101 queries → 2 queries**.
+
+**Batch field resolution:**
+> `ninja_aio/models/utils.py`
+
+All field objects resolved in a single `sync_to_async` call instead of N individual thread pool switches per field. With 10 fields: **10 thread switches → 1**.
+
+**COUNT query optimization:**
+> `ninja_aio/views/api.py`
+
+List view count uses `.acount()` directly instead of `.values(pk).acount()` which generated an unnecessary subquery.
+
+**Prefetch without refetch:**
+> `ninja_aio/models/utils.py`
+
+After update, reverse relations are loaded via `aprefetch_related_objects()` directly on the instance instead of refetching the entire object from DB. Eliminates 1 extra query per update.
+
+**Cache key optimization:**
+> `ninja_aio/models/utils.py`
+
+Relation cache keys use `id()` (O(1)) instead of `str()` (O(n)) for class references.
+
+**Cached properties:**
+> `ninja_aio/models/utils.py`
+
+`pk_field_type`, `model_fields`, `model_name`, `model_pk_name` converted from `@property` to `@cached_property` — computed once per `ModelUtil` instance.
+
+**No-copy cache returns:**
+> `ninja_aio/models/utils.py`
+
+Removed 4 redundant `.copy()` calls on cached relation lists. Cache hits now return direct references.
+
+**Direct PK extraction:**
+> `ninja_aio/views/api.py`
+
+`_get_pk()` uses `getattr()` instead of `model_dump()` — direct attribute access instead of full schema serialization on every retrieve/update/delete.
+
+---
+
+#### 📊 Realistic Performance Benchmarks
+> `tests/performance/test_performance.py`
+
+Added `MultiFKPerformanceTest` and `LargeListPerformanceTest` covering:
+
+| Benchmark | Description |
+|---|---|
+| `create_3fk` | Create with 3 FK fields |
+| `bulk_create_50x3fk` | 50 objects × 3 FKs each |
+| `list_1000_page20` | List 1000 records, page size 20 |
+| `list_1000_page100` | List 1000 records, page size 100 |
+
+---
+
+### 📖 Documentation
+
+- 🗑️ **Soft delete tutorial** — new `docs/tutorial/soft_delete.md` with step-by-step guide
+- 🔍 **Search mixin reference** — `SearchViewSetMixin` section in `docs/api/views/mixins.md`
+- 🗑️ **Soft delete mixin reference** — `SoftDeleteViewSetMixin` section in `docs/api/views/mixins.md`
+- ⚡ **Fast test runner** — `run-tests.sh` script (~3s excluding benchmarks), documented in CLAUDE.md
+- 🎨 **CSS animations** — button hover glow, table row highlights, anchor heading flash, page transitions, TOC indicator, nav tab underline
+- 📋 **TODO updated** — 53 tracked tasks with 20 completed
+
+---
+
+### 🎯 Summary
+
+Version 2.29.0 introduces **soft delete** and **multi-field search** mixins alongside **8 performance optimizations** that reduce database queries, eliminate unnecessary serialization overhead, and improve cache efficiency.
+
+**Key benefits:**
+- 🗑️ **Soft delete** — flag-based delete with auto-filtering, restore endpoint, hard delete, bulk support, and admin view mode
+- 🔍 **Multi-field search** — `?search=django` across configurable fields with OR logic, composable with all filter mixins
+- ⚡ **N+1 → batch** — M2M validation uses single batched query instead of per-PK queries
+- ⚡ **Fewer thread switches** — field resolution batched into single `sync_to_async` call
+- ⚡ **No refetch after update** — `aprefetch_related_objects` loads reverse relations in-place
+- ⚡ **O(1) cache keys** — `id()` instead of `str()` for class references
+- ⚡ **Cached properties** — static metadata computed once per ModelUtil instance
+- ✅ **100% coverage** — 913 tests, all passing
+
+---
+
 ## 🏷️ [v2.28.0] - 2026-03-23
 
 ---
