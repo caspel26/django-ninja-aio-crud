@@ -646,7 +646,7 @@ class ModelUtil(Generic[ModelT]):
             Relation attribute names.
         """
         # Check cache first (performance optimization)
-        cache_key = (self.model, str(self.serializer_class), is_for)
+        cache_key = (id(self.model), id(self.serializer_class), is_for)
         cached = self._relation_cache.get(cache_key)
         if cached is not None:
             logger.debug(f"Reverse relations cache hit for {self.model.__name__} (is_for={is_for})")
@@ -696,7 +696,7 @@ class ModelUtil(Generic[ModelT]):
             Relation attribute names.
         """
         # Check cache first (performance optimization)
-        cache_key = (self.model, str(self.serializer_class) + "_select", is_for)
+        cache_key = (id(self.model), id(self.serializer_class), "select", is_for)
         cached = self._relation_cache.get(cache_key)
         if cached is not None:
             logger.debug(f"Select related cache hit for {self.model.__name__} (is_for={is_for})")
