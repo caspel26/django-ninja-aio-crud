@@ -617,3 +617,29 @@ class SoftDeleteCustomFieldTestModel(BaseTestModel):
     """Model with custom soft delete field name."""
 
     deleted = models.BooleanField(default=False)
+
+
+# ==========================================================
+#               MULTI-FK MODELS (for benchmarks)
+# ==========================================================
+
+
+class PerfCategory(models.Model):
+    name = models.CharField(max_length=255)
+
+
+class PerfPublisher(models.Model):
+    name = models.CharField(max_length=255)
+
+
+class PerfAuthor(models.Model):
+    name = models.CharField(max_length=255)
+
+
+class PerfArticle(models.Model):
+    """Model with 3 FK relations for benchmarking batch FK resolution."""
+
+    title = models.CharField(max_length=255)
+    author = models.ForeignKey(PerfAuthor, on_delete=models.CASCADE)
+    category = models.ForeignKey(PerfCategory, on_delete=models.CASCADE)
+    publisher = models.ForeignKey(PerfPublisher, on_delete=models.CASCADE)

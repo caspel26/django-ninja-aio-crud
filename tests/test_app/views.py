@@ -449,3 +449,18 @@ class SoftDeleteIncludeDeletedTestAPI(
     schema_out = schema.TestModelSchemaOut
     schema_update = schema.TestModelSchemaPatch
     include_deleted = True
+
+
+# ==========================================================
+#              PERFORMANCE BENCHMARK APIS
+# ==========================================================
+
+
+class PerfArticleAPI(GenericAPIViewSet):
+    """ViewSet with 3 FK relations for benchmarking."""
+
+    model = models.PerfArticle
+    schema_in = schema.PerfArticleSchemaIn
+    schema_out = schema.PerfArticleSchemaOut
+    schema_update = schema.PerfArticleSchemaPatch
+    bulk_operations = ["create", "update", "delete"]
