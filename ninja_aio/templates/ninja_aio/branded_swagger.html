@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">
+    {% if api.branding.favicon_url %}
+    <link rel="icon" href="{{ api.branding.favicon_url }}">
+    {% else %}
+    <link rel="icon" href="https://django-ninja.dev/img/favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="https://django-ninja.dev/img/favicon.png" type="image/png">
+    {% endif %}
+    {% if api.branding.custom_css_url %}
+    <link type="text/css" rel="stylesheet" href="{{ api.branding.custom_css_url }}">
+    {% endif %}
+    <title>{{ api.title }}</title>
+    <style>
+        {% if api.branding.primary_color %}
+        .swagger-ui .topbar { background-color: {{ api.branding.primary_color }}; }
+        .swagger-ui .btn.authorize { border-color: {{ api.branding.primary_color }}; color: {{ api.branding.primary_color }}; }
+        .swagger-ui .btn.authorize svg { fill: {{ api.branding.primary_color }}; }
+        .swagger-ui .opblock.opblock-post .opblock-summary-method { background: {{ api.branding.primary_color }}; }
+        .swagger-ui .scheme-container { background: {{ api.branding.primary_color }}10; }
+        {% endif %}
+        {% if api.branding.logo_url %}
+        .swagger-ui .topbar-wrapper a {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .swagger-ui .topbar-wrapper a span { display: none; }
+        .swagger-ui .topbar-wrapper a::before {
+            content: '';
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            background: url('{{ api.branding.logo_url }}') no-repeat center;
+            background-size: contain;
+        }
+        .swagger-ui .topbar-wrapper a::after {
+            content: '{{ api.title }}';
+            font-size: 1.2em;
+            font-weight: 700;
+            color: #fff;
+        }
+        {% endif %}
+        {% if api.branding.custom_css %}
+        {{ api.branding.custom_css | safe }}
+        {% endif %}
+    </style>
+</head>
+<body>
+    <div id="swagger-ui"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+    <script type="application/json" id="swagger-settings">
+        {{ swagger_settings | safe }}
+    </script>
+    <script>
+        const configJson = document.getElementById("swagger-settings").textContent;
+        const configObject = JSON.parse(configJson);
+
+        configObject.dom_id = "#swagger-ui";
+        configObject.presets = [
+            SwaggerUIBundle.presets.apis,
+            SwaggerUIBundle.SwaggerUIStandalonePreset
+        ];
+    {% if add_csrf %}
+        configObject.requestInterceptor = (req) => {
+            req.headers['X-CSRFToken'] = "{{csrf_token}}";
+            return req;
+        };
+    {% endif %}
+
+        const ui = SwaggerUIBundle(configObject);
+    </script>
+</body>
+</html>
