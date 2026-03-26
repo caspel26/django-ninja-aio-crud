@@ -95,6 +95,18 @@ def on_update(_func_or_field: Callable | str | None = None, *extra_fields: str) 
     return decorator
 
 
+def _classify_hook(hooks: dict[str, Any], name: str, meta: _HookMeta) -> None:
+    """Add a single hook method to the appropriate bucket."""
+    if meta.event in ("create", "delete"):
+        hooks[meta.event].append(name)
+    elif meta.event == "update":
+        if meta.fields:
+            for field in meta.fields:
+                hooks["update_field"].setdefault(field, []).append(name)
+        else:
+            hooks["update_any"].append(name)
+
+
 def collect_reactive_hooks(cls: type) -> dict[str, Any]:
     """Scan a class for reactive hook decorators.
 
@@ -111,7 +123,7 @@ def collect_reactive_hooks(cls: type) -> dict[str, Any]:
     class's own methods, then parent classes in MRO order.
     """
     hooks = {"create": [], "update_any": [], "update_field": {}, "delete": []}
-    seen = set()
+    seen: set[str] = set()
 
     for klass in reversed(cls.__mro__):
         for name, method in vars(klass).items():
@@ -121,17 +133,7 @@ def collect_reactive_hooks(cls: type) -> dict[str, Any]:
             if meta is None:
                 continue
             seen.add(name)
-
-            if meta.event == "create":
-                hooks["create"].append(name)
-            elif meta.event == "delete":
-                hooks["delete"].append(name)
-            elif meta.event == "update":
-                if meta.fields:
-                    for field in meta.fields:
-                        hooks["update_field"].setdefault(field, []).append(name)
-                else:
-                    hooks["update_any"].append(name)
+            _classify_hook(hooks, name, meta)
 
     return hooks
 
