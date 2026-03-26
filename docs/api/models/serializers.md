@@ -238,6 +238,41 @@ class ArticleSerializer(serializers.Serializer):
 !!! note
     The sync hooks (`before_save`, `after_save`, `on_create_before_save`, `on_create_after_save`) are automatically wrapped with `sync_to_async` when called from the async `save()` method, so they are safe to use in async contexts without any changes.
 
+### :material-lightning-bolt: Reactive Hooks
+
+Declarative async hooks on the Serializer class. Unlike sync hooks, reactive hooks receive the `instance` as a parameter and support field-level triggers.
+
+```python
+from ninja_aio.models.serializers import Serializer, SchemaModelConfig
+from ninja_aio.models import on_create, on_update, on_delete
+
+class ArticleSerializer(Serializer):
+    class Meta:
+        model = Article
+        schema_in = SchemaModelConfig(fields=["title", "status"])
+        schema_out = SchemaModelConfig(fields=["id", "title", "status"])
+        schema_update = SchemaModelConfig(optionals=[("title", str), ("status", str)])
+
+    @on_create
+    async def notify_author(self, instance):
+        await send_email(instance.author.email, "Article created")
+
+    @on_update("status")
+    async def handle_publish(self, instance):
+        if instance.status == "published":
+            await invalidate_cache(f"article:{instance.pk}")
+
+    @on_delete
+    async def cleanup(self, instance):
+        await delete_s3_images(instance.pk)
+```
+
+!!! info "Difference from ModelSerializer"
+    On Serializer, hooks always receive `instance` as the first argument since the serializer is not the model itself.
+
+!!! note "Signal-based hooks"
+    Unlike ModelSerializer, Serializer reactive hooks only fire via the API path (not from admin/shell). This is because Django signals are connected to the model class, not to the serializer. For admin/shell, use the sync lifecycle hooks (`before_save`, `after_save`, `on_delete`).
+
 ---
 
 ## :material-arrow-left-right: Example: Reverse Relation with Nested Serialization

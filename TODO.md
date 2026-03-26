@@ -29,6 +29,7 @@
 | 19 | ~~Performance: no .copy() on cache~~ | `models/utils.py` | v2.29.0 | Removed redundant list copies on cache hit/miss. |
 | 20 | ~~Performance: getattr vs model_dump~~ | `views/api.py` | v2.29.0 | `_get_pk` uses direct attribute access instead of full schema serialization. |
 | 21 | ~~Multi-field search~~ | `views/mixins.py` | v2.29.0 | `SearchViewSetMixin` — `?search=` across configurable fields with OR logic, composable with all filter mixins. |
+| 22 | ~~Reactive model hooks~~ | `models/hooks.py`, `models/serializers.py`, `models/utils.py` | v2.30.0 | `@on_create`, `@on_update("status")`, `@on_delete` on ModelSerializer AND Serializer. Field-level triggers, async/sync support, zero extra DB queries for change detection. |
 
 ---
 
@@ -36,17 +37,16 @@
 
 | # | Task | File(s) | Description |
 |---|------|---------|-------------|
-| 21 | `@on` detail action shorthand | `decorators/actions.py` | `@on("publish", detail=True)` — pre-fetches object, runs hooks, you write only the logic. Wrapper over `@action` with zero boilerplate. |
-| 22 | Reactive model hooks | `models/serializers.py`, `models/` | `@on_create`, `@on_update("status")`, `@on_delete` decorators on ModelSerializer AND Serializer. Field-level triggers (`@on_update("status")` fires only when `status` changes). Works from API, admin, shell. |
-| 23 | Multi-tenancy mixin | `views/mixins.py` | `TenantViewSetMixin` — auto tenant filtering on all queries from header or JWT claim. |
-| 24 | Aggregation endpoints | `views/mixins.py` | `AggregationViewSetMixin` — COUNT, SUM, AVG, MIN, MAX on list views for dashboards. |
-| 25 | Field selection | `views/api.py` | `?fields=id,name,email` — select only needed fields in response. Reduces payload, improves performance. |
-| 26 | Nested writes | `models/utils.py`, `views/api.py` | Create parent + children in one atomic request. `POST /order` with `{"items": [...]}`. |
-| 27 | File upload mixin | `views/mixins.py` | `FileUploadViewSetMixin` — `POST /{pk}/upload` with `multipart/form-data`, configurable storage (local, S3). |
-| 28 | Auto admin inlines | `admin.py` | Extend `@register_admin` to auto-generate `InlineModelAdmin` for FK/M2M relations. |
-| 29 | Admin actions from ViewSet | `admin.py` | `@action` endpoints become available as Django Admin actions. `@action("publish")` → admin "Publish selected" action. |
-| 30 | ETag / Conditional requests | `views/api.py` | HTTP caching with `ETag`, `If-None-Match`, `If-Modified-Since` on retrieve/list. |
-| 31 | Deadlock retry in `aatomic` | `decorators/views.py` | Configurable exponential backoff with deadlock detection. |
+| 23 | `@on` detail action shorthand | `decorators/actions.py` | `@on("publish", detail=True)` — pre-fetches object, runs hooks, you write only the logic. Wrapper over `@action` with zero boilerplate. |
+| 24 | Multi-tenancy mixin | `views/mixins.py` | `TenantViewSetMixin` — auto tenant filtering on all queries from header or JWT claim. |
+| 25 | Aggregation endpoints | `views/mixins.py` | `AggregationViewSetMixin` — COUNT, SUM, AVG, MIN, MAX on list views for dashboards. |
+| 26 | Field selection | `views/api.py` | `?fields=id,name,email` — select only needed fields in response. Reduces payload, improves performance. |
+| 27 | Nested writes | `models/utils.py`, `views/api.py` | Create parent + children in one atomic request. `POST /order` with `{"items": [...]}`. |
+| 28 | File upload mixin | `views/mixins.py` | `FileUploadViewSetMixin` — `POST /{pk}/upload` with `multipart/form-data`, configurable storage (local, S3). |
+| 29 | Auto admin inlines | `admin.py` | Extend `@register_admin` to auto-generate `InlineModelAdmin` for FK/M2M relations. |
+| 30 | Admin actions from ViewSet | `admin.py` | `@action` endpoints become available as Django Admin actions. `@action("publish")` → admin "Publish selected" action. |
+| 31 | ETag / Conditional requests | `views/api.py` | HTTP caching with `ETag`, `If-None-Match`, `If-Modified-Since` on retrieve/list. |
+| 32 | Deadlock retry in `aatomic` | `decorators/views.py` | Configurable exponential backoff with deadlock detection. |
 
 ---
 
@@ -54,23 +54,23 @@
 
 | # | Task | File(s) | Description |
 |---|------|---------|-------------|
-| 32 | Idempotency keys | `decorators/`, `views/api.py` | `Idempotency-Key` header on POST — cache response, return cached on retry. Prevents double-creation for payments/orders. |
-| 33 | NinjaAIO theme/branding | `api.py` | Custom logo, colors, title on Swagger UI via `NinjaAIO(logo_url=..., theme_color=...)`. |
-| 34 | API Explorer in Django Admin | `admin.py`, `templates/` | Embedded API tester in admin panel — browse endpoints, send requests, see responses. Swagger-like but inside admin. |
-| 35 | Admin validator sync | `admin.py`, `forms.py` | Admin forms auto-use `CreateSerializer`/`UpdateSerializer` Pydantic validators. Single source of truth for validation. |
-| 36 | Admin audit log | `admin.py`, `models/` | Unified audit log for API + admin actions. Same table, same format — who changed what, from where. |
-| 37 | Admin dashboard widget | `admin.py`, `templates/` | Home widget showing model counts, recent changes, API stats. Zero config. |
-| 38 | Field-level read permissions | `models/serializers.py` | Show/hide fields in ReadSerializer based on user role. |
-| 39 | Optimistic locking | `models/utils.py` | Version field for concurrency control on updates. |
-| 40 | Bulk M2M set replacement | `helpers/api.py` | "Replace entire set" operation alongside add/remove on M2M endpoints. |
-| 41 | Nested resource routing | `views/api.py`, `helpers/` | `/authors/{id}/books/` with full CRUD on sub-resources. |
-| 42 | Export mixin | `views/mixins.py` | `ExportViewSetMixin` — CSV/JSON export of filtered querysets. |
-| 43 | Audit trail mixin | `views/mixins.py` | Auto-log create/update/delete to audit table with `created_by`, `changed_fields`, `timestamp`. |
-| 44 | Draft/Publish pattern | `views/mixins.py` | `DraftPublishViewSetMixin` — draft/published state management. |
-| 45 | Webhook mixin | `views/mixins.py` | Async HTTP POST to configured URLs on CRUD events with retry. |
-| 46 | Nested validation error paths | `exceptions.py` | Full field paths for nested object validation failures. |
-| 47 | Auto-form generation | `forms.py` (new) | Generate Django Forms from `schema_in` — server-side rendering with HTMX/Alpine.js. Template tag `{% ninja_form "articles" "create" %}`. |
-| 48 | Response compression | `api.py`, `middleware/` | Auto GZip/Brotli for large responses. Configurable threshold. |
+| 33 | Idempotency keys | `decorators/`, `views/api.py` | `Idempotency-Key` header on POST — cache response, return cached on retry. Prevents double-creation for payments/orders. |
+| 34 | NinjaAIO theme/branding | `api.py` | Custom logo, colors, title on Swagger UI via `NinjaAIO(logo_url=..., theme_color=...)`. |
+| 35 | API Explorer in Django Admin | `admin.py`, `templates/` | Embedded API tester in admin panel — browse endpoints, send requests, see responses. Swagger-like but inside admin. |
+| 36 | Admin validator sync | `admin.py`, `forms.py` | Admin forms auto-use `CreateSerializer`/`UpdateSerializer` Pydantic validators. Single source of truth for validation. |
+| 37 | Admin audit log | `admin.py`, `models/` | Unified audit log for API + admin actions. Same table, same format — who changed what, from where. |
+| 38 | Admin dashboard widget | `admin.py`, `templates/` | Home widget showing model counts, recent changes, API stats. Zero config. |
+| 39 | Field-level read permissions | `models/serializers.py` | Show/hide fields in ReadSerializer based on user role. |
+| 40 | Optimistic locking | `models/utils.py` | Version field for concurrency control on updates. |
+| 41 | Bulk M2M set replacement | `helpers/api.py` | "Replace entire set" operation alongside add/remove on M2M endpoints. |
+| 42 | Nested resource routing | `views/api.py`, `helpers/` | `/authors/{id}/books/` with full CRUD on sub-resources. |
+| 43 | Export mixin | `views/mixins.py` | `ExportViewSetMixin` — CSV/JSON export of filtered querysets. |
+| 44 | Audit trail mixin | `views/mixins.py` | Auto-log create/update/delete to audit table with `created_by`, `changed_fields`, `timestamp`. |
+| 45 | Draft/Publish pattern | `views/mixins.py` | `DraftPublishViewSetMixin` — draft/published state management. |
+| 46 | Webhook mixin | `views/mixins.py` | Async HTTP POST to configured URLs on CRUD events with retry. |
+| 47 | Nested validation error paths | `exceptions.py` | Full field paths for nested object validation failures. |
+| 48 | Auto-form generation | `forms.py` (new) | Generate Django Forms from `schema_in` — server-side rendering with HTMX/Alpine.js. Template tag `{% ninja_form "articles" "create" %}`. |
+| 49 | Response compression | `api.py`, `middleware/` | Auto GZip/Brotli for large responses. Configurable threshold. |
 
 ---
 
@@ -78,9 +78,9 @@
 
 | # | Task | Description |
 |---|------|-------------|
-| 49 | Metrics / instrumentation hooks | Optional hook points for Prometheus, StatsD — operation counts, latencies. |
-| 50 | Read operation caching | `@cache_query` decorator with configurable TTL and invalidation. |
-| 51 | Batch transaction endpoint | `POST /batch` executing multiple CRUD operations in a single atomic transaction. |
-| 52 | Rate limiting per-viewset | Granular throttling per endpoint beyond global NinjaAIO throttling. |
-| 53 | Health check endpoint | Auto-generated `/health` with DB connectivity check. |
-| 54 | Async savepoint management | Expose savepoints in `AsyncAtomicContextManager`. |
+| 50 | Metrics / instrumentation hooks | Optional hook points for Prometheus, StatsD — operation counts, latencies. |
+| 51 | Read operation caching | `@cache_query` decorator with configurable TTL and invalidation. |
+| 52 | Batch transaction endpoint | `POST /batch` executing multiple CRUD operations in a single atomic transaction. |
+| 53 | Rate limiting per-viewset | Granular throttling per endpoint beyond global NinjaAIO throttling. |
+| 54 | Health check endpoint | Auto-generated `/health` with DB connectivity check. |
+| 55 | Async savepoint management | Expose savepoints in `AsyncAtomicContextManager`. |

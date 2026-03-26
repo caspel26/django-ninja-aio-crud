@@ -1050,17 +1050,25 @@ class ModelUtil(Generic[ModelT]):
         ModelT
             The created model instance.
         """
+        from ninja_aio.models.hooks import execute_reactive_hooks, _api_hooks_active
+
         logger.info(f"Creating {self.model.__name__}")
         payload, customs = await self.parse_input_data(request, data)
-        # Create object and keep the full instance (FK instances already attached from parse_input_data)
-        obj = (
-            await self.model.objects.acreate(**payload)
-            if not self.with_serializer
-            else await self.serializer.create(payload)
-        )
+        token = _api_hooks_active.set(True)
+        try:
+            obj = (
+                await self.model.objects.acreate(**payload)
+                if not self.with_serializer
+                else await self.serializer.create(payload)
+            )
+        finally:
+            _api_hooks_active.reset(token)
         logger.debug(f"Created {self.model.__name__} (pk={obj.pk})")
         if isinstance(self.model, ModelSerializerMeta):
             await asyncio.gather(obj.custom_actions(customs), obj.post_create())
+            hooks = getattr(self.model, "_reactive_hooks", None)
+            if hooks and hooks["create"]:
+                await execute_reactive_hooks(obj, hooks["create"])
         if self.with_serializer:
             await asyncio.gather(
                 self.serializer.custom_actions(customs, obj),
@@ -1276,21 +1284,44 @@ class ModelUtil(Generic[ModelT]):
         ModelT
             The updated model instance.
         """
+        from ninja_aio.models.hooks import (
+            detect_changed_fields, fire_update_hooks, _api_hooks_active,
+        )
+
         logger.info(f"Updating {self.model.__name__} (pk={pk})")
         obj = await self.get_object(request, pk, is_for="read")
         payload, customs = await self.parse_input_data(request, data)
         if require_fields and not payload and not customs:
             raise SerializeError("No fields provided for update.")
+
+        # Snapshot changed fields BEFORE applying new values
+        hooks = getattr(self.model, "_reactive_hooks", None)
+        changed_fields = (
+            detect_changed_fields(obj, payload, hooks.get("update_field", {}))
+            if hooks
+            else set()
+        )
+
         for k, v in payload.items():
             if v is not None:
                 setattr(obj, k, v)
-        if isinstance(self.model, ModelSerializerMeta):
-            await obj.custom_actions(customs)
-        if self.with_serializer:
-            await self.serializer.custom_actions(customs, obj)
-            await self.serializer.save(obj)
-        else:
-            await obj.asave()
+
+        token = _api_hooks_active.set(True)
+        try:
+            if isinstance(self.model, ModelSerializerMeta):
+                await obj.custom_actions(customs)
+            if self.with_serializer:
+                await self.serializer.custom_actions(customs, obj)
+                await self.serializer.save(obj)
+            else:
+                await obj.asave()
+        finally:
+            _api_hooks_active.reset(token)
+
+        # Fire @on_update reactive hooks (ModelSerializer only — Serializer handled in save())
+        if isinstance(self.model, ModelSerializerMeta) and hooks:
+            await fire_update_hooks(obj, changed_fields, hooks)
+
         logger.debug(f"Updated {self.model.__name__} (pk={pk})")
         return obj
 
@@ -1344,10 +1375,27 @@ class ModelUtil(Generic[ModelT]):
         -------
         None
         """
+        from ninja_aio.models.hooks import execute_reactive_hooks, _api_hooks_active
+
         logger.info(f"Deleting {self.model.__name__} (pk={pk})")
         obj = await self.get_object(request, pk)
-        await obj.adelete()
+        token = _api_hooks_active.set(True)
+        try:
+            await obj.adelete()
+        finally:
+            _api_hooks_active.reset(token)
         logger.debug(f"Deleted {self.model.__name__} (pk={pk})")
+
+        # Fire @on_delete reactive hooks
+        if isinstance(self.model, ModelSerializerMeta):
+            hooks = getattr(self.model, "_reactive_hooks", None)
+            if hooks and hooks["delete"]:
+                await execute_reactive_hooks(obj, hooks["delete"])
+        if self.with_serializer:
+            hooks = getattr(self.serializer_class, "_reactive_hooks", None)
+            if hooks and hooks["delete"]:
+                await execute_reactive_hooks(self.serializer, hooks["delete"], obj)
+
         return None
 
     @staticmethod
