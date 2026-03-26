@@ -36,6 +36,7 @@ Usage on Serializer (receives instance as parameter)::
 
 import asyncio
 import logging
+from contextlib import asynccontextmanager
 from contextvars import ContextVar
 
 from asgiref.sync import sync_to_async, async_to_sync
@@ -238,6 +239,31 @@ def _execute_hooks_sync(target, hook_names: list[str], instance=None):
 
 # When True, signal handlers skip execution (API path fires hooks directly)
 _api_hooks_active: ContextVar[bool] = ContextVar("_api_hooks_active", default=False)
+
+
+@asynccontextmanager
+async def suppress_signals():
+    """Suppress reactive hook signals during API operations.
+
+    Prevents double-firing: the async API path fires hooks directly
+    with full context (field-change detection), so Django signals
+    should be skipped.
+    """
+    token = _api_hooks_active.set(True)
+    try:
+        yield
+    finally:
+        _api_hooks_active.reset(token)
+
+
+def get_hooks(model_or_serializer) -> dict | None:
+    """Get reactive hooks dict from a model or serializer class, or None."""
+    hooks = getattr(model_or_serializer, "_reactive_hooks", None)
+    if not hooks:
+        return None
+    if hooks["create"] or hooks["update_any"] or hooks["update_field"] or hooks["delete"]:
+        return hooks
+    return None
 
 
 def _on_post_save(sender, instance, created, **kwargs):
