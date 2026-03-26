@@ -1423,10 +1423,12 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
         super().__init_subclass__(**kwargs)
         from ninja_aio.models.utils import ModelUtil
         from ninja_aio.helpers.query import QueryUtil
+        from ninja_aio.models.hooks import collect_reactive_hooks, register_signals
 
-        # Bind a ModelUtil instance to the subclass for convenient access
         cls.util = ModelUtil(cls)
         cls.query_util = QueryUtil(cls)
+        cls._reactive_hooks = collect_reactive_hooks(cls)
+        register_signals(cls)
 
     @classmethod
     def as_admin(cls, **overrides) -> type:
@@ -1899,11 +1901,13 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         super().__init_subclass__(**kwargs)
         from ninja_aio.models.utils import ModelUtil
         from ninja_aio.helpers.query import QueryUtil
+        from ninja_aio.models.hooks import collect_reactive_hooks
 
         cls.model = cls._get_model()
         cls.util = ModelUtil(cls.model, serializer_class=cls)
         cls.query_util = QueryUtil(cls)
         cls._meta = cls.Meta
+        cls._reactive_hooks = collect_reactive_hooks(cls)
 
     class Meta:
         model: Optional[type[ModelT]] = None
@@ -2299,8 +2303,19 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         ModelT
             The saved model instance.
         """
+        from ninja_aio.models.hooks import execute_reactive_hooks, fire_update_hooks
+
         instance = self._resolve_instance(instance)
         creation = instance._state.adding
+        hooks = getattr(self.__class__, "_reactive_hooks", None)
+
+        # Snapshot which watched fields changed BEFORE save
+        changed_fields = set()
+        if not creation and hooks:
+            for field in hooks.get("update_field", {}):
+                if await self.ahas_changed(field, instance):
+                    changed_fields.add(field)
+
         if creation:
             await sync_to_async(self.on_create_before_save)(instance)
         await sync_to_async(self.before_save)(instance)
@@ -2308,6 +2323,14 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         if creation:
             await sync_to_async(self.on_create_after_save)(instance)
         await sync_to_async(self.after_save)(instance)
+
+        # Fire reactive hooks
+        if hooks:
+            if creation:
+                await execute_reactive_hooks(self, hooks.get("create", []), instance)
+            else:
+                await fire_update_hooks(self, changed_fields, hooks, instance)
+
         return instance
 
     async def create(self, payload: dict[str, Any] | Schema) -> ModelT:
