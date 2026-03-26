@@ -90,7 +90,7 @@ from ninja_aio.decorators import action
 - Actions survive `disable=["all"]` — always registered
 - Multiple methods create separate routes: `methods=["get", "post"]`
 
-See [APIViewSet @action](api_view_set.md#action-decorator) for full parameter reference.
+See [APIViewSet @action](api_view_set.md#recommended-action-decorator) for full parameter reference.
 
 ---
 
