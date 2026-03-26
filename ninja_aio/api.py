@@ -11,6 +11,7 @@ from .parsers import ORJSONParser
 from .renders import ORJSONRenderer
 from .exceptions import set_api_exception_handlers
 from .views import APIView, APIViewSet
+from .docs import Branding, BrandedSwagger
 
 # TypeVar for generic typing in decorators
 ModelT = TypeVar("ModelT", bound=models.Model)
@@ -18,13 +19,15 @@ ViewSetT = TypeVar("ViewSetT", bound=APIViewSet)
 
 
 class NinjaAIO(NinjaAPI):
+    branding: Branding
+
     def __init__(
         self,
         title: str = "NinjaAPI",
         version: str = "1.0.0",
         description: str = "",
         openapi_url: str | None = "/openapi.json",
-        docs: DocsBase = Swagger(),
+        docs: DocsBase | None = None,
         docs_url: str | None = "/docs",
         docs_decorator=None,
         servers: list[dict[str, Any]] | None = None,
@@ -33,7 +36,11 @@ class NinjaAIO(NinjaAPI):
         throttle: BaseThrottle | list[BaseThrottle] | NOT_SET_TYPE = NOT_SET,
         default_router: Router | None = None,
         openapi_extra: dict[str, Any] | None = None,
+        branding: Branding | None = None,
     ):
+        self.branding = branding or Branding()
+        if docs is None:
+            docs = BrandedSwagger() if branding else Swagger()
         super().__init__(
             title=title,
             version=version,
