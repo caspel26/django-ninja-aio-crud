@@ -30,6 +30,7 @@
 | 20 | ~~Performance: getattr vs model_dump~~ | `views/api.py` | v2.29.0 | `_get_pk` uses direct attribute access instead of full schema serialization. |
 | 21 | ~~Multi-field search~~ | `views/mixins.py` | v2.29.0 | `SearchViewSetMixin` — `?search=` across configurable fields with OR logic, composable with all filter mixins. |
 | 22 | ~~Reactive model hooks~~ | `models/hooks.py`, `models/serializers.py`, `models/utils.py` | v2.30.0 | `@on_create`, `@on_update("status")`, `@on_delete` on ModelSerializer AND Serializer. Field-level triggers, async/sync support, zero extra DB queries for change detection. |
+| 23 | ~~`@on` detail action shorthand~~ | `decorators/actions.py`, `views/api.py` | v2.30.0 | `@on("publish")` — auto object fetch + both hooks. Handler receives `(request, obj)` instead of `(request, pk)`. |
 
 ---
 
@@ -37,7 +38,6 @@
 
 | # | Task | File(s) | Description |
 |---|------|---------|-------------|
-| 23 | `@on` detail action shorthand | `decorators/actions.py` | `@on("publish", detail=True)` — pre-fetches object, runs hooks, you write only the logic. Wrapper over `@action` with zero boilerplate. |
 | 24 | Multi-tenancy mixin | `views/mixins.py` | `TenantViewSetMixin` — auto tenant filtering on all queries from header or JWT claim. |
 | 25 | Aggregation endpoints | `views/mixins.py` | `AggregationViewSetMixin` — COUNT, SUM, AVG, MIN, MAX on list views for dashboards. |
 | 26 | Field selection | `views/api.py` | `?fields=id,name,email` — select only needed fields in response. Reduces payload, improves performance. |
