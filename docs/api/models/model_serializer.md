@@ -899,6 +899,141 @@ class User(ModelSerializer):
 
 ---
 
+## :material-lightning-bolt: Reactive Hooks
+
+Declarative async hooks that fire automatically during CRUD operations. Unlike sync lifecycle hooks (which run inside `save()`), reactive hooks run in the async context after the operation completes.
+
+### `@on_create`
+
+Fires after a new instance is created via the API.
+
+```python
+from ninja_aio.models import ModelSerializer, on_create
+
+class Article(ModelSerializer):
+    title = models.CharField(max_length=255)
+
+    @on_create
+    async def notify_author(self):
+        await send_email(self.author.email, f"Article '{self.title}' created")
+```
+
+### `@on_update` and `@on_update("field")`
+
+Fires after an instance is updated. The field-level variant only fires when the specified field **actually changes**.
+
+```python
+from ninja_aio.models import on_update
+
+class Article(ModelSerializer):
+    status = models.CharField(max_length=20, default="draft")
+
+    @on_update("status")  # fires ONLY when status changes
+    async def handle_publish(self):
+        if self.status == "published":
+            await invalidate_cache(f"article:{self.pk}")
+
+    @on_update  # fires on ANY update
+    async def log_change(self):
+        logger.info(f"Article {self.pk} updated")
+```
+
+Multiple fields can be watched:
+
+```python
+    @on_update("status", "priority")  # fires when either changes
+    async def handle_status_or_priority(self):
+        ...
+```
+
+!!! info "Field change detection"
+    Field changes are detected by comparing the attribute value on the loaded object with the new value from the request payload — **zero extra DB queries**.
+
+### `@on_delete`
+
+Fires after an instance is deleted via the API.
+
+```python
+from ninja_aio.models import on_delete
+
+class Article(ModelSerializer):
+    @on_delete
+    async def cleanup(self):
+        await delete_s3_images(self.pk)
+```
+
+### Execution Order
+
+Reactive hooks fire **after** sync lifecycle hooks:
+
+```
+CREATE:
+1. on_create_before_save()   ← sync hook
+2. before_save()             ← sync hook
+3. super().save()
+4. on_create_after_save()    ← sync hook
+5. after_save()              ← sync hook
+6. custom_actions()
+7. post_create()
+8. @on_create                ← reactive hook (async)
+
+UPDATE:
+1. before_save()             ← sync hook
+2. super().save()
+3. after_save()              ← sync hook
+4. @on_update("field")       ← reactive hook (async, field-specific)
+5. @on_update                ← reactive hook (async, generic)
+
+DELETE:
+1. on_delete()               ← sync hook
+2. adelete()
+3. @on_delete                ← reactive hook (async)
+```
+
+### Sync and Async Support
+
+Both sync and async functions are supported. Sync hooks are automatically wrapped in `sync_to_async`:
+
+```python
+class Article(ModelSerializer):
+    @on_create
+    def sync_hook(self):  # sync — wrapped automatically
+        logger.info(f"Created {self.pk}")
+
+    @on_create
+    async def async_hook(self):  # async — called directly
+        await notify(self.pk)
+```
+
+### Works Everywhere — API, Admin, Shell
+
+Reactive hooks fire via **two paths** to ensure they work everywhere:
+
+| Path | When | Field-level `@on_update("field")` |
+|---|---|---|
+| **API** (async) | `_create_instance`, `_update_instance`, `delete_s` | Full support — compares old vs new values |
+| **Django signals** (sync) | `obj.save()`, `obj.delete()` from admin/shell | Only `@on_update` (generic) — signals don't provide old values |
+
+A `ContextVar` prevents double-firing: when the API path is active, Django signals are skipped.
+
+!!! note "Field-level detection limitation"
+    `@on_update("status")` only fires via the API path, because Django's `post_save` signal doesn't provide the previous field values. From shell/admin, only `@on_update` (generic, no field specified) will fire.
+
+```
+# Via API:
+PATCH /articles/1 {"status": "published"}
+→ @on_update("status") fires ✅
+→ @on_update fires ✅
+
+# Via shell:
+obj.status = "published"
+obj.save()
+→ @on_update("status") does NOT fire ❌ (no old value available)
+→ @on_update fires ✅
+```
+
+---
+
 ## :material-wrench: Utility Methods
 
 ### `has_changed(field)`
