@@ -30,6 +30,7 @@
 | 20 | ~~Performance: getattr vs model_dump~~ | `views/api.py` | v2.29.0 | `_get_pk` uses direct attribute access instead of full schema serialization. |
 | 21 | ~~Multi-field search~~ | `views/mixins.py` | v2.29.0 | `SearchViewSetMixin` — `?search=` across configurable fields with OR logic, composable with all filter mixins. |
 | 22 | ~~Reactive model hooks~~ | `models/hooks.py`, `models/serializers.py`, `models/utils.py` | v2.30.0 | `@on_create`, `@on_update("status")`, `@on_delete` on ModelSerializer AND Serializer. Field-level triggers, async/sync support, zero extra DB queries for change detection. |
+| 23 | ~~Swagger UI branding~~ | `docs.py`, `api.py`, `templates/` | v2.30.0 | `Branding` dataclass with `logo_url`, `primary_color`, `favicon_url`, `custom_css`. Auto-activates `BrandedSwagger` template. |
 
 ---
 
@@ -55,22 +56,21 @@
 | # | Task | File(s) | Description |
 |---|------|---------|-------------|
 | 33 | Idempotency keys | `decorators/`, `views/api.py` | `Idempotency-Key` header on POST — cache response, return cached on retry. Prevents double-creation for payments/orders. |
-| 34 | NinjaAIO theme/branding | `api.py` | Custom logo, colors, title on Swagger UI via `NinjaAIO(logo_url=..., theme_color=...)`. |
-| 35 | API Explorer in Django Admin | `admin.py`, `templates/` | Embedded API tester in admin panel — browse endpoints, send requests, see responses. Swagger-like but inside admin. |
-| 36 | Admin validator sync | `admin.py`, `forms.py` | Admin forms auto-use `CreateSerializer`/`UpdateSerializer` Pydantic validators. Single source of truth for validation. |
-| 37 | Admin audit log | `admin.py`, `models/` | Unified audit log for API + admin actions. Same table, same format — who changed what, from where. |
-| 38 | Admin dashboard widget | `admin.py`, `templates/` | Home widget showing model counts, recent changes, API stats. Zero config. |
-| 39 | Field-level read permissions | `models/serializers.py` | Show/hide fields in ReadSerializer based on user role. |
-| 40 | Optimistic locking | `models/utils.py` | Version field for concurrency control on updates. |
-| 41 | Bulk M2M set replacement | `helpers/api.py` | "Replace entire set" operation alongside add/remove on M2M endpoints. |
-| 42 | Nested resource routing | `views/api.py`, `helpers/` | `/authors/{id}/books/` with full CRUD on sub-resources. |
-| 43 | Export mixin | `views/mixins.py` | `ExportViewSetMixin` — CSV/JSON export of filtered querysets. |
-| 44 | Audit trail mixin | `views/mixins.py` | Auto-log create/update/delete to audit table with `created_by`, `changed_fields`, `timestamp`. |
-| 45 | Draft/Publish pattern | `views/mixins.py` | `DraftPublishViewSetMixin` — draft/published state management. |
-| 46 | Webhook mixin | `views/mixins.py` | Async HTTP POST to configured URLs on CRUD events with retry. |
-| 47 | Nested validation error paths | `exceptions.py` | Full field paths for nested object validation failures. |
-| 48 | Auto-form generation | `forms.py` (new) | Generate Django Forms from `schema_in` — server-side rendering with HTMX/Alpine.js. Template tag `{% ninja_form "articles" "create" %}`. |
-| 49 | Response compression | `api.py`, `middleware/` | Auto GZip/Brotli for large responses. Configurable threshold. |
+| 34 | API Explorer in Django Admin | `admin.py`, `templates/` | Embedded API tester in admin panel — browse endpoints, send requests, see responses. Swagger-like but inside admin. |
+| 35 | Admin validator sync | `admin.py`, `forms.py` | Admin forms auto-use `CreateSerializer`/`UpdateSerializer` Pydantic validators. Single source of truth for validation. |
+| 36 | Admin audit log | `admin.py`, `models/` | Unified audit log for API + admin actions. Same table, same format — who changed what, from where. |
+| 37 | Admin dashboard widget | `admin.py`, `templates/` | Home widget showing model counts, recent changes, API stats. Zero config. |
+| 38 | Field-level read permissions | `models/serializers.py` | Show/hide fields in ReadSerializer based on user role. |
+| 39 | Optimistic locking | `models/utils.py` | Version field for concurrency control on updates. |
+| 40 | Bulk M2M set replacement | `helpers/api.py` | "Replace entire set" operation alongside add/remove on M2M endpoints. |
+| 41 | Nested resource routing | `views/api.py`, `helpers/` | `/authors/{id}/books/` with full CRUD on sub-resources. |
+| 42 | Export mixin | `views/mixins.py` | `ExportViewSetMixin` — CSV/JSON export of filtered querysets. |
+| 43 | Audit trail mixin | `views/mixins.py` | Auto-log create/update/delete to audit table with `created_by`, `changed_fields`, `timestamp`. |
+| 44 | Draft/Publish pattern | `views/mixins.py` | `DraftPublishViewSetMixin` — draft/published state management. |
+| 45 | Webhook mixin | `views/mixins.py` | Async HTTP POST to configured URLs on CRUD events with retry. |
+| 46 | Nested validation error paths | `exceptions.py` | Full field paths for nested object validation failures. |
+| 47 | Auto-form generation | `forms.py` (new) | Generate Django Forms from `schema_in` — server-side rendering with HTMX/Alpine.js. Template tag `{% ninja_form "articles" "create" %}`. |
+| 48 | Response compression | `api.py`, `middleware/` | Auto GZip/Brotli for large responses. Configurable threshold. |
 
 ---
 
