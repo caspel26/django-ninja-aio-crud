@@ -511,7 +511,139 @@ class SignalBasedHooksTestCase(TestCase):
 
     def test_signal_skipped_in_api_path(self):
         """Signals are skipped when API path fires hooks directly."""
-        # This is implicitly tested by the API tests above — if signals
-        # were NOT skipped, hooks would fire twice and counts would be wrong.
-        # We verify the API create test still has exactly 1 hook call.
+        # Implicitly tested by the API tests — if signals were NOT skipped,
+        # hooks would fire twice and counts would be wrong.
         pass
+
+
+@tag("reactive_hooks")
+class SyncHookModelSignalTestCase(TestCase):
+    """Test sync hooks fired via signals on a model with only sync hooks."""
+
+    def setUp(self):
+        _reset()
+
+    def test_sync_create_hook_via_signal(self):
+        """Sync @on_create hook fires via signal on direct save."""
+        SyncHookTestModel.objects.all().delete()
+        obj = SyncHookTestModel(name="signal_sync")
+        obj.save()
+
+        events = [c[0] for c in _hook_calls]
+        self.assertIn("sync_create", events)
+
+    def test_no_hooks_model_signal_noop(self):
+        """Signal on a model without reactive hooks is a no-op."""
+        from tests.test_app.models import TestModelSerializer
+
+        _reset()
+        TestModelSerializer.objects.all().delete()
+        TestModelSerializer.objects.create(name="no_hooks", description="d")
+
+        # TestModelSerializer has _reactive_hooks but all lists are empty
+        # (no @on_create decorators), so signal should be a no-op
+        self.assertEqual(len(_hook_calls), 0)
+
+    def test_async_hook_fires_via_signal_without_event_loop(self):
+        """Async @on_create hook fires from signal via async_to_sync when no loop."""
+        HookTestModel.objects.all().delete()
+        # HookTestModel.on_created is async — signal should wrap with async_to_sync
+        obj = HookTestModel(name="async_signal", description="d", status="draft")
+        obj.save()
+
+        events = [c[0] for c in _hook_calls]
+        self.assertIn("create", events)
+
+    def test_register_signals_noop_without_hooks(self):
+        """register_signals is a no-op for models without any hooks."""
+        from ninja_aio.models.hooks import register_signals
+
+        class EmptyHooksModel(ModelSerializer):
+            name = models.CharField(max_length=255)
+
+            class Meta:
+                app_label = "test_app"
+
+            class ReadSerializer:
+                fields = ["id", "name"]
+
+            class CreateSerializer:
+                fields = ["name"]
+
+        self.assertEqual(EmptyHooksModel._reactive_hooks["create"], [])
+        register_signals(EmptyHooksModel)
+
+
+@tag("reactive_hooks")
+class HookInternalCoverageTestCase(TestCase):
+    """Unit tests for internal hook functions to cover edge case branches."""
+
+    def test_run_hook_sync_with_sync_method_and_instance(self):
+        """_run_hook_sync calls sync method with instance when provided."""
+        from ninja_aio.models.hooks import _run_hook_sync
+
+        calls = []
+
+        def my_hook(inst):
+            calls.append(("sync_with_instance", inst))
+
+        _run_hook_sync(my_hook, instance="fake_instance")
+        self.assertEqual(calls, [("sync_with_instance", "fake_instance")])
+
+    def test_run_hook_sync_with_async_method_and_instance(self):
+        """_run_hook_sync wraps async method with async_to_sync when instance provided."""
+        from ninja_aio.models.hooks import _run_hook_sync
+
+        calls = []
+
+        async def my_async_hook(inst):
+            calls.append(("async_with_instance", inst))
+
+        _run_hook_sync(my_async_hook, instance="fake_instance")
+        self.assertEqual(calls, [("async_with_instance", "fake_instance")])
+
+    def test_on_post_save_noop_for_model_without_hooks(self):
+        """_on_post_save is a no-op when sender has no _reactive_hooks."""
+        from ninja_aio.models.hooks import _on_post_save
+
+        _reset()
+
+        class FakeModel:
+            _reactive_hooks = None
+
+        _on_post_save(sender=FakeModel, instance=None, created=True)
+        self.assertEqual(len(_hook_calls), 0)
+
+    def test_on_post_delete_noop_for_model_without_hooks(self):
+        """_on_post_delete is a no-op when sender has no _reactive_hooks."""
+        from ninja_aio.models.hooks import _on_post_delete
+
+        _reset()
+
+        class FakeModel:
+            _reactive_hooks = None
+
+        _on_post_delete(sender=FakeModel, instance=None)
+        self.assertEqual(len(_hook_calls), 0)
+
+    def test_register_signals_noop_without_reactive_hooks_attr(self):
+        """register_signals is a no-op when model has no _reactive_hooks attr."""
+        from ninja_aio.models.hooks import register_signals
+
+        class NoAttrModel:
+            pass
+
+        register_signals(NoAttrModel)  # should not raise
+
+    async def test_run_hook_sync_skips_async_when_loop_running(self):
+        """_run_hook_sync skips async hooks when an event loop is already running."""
+        from ninja_aio.models.hooks import _run_hook_sync
+
+        calls = []
+
+        async def my_async_hook():
+            calls.append("should_not_fire")
+
+        # We're inside an async test, so there IS a running event loop
+        _run_hook_sync(my_async_hook)
+        self.assertEqual(calls, [])
