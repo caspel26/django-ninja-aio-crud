@@ -272,3 +272,158 @@ class ActionAuthTestCase(TestCase):
         """Action with explicit auth uses the override."""
         no_auth_config = self.viewset.no_auth._action_config
         self.assertIsNone(no_auth_config.auth)
+
+
+# ---------------------------------------------------------------------------
+# @on decorator tests
+# ---------------------------------------------------------------------------
+
+
+from ninja_aio.decorators import on
+
+
+class OnDecoratorViewSet(APIViewSet):
+    model = models.TestModel
+    schema_in = schema.TestModelSchemaIn
+    schema_out = schema.TestModelSchemaOut
+    schema_update = schema.TestModelSchemaPatch
+
+    @on("publish")
+    async def publish(self, request, obj):
+        obj.name = f"{obj.name}_published"
+        await obj.asave()
+        return Status(200, {"message": "published", "name": obj.name})
+
+    @on("archive", methods=["patch"], url_path="archive-item")
+    async def archive(self, request, obj):
+        return Status(200, {"message": "archived"})
+
+
+_hook_log = []
+
+
+class OnHookTrackingViewSet(APIViewSet):
+    model = models.TestModel
+    schema_in = schema.TestModelSchemaIn
+    schema_out = schema.TestModelSchemaOut
+    schema_update = schema.TestModelSchemaPatch
+
+    @on("do_action")
+    async def do_action(self, request, obj):
+        return Status(200, {"pk": obj.pk})
+
+    async def on_before_operation(self, request, operation):
+        _hook_log.append(("before_op", operation))
+
+    async def on_before_object_operation(self, request, operation, obj):
+        _hook_log.append(("before_obj_op", operation, obj.pk))
+
+
+@tag("on_decorator")
+class OnDecoratorRegistrationTestCase(TestCase):
+    """Test @on decorator endpoint registration."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.api = NinjaAIO(urls_namespace="on_reg_test")
+        cls.viewset = OnDecoratorViewSet()
+        cls.viewset.api = cls.api
+        cls.viewset.add_views_to_route()
+
+    def test_on_registers_post_by_default(self):
+        """@on registers POST method by default."""
+        config = self.viewset.publish._action_config
+        self.assertEqual(config.methods, ["post"])
+        self.assertTrue(config.detail)
+
+    def test_on_custom_method_and_url(self):
+        """@on supports custom methods and url_path."""
+        config = self.viewset.archive._action_config
+        self.assertEqual(config.methods, ["patch"])
+        self.assertEqual(config.url_path, "archive-item")
+
+    def test_on_has_on_config_marker(self):
+        """@on-decorated method has _on_config attribute."""
+        self.assertTrue(hasattr(self.viewset.publish, "_on_config"))
+        self.assertEqual(self.viewset.publish._on_config.action_name, "publish")
+
+
+@tag("on_decorator")
+class OnDecoratorExecutionTestCase(TestCase):
+    """Test @on decorator execution — object fetching and mutation."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.api = NinjaAIO(urls_namespace="on_exec_test")
+        cls.viewset = OnDecoratorViewSet()
+        cls.viewset.api = cls.api
+        cls.viewset.add_views_to_route()
+        cls.model = models.TestModel
+        cls.test_util = ModelUtil(cls.model)
+        cls.request = Request(cls.test_util.verbose_name_path_resolver())
+
+    async def test_on_handler_receives_object(self):
+        """@on handler receives the fetched model instance, not pk."""
+        await self.model.objects.all().adelete()
+        obj = await self.model.objects.acreate(name="test_on", description="d")
+
+        ops = self.viewset.router.path_operations
+        publish_path = f"{{{self.test_util.model_pk_name}}}/publish"
+        publish_op = ops.get(publish_path)
+        self.assertIsNotNone(publish_op, f"Publish endpoint not found at {publish_path}")
+        publish_view = publish_op.operations[0].view_func
+
+        pk_schema = self.viewset.path_schema(id=obj.pk)
+        result = await publish_view(self.request.post(), pk_schema)
+
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(result.value["name"], "test_on_published")
+
+        await obj.arefresh_from_db()
+        self.assertEqual(obj.name, "test_on_published")
+
+
+@tag("on_decorator")
+class OnDecoratorHooksTestCase(TestCase):
+    """Test @on decorator fires both operation hooks."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.api = NinjaAIO(urls_namespace="on_hooks_test")
+        cls.viewset = OnHookTrackingViewSet()
+        cls.viewset.api = cls.api
+        cls.viewset.add_views_to_route()
+        cls.model = models.TestModel
+        cls.test_util = ModelUtil(cls.model)
+        cls.request = Request(cls.test_util.verbose_name_path_resolver())
+
+    def setUp(self):
+        _hook_log.clear()
+
+    async def test_on_fires_both_hooks(self):
+        """@on fires on_before_operation AND on_before_object_operation."""
+        await self.model.objects.all().adelete()
+        obj = await self.model.objects.acreate(name="hooks_test", description="d")
+
+        ops = self.viewset.router.path_operations
+        action_path = f"{{{self.test_util.model_pk_name}}}/do-action"
+        action_op = ops.get(action_path)
+        self.assertIsNotNone(action_op)
+        action_view = action_op.operations[0].view_func
+
+        pk_schema = self.viewset.path_schema(id=obj.pk)
+        result = await action_view(self.request.post(), pk_schema)
+
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(result.value["pk"], obj.pk)
+
+        events = [c[0] for c in _hook_log]
+        self.assertIn("before_op", events)
+        self.assertIn("before_obj_op", events)
+
+        op_call = [c for c in _hook_log if c[0] == "before_op"][0]
+        self.assertEqual(op_call[1], "do_action")
+
+        obj_call = [c for c in _hook_log if c[0] == "before_obj_op"][0]
+        self.assertEqual(obj_call[1], "do_action")
+        self.assertEqual(obj_call[2], obj.pk)
