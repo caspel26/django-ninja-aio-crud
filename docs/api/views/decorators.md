@@ -94,6 +94,44 @@ See [APIViewSet @action](api_view_set.md#action-decorator) for full parameter re
 
 ---
 
+## :material-lightning-bolt: `@on` — Detail Action Shorthand
+
+A simpler alternative to `@action` for detail endpoints that operate on a single object. The framework automatically fetches the object and runs operation hooks.
+
+```python
+from ninja_aio.decorators import on
+
+@api.viewset(Article)
+class ArticleViewSet(APIViewSet):
+    @on("publish")
+    async def publish(self, request, obj):
+        # obj is already fetched, hooks already ran
+        obj.status = "published"
+        await obj.asave()
+        return Status(200, {"message": "published"})
+
+    @on("archive", methods=["patch"], url_path="archive-item")
+    async def archive(self, request, obj):
+        obj.archived = True
+        await obj.asave()
+        return Status(200, {"message": "archived"})
+```
+
+**Comparison with `@action`:**
+
+| | `@action` | `@on` |
+|---|---|---|
+| Object fetch | Manual (`get_object`) | Automatic |
+| Handler receives | `pk` | `obj` (model instance) |
+| Hooks | `on_before_operation` only | Both `on_before_operation` + `on_before_object_operation` |
+| Default method | GET | POST |
+| `detail` param | Required | Always `True` |
+| List actions | Supported | Not supported — use `@action` |
+
+**Parameters:** Same as `@action`, except `detail` is always True and `action_name` replaces the first positional argument.
+
+---
+
 ## :material-layers: `decorate_view`
 
 Compose multiple decorators into a single view wrapper.
