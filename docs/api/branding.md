@@ -222,6 +222,7 @@ class MySwagger(BrandedSwagger):
 
 Your template has access to:
 
+{% raw %}
 | Variable | Description |
 |---|---|
 | `{{ api.title }}` | API title |
@@ -230,5 +231,6 @@ Your template has access to:
 | `{{ api.branding.favicon_url }}` | Favicon URL |
 | `{{ api.branding.custom_css }}` | Inline CSS |
 | `{{ api.branding.custom_css_url }}` | External CSS URL |
-| `{{ swagger_settings \| safe }}` | Swagger UI config JSON |
+| `{{ swagger_settings\|safe }}` | Swagger UI config JSON |
 | `{{ add_csrf }}` | Whether to inject CSRF token |
+{% endraw %}
