@@ -107,3 +107,80 @@ def action(
         return func
 
     return decorator
+
+
+@dataclass
+class OnConfig:
+    """Marker for @on-decorated methods — triggers object fetch + hooks."""
+
+    action_name: str
+
+
+def on(
+    action_name: str,
+    *,
+    methods: list[str] | None = None,
+    url_path: str | None = None,
+    url_name: str | None = None,
+    auth: Any = NOT_SET,
+    response: Any = NOT_SET,
+    summary: str | None = None,
+    description: str | None = None,
+    tags: list[str] | None = None,
+    deprecated: bool | None = None,
+    decorators: list[Callable] | None = None,
+    throttle: BaseThrottle | list[BaseThrottle] | NOT_SET_TYPE = NOT_SET,
+    include_in_schema: bool = True,
+    openapi_extra: Optional[dict[str, Any]] = None,
+):
+    """
+    Decorator for detail actions with automatic object fetching and hooks.
+
+    The handler receives ``(self, request, obj)`` instead of ``(self, request, pk)``.
+    Before calling the handler, the framework:
+
+    1. Calls ``on_before_operation(request, action_name)``
+    2. Fetches the object via ``model_util.get_object(request, pk)``
+    3. Calls ``on_before_object_operation(request, action_name, obj)``
+
+    Parameters
+    ----------
+    action_name : str
+        Operation name used for hooks and default URL path.
+    methods : list[str], optional
+        HTTP methods. Defaults to ``["post"]``.
+    url_path : str, optional
+        Custom URL segment. Defaults to action_name with ``_`` as ``-``.
+
+    All other parameters are identical to :func:`action`.
+
+    Example::
+
+        @on("publish")
+        async def publish(self, request, obj):
+            obj.status = "published"
+            await obj.asave()
+            return Status(200, {"message": "published"})
+    """
+
+    def decorator(func):
+        func._action_config = ActionConfig(
+            detail=True,
+            methods=methods or ["post"],
+            url_path=url_path or action_name.replace("_", "-"),
+            url_name=url_name,
+            auth=auth,
+            response=response,
+            summary=summary,
+            description=description,
+            tags=tags,
+            deprecated=deprecated,
+            decorators=decorators,
+            throttle=throttle,
+            include_in_schema=include_in_schema,
+            openapi_extra=openapi_extra,
+        )
+        func._on_config = OnConfig(action_name=action_name)
+        return func
+
+    return decorator

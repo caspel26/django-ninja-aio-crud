@@ -1106,22 +1106,45 @@ class APIViewSet(API, Generic[ModelT]):
             handler = factory._build_handler(self, method)
             factory._apply_metadata(handler, method)
 
-            # Wrap handler with on_before_operation hook
+            on_config = getattr(method, "_on_config", None)
             original_handler = handler
 
-            @functools.wraps(original_handler)
-            async def hooked_handler(
-                *args,
-                _action_name=name,
-                _viewset=self,
-                _orig=original_handler,
-                **kwargs,
-            ):
-                request = args[0] if args else kwargs.get("request")
-                await _viewset.on_before_operation(request, _action_name)
-                return await _orig(*args, **kwargs)
+            if on_config is not None:
+                # @on decorator: fetch object + both hooks
+                @functools.wraps(original_handler)
+                async def on_handler(
+                    request,
+                    pk,
+                    *args,
+                    _action_name=on_config.action_name,
+                    _viewset=self,
+                    _orig=original_handler,
+                    **kwargs,
+                ):
+                    await _viewset.on_before_operation(request, _action_name)
+                    _pk = _viewset._get_pk(pk)
+                    obj = await _viewset.model_util.get_object(request, _pk)
+                    await _viewset.on_before_object_operation(
+                        request, _action_name, obj
+                    )
+                    return await _orig(request, obj, *args, **kwargs)
 
-            handler = hooked_handler
+                handler = on_handler
+            else:
+                # Regular @action: view-level hook only
+                @functools.wraps(original_handler)
+                async def hooked_handler(
+                    *args,
+                    _action_name=name,
+                    _viewset=self,
+                    _orig=original_handler,
+                    **kwargs,
+                ):
+                    request = args[0] if args else kwargs.get("request")
+                    await _viewset.on_before_operation(request, _action_name)
+                    return await _orig(*args, **kwargs)
+
+                handler = hooked_handler
 
             if config.detail:
                 self._rename_pk_param(handler)
