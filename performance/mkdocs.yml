@@ -34,6 +34,7 @@ nav:
       - Serializer (Meta-driven): api/models/serializers.md
       - Validators: api/models/validators.md
     - Auto Admin: api/admin.md
+    - Swagger UI: api/branding.md
     - Authentication: api/authentication.md
     - Exceptions: api/exceptions.md
     - Pagination: api/pagination.md
