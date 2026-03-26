@@ -36,8 +36,10 @@ Usage on Serializer (receives instance as parameter)::
 
 import asyncio
 import logging
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
+from typing import Any
 
 from asgiref.sync import sync_to_async, async_to_sync
 from django.db.models.signals import post_save, post_delete
@@ -57,19 +59,19 @@ class _HookMeta:
         self.fields = fields
 
 
-def on_create(func):
+def on_create(func: Callable) -> Callable:
     """Mark a method to fire after instance creation."""
     setattr(func, _HOOK_ATTR, _HookMeta("create"))
     return func
 
 
-def on_delete(func):
+def on_delete(func: Callable) -> Callable:
     """Mark a method to fire after instance deletion."""
     setattr(func, _HOOK_ATTR, _HookMeta("delete"))
     return func
 
 
-def on_update(_func_or_field=None, *extra_fields):
+def on_update(_func_or_field: Callable | str | None = None, *extra_fields: str) -> Callable:
     """Mark a method to fire after instance update.
 
     Usage::
@@ -93,7 +95,7 @@ def on_update(_func_or_field=None, *extra_fields):
     return decorator
 
 
-def collect_reactive_hooks(cls) -> dict:
+def collect_reactive_hooks(cls: type) -> dict[str, Any]:
     """Scan a class for reactive hook decorators.
 
     Returns a dict::
@@ -135,7 +137,7 @@ def collect_reactive_hooks(cls) -> dict:
 
 
 async def execute_reactive_hooks(
-    target, hook_names: list[str], instance=None
+    target: Any, hook_names: list[str], instance: Any = None
 ) -> None:
     """Execute a list of hook methods sequentially on *target*.
 
@@ -164,7 +166,7 @@ async def execute_reactive_hooks(
 
 
 def detect_changed_fields(
-    obj, payload: dict, watched_fields: dict[str, list[str]]
+    obj: Any, payload: dict[str, Any], watched_fields: dict[str, list[str]]
 ) -> set[str]:
     """Compare old attribute values on *obj* with new values in *payload*.
 
@@ -181,7 +183,9 @@ def detect_changed_fields(
     return changed
 
 
-async def fire_update_hooks(target, changed_fields: set, hooks: dict, instance=None):
+async def fire_update_hooks(
+    target: Any, changed_fields: set[str], hooks: dict[str, Any], instance: Any = None
+) -> None:
     """Fire field-specific and generic update hooks.
 
     Parameters
@@ -206,7 +210,7 @@ async def fire_update_hooks(target, changed_fields: set, hooks: dict, instance=N
         await execute_reactive_hooks(target, hooks["update_any"], instance)
 
 
-def _run_hook_sync(method, instance=None):
+def _run_hook_sync(method: Callable, instance: Any = None) -> None:
     """Run a single hook method, handling both sync and async."""
     if asyncio.iscoroutinefunction(method):
         try:
@@ -230,7 +234,7 @@ def _run_hook_sync(method, instance=None):
             method()
 
 
-def _execute_hooks_sync(target, hook_names: list[str], instance=None):
+def _execute_hooks_sync(target: Any, hook_names: list[str], instance: Any = None) -> None:
     """Execute hook methods synchronously (for signal handlers)."""
     for name in hook_names:
         method = getattr(target, name)
@@ -242,7 +246,7 @@ _api_hooks_active: ContextVar[bool] = ContextVar("_api_hooks_active", default=Fa
 
 
 @asynccontextmanager
-async def suppress_signals():
+async def suppress_signals() -> AsyncIterator[None]:
     """Suppress reactive hook signals during API operations.
 
     Prevents double-firing: the async API path fires hooks directly
@@ -256,7 +260,7 @@ async def suppress_signals():
         _api_hooks_active.reset(token)
 
 
-def get_hooks(model_or_serializer) -> dict | None:
+def get_hooks(model_or_serializer: type) -> dict[str, Any] | None:
     """Get reactive hooks dict from a model or serializer class, or None."""
     hooks = getattr(model_or_serializer, "_reactive_hooks", None)
     if not hooks:
@@ -266,7 +270,7 @@ def get_hooks(model_or_serializer) -> dict | None:
     return None
 
 
-def _on_post_save(sender, instance, created, **kwargs):
+def _on_post_save(sender: type, instance: Any, created: bool, **kwargs: Any) -> None:
     """Django post_save signal handler — fires @on_create or @on_update hooks.
 
     Skipped when ``_api_hooks_active`` is True (the async API path in
@@ -289,7 +293,7 @@ def _on_post_save(sender, instance, created, **kwargs):
             _execute_hooks_sync(instance, hooks["update_any"])
 
 
-def _on_post_delete(sender, instance, **kwargs):
+def _on_post_delete(sender: type, instance: Any, **kwargs: Any) -> None:
     """Django post_delete signal handler — fires @on_delete hooks.
 
     Skipped when ``_api_hooks_active`` is True.
@@ -306,7 +310,7 @@ def _on_post_delete(sender, instance, **kwargs):
         _execute_hooks_sync(instance, hooks["delete"])
 
 
-def register_signals(model_class):
+def register_signals(model_class: type) -> None:
     """Connect post_save and post_delete signals for a ModelSerializer class.
 
     Called from ModelSerializer.__init_subclass__ after hook collection.
