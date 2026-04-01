@@ -279,7 +279,7 @@ async def login(request, data: LoginSchema):
 | `token` | `str` | — | JWT compact string |
 | `cookie_name` | `str` | `"access_token"` | Should match `AsyncJwtCookie.param_name` |
 | `max_age` | `int` | `None` | Cookie lifetime in seconds |
-| `secure` | `bool` | `True` | HTTPS only |
+| `secure` | `bool` | `not settings.DEBUG` | HTTPS only (auto-safe: secure in production, permissive in development) |
 | `httponly` | `bool` | `True` | Inaccessible to JavaScript |
 | `samesite` | `str` | `"Lax"` | SameSite policy |
 | `path` | `str` | `"/"` | Cookie path |
