@@ -136,7 +136,7 @@ set_jwt_cookie(
     token,
     cookie_name="access_token",  # match AsyncJwtCookie.param_name
     max_age=900,                 # 15 minutes
-    secure=True,                 # HTTPS only
+    secure=None,                 # auto: not settings.DEBUG
     httponly=True,                # inaccessible to JS
     samesite="Lax",              # CSRF mitigation
     path="/",
@@ -144,7 +144,7 @@ set_jwt_cookie(
 )
 ```
 
-**Secure defaults:** `httponly=True`, `secure=True`, `samesite="Lax"`.
+**Secure defaults:** `httponly=True`, `secure=not settings.DEBUG` (auto-safe), `samesite="Lax"`.
 
 ---
 
@@ -167,7 +167,7 @@ delete_jwt_cookie(
 
 ## :material-shield-star: Security Best Practices
 
-1. **Always use `secure=True`** in production (HTTPS only).
+1. **`secure` defaults to `not settings.DEBUG`** — automatically secure in production, works over HTTP in development. Override with `secure=True` or `secure=False` if needed.
 
 2. **Keep `httponly=True`** — this is the whole point of cookie-based auth.
 
