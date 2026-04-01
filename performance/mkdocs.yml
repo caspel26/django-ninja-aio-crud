@@ -41,6 +41,7 @@ nav:
     - Renderers: api/renderers/orjson_renderer.md
   - Authentication:
       - JWT & AsyncJwtBearer: auth.md
+      - Cookie Auth (BFF): auth_cookie.md
   - Benchmarks:
       - Framework Comparison: comparison.md
       - Performance: performance.md
