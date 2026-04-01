@@ -1,5 +1,24 @@
 # 📋 Release Notes
 
+## 🏷️ [v2.30.1] - 2026-04-01
+
+---
+
+### 🐛 Bug Fix
+
+#### 🔒 Early return for missing JWT token
+> `ninja_aio/auth.py`
+
+`JwtAuthMixin.authenticate` now returns `False` immediately when the token is `None` or empty, with a debug log message. Previously, a missing token (e.g., absent cookie in `AsyncJwtCookie`) would fall through to `jwt.decode(None, ...)` and raise an uninformative `JoseError`.
+
+---
+
+### 🎯 Summary
+
+Patch release that adds a guard clause for missing JWT tokens in the shared `JwtAuthMixin.authenticate` method. Affects both `AsyncJwtBearer` (missing `Authorization` header) and `AsyncJwtCookie` (missing cookie).
+
+---
+
 ## 🏷️ [v2.30.0] - 2026-04-01
 
 ---
