@@ -6,6 +6,7 @@ from joserfc import jwt, jwk, errors
 from django.http.request import HttpRequest
 from django.utils import timezone
 from django.conf import settings
+from ninja.security.apikey import APIKeyCookie
 from ninja.security.http import HttpBearer
 
 from ninja_aio.types import JwtKeys
@@ -18,13 +19,15 @@ JWT_MANDATORY_CLAIMS = [
 ]
 
 
-class AsyncJwtBearer(HttpBearer):
+class JwtAuthMixin:
     """
-    AsyncJwtBearer provides asynchronous JWT-based authentication for Django Ninja endpoints
-    using HTTP Bearer tokens. It decodes and validates JWTs against a configured public key
-    and claim registry, then delegates user retrieval to an overridable async handler.
+    Mixin providing JWT decode, claim validation, and async auth dispatch.
+
+    Subclasses must be combined with a Django Ninja auth base that provides
+    the token extraction mechanism (HttpBearer, APIKeyCookie, etc.).
+
     Attributes:
-        jwt_public (jwk.RSAKey | jwk.ECKey):
+        jwt_public (jwk.RSAKey | jwk.ECKey | jwk.OctKey):
             The public key (JWK format) used to verify the JWT signature.
             Must be set externally before authentication occurs.
         claims (dict[str, dict]):
@@ -35,54 +38,6 @@ class AsyncJwtBearer(HttpBearer):
             List of permitted JWT algorithms for signature verification. Defaults to ["RS256"].
         dcd (jwt.Token | None):
             Set after successful decode; holds the decoded token object (assigned dynamically).
-    Class Methods:
-        get_claims() -> jwt.JWTClaimsRegistry:
-            Constructs and returns a claims registry from the class-level claims definition.
-    Instance Methods:
-        validate_claims(claims: jwt.Claims) -> None:
-            Validates the provided claims object against the registry. Raises jose.errors.JoseError
-            or ValueError-derived exceptions if validation fails.
-        auth_handler(request: HttpRequest) -> Any:
-            Asynchronous hook to be overridden by subclasses to implement application-specific
-            user resolution (e.g., fetching a user model instance). Must return a user-like object
-            on success or raise / return False on failure.
-        authenticate(request: HttpRequest, token: str) -> Any | bool:
-            Orchestrates authentication:
-                1. Attempts to decode the JWT using the configured public key and algorithms.
-                2. Validates claims via validate_claims.
-                3. Delegates to auth_handler for domain-specific user retrieval.
-            Returns the user object on success; returns False if decoding or claim validation fails.
-    Usage Notes:
-        - You must assign jwt_public (jwk.RSAKey) and populate claims before calling authenticate.
-        - Override auth_handler to integrate with your user persistence layer.
-        - Token decoding failures (e.g., signature mismatch, malformed token) result in False.
-        - Claim validation errors (e.g., expired token, issuer mismatch) result in False.
-        - This class does not itself raise HTTP errors; caller may translate False into an HTTP response.
-    Example Extension:
-        class MyBearer(AsyncJwtBearer):
-            jwt_public = jwk.RSAKey.import_key(open("pub.pem").read())
-            claims = {
-                "iss": {"value": "https://auth.example"},
-                "aud": {"value": "my-api"},
-            }
-            async def auth_handler(self, request):
-                sub = self.dcd.claims.get("sub")
-                return await get_user_by_id(sub)
-    Thread Safety:
-        - Instances are not inherently thread-safe if mutable shared state is attached.
-        - Prefer per-request instantiation or ensure read-only shared configuration.
-    Security Considerations:
-        - Ensure jwt_public key rotation strategy is in place.
-        - Validate critical claims (exp, nbf, iss, aud) via the claims registry configuration.
-        - Avoid logging raw tokens or sensitive claim contents.
-    Raises:
-        jose.errors.JoseError:
-            Propagated from validate_claims if claim checks fail.
-        ValueError:
-            May occur during token decoding (e.g., invalid structure) but is internally caught
-            and converted to a False return value.
-    Return Semantics:
-        - authenticate -> user object (success) | False (failure)
     """
 
     jwt_public: JwtKeys
@@ -117,6 +72,57 @@ class AsyncJwtBearer(HttpBearer):
 
         logger.debug("JWT authentication successful")
         return await self.auth_handler(request)
+
+
+class AsyncJwtBearer(JwtAuthMixin, HttpBearer):
+    """
+    Asynchronous JWT authentication via Authorization: Bearer header.
+
+    Decodes and validates JWTs against a configured public key and claim registry,
+    then delegates user retrieval to an overridable async handler.
+
+    Example:
+        class MyBearer(AsyncJwtBearer):
+            jwt_public = jwk.RSAKey.import_key(open("pub.pem").read())
+            claims = {
+                "iss": {"value": "https://auth.example"},
+                "aud": {"value": "my-api"},
+            }
+            async def auth_handler(self, request):
+                sub = self.dcd.claims.get("sub")
+                return await get_user_by_id(sub)
+    """
+
+    pass
+
+
+class AsyncJwtCookie(JwtAuthMixin, APIKeyCookie):
+    """
+    Asynchronous JWT authentication via HttpOnly cookie.
+
+    For BFF (Backend for Frontend) patterns where JWTs are stored
+    in HttpOnly cookies instead of Authorization headers.
+    CSRF protection is enabled by default.
+
+    Attributes:
+        param_name (str): Cookie name. Defaults to "access_token".
+
+    Example:
+        class MyCookieAuth(AsyncJwtCookie):
+            jwt_public = jwk.RSAKey.import_key(open("pub.pem").read())
+            claims = {
+                "iss": {"value": "https://auth.example"},
+                "aud": {"value": "my-api"},
+            }
+            async def auth_handler(self, request):
+                sub = self.dcd.claims.get("sub")
+                return await get_user_by_id(sub)
+
+        # CSRF disabled (not recommended):
+        auth = MyCookieAuth(csrf=False)
+    """
+
+    param_name: str = "access_token"
 
 
 def validate_key(key: Optional[JwtKeys], setting_name: str) -> JwtKeys:
@@ -225,3 +231,65 @@ def decode_jwt(
         validate_key(public_key, "JWT_PUBLIC_KEY"),
         algorithms=algorithms or ["RS256"],
     )
+
+
+def set_jwt_cookie(
+    response,
+    token: str,
+    cookie_name: str = "access_token",
+    max_age: int = None,
+    secure: bool = None,
+    httponly: bool = True,
+    samesite: str = "Lax",
+    path: str = "/",
+    domain: str = None,
+):
+    """
+    Set a JWT as an HttpOnly cookie on a Django response.
+
+    Pairs with AsyncJwtCookie for BFF authentication patterns.
+
+    Parameters:
+      - response: Django HttpResponse (or subclass)
+      - token (str): The JWT compact string
+      - cookie_name (str): Cookie name, should match AsyncJwtCookie.param_name
+      - max_age (int): Cookie lifetime in seconds
+      - secure (bool): HTTPS only. Defaults to ``not settings.DEBUG``
+        (secure in production, permissive in development)
+      - httponly (bool): Inaccessible to JavaScript. Defaults to True
+      - samesite (str): SameSite policy. Defaults to "Lax"
+      - path (str): Cookie path. Defaults to "/"
+      - domain (str): Cookie domain. Defaults to None
+    """
+    if secure is None:
+        secure = not settings.DEBUG
+    response.set_cookie(
+        key=cookie_name,
+        value=token,
+        max_age=max_age,
+        secure=secure,
+        httponly=httponly,
+        samesite=samesite,
+        path=path,
+        domain=domain,
+    )
+    return response
+
+
+def delete_jwt_cookie(
+    response,
+    cookie_name: str = "access_token",
+    path: str = "/",
+    domain: str = None,
+):
+    """
+    Remove the JWT cookie from a Django response (for logout).
+
+    Parameters:
+      - response: Django HttpResponse (or subclass)
+      - cookie_name (str): Cookie name, should match AsyncJwtCookie.param_name
+      - path (str): Cookie path. Defaults to "/"
+      - domain (str): Cookie domain. Defaults to None
+    """
+    response.delete_cookie(key=cookie_name, path=path, domain=domain)
+    return response

@@ -1,15 +1,18 @@
 # :material-shield-lock-outline: JWT Authentication and AsyncJwtBearer
 
-This page documents the JWT helpers and the `AsyncJwtBearer` class in `ninja_aio/auth.py`, including configuration, validation, and usage in Django Ninja.
+This page documents the JWT helpers and the `AsyncJwtBearer` and `AsyncJwtCookie` classes in `ninja_aio/auth.py`, including configuration, validation, and usage in Django Ninja.
 
 ## :material-information-outline: Overview
 
 - :material-shield-check: **AsyncJwtBearer** — Asynchronous HTTP Bearer auth that verifies JWTs, validates claims via a registry, and delegates user resolution to `auth_handler`.
+- :material-cookie-lock: **AsyncJwtCookie** — Asynchronous cookie-based JWT auth for BFF (Backend for Frontend) patterns. Reads JWTs from HttpOnly cookies with CSRF protection.
 - :material-wrench: **Helpers:**
   - :material-key-variant: `validate_key` — Ensures JWK keys are present and of the correct type.
   - :material-check-decagram: `validate_mandatory_claims` — Ensures `iss` and `aud` are present (from settings if not provided).
   - :material-pencil-lock: `encode_jwt` — Signs a JWT with time-based claims (`iat`, `nbf`, `exp`) and mandatory `iss/aud`.
   - :material-lock-open-check: `decode_jwt` — Verifies and decodes a JWT with a public key and allowed algorithms.
+  - :material-cookie-plus: `set_jwt_cookie` — Sets a JWT as an HttpOnly cookie on a response.
+  - :material-cookie-remove: `delete_jwt_cookie` — Removes a JWT cookie from a response (for logout).
 
 ---
 
@@ -103,9 +106,9 @@ class SettingsBearer(AsyncJwtBearer):
 
 ---
 
-## :material-shield-check: AsyncJwtBearer
+## :material-puzzle: JwtAuthMixin
 
-### :material-key-variant: Key Points
+Both `AsyncJwtBearer` and `AsyncJwtCookie` share the same JWT logic via `JwtAuthMixin`. The mixin provides:
 
 - `jwt_public`: Must be a JWK (RSA or EC) used to verify signatures.
 - `claims`: Dict passed to `jwt.JWTClaimsRegistry` defining validations (e.g., `iss`, `aud`, `exp`, `nbf`).
@@ -115,6 +118,12 @@ class SettingsBearer(AsyncJwtBearer):
 - `validate_claims(claims)`: Validates decoded claims; raises `jose.errors.JoseError` on failure.
 - `auth_handler(request)`: Async hook to resolve application user given the decoded token (`self.dcd`).
 - `authenticate(request, token)`: Decodes, validates, and delegates to `auth_handler`. Returns user or `False`.
+
+---
+
+## :material-shield-check: AsyncJwtBearer
+
+Extracts JWTs from the `Authorization: Bearer <token>` header. Extends `JwtAuthMixin` and Django Ninja's `HttpBearer`.
 
 ### :material-code-braces: Example
 
@@ -198,6 +207,98 @@ decoded = decode_jwt(
 
 claims = decoded.claims
 sub = claims.get("sub")
+```
+
+---
+
+## :material-cookie-lock: AsyncJwtCookie
+
+Extracts JWTs from an HttpOnly cookie. Extends `JwtAuthMixin` and Django Ninja's `APIKeyCookie`. Designed for BFF (Backend for Frontend) patterns where the backend manages JWT cookies and the frontend never handles raw tokens.
+
+### :material-key-variant: Key Points
+
+- `param_name`: Cookie name (default `"access_token"`).
+- CSRF protection is **enabled by default** (inherited from `APIKeyCookie`).
+- Same `jwt_public`, `claims`, `algorithms`, `dcd`, and `auth_handler` as `AsyncJwtBearer`.
+
+### :material-code-braces: Example
+
+```python
+from joserfc import jwk
+from ninja_aio.auth import AsyncJwtCookie
+
+class MyCookieAuth(AsyncJwtCookie):
+    jwt_public = jwk.RSAKey.import_key(open("pub.jwk").read())
+    claims = {
+        "iss": {"value": "https://auth.example"},
+        "aud": {"value": "my-api"},
+    }
+
+    async def auth_handler(self, request):
+        sub = self.dcd.claims.get("sub")
+        return {"user_id": sub}
+
+# CSRF disabled (not recommended for production):
+# auth = MyCookieAuth(csrf=False)
+```
+
+### :material-compare: When to Use Which
+
+| | `AsyncJwtBearer` | `AsyncJwtCookie` |
+|---|---|---|
+| **Token location** | `Authorization: Bearer <token>` header | HttpOnly cookie |
+| **Best for** | SPAs, mobile apps, API-to-API | BFF pattern, server-rendered apps |
+| **XSS protection** | Token accessible to JS | Token inaccessible to JS (HttpOnly) |
+| **CSRF protection** | Not needed (explicit header) | Built-in (enabled by default) |
+
+---
+
+## :material-cookie-plus: set_jwt_cookie
+
+Sets a JWT as an HttpOnly cookie on a Django response. Pairs with `AsyncJwtCookie` for BFF patterns.
+
+```python
+from ninja_aio.auth import set_jwt_cookie, encode_jwt
+
+# In a login endpoint:
+@api.post("/auth/login/")
+async def login(request, data: LoginSchema):
+    # ... authenticate user ...
+    token = encode_jwt(claims={"sub": str(user.id)}, duration=900)
+
+    response = api.create_response(request, {"message": "ok"})
+    set_jwt_cookie(response, token, max_age=900)
+    return response
+```
+
+**Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `response` | `HttpResponse` | — | Django response object |
+| `token` | `str` | — | JWT compact string |
+| `cookie_name` | `str` | `"access_token"` | Should match `AsyncJwtCookie.param_name` |
+| `max_age` | `int` | `None` | Cookie lifetime in seconds |
+| `secure` | `bool` | `not settings.DEBUG` | HTTPS only (auto-safe: secure in production, permissive in development) |
+| `httponly` | `bool` | `True` | Inaccessible to JavaScript |
+| `samesite` | `str` | `"Lax"` | SameSite policy |
+| `path` | `str` | `"/"` | Cookie path |
+| `domain` | `str` | `None` | Cookie domain |
+
+---
+
+## :material-cookie-remove: delete_jwt_cookie
+
+Removes the JWT cookie from a response (for logout flows).
+
+```python
+from ninja_aio.auth import delete_jwt_cookie
+
+@api.post("/auth/logout/")
+async def logout(request):
+    response = api.create_response(request, {"message": "logged out"})
+    delete_jwt_cookie(response)
+    return response
 ```
 
 ---

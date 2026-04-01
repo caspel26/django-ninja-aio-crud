@@ -9,13 +9,16 @@ from ninja_aio.auth import (
     encode_jwt,
     decode_jwt,
     AsyncJwtBearer,
+    AsyncJwtCookie,
+    set_jwt_cookie,
+    delete_jwt_cookie,
 )
 
 
-class JwtAuthTests(TestCase):
+class JwtTestBase(TestCase):
+    """Shared setUp/tearDown for JWT auth tests."""
+
     def setUp(self):
-        # Generate an RSA keypair for signing/verification
-        # If your joserfc version uses a different signature, adjust "size" accordingly.
         self.private_jwk = jwk.RSAKey.generate_key(key_size=2048)
         self.private_jwk.ensure_kid()
         # Try common public conversion names to keep compatibility across joserfc versions
@@ -37,6 +40,9 @@ class JwtAuthTests(TestCase):
 
     def tearDown(self):
         self._settings.disable()
+
+
+class JwtAuthTests(JwtTestBase):
 
     def test_encode_decode_roundtrip(self):
         token = encode_jwt({"sub": "u1"}, duration=60)
@@ -171,3 +177,202 @@ class JwtAuthTests(TestCase):
         # Should keep the pre-set values, not override with settings
         self.assertEqual(result["iss"], "custom-issuer")
         self.assertEqual(result["aud"], "custom-audience")
+
+
+class JwtCookieAuthTests(JwtTestBase):
+
+    def test_async_cookie_authenticate_success(self):
+        token = encode_jwt({"sub": "42"}, duration=60)
+        pub = self.public_jwk
+
+        class TC(AsyncJwtCookie):
+            jwt_public = pub
+            claims = {
+                "iss": {"value": "test-issuer"},
+                "aud": {"value": "test-audience"},
+            }
+
+            async def auth_handler(self, request):
+                return self.dcd.claims.get("sub")
+
+        cookie_auth = TC()
+        result = async_to_sync(cookie_auth.authenticate)(HttpRequest(), token)
+        self.assertEqual(result, "42")
+
+    def test_async_cookie_authenticate_invalid_claims_returns_false(self):
+        token = encode_jwt({"sub": "42"}, duration=60)
+        pub = self.public_jwk
+
+        class TC(AsyncJwtCookie):
+            jwt_public = pub
+            claims = {
+                "iss": {"value": "test-issuer"},
+                "aud": {"value": "wrong-audience"},
+            }
+
+            async def auth_handler(self, request):
+                return "should-not-happen"
+
+        cookie_auth = TC()
+        result = async_to_sync(cookie_auth.authenticate)(HttpRequest(), token)
+        self.assertFalse(result)
+
+    def test_async_cookie_authenticate_invalid_token_returns_false(self):
+        pub = self.public_jwk
+
+        class TC(AsyncJwtCookie):
+            jwt_public = pub
+            claims = {
+                "iss": {"value": "test-issuer"},
+                "aud": {"value": "test-audience"},
+            }
+
+            async def auth_handler(self, request):
+                return "should-not-happen"
+
+        cookie_auth = TC()
+
+        import unittest.mock as mock
+
+        with mock.patch("ninja_aio.auth.jwt.decode") as mock_decode:
+            mock_decode.side_effect = errors.JoseError("invalid token")
+            result = async_to_sync(cookie_auth.authenticate)(
+                HttpRequest(), "fake-token"
+            )
+            self.assertFalse(result)
+
+    def test_async_cookie_base_auth_handler_returns_none(self):
+        pub = self.public_jwk
+
+        class TC(AsyncJwtCookie):
+            jwt_public = pub
+            claims = {
+                "iss": {"value": "test-issuer"},
+                "aud": {"value": "test-audience"},
+            }
+
+        token = encode_jwt({"sub": "42"}, duration=60)
+        cookie_auth = TC()
+        result = async_to_sync(cookie_auth.authenticate)(HttpRequest(), token)
+        self.assertIsNone(result)
+
+    def test_async_cookie_custom_param_name(self):
+        pub = self.public_jwk
+
+        class TC(AsyncJwtCookie):
+            jwt_public = pub
+            param_name = "my_jwt"
+            claims = {
+                "iss": {"value": "test-issuer"},
+                "aud": {"value": "test-audience"},
+            }
+
+        cookie_auth = TC()
+        self.assertEqual(cookie_auth.param_name, "my_jwt")
+
+    def test_async_cookie_default_param_name(self):
+        pub = self.public_jwk
+
+        class TC(AsyncJwtCookie):
+            jwt_public = pub
+            claims = {
+                "iss": {"value": "test-issuer"},
+                "aud": {"value": "test-audience"},
+            }
+
+        cookie_auth = TC()
+        self.assertEqual(cookie_auth.param_name, "access_token")
+
+    def test_async_cookie_csrf_enabled_by_default(self):
+        pub = self.public_jwk
+
+        class TC(AsyncJwtCookie):
+            jwt_public = pub
+            claims = {
+                "iss": {"value": "test-issuer"},
+                "aud": {"value": "test-audience"},
+            }
+
+        cookie_auth = TC()
+        self.assertTrue(cookie_auth.csrf)
+
+    def test_async_cookie_csrf_can_be_disabled(self):
+        pub = self.public_jwk
+
+        class TC(AsyncJwtCookie):
+            jwt_public = pub
+            claims = {
+                "iss": {"value": "test-issuer"},
+                "aud": {"value": "test-audience"},
+            }
+
+        cookie_auth = TC(csrf=False)
+        self.assertFalse(cookie_auth.csrf)
+
+
+class JwtCookieHelperTests(TestCase):
+    def test_set_jwt_cookie_defaults_production(self):
+        """secure defaults to True when DEBUG=False."""
+        from django.http import HttpResponse
+
+        with self.settings(DEBUG=False):
+            response = HttpResponse()
+            result = set_jwt_cookie(response, "my.jwt.token")
+            self.assertIs(result, response)
+            cookie = response.cookies["access_token"]
+            self.assertEqual(cookie.value, "my.jwt.token")
+            self.assertTrue(cookie["httponly"])
+            self.assertTrue(cookie["secure"])
+            self.assertEqual(cookie["samesite"], "Lax")
+            self.assertEqual(cookie["path"], "/")
+
+    def test_set_jwt_cookie_defaults_development(self):
+        """secure defaults to False when DEBUG=True."""
+        from django.http import HttpResponse
+
+        with self.settings(DEBUG=True):
+            response = HttpResponse()
+            set_jwt_cookie(response, "my.jwt.token")
+            cookie = response.cookies["access_token"]
+            self.assertEqual(cookie["secure"], "")
+
+    def test_set_jwt_cookie_custom_params(self):
+        from django.http import HttpResponse
+
+        response = HttpResponse()
+        set_jwt_cookie(
+            response,
+            "my.jwt.token",
+            cookie_name="session_jwt",
+            max_age=3600,
+            secure=False,
+            httponly=False,
+            samesite="Strict",
+            path="/api",
+            domain="example.com",
+        )
+        cookie = response.cookies["session_jwt"]
+        self.assertEqual(cookie.value, "my.jwt.token")
+        self.assertEqual(cookie["max-age"], 3600)
+        self.assertEqual(cookie["samesite"], "Strict")
+        self.assertEqual(cookie["path"], "/api")
+        self.assertEqual(cookie["domain"], "example.com")
+
+    def test_delete_jwt_cookie(self):
+        from django.http import HttpResponse
+
+        response = HttpResponse()
+        response.set_cookie("access_token", "my.jwt.token")
+        result = delete_jwt_cookie(response)
+        self.assertIs(result, response)
+        cookie = response.cookies["access_token"]
+        self.assertEqual(cookie["max-age"], 0)
+
+    def test_delete_jwt_cookie_custom_name(self):
+        from django.http import HttpResponse
+
+        response = HttpResponse()
+        response.set_cookie("my_token", "my.jwt.token")
+        delete_jwt_cookie(response, cookie_name="my_token")
+        cookie = response.cookies["my_token"]
+        self.assertEqual(cookie["max-age"], 0)

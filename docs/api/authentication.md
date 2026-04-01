@@ -12,6 +12,7 @@ Authentication in Django Ninja AIO:
 - :material-tune: **Flexible** — Per-endpoint or global authentication
 - :material-cog: **Customizable** — Override default behavior
 - :material-lock: **RSA/HMAC Support** — Multiple signing algorithms
+- :material-cookie-lock: **Cookie Auth** — BFF-ready JWT cookie authentication with CSRF protection
 
 ---
 
@@ -300,6 +301,108 @@ async def auth_handler(self, request):
         cache.set(cache_key, user, 300)  # Cache 5 minutes
 
     return user
+```
+
+---
+
+## :material-cookie-lock: AsyncJwtCookie
+
+Cookie-based JWT authentication for **BFF (Backend for Frontend)** patterns. Instead of reading the token from the `Authorization` header, it reads from an HttpOnly cookie.
+
+### Class Definition
+
+```python
+from ninja_aio.auth import AsyncJwtCookie
+from joserfc import jwk
+
+class MyCookieAuth(AsyncJwtCookie):
+    jwt_public: jwk.RSAKey | jwk.OctKey  # Public key for verification
+    param_name: str = "access_token"  # Cookie name
+    claims: dict = {}  # Required claims
+
+    async def auth_handler(self, request):
+        # Return user object or custom auth context
+        pass
+```
+
+### :material-cog: Attributes
+
+#### `param_name`
+
+The cookie name to read the JWT from. Defaults to `"access_token"`.
+
+```python
+class MyCookieAuth(AsyncJwtCookie):
+    param_name = "session_jwt"  # Custom cookie name
+```
+
+#### CSRF Protection
+
+CSRF is **enabled by default**. Disable it (not recommended) by passing `csrf=False`:
+
+```python
+auth = MyCookieAuth(csrf=False)
+```
+
+### :material-code-braces: Quick Start
+
+```python
+# auth.py
+from ninja_aio.auth import AsyncJwtCookie
+from joserfc import jwk
+from django.conf import settings
+
+class CookieAuth(AsyncJwtCookie):
+    jwt_public = jwk.RSAKey.import_key(settings.JWT_PUBLIC_KEY)
+    claims = {
+        "iss": {"essential": True, "value": settings.JWT_ISSUER},
+        "aud": {"essential": True, "value": settings.JWT_AUDIENCE},
+    }
+
+    async def auth_handler(self, request):
+        user_id = self.dcd.claims.get("sub")
+        user = await User.objects.aget(id=user_id)
+        return user
+```
+
+### :material-login: BFF Login / Logout Endpoints
+
+```python
+from ninja_aio.auth import encode_jwt, set_jwt_cookie, delete_jwt_cookie
+
+@api.post("/auth/login/")
+async def login(request, data: LoginSchema):
+    user = await authenticate_user(data)
+    token = encode_jwt(claims={"sub": str(user.id)}, duration=900)
+
+    response = api.create_response(request, {"message": "ok"})
+    set_jwt_cookie(response, token, max_age=900)
+    return response
+
+
+@api.post("/auth/logout/")
+async def logout(request):
+    response = api.create_response(request, {"message": "logged out"})
+    delete_jwt_cookie(response)
+    return response
+```
+
+### :material-compare: AsyncJwtBearer vs AsyncJwtCookie
+
+| | `AsyncJwtBearer` | `AsyncJwtCookie` |
+|---|---|---|
+| **Token location** | `Authorization: Bearer <token>` header | HttpOnly cookie |
+| **Best for** | SPAs, mobile apps, API-to-API | BFF pattern, server-rendered apps |
+| **XSS protection** | Token accessible to JS | Token inaccessible to JS (HttpOnly) |
+| **CSRF protection** | Not needed (explicit header) | Built-in (enabled by default) |
+| **Frontend code** | Must manage token storage | Zero token management |
+
+### Apply to ViewSet
+
+```python
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    auth = [CookieAuth()]
 ```
 
 ---
