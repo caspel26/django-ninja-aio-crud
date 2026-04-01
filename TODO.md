@@ -31,6 +31,7 @@
 | 21 | ~~Multi-field search~~ | `views/mixins.py` | v2.29.0 | `SearchViewSetMixin` — `?search=` across configurable fields with OR logic, composable with all filter mixins. |
 | 22 | ~~Reactive model hooks~~ | `models/hooks.py`, `models/serializers.py`, `models/utils.py` | v2.30.0 | `@on_create`, `@on_update("status")`, `@on_delete` on ModelSerializer AND Serializer. Field-level triggers, async/sync support, zero extra DB queries for change detection. |
 | 23 | ~~Swagger UI branding~~ | `docs.py`, `api.py`, `templates/` | v2.30.0 | `Branding` dataclass with `logo_url`, `primary_color`, `favicon_url`, `custom_css`. Auto-activates `BrandedSwagger` template. |
+| 24 | ~~JWT Cookie Auth (BFF)~~ | `auth.py` | v2.30.0 | `AsyncJwtCookie` for HttpOnly cookie JWT auth. `JwtAuthMixin` eliminates duplication. `set_jwt_cookie`/`delete_jwt_cookie` helpers with auto-safe `secure` flag. |
 
 ---
 

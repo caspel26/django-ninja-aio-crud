@@ -1,5 +1,158 @@
 # 📋 Release Notes
 
+## 🏷️ [v2.30.0] - 2026-04-01
+
+---
+
+### ✨ New Features
+
+#### 🔄 Reactive Model Hooks
+> `ninja_aio/models/hooks.py`, `ninja_aio/models/serializers.py`, `ninja_aio/models/utils.py`
+
+Declarative lifecycle hooks for `ModelSerializer` and `Serializer`. Define sync or async callbacks that fire automatically on create, update, and delete operations — with optional field-level triggers for updates.
+
+```python
+from ninja_aio.models import ModelSerializer
+from ninja_aio.models.hooks import on_create, on_update, on_delete
+
+class Article(ModelSerializer):
+    # ...
+
+    @on_create
+    async def notify_author(self):
+        await send_notification(self.author, "Article created")
+
+    @on_update("status")
+    async def handle_publish(self):
+        if self.status == "published":
+            await index_article(self)
+
+    @on_delete
+    def cleanup(self):
+        logger.info(f"Article {self.pk} deleted")
+```
+
+**Key capabilities:**
+
+| Feature | Description |
+|---|---|
+| `@on_create` | Fires after successful create |
+| `@on_update` / `@on_update("field")` | Fires after update, optionally only when specific fields change |
+| `@on_delete` | Fires before delete |
+| `suppress_signals` | Context manager to temporarily disable all hooks |
+| Async + sync | Both supported — framework detects and dispatches correctly |
+
+Works with both `ModelSerializer` and `Serializer` (Meta-driven) patterns.
+
+---
+
+#### 🎨 Swagger UI Branding
+> `ninja_aio/docs.py`, `ninja_aio/api.py`, `ninja_aio/templates/ninja_aio/branded_swagger.html`
+
+Customizable Swagger UI via a `Branding` dataclass. Personalize your API docs with logos, colors, and custom CSS — zero JavaScript required.
+
+```python
+from ninja_aio import NinjaAIO, Branding
+
+api = NinjaAIO(
+    branding=Branding(
+        logo_url="/static/logo.png",
+        primary_color="#6C63FF",
+        favicon_url="/static/favicon.ico",
+        custom_css=".swagger-ui .topbar { display: none; }",
+    )
+)
+```
+
+**Template variables:**
+
+| Variable | Type | Default | Description |
+|---|---|---|---|
+| `logo_url` | `str` | `None` | Header logo image URL |
+| `primary_color` | `str` | `None` | Accent color for buttons, links, headers |
+| `favicon_url` | `str` | `None` | Browser tab favicon |
+| `custom_css` | `str` | `None` | Additional CSS injected into the page |
+
+Auto-activates `BrandedSwagger` renderer when any branding option is set. Falls back to default Swagger UI when no branding is configured.
+
+---
+
+#### 🍪 JWT Cookie Authentication (BFF)
+> `ninja_aio/auth.py`
+
+`AsyncJwtCookie` — cookie-based JWT authentication for Backend for Frontend patterns. Reads JWTs from HttpOnly cookies with built-in CSRF protection via Django Ninja's `APIKeyCookie`.
+
+```python
+from ninja_aio.auth import AsyncJwtCookie
+
+class CookieAuth(AsyncJwtCookie):
+    jwt_public = jwk.RSAKey.import_key(settings.JWT_PUBLIC_KEY)
+    param_name = "access_token"  # cookie name (default)
+    claims = {
+        "iss": {"value": settings.JWT_ISSUER},
+        "aud": {"value": settings.JWT_AUDIENCE},
+    }
+
+    async def auth_handler(self, request):
+        return await User.objects.aget(id=self.dcd.claims["sub"])
+```
+
+**Cookie helpers:**
+
+| Function | Description |
+|---|---|
+| `set_jwt_cookie(response, token, ...)` | Set JWT as HttpOnly cookie with secure defaults |
+| `delete_jwt_cookie(response, ...)` | Remove JWT cookie (logout) |
+
+`secure` defaults to `not settings.DEBUG` — automatically secure in production, works over HTTP in development.
+
+**Architecture:** `JwtAuthMixin` extracts shared JWT logic, eliminating duplication between `AsyncJwtBearer` (header-based) and `AsyncJwtCookie` (cookie-based).
+
+| | `AsyncJwtBearer` | `AsyncJwtCookie` |
+|---|---|---|
+| Token location | `Authorization: Bearer` header | HttpOnly cookie |
+| Best for | SPAs, mobile, API-to-API | BFF, server-rendered apps |
+| XSS protection | Token accessible to JS | Token inaccessible to JS |
+| CSRF | Not needed | Built-in (enabled by default) |
+
+---
+
+### 🔧 Improvements
+
+#### 🧩 JwtAuthMixin Refactor
+> `ninja_aio/auth.py`
+
+Extracted shared JWT decode/validate/dispatch logic into `JwtAuthMixin`. Both `AsyncJwtBearer` and `AsyncJwtCookie` now compose from this mixin — zero code duplication, same behavior.
+
+#### 🏷️ Type Hints for Hooks and Signals
+> `ninja_aio/models/hooks.py`, `ninja_aio/models/utils.py`
+
+Added type annotations to all hook functions and signal handlers for improved IDE support and clarity.
+
+---
+
+### 📖 Documentation
+
+- ✨ New dedicated page: **Cookie Auth (BFF)** — full guide with architecture diagram, security best practices, and login/logout examples
+- ✨ New section in **JWT Authentication** page: `JwtAuthMixin`, `AsyncJwtCookie`, `set_jwt_cookie`, `delete_jwt_cookie`, comparison table
+- ✨ New section in **API Authentication** reference: `AsyncJwtCookie` quick start, BFF login/logout endpoints, comparison table
+- ✨ New page: **Swagger UI Branding** — `Branding` dataclass configuration, template variables
+- ✨ New page: **Reactive Hooks** — `@on_create`, `@on_update`, `@on_delete` for ModelSerializer and Serializer
+- 🔧 Fixed `@action` decorator reference link in decorators docs
+
+---
+
+### 🎯 Summary
+
+v2.30.0 adds three major features: **reactive model hooks** for declarative lifecycle callbacks, **Swagger UI branding** for customizable API documentation, and **cookie-based JWT authentication** for BFF patterns.
+
+**Key benefits:**
+
+- 🔄 Reactive hooks eliminate manual signal wiring — declare `@on_create`/`@on_update`/`@on_delete` directly on your models
+- 🎨 Branded Swagger UI with zero JavaScript — logos, colors, and custom CSS via a simple dataclass
+- 🍪 Secure cookie auth for BFF — HttpOnly + CSRF + auto-safe `secure` flag based on `DEBUG` setting
+- 🧩 `JwtAuthMixin` removes auth code duplication between Bearer and Cookie classes
+- 📖 Comprehensive documentation for all new features
 ## 🏷️ [v2.29.0] - 2026-03-25
 
 ---
