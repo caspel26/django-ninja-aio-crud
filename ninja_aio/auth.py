@@ -238,7 +238,7 @@ def set_jwt_cookie(
     token: str,
     cookie_name: str = "access_token",
     max_age: int = None,
-    secure: bool = True,
+    secure: bool = None,
     httponly: bool = True,
     samesite: str = "Lax",
     path: str = "/",
@@ -254,12 +254,15 @@ def set_jwt_cookie(
       - token (str): The JWT compact string
       - cookie_name (str): Cookie name, should match AsyncJwtCookie.param_name
       - max_age (int): Cookie lifetime in seconds
-      - secure (bool): HTTPS only. Defaults to True
+      - secure (bool): HTTPS only. Defaults to ``not settings.DEBUG``
+        (secure in production, permissive in development)
       - httponly (bool): Inaccessible to JavaScript. Defaults to True
       - samesite (str): SameSite policy. Defaults to "Lax"
       - path (str): Cookie path. Defaults to "/"
       - domain (str): Cookie domain. Defaults to None
     """
+    if secure is None:
+        secure = not settings.DEBUG
     response.set_cookie(
         key=cookie_name,
         value=token,

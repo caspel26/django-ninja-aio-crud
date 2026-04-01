@@ -15,10 +15,10 @@ from ninja_aio.auth import (
 )
 
 
-class JwtAuthTests(TestCase):
+class JwtTestBase(TestCase):
+    """Shared setUp/tearDown for JWT auth tests."""
+
     def setUp(self):
-        # Generate an RSA keypair for signing/verification
-        # If your joserfc version uses a different signature, adjust "size" accordingly.
         self.private_jwk = jwk.RSAKey.generate_key(key_size=2048)
         self.private_jwk.ensure_kid()
         # Try common public conversion names to keep compatibility across joserfc versions
@@ -40,6 +40,9 @@ class JwtAuthTests(TestCase):
 
     def tearDown(self):
         self._settings.disable()
+
+
+class JwtAuthTests(JwtTestBase):
 
     def test_encode_decode_roundtrip(self):
         token = encode_jwt({"sub": "u1"}, duration=60)
@@ -176,28 +179,7 @@ class JwtAuthTests(TestCase):
         self.assertEqual(result["aud"], "custom-audience")
 
 
-class JwtCookieAuthTests(TestCase):
-    def setUp(self):
-        self.private_jwk = jwk.RSAKey.generate_key(key_size=2048)
-        self.private_jwk.ensure_kid()
-        self.public_jwk = getattr(self.private_jwk, "as_public_key", None)
-        if callable(self.public_jwk):
-            self.public_jwk = self.public_jwk()
-        else:
-            as_public = getattr(self.private_jwk, "as_public", None)
-            self.public_jwk = as_public() if callable(as_public) else self.private_jwk
-        self.public_jwk.ensure_kid()
-
-        self._settings = override_settings(
-            JWT_PRIVATE_KEY=self.private_jwk,
-            JWT_PUBLIC_KEY=self.public_jwk,
-            JWT_ISSUER="test-issuer",
-            JWT_AUDIENCE="test-audience",
-        )
-        self._settings.enable()
-
-    def tearDown(self):
-        self._settings.disable()
+class JwtCookieAuthTests(JwtTestBase):
 
     def test_async_cookie_authenticate_success(self):
         token = encode_jwt({"sub": "42"}, duration=60)
@@ -329,18 +311,30 @@ class JwtCookieAuthTests(TestCase):
 
 
 class JwtCookieHelperTests(TestCase):
-    def test_set_jwt_cookie_defaults(self):
+    def test_set_jwt_cookie_defaults_production(self):
+        """secure defaults to True when DEBUG=False."""
         from django.http import HttpResponse
 
-        response = HttpResponse()
-        result = set_jwt_cookie(response, "my.jwt.token")
-        self.assertIs(result, response)
-        cookie = response.cookies["access_token"]
-        self.assertEqual(cookie.value, "my.jwt.token")
-        self.assertTrue(cookie["httponly"])
-        self.assertTrue(cookie["secure"])
-        self.assertEqual(cookie["samesite"], "Lax")
-        self.assertEqual(cookie["path"], "/")
+        with self.settings(DEBUG=False):
+            response = HttpResponse()
+            result = set_jwt_cookie(response, "my.jwt.token")
+            self.assertIs(result, response)
+            cookie = response.cookies["access_token"]
+            self.assertEqual(cookie.value, "my.jwt.token")
+            self.assertTrue(cookie["httponly"])
+            self.assertTrue(cookie["secure"])
+            self.assertEqual(cookie["samesite"], "Lax")
+            self.assertEqual(cookie["path"], "/")
+
+    def test_set_jwt_cookie_defaults_development(self):
+        """secure defaults to False when DEBUG=True."""
+        from django.http import HttpResponse
+
+        with self.settings(DEBUG=True):
+            response = HttpResponse()
+            set_jwt_cookie(response, "my.jwt.token")
+            cookie = response.cookies["access_token"]
+            self.assertEqual(cookie["secure"], "")
 
     def test_set_jwt_cookie_custom_params(self):
         from django.http import HttpResponse
