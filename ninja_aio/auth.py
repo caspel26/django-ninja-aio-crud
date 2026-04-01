@@ -63,6 +63,9 @@ class JwtAuthMixin:
         Authenticate the request and return the user if authentication is successful.
         If authentication fails, returns false.
         """
+        if not token:
+            logger.debug("No JWT token provided")
+            return False
         try:
             self.dcd = jwt.decode(token, self.jwt_public, algorithms=self.algorithms)
             self.validate_claims(self.dcd.claims)
