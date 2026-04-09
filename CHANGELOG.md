@@ -1,5 +1,28 @@
 # 📋 Release Notes
 
+## 🏷️ [v2.30.2] - 2026-04-09
+
+---
+
+### 🐛 Bug Fix
+
+#### 🍪 Fix CSRF error when JWT cookie is absent
+> `ninja_aio/auth.py`
+
+`AsyncJwtCookie._get_key` now checks if the JWT cookie exists **before** enforcing CSRF. Previously, requests without the JWT cookie (unauthenticated) would hit the CSRF check first and raise `403 CSRF check Failed` instead of returning `None` (auth not attempted). Now:
+
+- **No cookie** → returns `None` (skips CSRF, auth not attempted → 401)
+- **Cookie present, no CSRF token** → raises `403 CSRF check Failed`
+- **Cookie present, valid CSRF** → returns the JWT for decoding
+
+---
+
+### 🎯 Summary
+
+Patch release that fixes `AsyncJwtCookie` CSRF handling. Unauthenticated requests (no JWT cookie) no longer trigger CSRF validation — they cleanly fall through to a 401 response.
+
+---
+
 ## 🏷️ [v2.30.1] - 2026-04-01
 
 ---
