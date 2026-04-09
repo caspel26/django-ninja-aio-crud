@@ -256,6 +256,20 @@ class JwtCookieAuthTests(JwtTestBase):
         result = async_to_sync(cookie_auth.authenticate)(HttpRequest(), token)
         self.assertIsNone(result)
 
+    def test_async_cookie_authenticate_missing_token_returns_false(self):
+        pub = self.public_jwk
+
+        class TC(AsyncJwtCookie):
+            jwt_public = pub
+            claims = {
+                "iss": {"value": "test-issuer"},
+                "aud": {"value": "test-audience"},
+            }
+
+        cookie_auth = TC()
+        result = async_to_sync(cookie_auth.authenticate)(HttpRequest(), None)
+        self.assertFalse(result)
+
     def test_async_cookie_custom_param_name(self):
         pub = self.public_jwk
 
@@ -308,6 +322,62 @@ class JwtCookieAuthTests(JwtTestBase):
 
         cookie_auth = TC(csrf=False)
         self.assertFalse(cookie_auth.csrf)
+
+    def test_async_cookie_missing_cookie_skips_csrf(self):
+        """No cookie present should return None without CSRF error."""
+        pub = self.public_jwk
+
+        class TC(AsyncJwtCookie):
+            jwt_public = pub
+            claims = {
+                "iss": {"value": "test-issuer"},
+                "aud": {"value": "test-audience"},
+            }
+
+        cookie_auth = TC()
+        request = HttpRequest()
+        # No cookie set, no CSRF token — should not raise 403
+        key = cookie_auth._get_key(request)
+        self.assertIsNone(key)
+
+    def test_async_cookie_present_without_csrf_raises_403(self):
+        """Cookie present but no CSRF token should raise 403."""
+        from ninja.errors import HttpError
+
+        pub = self.public_jwk
+
+        class TC(AsyncJwtCookie):
+            jwt_public = pub
+            claims = {
+                "iss": {"value": "test-issuer"},
+                "aud": {"value": "test-audience"},
+            }
+
+        cookie_auth = TC()
+        request = HttpRequest()
+        request.COOKIES["access_token"] = "some.jwt.token"
+        request.META["REQUEST_METHOD"] = "POST"
+        with self.assertRaises(HttpError) as ctx:
+            cookie_auth._get_key(request)
+        self.assertEqual(ctx.exception.status_code, 403)
+
+    def test_async_cookie_csrf_disabled_skips_check(self):
+        """With csrf=False, cookie present without CSRF token should not raise."""
+        pub = self.public_jwk
+
+        class TC(AsyncJwtCookie):
+            jwt_public = pub
+            claims = {
+                "iss": {"value": "test-issuer"},
+                "aud": {"value": "test-audience"},
+            }
+
+        cookie_auth = TC(csrf=False)
+        request = HttpRequest()
+        request.COOKIES["access_token"] = "some.jwt.token"
+        request.META["REQUEST_METHOD"] = "POST"
+        key = cookie_auth._get_key(request)
+        self.assertEqual(key, "some.jwt.token")
 
 
 class JwtCookieHelperTests(TestCase):

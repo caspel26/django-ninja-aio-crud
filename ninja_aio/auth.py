@@ -127,6 +127,20 @@ class AsyncJwtCookie(JwtAuthMixin, APIKeyCookie):
 
     param_name: str = "access_token"
 
+    def _get_key(self, request: HttpRequest):
+        key = request.COOKIES.get(self.param_name)
+        if not key:
+            return None
+        # Only enforce CSRF when a JWT cookie is actually present
+        if self.csrf and not getattr(request, "_ninja_csrf_exempt", False):
+            from ninja.errors import HttpError
+            from ninja.utils import check_csrf
+
+            error_response = check_csrf(request)
+            if error_response:
+                raise HttpError(403, "CSRF check Failed")
+        return key
+
 
 def validate_key(key: Optional[JwtKeys], setting_name: str) -> JwtKeys:
     if key is None:
