@@ -446,3 +446,99 @@ class JwtCookieHelperTests(TestCase):
         delete_jwt_cookie(response, cookie_name="my_token")
         cookie = response.cookies["my_token"]
         self.assertEqual(cookie["max-age"], 0)
+
+
+class MultiAuthChainTests(JwtTestBase):
+    """
+    End-to-end tests for chaining multiple JWT auth methods on a single endpoint.
+
+    Regression coverage for the v2.30.2 CSRF bug: AsyncJwtCookie used to raise
+    403 CSRF Failed before checking if its cookie was even present, which broke
+    `auth=[AsyncJwtBearer(), AsyncJwtCookie()]` chains — Django Ninja stops
+    iterating auth methods on the first exception.
+    """
+
+    def _make_auth_classes(self):
+        pub = self.public_jwk
+
+        class TBearer(AsyncJwtBearer):
+            jwt_public = pub
+            claims = {
+                "iss": {"value": "test-issuer"},
+                "aud": {"value": "test-audience"},
+            }
+
+            async def auth_handler(self, request):
+                return {"via": "bearer", "sub": self.dcd.claims.get("sub")}
+
+        class TCookie(AsyncJwtCookie):
+            jwt_public = pub
+            claims = {
+                "iss": {"value": "test-issuer"},
+                "aud": {"value": "test-audience"},
+            }
+
+            async def auth_handler(self, request):
+                return {"via": "cookie", "sub": self.dcd.claims.get("sub")}
+
+        return TBearer, TCookie
+
+    def _build_async_api(self, TBearer, TCookie):
+        from ninja import NinjaAPI
+
+        api = NinjaAPI(urls_namespace=f"multiauth_{id(self)}")
+
+        @api.get("/whoami", auth=[TBearer(), TCookie(csrf=False)])
+        async def whoami(request):
+            return request.auth
+
+        return api
+
+    def _async_get(self, client, path, **kwargs):
+        async def _call():
+            return await client.get(path, **kwargs)
+
+        return async_to_sync(_call)()
+
+    def test_chain_resolves_with_bearer_when_no_cookie(self):
+        """
+        Bearer header alone should authenticate even though AsyncJwtCookie is
+        also in the chain. This is the exact scenario the v2.30.2 fix unblocks:
+        without the fix, AsyncJwtCookie raised 403 before Bearer was tried.
+        """
+        from ninja.testing import TestAsyncClient
+
+        TBearer, TCookie = self._make_auth_classes()
+        api = self._build_async_api(TBearer, TCookie)
+        client = TestAsyncClient(api)
+
+        token = encode_jwt({"sub": "42"}, duration=60)
+        resp = self._async_get(
+            client, "/whoami", headers={"Authorization": f"Bearer {token}"}
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json(), {"via": "bearer", "sub": "42"})
+
+    def test_chain_resolves_with_cookie_when_no_bearer(self):
+        """Cookie alone should authenticate when no Authorization header is sent."""
+        from ninja.testing import TestAsyncClient
+
+        TBearer, TCookie = self._make_auth_classes()
+        api = self._build_async_api(TBearer, TCookie)
+        client = TestAsyncClient(api)
+
+        token = encode_jwt({"sub": "99"}, duration=60)
+        resp = self._async_get(client, "/whoami", COOKIES={"access_token": token})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json(), {"via": "cookie", "sub": "99"})
+
+    def test_chain_returns_401_when_neither_provided(self):
+        """No bearer header AND no cookie should return 401, not 403."""
+        from ninja.testing import TestAsyncClient
+
+        TBearer, TCookie = self._make_auth_classes()
+        api = self._build_async_api(TBearer, TCookie)
+        client = TestAsyncClient(api)
+
+        resp = self._async_get(client, "/whoami")
+        self.assertEqual(resp.status_code, 401)
