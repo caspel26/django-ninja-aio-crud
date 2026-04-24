@@ -1,5 +1,56 @@
 # 📋 Release Notes
 
+## 🏷️ [v2.30.3] - 2026-04-24
+
+---
+
+### 🐛 Bug Fix
+
+#### 🔑 Normalize request PKs before M2M dict lookup
+> `ninja_aio/helpers/api.py`
+
+`ManyToManyAPI._check_m2m_objs` built its `resolved` map keyed by `obj.pk` (native types — `uuid.UUID`, `int`, etc.) but looked it up with the raw primary keys from the request payload, which JSON always delivers as strings. Every lookup against a UUID-keyed dict using a string missed, so **every M2M add/remove against a model with a UUID primary key failed with "not found"**, regardless of the auth method in use.
+
+A new `_normalize_pk(pk_field, value)` `@staticmethod` on `ManyToManyAPI` runs `pk_field.to_python(value)` to coerce the incoming string into the PK field's native type before dict lookup. This is Django's canonical conversion hook, so the fix generalizes to any PK field type (UUIDField, IntegerField, BigIntegerField, custom fields). Invalid inputs fall through to the existing "not found" branch instead of raising.
+
+Both resolution paths are covered:
+
+- **Batched path** (no custom `{related_name}_query_handler`) — `resolved` keys stay as native `obj.pk`, lookup normalizes the request PK to match.
+- **Query handler path** — `resolved` keys are built from `_normalize_pk(pk_field, obj_pk)` so the later lookup matches exactly.
+
+```python
+# Before — broken for UUID PKs:
+#   resolved = {UUID('...'): tag_obj}
+#   resolved.get('...')  # → None, "not found"
+
+# After — _normalize_pk coerces the string to UUID before lookup:
+#   resolved.get(UUID('...'))  # → tag_obj ✅
+```
+
+---
+
+### 🔧 Improvements
+
+#### 🏷️ Type hints on `_normalize_pk`
+> `ninja_aio/helpers/api.py`
+
+The new helper is typed as `_normalize_pk(pk_field: Field, value: Any) -> Any`, using `django.db.models.fields.Field` for the PK field parameter.
+
+---
+
+### 🎯 Summary
+
+Patch release fixing a silent M2M failure mode for models with UUID primary keys. Any `ManyToManyAPI` add/remove endpoint operating on a UUID-keyed related model now resolves payload PKs correctly instead of returning "not found" for every entry.
+
+**Key benefits:**
+
+- ✅ UUID-PK models fully supported by M2M add/remove endpoints
+- ✅ Fix generalizes to all Django PK field types via `Field.to_python`
+- ✅ Both batched and `query_handler` resolution paths covered
+- ✅ Invalid PK strings still surface cleanly as "not found", never a 500
+
+---
+
 ## 🏷️ [v2.30.2] - 2026-04-09
 
 ---
