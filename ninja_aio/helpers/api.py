@@ -1,7 +1,8 @@
 import asyncio
 import logging
-from typing import Coroutine
+from typing import Any, Coroutine
 
+from django.core.exceptions import ValidationError
 from django.http import HttpRequest
 from ninja import Path, Query, Status
 from ninja.pagination import paginate
@@ -16,6 +17,7 @@ from ninja_aio.schemas import (
     M2MRemoveSchemaIn,
 )
 from django.db.models import QuerySet, Model
+from django.db.models.fields import Field
 
 
 logger = logging.getLogger("ninja_aio.helpers")
@@ -271,6 +273,16 @@ class ManyToManyAPI:
     def _get_query_handler(self, related_name: str) -> Coroutine | None:
         return getattr(self.view_set, f"{related_name}_query_handler", None)
 
+    @staticmethod
+    def _normalize_pk(pk_field: Field, value: Any) -> Any:
+        # Incoming PKs from request payloads are typically strings (e.g. JSON
+        # UUIDs). Dict lookups against keys built from ``obj.pk`` (native
+        # types like ``uuid.UUID`` or ``int``) miss otherwise.
+        try:
+            return pk_field.to_python(value)
+        except (ValidationError, TypeError, ValueError):
+            return value
+
     async def _check_m2m_objs(
         self,
         request: HttpRequest,
@@ -290,6 +302,7 @@ class ManyToManyAPI:
         rel_obj_pks = {rel_obj.pk async for rel_obj in related_manager.all()}
         rel_model_name = related_model._meta.verbose_name.capitalize()
         query_handler = self._get_query_handler(related_name)
+        pk_field = related_model._meta.pk
 
         if query_handler:
             # Custom query handler: must validate per-PK (cannot batch)
@@ -298,17 +311,17 @@ class ManyToManyAPI:
                 rel_obj = await (
                     await query_handler(request, obj_pk, instance)
                 ).afirst()
-                resolved[obj_pk] = rel_obj
+                resolved[self._normalize_pk(pk_field, obj_pk)] = rel_obj
         else:
             # No custom handler: single batched query for all PKs
-            pk_name = related_model._meta.pk.attname
+            pk_name = pk_field.attname
             qs = await ModelUtil(related_model).get_objects(request)
             resolved = {}
             async for obj in qs.filter(**{f"{pk_name}__in": objs_pks}):
                 resolved[obj.pk] = obj
 
         for obj_pk in objs_pks:
-            rel_obj = resolved.get(obj_pk)
+            rel_obj = resolved.get(self._normalize_pk(pk_field, obj_pk))
             if rel_obj is None:
                 logger.debug(f"M2M check: {rel_model_name} with pk {obj_pk} not found")
                 errors.append(f"{rel_model_name} with pk {obj_pk} not found.")

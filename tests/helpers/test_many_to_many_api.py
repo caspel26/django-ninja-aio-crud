@@ -1,3 +1,5 @@
+import uuid
+
 from django.test import TestCase, tag
 from asgiref.sync import async_to_sync
 from ninja_aio import NinjaAIO
@@ -661,3 +663,146 @@ class M2MAsyncQueryParamsHandlerTestCase(TestCase):
         content = result.value
         self.assertEqual(content["count"], 1)
         self.assertEqual(content["items"][0]["name"], "async_target")
+
+
+class UUIDArticleViewSet(APIViewSet):
+    """ViewSet over ArticleUUID (UUID PK) with an M2M to TagUUID (UUID PK)."""
+
+    model = models.ArticleUUID
+    m2m_relations = [
+        M2MRelationSchema(
+            model=models.TagUUID,
+            related_name="tags_uuid",
+            append_slash=True,
+        )
+    ]
+
+
+class UUIDArticleQueryHandlerViewSet(APIViewSet):
+    """Same as UUIDArticleViewSet but routes pk resolution through a custom handler."""
+
+    model = models.ArticleUUID
+    m2m_relations = [
+        M2MRelationSchema(
+            model=models.TagUUID,
+            related_name="tags_uuid",
+            append_slash=True,
+        )
+    ]
+
+    async def tags_uuid_query_handler(self, request, pk, instance):
+        return models.TagUUID.objects.filter(pk=pk)
+
+
+@tag("m2m", "uuid", "regression")
+class NormalizePkTestCase(TestCase):
+    """Unit coverage for ManyToManyAPI._normalize_pk."""
+
+    def test_coerces_uuid_string_to_uuid(self):
+        """Strings from JSON must resolve to UUID instances for dict lookup."""
+        pk_field = models.TagUUID._meta.pk
+        raw = uuid.uuid4()
+        normalized = ManyToManyAPI._normalize_pk(pk_field, str(raw))
+        self.assertIsInstance(normalized, uuid.UUID)
+        self.assertEqual(normalized, raw)
+
+    def test_passes_through_uuid_instance(self):
+        pk_field = models.TagUUID._meta.pk
+        raw = uuid.uuid4()
+        self.assertEqual(ManyToManyAPI._normalize_pk(pk_field, raw), raw)
+
+    def test_invalid_value_returns_original(self):
+        """Bad inputs fall through to "not found" downstream, not a 500."""
+        pk_field = models.TagUUID._meta.pk
+        self.assertEqual(ManyToManyAPI._normalize_pk(pk_field, "not-a-uuid"), "not-a-uuid")
+
+
+@tag("m2m", "uuid", "regression")
+class M2MUUIDPkRegressionTestCase(TestCase):
+    """
+    Regression: _check_m2m_objs must match dict keys built from obj.pk (UUID)
+    against request payload pks (str), which JSON always delivers as strings.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.api = NinjaAIO(urls_namespace="m2m_uuid_regression")
+        cls.viewset = UUIDArticleViewSet(api=cls.api)
+        cls.request = Request(cls.viewset.path)
+        cls.article = models.ArticleUUID.objects.create(name="base")
+        cls.tags = [
+            models.TagUUID.objects.create(name=f"tag-{i}") for i in range(3)
+        ]
+
+    async def test_add_with_string_uuid_pks_resolves(self):
+        """Batched path: string UUIDs from JSON must resolve to objects."""
+        str_pks = [str(t.pk) for t in self.tags[:2]]
+        errors, details, objs = await self.viewset.m2m_api._check_m2m_objs(
+            self.request.post(),
+            str_pks,
+            models.TagUUID,
+            self.article.tags_uuid,
+            "tags_uuid",
+            self.article,
+        )
+        self.assertEqual(errors, [])
+        self.assertEqual(len(objs), 2)
+        self.assertEqual({o.pk for o in objs}, {t.pk for t in self.tags[:2]})
+
+    async def test_remove_with_string_uuid_pks_resolves(self):
+        """Remove path: already-related UUIDs passed as strings must match."""
+        await self.article.tags_uuid.aadd(*self.tags[:2])
+        str_pks = [str(self.tags[0].pk)]
+        errors, details, objs = await self.viewset.m2m_api._check_m2m_objs(
+            self.request.post(),
+            str_pks,
+            models.TagUUID,
+            self.article.tags_uuid,
+            "tags_uuid",
+            self.article,
+            remove=True,
+        )
+        self.assertEqual(errors, [])
+        self.assertEqual([o.pk for o in objs], [self.tags[0].pk])
+
+    async def test_nonexistent_uuid_string_yields_not_found(self):
+        bogus = str(uuid.uuid4())
+        errors, details, objs = await self.viewset.m2m_api._check_m2m_objs(
+            self.request.post(),
+            [bogus],
+            models.TagUUID,
+            self.article.tags_uuid,
+            "tags_uuid",
+            self.article,
+        )
+        self.assertEqual(objs, [])
+        self.assertEqual(len(errors), 1)
+        self.assertIn("not found", errors[0])
+
+
+@tag("m2m", "uuid", "regression", "query_handler")
+class M2MUUIDPkQueryHandlerRegressionTestCase(TestCase):
+    """Same regression, exercised through the custom query_handler branch."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.api = NinjaAIO(urls_namespace="m2m_uuid_qh_regression")
+        cls.viewset = UUIDArticleQueryHandlerViewSet(api=cls.api)
+        cls.request = Request(cls.viewset.path)
+        cls.article = models.ArticleUUID.objects.create(name="base")
+        cls.tags = [
+            models.TagUUID.objects.create(name=f"qh-tag-{i}") for i in range(2)
+        ]
+
+    async def test_add_with_string_uuid_pks_resolves_via_handler(self):
+        str_pks = [str(t.pk) for t in self.tags]
+        errors, details, objs = await self.viewset.m2m_api._check_m2m_objs(
+            self.request.post(),
+            str_pks,
+            models.TagUUID,
+            self.article.tags_uuid,
+            "tags_uuid",
+            self.article,
+        )
+        self.assertEqual(errors, [])
+        self.assertEqual({o.pk for o in objs}, {t.pk for t in self.tags})
