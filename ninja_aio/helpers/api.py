@@ -1,11 +1,11 @@
 import asyncio
 import logging
-from typing import Any, Coroutine
+from typing import Any, Coroutine, List
 
 from django.core.exceptions import ValidationError
 from django.http import HttpRequest
-from ninja import Path, Query, Status
-from ninja.pagination import paginate
+from ninja import Path, Query, Schema, Status
+from pydantic import create_model
 from ninja_aio.decorators import unique_view, decorate_view
 from ninja_aio.models import ModelSerializer, ModelUtil
 from ninja_aio.schemas import (
@@ -387,10 +387,20 @@ class ManyToManyAPI:
         verbose_name_plural: str,
         decorators: list,
     ):
+        _paginator = self.pagination_class()
+        _input_class = self.pagination_class.Input
+        _default_pagination = _input_class()
+        _paginated_schema = create_model(
+            f"Paginated{related_schema.__name__}",
+            __base__=Schema,
+            items=(List[related_schema], ...),
+            count=(int, ...),
+        )
+
         @self.router.get(
             self._get_api_path(rel_path, append_slash=append_slash),
             response={
-                200: list[related_schema],
+                200: _paginated_schema,
                 self.view_set.error_codes: GenericMessageSchema,
             },
             auth=m2m_auth,
@@ -399,14 +409,17 @@ class ManyToManyAPI:
         )
         @decorate_view(
             unique_view(f"get_{self.related_model_util.model_name}_{rel_path}"),
-            paginate(self.pagination_class),
             *decorators,
         )
         async def get_related(
             request: HttpRequest,
             pk: Path[self.path_schema],  # type: ignore
             filters: Query[filters_schema] = None,  # type: ignore
+            ninja_pagination: _input_class = Query(_default_pagination),  # type: ignore
         ):
+            if not isinstance(ninja_pagination, _input_class):
+                ninja_pagination = _default_pagination
+
             obj = await self.related_model_util.get_object(
                 request, self.view_set._get_pk(pk)
             )
@@ -420,9 +433,14 @@ class ManyToManyAPI:
                 else:
                     related_qs = query_handler(related_qs, filters.model_dump())
 
-            return Status(
-                200, await rel_util.list_read_s(related_schema, request, related_qs)
+            count = await related_qs.acount()
+            offset, page_size = self.view_set._get_page_params(
+                _paginator, ninja_pagination
             )
+            sliced_qs = related_qs[offset : offset + page_size]
+
+            items = await rel_util.list_read_s(related_schema, request, sliced_qs)
+            return Status(200, {"items": items, "count": count})
 
     def _resolve_action_schema(self, add: bool, remove: bool):
         return self.views_action_map[(add, remove)]
