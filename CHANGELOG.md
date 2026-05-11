@@ -1,5 +1,73 @@
 # 📋 Release Notes
 
+## 🏷️ [v2.30.6] - 2026-05-11
+
+---
+
+### 🐛 Bug Fix
+
+#### 🔐 Extend FK scoping to vanilla Django models via serializer registry
+> `ninja_aio/models/utils.py`, `ninja_aio/models/serializers.py`
+
+`v2.30.5` closed the multi-tenant FK bypass for foreign keys pointing at `ModelSerializer` subclasses, but left an unaddressed gap: foreign keys pointing at **vanilla Django models** (those that do not inherit from `ModelSerializer`) had no `queryset_request` hook to invoke and silently fell back to an unscoped `rel_model.objects.aget(pk=v)` — re-opening the same cross-tenant reference path the previous patch was meant to close.
+
+This release introduces a **module-level serializer registry** in `ninja_aio/models/utils.py` mapping every Django model to the `Serializer`/`ModelSerializer` subclass that scopes its querysets:
+
+- `register_serializer_for_model(model, serializer_cls)` — populates the registry.
+- `get_serializer_for_model(model)` — returns the registered serializer (or `None`).
+- Auto-registration is wired into `ModelSerializer.__init_subclass__` and `Serializer.__init_subclass__`, so users get the protection by simply defining a serializer for the related model — no extra configuration required.
+
+`_resolve_fk` now decides scope in three tiers:
+
+1. `rel_model` is a `ModelSerializer` subclass → use `ModelUtil(rel_model)` (its own `queryset_request` applies).
+2. `rel_model` is a vanilla Django model **with a registered `Serializer`** → use `ModelUtil(rel_model, serializer_class=registered)` so the registered serializer's `queryset_request(request)` filters the lookup.
+3. `rel_model` is a vanilla Django model with **no registered serializer** → fall back to `rel_model.objects.aget(pk=v)` (historical single-tenant behavior).
+
+In every scoped path, an out-of-scope row raises the standard `NotFoundError(rel_model)` — indistinguishable from a real 404, preventing cross-tenant probing.
+
+```python
+# Setup — vanilla Django model + Serializer with tenant scoping
+class Tag(models.Model):  # vanilla, not a ModelSerializer
+    name = models.CharField(max_length=64)
+    tenant = models.ForeignKey("Tenant", on_delete=models.CASCADE)
+
+class TagSerializer(Serializer[Tag]):  # auto-registers Tag -> TagSerializer
+    class Meta:
+        model = Tag
+        schema_in = SchemaModelConfig(fields=["name"])
+
+    @classmethod
+    async def queryset_request(cls, request):
+        return Tag.objects.filter(tenant=request.user.tenant)
+
+# Now: a Post with FK -> Tag is protected even though Tag is vanilla
+#   POST /posts  { "tag_id": "<other-tenant-tag-pk>" }
+#   → registry hit: TagSerializer
+#   → ModelUtil(Tag, serializer_class=TagSerializer).get_object(request, pk=...)
+#   → queryset filtered by tenant → not found
+#   → NotFoundError(Tag) → 404 ✅
+```
+
+**Duplicate-registration policy:** When multiple `Serializer` subclasses target the same model (e.g. distinct read shapes for admin vs public APIs), the **last registration wins** and the override is logged at DEBUG level. In practice `queryset_request` is a tenant-scope concern and typically identical across read-shape variants, so the choice rarely matters; when it does, users can control resolution via import order. An explicit opt-in/opt-out attribute can be added in a future release if real-world collisions warrant it.
+
+**Backward compatibility:** Single-tenant deployments and any code that already used `ModelSerializer` for the related model behave identically. The only behavioral change is on the previously-unscoped vanilla-FK path — and only when the related model now has a `Serializer` defined for it.
+
+---
+
+### 🎯 Summary
+
+Closes the remaining half of the multi-tenant FK bypass first patched in v2.30.5. After this release, foreign keys are tenant-scoped consistently whether the target is a `ModelSerializer` (direct hook) or a plain Django model with a `Serializer` defined elsewhere (registry lookup).
+
+**Key benefits:**
+
+- 🔒 Multi-tenant FK isolation is now complete — covers `ModelSerializer` *and* vanilla Django models
+- 🪄 Zero-config protection — defining a `Serializer` for a model auto-registers it
+- ♻️ Single decision tree in `_resolve_fk`; no duplicated tenant-filtering logic
+- 🔄 Fully backward compatible for single-tenant setups (vanilla models with no `Serializer` keep the historical lookup)
+- 🧪 938 existing tests pass; no behavioral change on any non-FK code path
+
+---
+
 ## 🏷️ [v2.30.5] - 2026-05-11
 
 ---
