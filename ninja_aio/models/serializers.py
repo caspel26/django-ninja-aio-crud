@@ -1421,7 +1421,7 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
-        from ninja_aio.models.utils import ModelUtil
+        from ninja_aio.models.utils import ModelUtil, register_serializer_for_model
         from ninja_aio.helpers.query import QueryUtil
         from ninja_aio.models.hooks import collect_reactive_hooks, register_signals
 
@@ -1429,6 +1429,8 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
         cls.query_util = QueryUtil(cls)
         cls._reactive_hooks = collect_reactive_hooks(cls)
         register_signals(cls)
+        if not cls._meta.abstract:
+            register_serializer_for_model(cls, cls)
 
     @classmethod
     def as_admin(cls, **overrides) -> type:
@@ -1899,7 +1901,7 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
-        from ninja_aio.models.utils import ModelUtil
+        from ninja_aio.models.utils import ModelUtil, register_serializer_for_model
         from ninja_aio.helpers.query import QueryUtil
         from ninja_aio.models.hooks import collect_reactive_hooks
 
@@ -1908,6 +1910,7 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         cls.query_util = QueryUtil(cls)
         cls._meta = cls.Meta
         cls._reactive_hooks = collect_reactive_hooks(cls)
+        register_serializer_for_model(cls.model, cls)
 
     class Meta:
         model: Optional[type[ModelT]] = None

@@ -37,6 +37,44 @@ ModelT = TypeVar("ModelT", bound=models.Model)
 logger = logging.getLogger("ninja_aio.models")
 
 
+# Registry mapping a Django model class to the Serializer/ModelSerializer subclass
+# that scopes its querysets via `queryset_request`. Populated by
+# `ModelSerializer.__init_subclass__` and `Serializer.__init_subclass__`.
+#
+# Used by `ModelUtil._resolve_fk` so that foreign keys pointing at vanilla
+# Django models are still tenant-scoped when a serializer has been defined for
+# the target model. When no serializer is registered for a model, FK lookups
+# fall back to the unscoped manager (single-tenant default).
+#
+# Policy on duplicates: last registration wins. Multiple serializers can
+# target the same model (e.g. different read shapes); their `queryset_request`
+# is typically identical (tenant scope, not view). Users who need a specific
+# serializer to win can control it via import order; an explicit opt-in flag
+# can be layered on later without breaking this default.
+_SERIALIZER_REGISTRY: dict[type[models.Model], type] = {}
+
+
+def register_serializer_for_model(model: type[models.Model], serializer_cls: type) -> None:
+    """Register *serializer_cls* as the FK-resolution scope for *model*.
+
+    Called automatically by `ModelSerializer` and `Serializer` subclasses.
+    Last registration wins; an existing entry is overwritten and logged at
+    DEBUG level so collisions are diagnosable without being fatal.
+    """
+    existing = _SERIALIZER_REGISTRY.get(model)
+    if existing is not None and existing is not serializer_cls:
+        logger.debug(
+            f"FK-resolution serializer for {model.__name__} overridden:"
+            f" {existing.__name__} -> {serializer_cls.__name__}"
+        )
+    _SERIALIZER_REGISTRY[model] = serializer_cls
+
+
+def get_serializer_for_model(model: type[models.Model]) -> type | None:
+    """Return the registered serializer for *model*, or None."""
+    return _SERIALIZER_REGISTRY.get(model)
+
+
 class LRUCache:
     """
     Thread-safe LRU cache backed by OrderedDict.
@@ -934,13 +972,43 @@ class ModelUtil(Generic[ModelT]):
     ) -> None:
         """Resolve foreign key ID to model instance in place.
 
-        Routes through ``ModelUtil(rel_model).get_object`` so the related
-        model's ``queryset_request`` hook is applied — preventing cross-tenant
-        FK references in multi-tenant setups.
+        Multi-tenant scoping rules:
+
+        - If *rel_model* is a ``ModelSerializer`` subclass, its own
+          ``queryset_request`` is applied via ``ModelUtil(rel_model)``.
+        - If *rel_model* is a vanilla Django model that has a ``Serializer``
+          subclass registered for it (see ``_SERIALIZER_REGISTRY``), that
+          serializer's ``queryset_request`` is applied via
+          ``ModelUtil(rel_model, serializer_class=...)``.
+        - Otherwise (vanilla model, no registered serializer), the unscoped
+          manager is used. In single-tenant setups this matches the historical
+          behavior; in multi-tenant setups, define a ``Serializer`` for the
+          related model to opt in to FK scoping.
+
+        In every scoped path, a row outside the caller's scope raises the
+        standard ``NotFoundError(rel_model)`` — indistinguishable from a real
+        404, so cross-tenant probing cannot leak existence.
         """
         rel_model = field_obj.related_model
-        logger.debug(f"Resolving FK '{k}' -> {rel_model.__name__} (pk={v}) for {self.model.__name__}")
-        payload[k] = await ModelUtil(rel_model).get_object(request, pk=v)
+        logger.debug(
+            f"Resolving FK '{k}' -> {rel_model.__name__} (pk={v}) for {self.model.__name__}"
+        )
+
+        if isinstance(rel_model, ModelSerializerMeta):
+            payload[k] = await ModelUtil(rel_model).get_object(request, pk=v)
+            return
+
+        rel_serializer_cls = get_serializer_for_model(rel_model)
+        if rel_serializer_cls is not None:
+            payload[k] = await ModelUtil(
+                rel_model, serializer_class=rel_serializer_cls
+            ).get_object(request, pk=v)
+            return
+
+        try:
+            payload[k] = await rel_model.objects.aget(pk=v)
+        except rel_model.DoesNotExist:
+            raise NotFoundError(rel_model)
 
     async def _process_payload_fields(
         self,
