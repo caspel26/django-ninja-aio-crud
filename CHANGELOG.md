@@ -1,5 +1,55 @@
 # 📋 Release Notes
 
+## 🏷️ [v2.30.5] - 2026-05-11
+
+---
+
+### 🐛 Bug Fix
+
+#### 🔐 Foreign-key resolution now respects `queryset_request` (multi-tenant safety)
+> `ninja_aio/models/utils.py`
+
+`ModelUtil._resolve_fk` previously resolved foreign keys via `rel_model.objects.aget(pk=v)`, bypassing the related model's `queryset_request` hook. In multi-tenant deployments — where tenant isolation is enforced exclusively through `queryset_request` — this allowed a client to submit a create or update payload referencing **another tenant's primary key**, and the FK would resolve successfully. The cross-tenant reference was then persisted with no error surfaced, since `DoesNotExist` cannot fire when the manager has no tenant filter applied.
+
+FK resolution now flows through `ModelUtil(rel_model).get_object(request, pk=v)`, which:
+
+- Applies the related model's `queryset_request(request)` (or the related serializer class's, when present).
+- Raises the standard `NotFoundError(rel_model)` when the referenced row is outside the caller's tenant scope — the same error returned for a genuinely missing row, so cross-tenant probing is indistinguishable from a 404.
+- Continues to honor every existing query optimization path (`select_related` / `prefetch_related` discovery) on the related model.
+
+`request` is now threaded from `parse_input_data` → `_process_payload_fields` → `_resolve_fk`, so both `create_s` and `update_s` paths (and the bulk variants built on top of them) are covered uniformly.
+
+```python
+# Before — multi-tenant boundary violation:
+#   POST /resources  { "owner_id": "<other-tenant-uuid>" }
+#   → rel_model.objects.aget(pk=<other-tenant-uuid>)  ✓ resolves
+#   → row persisted with foreign tenant FK ❌
+
+# After — queryset_request is enforced:
+#   POST /resources  { "owner_id": "<other-tenant-uuid>" }
+#   → ModelUtil(Owner).get_object(request, pk=...)
+#   → queryset filtered by tenant → row not in scope
+#   → NotFoundError(Owner) → 404 ✅
+```
+
+The local `rel_model.DoesNotExist` catch in `_resolve_fk` was removed because `get_object` already raises `NotFoundError(rel_model)` on miss — no behavioral change for the single-tenant case, only the lookup is now tenant-aware.
+
+---
+
+### 🎯 Summary
+
+Security-relevant patch release that closes a multi-tenant foreign-key bypass in `ModelUtil._resolve_fk`. The wire-level API is unchanged: legitimate requests behave identically, while cross-tenant FK references are now rejected with the standard `NotFoundError` shape produced everywhere else in the framework.
+
+**Key benefits:**
+
+- 🔒 Multi-tenant isolation is consistently enforced on every FK resolution path, not just on reads
+- ✅ Uniform fix covers `create_s`, `update_s`, `bulk_create_s`, and `bulk_update_s` via a single change point
+- ♻️ Reuses the existing `get_object` pipeline — no new code paths, no duplicated tenant-filtering logic
+- 🔄 No wire-format change and no impact on single-tenant deployments
+- 🧪 938 existing tests continue to pass with the new resolution path
+
+---
+
 ## 🏷️ [v2.30.4] - 2026-04-30
 
 ---
