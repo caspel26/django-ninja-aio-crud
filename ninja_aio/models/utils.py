@@ -926,18 +926,21 @@ class ModelUtil(Generic[ModelT]):
 
     async def _resolve_fk(
         self,
+        request: HttpRequest,
         payload: dict,
         k: str,
         v: Any,
         field_obj: models.ForeignKey,
     ) -> None:
-        """Resolve foreign key ID to model instance in place."""
+        """Resolve foreign key ID to model instance in place.
+
+        Routes through ``ModelUtil(rel_model).get_object`` so the related
+        model's ``queryset_request`` hook is applied — preventing cross-tenant
+        FK references in multi-tenant setups.
+        """
         rel_model = field_obj.related_model
         logger.debug(f"Resolving FK '{k}' -> {rel_model.__name__} (pk={v}) for {self.model.__name__}")
-        try:
-            payload[k] = await rel_model.objects.aget(pk=v)
-        except rel_model.DoesNotExist:
-            raise NotFoundError(rel_model)
+        payload[k] = await ModelUtil(rel_model).get_object(request, pk=v)
 
     async def _process_payload_fields(
         self,
@@ -971,7 +974,7 @@ class ModelUtil(Generic[ModelT]):
         for (k, v), field_obj in zip(fields_to_process, field_objs):
             self._decode_binary(payload, k, v, field_obj)
             if isinstance(field_obj, models.ForeignKey) and v is not None:
-                fk_tasks.append(self._resolve_fk(payload, k, v, field_obj))
+                fk_tasks.append(self._resolve_fk(request, payload, k, v, field_obj))
 
         if fk_tasks:
             await asyncio.gather(*fk_tasks)
