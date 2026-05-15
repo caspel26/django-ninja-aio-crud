@@ -1,5 +1,77 @@
 # 📋 Release Notes
 
+## 🏷️ [v2.31.0] - 2026-05-15
+
+---
+
+### ✨ New Features
+
+#### 🔀 Per-Operation Response Schemas (`schema_create_out`, `schema_update_out`, `schema_delete_out`)
+> `ninja_aio/views/api.py`
+
+Three new `APIViewSet` class attributes allow developers to configure a distinct response schema for each mutating CRUD endpoint, independently of the global `schema_out`.
+
+| Attribute | Endpoint | Default |
+|---|---|---|
+| `schema_create_out` | `POST /` (201) | Falls back to `schema_out` |
+| `schema_update_out` | `PATCH /{pk}/` (200) | Falls back to `schema_out` |
+| `schema_delete_out` | `DELETE /{pk}/` | `None` → 204 No Content |
+
+**Lightweight create/update responses:**
+
+```python
+class ArticleCreatedOut(Schema):
+    id: int
+    title: str          # Only return what matters on create
+
+class ArticleUpdatedOut(Schema):
+    id: int
+    updated_at: str     # Return the updated timestamp on PATCH
+
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    schema_in = ArticleIn
+    schema_out = ArticleFullOut
+    schema_create_out = ArticleCreatedOut   # POST  → 201 with minimal shape
+    schema_update_out = ArticleUpdatedOut   # PATCH → 200 with update-specific shape
+    # schema_delete_out not set → DELETE stays 204 No Content
+```
+
+**Delete that returns the deleted object:**
+
+```python
+class ArticleDeletedOut(Schema):
+    id: int
+    title: str
+
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    schema_delete_out = ArticleDeletedOut   # DELETE → 200 with deleted object
+```
+
+When `schema_delete_out` is set, the delete endpoint fetches and serializes the object **before** deleting it, then returns `200` with the serialized data. If not set, behaviour is unchanged (`204 No Content`).
+
+All three attributes are fully backwards compatible — existing ViewSets without them behave exactly as before.
+
+---
+
+### 📚 Documentation
+
+- `docs/api/views/api_view_set.md` — updated endpoints table, core attributes table, schema generation section, and new **Per-Operation Response Schemas** subsection with annotated examples
+- `docs/tutorial/crud.md` — updated endpoints table, learning objectives, and new **Per-Operation Response Schemas** tutorial section
+
+---
+
+### 🎯 Summary
+
+v2.31.0 introduces fine-grained control over CRUD response shapes. Previously all mutating endpoints (`POST`, `PATCH`, `DELETE`) shared `schema_out` for their response. With this release each operation can define its own output schema, enabling cleaner API contracts and more intentional response payloads.
+
+**Key benefits:**
+- 🔀 Return a different shape on create vs update vs list without changing `schema_out`
+- 🗑️ Optionally return the deleted object from `DELETE` with a `200` response
+- ✅ Fully backwards compatible — omitting the new attributes preserves existing behaviour
+- 📖 Full OpenAPI docs reflect the per-operation schemas automatically
+
 ## 🏷️ [v2.30.6] - 2026-05-11
 
 ---
