@@ -4,13 +4,13 @@
 
 ## :material-auto-fix: Generated CRUD Endpoints
 
-| Method | Path            | Summary        | Response                                      |
-| ------ | --------------- | -------------- | --------------------------------------------- |
-| POST   | `/{base}/`      | Create Model   | `201 schema_out`                              |
-| GET    | `/{base}/`      | List Models    | `200 List[schema_out]` (paginated)            |
-| GET    | `/{base}/{pk}`  | Retrieve Model | `200 schema_detail` (or `schema_out` if none) |
-| PATCH  | `/{base}/{pk}/` | Update Model   | `200 schema_out`                              |
-| DELETE | `/{base}/{pk}/` | Delete Model   | `204 No Content`                              |
+| Method | Path            | Summary        | Response                                                              |
+| ------ | --------------- | -------------- | --------------------------------------------------------------------- |
+| POST   | `/{base}/`      | Create Model   | `201 schema_create_out` (falls back to `schema_out`)                  |
+| GET    | `/{base}/`      | List Models    | `200 List[schema_out]` (paginated)                                    |
+| GET    | `/{base}/{pk}`  | Retrieve Model | `200 schema_detail` (or `schema_out` if none)                         |
+| PATCH  | `/{base}/{pk}/` | Update Model   | `200 schema_update_out` (falls back to `schema_out`)                  |
+| DELETE | `/{base}/{pk}/` | Delete Model   | `204 No Content` or `200 schema_delete_out` (if `schema_delete_out` is set) |
 
 Notes:
 
@@ -39,7 +39,7 @@ graph TD
     H --> I[Serialize Response]
     E --> J[Run Hooks & Save]
     J --> I
-    F --> K[Delete & Return 204]
+    F --> K[Delete & Return 204 or 200]
     I --> L[JSON Response]
 
     style A fill:#7c4dff,stroke:#7c4dff,color:#fff
@@ -268,9 +268,12 @@ class ArticleViewSet(APIViewSet):
 | `api`                       | `NinjaAPI`                    | —                                                  | API instance (required)                                                 |
 | `serializer_class`          | `Serializer \| None`          | `None`                                             | Serializer class for plain models (alternative to ModelSerializer)      |
 | `schema_in`                 | `Schema \| None`              | `None` (auto)                                      | Create input schema override                                            |
-| `schema_out`                | `Schema \| None`              | `None` (auto)                                      | List/output schema override                                             |
+| `schema_out`                | `Schema \| None`              | `None` (auto)                                      | Default output schema (list, and fallback for create/update responses)  |
 | `schema_detail`             | `Schema \| None`              | `None` (auto)                                      | Retrieve/detail schema override (falls back to `schema_out`)            |
 | `schema_update`             | `Schema \| None`              | `None` (auto)                                      | Update input schema override                                            |
+| `schema_create_out`         | `Schema \| None`              | `None` (falls back to `schema_out`)                | Response schema for create endpoint (POST)                              |
+| `schema_update_out`         | `Schema \| None`              | `None` (falls back to `schema_out`)                | Response schema for update endpoint (PATCH)                             |
+| `schema_delete_out`         | `Schema \| None`              | `None` (204 No Content)                            | Response schema for delete endpoint (DELETE). When set, returns `200` with the serialized deleted object instead of `204` |
 | `pagination_class`          | `type[AsyncPaginationBase]`   | `PageNumberPagination`                             | Pagination strategy                                                     |
 | `query_params`              | `dict[str, tuple[type, ...]]` | `{}`                                               | List endpoint filters definition                                        |
 | `disable`                   | `list[type[VIEW_TYPES]]`      | `[]`                                               | Disable views (`create`,`list`,`retrieve`,`update`,`delete`,`bulk_create`,`bulk_update`,`bulk_delete`,`all`) |
@@ -365,6 +368,9 @@ If `model` is a subclass of `ModelSerializerMeta`:
 - `schema_detail` is generated from `DetailSerializer` (optional, falls back to `schema_out`)
 - `schema_in` from `CreateSerializer`
 - `schema_update` from `UpdateSerializer`
+- `schema_create_out` falls back to `schema_out` unless explicitly set
+- `schema_update_out` falls back to `schema_out` unless explicitly set
+- `schema_delete_out` defaults to `None` (204 No Content) unless explicitly set
 
 For plain Django models, you can provide a `serializer_class` (Serializer) instead:
 
@@ -386,7 +392,7 @@ class ArticleViewSet(APIViewSet):
     serializer_class = ArticleSerializer
 ```
 
-Otherwise provide schemas manually via `schema_in`, `schema_out`, `schema_detail`, and `schema_update` attributes.
+Otherwise provide schemas manually via `schema_in`, `schema_out`, `schema_detail`, `schema_update`, and the per-operation out schemas attributes.
 
 ### Detail Schema for Retrieve Endpoint
 
@@ -422,6 +428,76 @@ class ArticleViewSet(APIViewSet):
 Endpoints behavior:
 - `GET /articles/` returns `[{"id": 1, "title": "...", "summary": "..."}, ...]`
 - `GET /articles/1` returns `{"id": 1, "title": "...", "summary": "...", "content": "...", "author": {...}, "tags": [...]}`
+
+### Per-Operation Response Schemas
+
+Use `schema_create_out`, `schema_update_out`, and `schema_delete_out` when you want create, update, or delete endpoints to return a different shape than `schema_out`.
+
+**Resolution order:**
+
+| Attribute | Fallback | Endpoint |
+|---|---|---|
+| `schema_create_out` | `schema_out` | `POST /` (201) |
+| `schema_update_out` | `schema_out` | `PATCH /{pk}/` (200) |
+| `schema_delete_out` | `None` → 204 No Content | `DELETE /{pk}/` (200 when set) |
+
+**Example — lightweight create/update responses:**
+
+```python
+from ninja import Schema
+
+class ArticleIn(Schema):
+    title: str
+    content: str
+    author_id: int
+
+class ArticleOut(Schema):
+    id: int
+    title: str
+    content: str
+    author_id: int
+    created_at: str
+
+class ArticleCreatedOut(Schema):
+    id: int
+    title: str
+
+class ArticleUpdatedOut(Schema):
+    id: int
+    title: str
+    updated_at: str
+
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    schema_in = ArticleIn
+    schema_out = ArticleOut
+    schema_create_out = ArticleCreatedOut  # POST returns only id + title
+    schema_update_out = ArticleUpdatedOut  # PATCH returns id + title + updated_at
+    # DELETE still returns 204 No Content (schema_delete_out not set)
+```
+
+**Example — delete that returns the deleted object:**
+
+```python
+class ArticleDeletedOut(Schema):
+    id: int
+    title: str
+
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    schema_in = ArticleIn
+    schema_out = ArticleOut
+    schema_delete_out = ArticleDeletedOut  # DELETE now returns 200 with the deleted object
+```
+
+When `schema_delete_out` is set, the delete endpoint:
+
+1. Fetches and serializes the object using `schema_delete_out`
+2. Deletes the object from the database
+3. Returns `200` with the serialized data
+
+!!! note
+    `schema_create_out` and `schema_update_out` are independent of each other and of `schema_out`. Setting one does not affect the others.
 
 ## :material-shield-check: Partial Update Validation
 

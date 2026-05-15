@@ -273,6 +273,9 @@ class APIViewSet(API, Generic[ModelT]):
     schema_out: Schema | None = None
     schema_detail: Schema | None = None
     schema_update: Schema | None = None
+    schema_create_out: Schema | None = None
+    schema_update_out: Schema | None = None
+    schema_delete_out: Schema | None = None
     get_auth: list | None = NOT_SET
     post_auth: list | None = NOT_SET
     patch_auth: list | None = NOT_SET
@@ -317,9 +320,15 @@ class APIViewSet(API, Generic[ModelT]):
             if not isinstance(self.model, ModelSerializerMeta)
             else self.model.util
         )
-        self.schema_out, self.schema_detail, self.schema_in, self.schema_update = (
-            self.get_schemas()
-        )
+        (
+            self.schema_out,
+            self.schema_detail,
+            self.schema_in,
+            self.schema_update,
+            self.schema_create_out,
+            self.schema_update_out,
+            self.schema_delete_out,
+        ) = self.get_schemas()
         self.path_schema = self._generate_path_schema()
         self.filters_schema = self._generate_filters_schema()
         self.model_verbose_name = (
@@ -628,20 +637,37 @@ class APIViewSet(API, Generic[ModelT]):
             else self.model.query_util.read_config
         )
 
-    def get_schemas(self) -> tuple[Schema | None, Schema | None, Schema | None, Schema | None]:
+    def get_schemas(
+        self,
+    ) -> tuple[
+        Schema | None,
+        Schema | None,
+        Schema | None,
+        Schema | None,
+        Schema | None,
+        Schema | None,
+        Schema | None,
+    ]:
         """
-        Compute and return (schema_out, schema_detail, schema_in, schema_update).
+        Compute and return (schema_out, schema_detail, schema_in, schema_update,
+        schema_create_out, schema_update_out, schema_delete_out).
 
         - If model is a ModelSerializer (ModelSerializerMeta), auto-generate read/detail/create/update schemas.
         - Otherwise, use existing schemas or generate from serializer_class if provided.
+        - schema_create_out / schema_update_out fall back to schema_out when not set.
+        - schema_delete_out defaults to None (204 No Content) when not set.
         """
         # ModelSerializer case: prefer explicitly set schemas, otherwise generate from the model
         if isinstance(self.model, ModelSerializerMeta):
+            schema_out = self.schema_out or self.model.generate_read_s()
             return (
-                self.schema_out or self.model.generate_read_s(),
+                schema_out,
                 self.schema_detail or self.model.generate_detail_s(),
                 self.schema_in or self.model.generate_create_s(),
                 self.schema_update or self.model.generate_update_s(),
+                self.schema_create_out or schema_out,
+                self.schema_update_out or schema_out,
+                self.schema_delete_out,
             )
 
         # Non-ModelSerializer: start from provided schemas
@@ -659,7 +685,15 @@ class APIViewSet(API, Generic[ModelT]):
             schema_detail = schema_detail or self.serializer_class.generate_detail_s()
             schema_update = schema_update or self.serializer_class.generate_update_s()
 
-        return (schema_out, schema_detail, schema_in, schema_update)
+        return (
+            schema_out,
+            schema_detail,
+            schema_in,
+            schema_update,
+            self.schema_create_out or schema_out,
+            self.schema_update_out or schema_out,
+            self.schema_delete_out,
+        )
 
     async def query_params_handler(
         self, queryset: QuerySet[ModelSerializer], filters: dict
@@ -716,13 +750,13 @@ class APIViewSet(API, Generic[ModelT]):
             auth=self.post_view_auth(),
             summary=f"Create {self.model_verbose_name}",
             description=self.create_docs,
-            response={201: self.schema_out, self.error_codes: GenericMessageSchema},
+            response={201: self.schema_create_out, self.error_codes: GenericMessageSchema},
         )
         @decorate_view(aatomic, unique_view(self), *self.extra_decorators.create)
         async def create(request: HttpRequest, data: self.schema_in):  # type: ignore
             await self.on_before_operation(request, "create")
             return Status(
-                201, await self.model_util.create_s(request, data, self.schema_out)
+                201, await self.model_util.create_s(request, data, self.schema_create_out)
             )
 
         return create
@@ -847,7 +881,7 @@ class APIViewSet(API, Generic[ModelT]):
             auth=self.patch_view_auth(),
             summary=f"Update {self.model_verbose_name}",
             description=self.update_docs,
-            response={200: self.schema_out, self.error_codes: GenericMessageSchema},
+            response={200: self.schema_update_out, self.error_codes: GenericMessageSchema},
         )
         @decorate_view(aatomic, unique_view(self), *self.extra_decorators.update)
         async def update(
@@ -863,7 +897,7 @@ class APIViewSet(API, Generic[ModelT]):
                     request,
                     data,
                     _pk,
-                    self.schema_out,
+                    self.schema_update_out,
                     self.require_update_fields,
                 ),
             )
@@ -873,19 +907,34 @@ class APIViewSet(API, Generic[ModelT]):
     def delete_view(self) -> Callable:
         """
         Register delete endpoint.
+
+        When schema_delete_out is set the endpoint fetches and serializes the object
+        before deleting it and returns 200 with the serialized data.
+        Otherwise it returns 204 No Content (default behaviour).
         """
+        _delete_schema = self.schema_delete_out
+        _response = (
+            {200: _delete_schema, self.error_codes: GenericMessageSchema}
+            if _delete_schema
+            else {204: None, self.error_codes: GenericMessageSchema}
+        )
 
         @self.router.delete(
             self.path_retrieve,
             auth=self.delete_view_auth(),
             summary=f"Delete {self.model_verbose_name}",
             description=self.delete_docs,
-            response={204: None, self.error_codes: GenericMessageSchema},
+            response=_response,
         )
         @decorate_view(aatomic, unique_view(self), *self.extra_decorators.delete)
         async def delete(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
             _pk = self._get_pk(pk)
             await self._run_object_hooks(request, "delete", _pk)
+            if _delete_schema:
+                obj = await self.model_util.get_object(request, _pk)
+                serialized = await self.model_util.read_s(_delete_schema, request, obj)
+                await self.model_util.delete_s(request, _pk)
+                return Status(200, serialized)
             return Status(
                 204, await self.model_util.delete_s(request, _pk)
             )

@@ -504,3 +504,38 @@ class PerfArticleAPI(GenericAPIViewSet):
     schema_out = schema.PerfArticleSchemaOut
     schema_update = schema.PerfArticleSchemaPatch
     bulk_operations = ["create", "update", "delete"]
+
+
+# ==========================================================
+#              PER-OPERATION OUT SCHEMA APIS
+# ==========================================================
+
+
+class TestModelCreateOutAPI(GenericAPIViewSet):
+    """ViewSet with a custom schema_create_out."""
+
+    model = models.TestModel
+    schema_in = schema.TestModelSchemaIn
+    schema_out = schema.TestModelSchemaOut
+    schema_update = schema.TestModelSchemaPatch
+    schema_create_out = schema.TestModelCreateOut
+
+
+class TestModelUpdateOutAPI(GenericAPIViewSet):
+    """ViewSet with a custom schema_update_out."""
+
+    model = models.TestModel
+    schema_in = schema.TestModelSchemaIn
+    schema_out = schema.TestModelSchemaOut
+    schema_update = schema.TestModelSchemaPatch
+    schema_update_out = schema.TestModelUpdateOut
+
+
+class TestModelDeleteOutAPI(GenericAPIViewSet):
+    """ViewSet with a custom schema_delete_out (returns 200 with the deleted object)."""
+
+    model = models.TestModel
+    schema_in = schema.TestModelSchemaIn
+    schema_out = schema.TestModelSchemaOut
+    schema_update = schema.TestModelSchemaPatch
+    schema_delete_out = schema.TestModelDeleteOut
