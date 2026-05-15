@@ -19,6 +19,7 @@ Build a complete REST API with automatic CRUD operations using <code>APIViewSet<
 - :material-filter: Customizing query parameters
 - :material-content-copy: Enabling bulk operations
 - :material-pencil-plus: Adding custom endpoints
+- :material-swap-horizontal: Per-operation response schemas
 - :material-web: Working with request context
 - :material-alert-circle: Handling errors
 
@@ -95,13 +96,13 @@ graph LR
 
 The ViewSet automatically generates these endpoints:
 
-| Method   | Endpoint             | Description                   | Request Body         | Response                           |
-| -------- | -------------------- | ----------------------------- | -------------------- | ---------------------------------- |
-| `GET`    | `/api/article/`      | List all articles (paginated) | None                 | `{count, next, previous, results}` |
-| `POST`   | `/api/article/`      | Create new article            | Article data         | Created article                    |
-| `GET`    | `/api/article/{id}`  | Retrieve single article       | None                 | Article data                       |
-| `PATCH`  | `/api/article/{id}/` | Update article                | Partial article data | Updated article                    |
-| `DELETE` | `/api/article/{id}/` | Delete article                | None                 | None (204)                         |
+| Method   | Endpoint             | Description                   | Request Body         | Response                                       |
+| -------- | -------------------- | ----------------------------- | -------------------- | ---------------------------------------------- |
+| `GET`    | `/api/article/`      | List all articles (paginated) | None                 | `{count, next, previous, results}`             |
+| `POST`   | `/api/article/`      | Create new article            | Article data         | Created article (`schema_create_out`)          |
+| `GET`    | `/api/article/{id}`  | Retrieve single article       | None                 | Article data                                   |
+| `PATCH`  | `/api/article/{id}/` | Update article                | Partial article data | Updated article (`schema_update_out`)          |
+| `DELETE` | `/api/article/{id}/` | Delete article                | None                 | `204 No Content` (or `200` if `schema_delete_out` is set) |
 
 ??? example "Example error responses"
 
@@ -730,6 +731,48 @@ class ArticleViewSet(APIViewSet):
 
 ---
 
+## :material-swap-horizontal: Per-Operation Response Schemas
+
+By default, create and update endpoints return `schema_out`. Use `schema_create_out`, `schema_update_out`, and `schema_delete_out` to return a different shape per operation without changing the global output schema.
+
+```python
+from ninja import Schema
+
+class ArticleCreatedOut(Schema):
+    """Minimal response after a successful create."""
+    id: int
+    title: str
+
+class ArticleUpdatedOut(Schema):
+    """Response after a successful update."""
+    id: int
+    title: str
+
+class ArticleDeletedOut(Schema):
+    """Return the deleted article data on delete."""
+    id: int
+    title: str
+
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    schema_create_out = ArticleCreatedOut  # POST  → 201 ArticleCreatedOut
+    schema_update_out = ArticleUpdatedOut  # PATCH → 200 ArticleUpdatedOut
+    schema_delete_out = ArticleDeletedOut  # DELETE → 200 ArticleDeletedOut (instead of 204)
+```
+
+**Fallback behaviour:**
+
+| Attribute | When omitted |
+|---|---|
+| `schema_create_out` | Falls back to `schema_out` |
+| `schema_update_out` | Falls back to `schema_out` |
+| `schema_delete_out` | Returns `204 No Content` (default) |
+
+!!! tip
+    Setting `schema_delete_out` changes the delete endpoint from `204 No Content` to `200` and serializes the deleted object before removing it from the database, so clients can confirm exactly what was deleted.
+
+---
+
 ## :material-shield-check: Partial Update Validation
 
 By default, PATCH endpoints accept empty payloads. Enable validation to reject them:
@@ -1069,6 +1112,7 @@ Now that you have CRUD operations set up, let's add authentication!
 - :material-check: Working with pagination
 - :material-check: Handling errors properly
 - :material-check: Using bulk operations
+- :material-check: Per-operation response schemas
 - :material-check: Customizing responses
 
 </div>
