@@ -49,11 +49,15 @@ class BaseTests:
     class ModelSerializerViewSetTestCaseBase(SetUpViewSetTestCase):
         @property
         def schemas(self):
+            read_s = self.model.generate_read_s()
             return (
-                self.model.generate_read_s(),
+                read_s,
                 self.model.generate_detail_s(),
                 self.model.generate_create_s(),
                 self.model.generate_update_s(),
+                read_s,
+                read_s,
+                None,
             )
 
     class ApiViewSetSetUpRelation(SetUpViewSetTestCase):
@@ -418,6 +422,9 @@ class ApiViewSetModelTestCase(
             None,  # No detail schema for plain model
             schema.TestModelSchemaIn,
             schema.TestModelSchemaPatch,
+            schema.TestModelSchemaOut,
+            schema.TestModelSchemaOut,
+            None,
         )
 
 
@@ -436,6 +443,9 @@ class ApiViewSetModelForeignKeyTestCase(BaseTests.ApiViewSetForeignKeyTestCaseBa
             None,  # No detail schema for plain model
             schema.TestModelForeignKeySchemaIn,
             schema.TestModelSchemaPatch,
+            schema.TestModelForeignKeySchemaOut,
+            schema.TestModelForeignKeySchemaOut,
+            None,
         )
 
     @property
@@ -462,6 +472,9 @@ class ApiViewSetModelReverseForeignKeyTestCase(
             None,  # No detail schema for plain model
             schema.TestModelReverseForeignKeySchemaIn,
             schema.TestModelSchemaPatch,
+            schema.TestModelReverseForeignKeySchemaOut,
+            schema.TestModelReverseForeignKeySchemaOut,
+            None,
         )
 
 
@@ -479,6 +492,9 @@ class ApiViewSetModelOneToOneTestCase(ApiViewSetModelForeignKeyTestCase):
             None,  # No detail schema for plain model
             schema.TestModelForeignKeySchemaIn,
             schema.TestModelSchemaPatch,
+            schema.TestModelForeignKeySchemaOut,
+            schema.TestModelForeignKeySchemaOut,
+            None,
         )
 
 
@@ -497,6 +513,9 @@ class ApiViewSetModelReverseOneToOneTestCase(ApiViewSetModelReverseForeignKeyTes
             None,  # No detail schema for plain model
             schema.TestModelReverseForeignKeySchemaIn,
             schema.TestModelSchemaPatch,
+            schema.TestModelReverseOneToOneSchemaOut,
+            schema.TestModelReverseOneToOneSchemaOut,
+            None,
         )
 
     @property
@@ -526,6 +545,9 @@ class ApiViewSetModelManyToManyTestCase(BaseTests.ApiViewSetManyToManyTestCaseBa
             None,  # No detail schema for plain model
             schema.TestModelSchemaIn,
             schema.TestModelSchemaPatch,
+            schema.TestModelManyToManySchemaOut,
+            schema.TestModelManyToManySchemaOut,
+            None,
         )
 
 
@@ -547,6 +569,9 @@ class ApiViewSetModelReverseManyToManyTestCase(
             None,  # No detail schema for plain model
             schema.TestModelSchemaIn,
             schema.TestModelSchemaPatch,
+            schema.TestModelReverseManyToManySchemaOut,
+            schema.TestModelReverseManyToManySchemaOut,
+            None,
         )
 
 
@@ -562,11 +587,15 @@ class ApiViewSetModelForeignKeySerializerTestCase(
 
     @property
     def schemas(self):
+        read_s = serializers.TestModelForeignKeySerializer.generate_read_s()
         return (
-            serializers.TestModelForeignKeySerializer.generate_read_s(),
+            read_s,
             serializers.TestModelForeignKeySerializer.generate_detail_s(),
             serializers.TestModelForeignKeySerializer.generate_create_s(),
             serializers.TestModelForeignKeySerializer.generate_update_s(),
+            read_s,
+            read_s,
+            None,
         )
 
     @property
@@ -895,13 +924,16 @@ class DetailSchemaModelSerializerTestCase(TestCase):
         retrieve_schema = self.viewset._get_retrieve_schema()
         self.assertEqual(retrieve_schema, self.viewset.schema_detail)
 
-    def test_get_schemas_returns_four_tuple(self):
-        """Test that get_schemas returns a 4-tuple with detail schema."""
+    def test_get_schemas_returns_seven_tuple(self):
+        """Test that get_schemas returns a 7-tuple including per-operation out schemas."""
         result = self.viewset.get_schemas()
-        self.assertEqual(len(result), 4)
-        schema_out, schema_detail, _, _ = result
+        self.assertEqual(len(result), 7)
+        schema_out, schema_detail, _, _, schema_create_out, schema_update_out, schema_delete_out = result
         self.assertIsNotNone(schema_out)
         self.assertIsNotNone(schema_detail)
+        self.assertEqual(schema_create_out, schema_out)
+        self.assertEqual(schema_update_out, schema_out)
+        self.assertIsNone(schema_delete_out)
 
 
 @tag("detail_schema")
@@ -1384,3 +1416,119 @@ class BatchFKResolutionTestCase(TestCase):
         )
         with self.assertRaises(NotFoundError):
             await view(self.request.post(), data)
+
+
+@tag("per_operation_out_schema")
+class PerOperationOutSchemaTestCase(TestCase):
+    """Test schema_create_out, schema_update_out, schema_delete_out on APIViewSet."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from tests.generics.request import Request
+
+        cls.model = models.TestModel
+        cls.pk_att = cls.model._meta.pk.attname
+
+        cls.create_out_ns = "per_op_create_out"
+        cls.create_out_api = NinjaAIO(urls_namespace=cls.create_out_ns)
+        cls.create_out_viewset = views.TestModelCreateOutAPI()
+        cls.create_out_viewset.api = cls.create_out_api
+        cls.create_out_viewset.add_views_to_route()
+
+        cls.update_out_ns = "per_op_update_out"
+        cls.update_out_api = NinjaAIO(urls_namespace=cls.update_out_ns)
+        cls.update_out_viewset = views.TestModelUpdateOutAPI()
+        cls.update_out_viewset.api = cls.update_out_api
+        cls.update_out_viewset.add_views_to_route()
+
+        cls.delete_out_ns = "per_op_delete_out"
+        cls.delete_out_api = NinjaAIO(urls_namespace=cls.delete_out_ns)
+        cls.delete_out_viewset = views.TestModelDeleteOutAPI()
+        cls.delete_out_viewset.api = cls.delete_out_api
+        cls.delete_out_viewset.add_views_to_route()
+
+        cls.request = Request("test-models")
+
+        cls.payload = {"name": "per_op_test", "description": "per_op_desc"}
+        cls.obj = models.TestModel.objects.create(**cls.payload)
+
+    def test_schema_create_out_set_on_viewset(self):
+        self.assertEqual(self.create_out_viewset.schema_create_out, schema.TestModelCreateOut)
+        self.assertEqual(self.create_out_viewset.schema_out, schema.TestModelSchemaOut)
+
+    def test_schema_update_out_set_on_viewset(self):
+        self.assertEqual(self.update_out_viewset.schema_update_out, schema.TestModelUpdateOut)
+        self.assertEqual(self.update_out_viewset.schema_out, schema.TestModelSchemaOut)
+
+    def test_schema_delete_out_set_on_viewset(self):
+        self.assertEqual(self.delete_out_viewset.schema_delete_out, schema.TestModelDeleteOut)
+
+    def test_get_schemas_create_out(self):
+        schemas = self.create_out_viewset.get_schemas()
+        self.assertEqual(len(schemas), 7)
+        schema_out, _, _, _, schema_create_out, schema_update_out, schema_delete_out = schemas
+        self.assertEqual(schema_out, schema.TestModelSchemaOut)
+        self.assertEqual(schema_create_out, schema.TestModelCreateOut)
+        self.assertEqual(schema_update_out, schema.TestModelSchemaOut)
+        self.assertIsNone(schema_delete_out)
+
+    def test_get_schemas_update_out(self):
+        schemas = self.update_out_viewset.get_schemas()
+        self.assertEqual(len(schemas), 7)
+        schema_out, _, _, _, schema_create_out, schema_update_out, schema_delete_out = schemas
+        self.assertEqual(schema_out, schema.TestModelSchemaOut)
+        self.assertEqual(schema_create_out, schema.TestModelSchemaOut)
+        self.assertEqual(schema_update_out, schema.TestModelUpdateOut)
+        self.assertIsNone(schema_delete_out)
+
+    def test_get_schemas_delete_out(self):
+        schemas = self.delete_out_viewset.get_schemas()
+        self.assertEqual(len(schemas), 7)
+        _, _, _, _, schema_create_out, schema_update_out, schema_delete_out = schemas
+        self.assertEqual(schema_create_out, schema.TestModelSchemaOut)
+        self.assertEqual(schema_update_out, schema.TestModelSchemaOut)
+        self.assertEqual(schema_delete_out, schema.TestModelDeleteOut)
+
+    async def test_create_returns_schema_create_out(self):
+        await self.model.objects.all().adelete()
+        view = self.create_out_viewset.create_view()
+        data = schema.TestModelSchemaIn(**self.payload)
+        result = await view(self.request.post(), data)
+        self.assertEqual(result.status_code, 201)
+        content = result.value
+        self.assertIn(self.pk_att, content)
+        self.assertIn("name", content)
+        self.assertNotIn("description", content)
+
+    async def test_update_returns_schema_update_out(self):
+        view = self.update_out_viewset.update_view()
+        path_schema = self.update_out_viewset.path_schema(**{self.pk_att: self.obj.pk})
+        update_data = schema.TestModelSchemaPatch(description="updated_desc")
+        result = await view(self.request.patch(), update_data, path_schema)
+        self.assertEqual(result.status_code, 200)
+        content = result.value
+        self.assertIn(self.pk_att, content)
+        self.assertIn("description", content)
+        self.assertNotIn("name", content)
+
+    async def test_delete_returns_204_without_schema_delete_out(self):
+        obj = await self.model.objects.acreate(name="to_delete_default", description="d")
+        view = self.create_out_viewset.delete_view()
+        path_schema = self.create_out_viewset.path_schema(**{self.pk_att: obj.pk})
+        result = await view(self.request.delete(), path_schema)
+        self.assertEqual(result.status_code, 204)
+        self.assertIsNone(result.value)
+
+    async def test_delete_returns_200_with_schema_delete_out(self):
+        obj = await self.model.objects.acreate(name="to_delete_out", description="d")
+        pk = obj.pk
+        view = self.delete_out_viewset.delete_view()
+        path_schema = self.delete_out_viewset.path_schema(**{self.pk_att: pk})
+        result = await view(self.request.delete(), path_schema)
+        self.assertEqual(result.status_code, 200)
+        content = result.value
+        self.assertEqual(content[self.pk_att], pk)
+        self.assertIn("name", content)
+        self.assertEqual(content["name"], "to_delete_out")
+        self.assertNotIn("description", content)
+        self.assertFalse(await self.model.objects.filter(pk=pk).aexists())

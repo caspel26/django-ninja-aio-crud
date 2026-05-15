@@ -91,3 +91,19 @@ class PerfArticleSchemaOut(Schema):
 
 class PerfArticleSchemaPatch(Schema):
     title: str
+
+
+# Per-operation out schema test schemas
+class TestModelCreateOut(Schema):
+    id: int | str
+    name: str
+
+
+class TestModelUpdateOut(Schema):
+    id: int | str
+    description: str
+
+
+class TestModelDeleteOut(Schema):
+    id: int | str
+    name: str
