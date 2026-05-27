@@ -12,10 +12,12 @@ from .renders import ORJSONRenderer
 from .exceptions import set_api_exception_handlers
 from .views import APIView, APIViewSet
 from .docs import Branding, BrandedSwagger
+from .router import NinjaAIORouter
 
 # TypeVar for generic typing in decorators
 ModelT = TypeVar("ModelT", bound=models.Model)
 ViewSetT = TypeVar("ViewSetT", bound=APIViewSet)
+RouterT = TypeVar("RouterT", bound=NinjaAIORouter)
 
 
 class NinjaAIO(NinjaAPI):
@@ -94,6 +96,25 @@ class NinjaAIO(NinjaAPI):
                 api=self, model=model, prefix=prefix, tags=tags
             )
             instance.add_views_to_route()
+            return instance
+
+        return wrapper
+
+    def router(self, prefix: str, **kwargs) -> Any:
+        """
+        Decorator to attach a NinjaAIORouter to this API under the given prefix.
+
+        Usage:
+            @api.router("/v1")
+            class V1Router(NinjaAIORouter):
+                pass
+
+        Keyword arguments are forwarded to api.add_router() (e.g. tags, auth).
+        """
+
+        def wrapper(router_cls: type[RouterT]) -> RouterT:
+            instance: RouterT = router_cls()
+            self.add_router(prefix, instance, **kwargs)
             return instance
 
         return wrapper
