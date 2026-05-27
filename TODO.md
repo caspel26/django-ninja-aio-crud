@@ -33,6 +33,7 @@
 | 23 | ~~Swagger UI branding~~ | `docs.py`, `api.py`, `templates/` | v2.30.0 | `Branding` dataclass with `logo_url`, `primary_color`, `favicon_url`, `custom_css`. Auto-activates `BrandedSwagger` template. |
 | 24 | ~~JWT Cookie Auth (BFF)~~ | `auth.py` | v2.30.0 | `AsyncJwtCookie` for HttpOnly cookie JWT auth. `JwtAuthMixin` eliminates duplication. `set_jwt_cookie`/`delete_jwt_cookie` helpers with auto-safe `secure` flag. |
 | 25 | ~~Per-operation response schemas~~ | `views/api.py` | v2.31.0 | `schema_create_out`, `schema_update_out`, `schema_delete_out` on `APIViewSet`. Each mutating endpoint can return a distinct schema; `schema_delete_out` switches delete from 204 to 200 with the serialized deleted object. |
+| 26 | ~~NinjaAIORouter~~ | `ninja_aio/router.py`, `ninja_aio/api.py` | v2.32.0 | Composable router with `.view()` and `.viewset()` decorators. Attach via `api.add_router()` or `@api.router()`. Enables versioned and domain-separated API layouts. |
 
 ---
 

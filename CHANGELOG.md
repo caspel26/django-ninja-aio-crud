@@ -1,5 +1,107 @@
 # 📋 Release Notes
 
+## 🏷️ [v2.32.0] - 2026-05-27
+
+---
+
+### ✨ New Features
+
+#### 🔀 NinjaAIORouter — Composable Router with `.view()` and `.viewset()`
+> `ninja_aio/router.py`, `ninja_aio/api.py`
+
+`NinjaAIORouter` is a new class that extends Django Ninja's `Router` with the same `.view()` and `.viewset()` decorators found on `NinjaAIO`. It lets you group related views and viewsets into a self-contained, nestable unit — then attach the whole tree to the main API with a single call.
+
+Each view or viewset registered on a `NinjaAIORouter` gets its own sub-router mounted at the given prefix (nested routing), so the full path hierarchy is preserved in the OpenAPI docs.
+
+**Two attachment styles are supported:**
+
+```python
+from ninja_aio import NinjaAIO, NinjaAIORouter
+from ninja_aio.views import APIView, APIViewSet
+
+api = NinjaAIO(title="My API")
+
+# Style 1 — instantiate and attach with api.add_router()
+router = NinjaAIORouter()
+
+@router.view(prefix="/health", tags=["Health"])
+class HealthView(APIView):
+    ...
+
+@router.viewset(model=Article, prefix="/articles", tags=["Articles"])
+class ArticleViewSet(APIViewSet):
+    schema_in = ArticleIn
+    schema_out = ArticleOut
+    schema_update = ArticlePatch
+
+api.add_router("/v1", router)
+
+# Style 2 — subclass with @api.router() decorator
+@api.router("/v2")
+class V2Router(NinjaAIORouter):
+    pass
+
+@V2Router.view(prefix="/health", tags=["Health"])
+class HealthV2View(APIView):
+    ...
+
+@V2Router.viewset(model=Article, prefix="/articles", tags=["Articles"])
+class ArticleV2ViewSet(APIViewSet):
+    ...
+```
+
+The `@api.router()` decorator on `NinjaAIO` instantiates the router class and mounts it in one step. Any keyword arguments (`auth`, `tags`, etc.) are forwarded to `api.add_router()`.
+
+**`NinjaAIORouter` is exported from the top-level package:**
+
+```python
+from ninja_aio import NinjaAIORouter
+```
+
+**Versioned API example:**
+
+```python
+@api.router("/v1")
+class V1Router(NinjaAIORouter):
+    pass
+
+@api.router("/v2")
+class V2Router(NinjaAIORouter):
+    pass
+
+@V1Router.viewset(model=Article, prefix="/articles", tags=["v1 - Articles"])
+class ArticleV1ViewSet(APIViewSet):
+    schema_out = ArticleV1Out
+    ...
+
+@V2Router.viewset(model=Article, prefix="/articles", tags=["v2 - Articles"])
+class ArticleV2ViewSet(APIViewSet):
+    schema_out = ArticleV2Out
+    ...
+```
+
+---
+
+### 📚 Documentation
+
+- `docs/api/views/router.md` — new reference page for `NinjaAIORouter` covering both attachment styles, the versioned API pattern, and a when-to-use guidance table
+- `mkdocs.yml` — `NinjaAIORouter` added to the **Views** section of the API Reference nav
+
+---
+
+### 🎯 Summary
+
+v2.32.0 introduces `NinjaAIORouter`, a composable building block for organizing larger APIs. Instead of registering every view and viewset directly on the `NinjaAIO` instance, you can now group them by version (`/v1`, `/v2`) or domain (auth, billing, catalog) into isolated router objects, then attach the whole group with a single line.
+
+**Key benefits:**
+- 🗂️ **Domain grouping** — keep related views and viewsets together, out of the top-level `api.py`
+- 🔢 **API versioning** — one `NinjaAIORouter` per version, attached under `/v1`, `/v2`, etc.
+- 📦 **Reusable routers** — define a router in isolation and let consumers attach it to their own API instance
+- 🔌 **Two attachment styles** — `api.add_router()` for plain compatibility, `@api.router()` for the decorator-first style consistent with `.view()` and `.viewset()`
+- ✅ **Fully backwards-compatible** — no changes to existing code required
+
+---
+
 ## 🏷️ [v2.31.0] - 2026-05-15
 
 ---
