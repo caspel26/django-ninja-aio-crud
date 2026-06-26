@@ -1,5 +1,137 @@
 # 📋 Release Notes
 
+## 🏷️ [v2.33.0] - 2026-06-26
+
+---
+
+### ✨ New Features
+
+#### 🎛️ FieldSelectionViewSetMixin — Dynamic Field Selection via `?fields=`
+> `ninja_aio/views/mixins.py`
+
+`FieldSelectionViewSetMixin` adds a `?fields=` query parameter to `list` and `retrieve` endpoints, letting clients request only the fields they need. Unrequested fields are stripped from the response without altering the declared Pydantic schema.
+
+```python
+from ninja_aio.views import APIViewSet, mixins
+
+class ArticleViewSet(mixins.FieldSelectionViewSetMixin, APIViewSet):
+    model = Article
+    schema_out = ArticleOut
+    schema_in = ArticleIn
+    schema_update = ArticlePatch
+```
+
+Clients can then filter fields per request:
+
+```http
+GET /api/articles/?fields=id,title
+GET /api/articles/42/?fields=id,title,author
+```
+
+**Behaviour:**
+- Unknown field names are silently ignored
+- If all requested fields are unknown, the full response is returned
+- Field selection is post-serialization — the queryset is not modified
+- The `?fields` parameter does **not** interfere with filter mixins (e.g. `IcontainsFilterViewSetMixin`)
+- The mixin is composable with `PermissionViewSetMixin`, filter mixins, and other mixins in any order
+
+**How it works:** When a valid `?fields` value is detected, the mixin returns a `JsonResponse` directly instead of a `Status` tuple. Django Ninja passes `HttpResponse` subclasses through without Pydantic re-validation, so partial dicts do not break strict schema checks. The OpenAPI docs continue to show the full schema.
+
+The `_fields_param` class attribute (`"fields"` by default) can be overridden if the name conflicts with a model field.
+
+```python
+class MyViewSet(mixins.FieldSelectionViewSetMixin, APIViewSet):
+    _fields_param = "select"  # use ?select=id,name instead
+    ...
+```
+
+---
+
+#### ⚡ `@on` — Detail Action Shorthand with Auto Object Prefetch
+> `ninja_aio/decorators/actions.py`
+
+`@on` is a new decorator for defining detail actions on `APIViewSet` that automatically fetches the target object before calling the handler. Unlike `@action(detail=True)`, the handler receives the **model instance** directly — no manual `get_object_or_404` required.
+
+```python
+from ninja_aio.decorators import on
+from ninja_aio.views import APIViewSet
+
+class ArticleViewSet(APIViewSet):
+    model = Article
+    schema_out = ArticleOut
+    schema_in = ArticleIn
+    schema_update = ArticlePatch
+
+    @on("publish", methods=["post"])
+    async def publish(self, request, obj):
+        obj.status = "published"
+        await obj.asave(update_fields=["status"])
+        return Status(200, {"message": "published", "id": obj.id})
+
+    @on("archive", methods=["patch"], url_path="move-to-archive")
+    async def archive(self, request, obj):
+        obj.status = "archived"
+        await obj.asave(update_fields=["status"])
+        return Status(200, {"message": "archived"})
+```
+
+**What `@on` does automatically:**
+- Registers the endpoint as a **detail action** (URL includes `/{pk}/`)
+- Calls `on_before_operation(request, action_name)` before any other work
+- Fetches the model instance by pk via `get_object` — raises **404** if not found
+- Calls `on_before_object_operation(request, action_name, obj)` with the fetched instance
+- Passes the instance as `obj` to your handler
+
+**Parameters:**
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `action_name` | `str` | required | Name of the action (used as url_path by default) |
+| `methods` | `list[str]` | `["post"]` | HTTP methods to register |
+| `url_path` | `str \| None` | `action_name` | URL path segment after `/{pk}/` |
+| `auth` | any | `NOT_SET` | Override default authentication |
+| `response` | any | `NOT_SET` | Override response schema |
+| `tags` | `list[str] \| None` | `None` | OpenAPI tags |
+| `summary` | `str \| None` | `None` | OpenAPI summary |
+| `description` | `str \| None` | `None` | OpenAPI description |
+| `deprecated` | `bool` | `False` | Mark as deprecated in OpenAPI |
+
+**`@on` vs `@action`:**
+
+| | `@action` | `@on` |
+|---|---|---|
+| Object pre-fetch | ❌ manual | ✅ automatic |
+| Hook chain | ✅ | ✅ |
+| Default method | `get` | `post` |
+| `detail` | configurable | always `True` |
+| Handler receives | `request, **kwargs` | `request, obj` |
+
+---
+
+### 📚 Documentation
+
+- `docs/api/views/mixins.md` — new `FieldSelectionViewSetMixin` section with attribute reference, tabbed examples, composability notes, and OpenAPI behaviour
+- `docs/api/views/decorators.md` — new `@on` section with parameter table, `@on` vs `@action` comparison, and worked examples
+
+---
+
+### 🎯 Summary
+
+v2.33.0 adds two quality-of-life features for `APIViewSet` users: field selection and object-aware detail actions.
+
+`FieldSelectionViewSetMixin` lets API clients trim response payloads on the fly without any per-field schema boilerplate — useful for mobile clients, dashboards, or any consumer that only needs a subset of a large model's fields.
+
+`@on` removes the repetitive pattern of pk-lookup + permission check + object fetch from custom detail actions. Declare the handler, receive the object, do the work — the framework handles the rest.
+
+**Key benefits:**
+- 🎛️ **Field selection** — `?fields=id,name` on any list or retrieve endpoint, zero schema changes required
+- ⚡ **`@on` shorthand** — detail actions receive the model instance directly, with full hook chain support
+- 🔌 **Composable** — both features work alongside existing mixins (`PermissionViewSetMixin`, filter mixins, etc.)
+- 📄 **OpenAPI-accurate** — full schema is always visible in docs regardless of runtime field filtering
+- 🛡️ **404 by default** — `@on` raises `NotFoundError` automatically when the pk is not found
+
+---
+
 ## 🏷️ [v2.32.0] - 2026-05-27
 
 ---
