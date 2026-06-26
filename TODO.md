@@ -34,6 +34,8 @@
 | 24 | ~~JWT Cookie Auth (BFF)~~ | `auth.py` | v2.30.0 | `AsyncJwtCookie` for HttpOnly cookie JWT auth. `JwtAuthMixin` eliminates duplication. `set_jwt_cookie`/`delete_jwt_cookie` helpers with auto-safe `secure` flag. |
 | 25 | ~~Per-operation response schemas~~ | `views/api.py` | v2.31.0 | `schema_create_out`, `schema_update_out`, `schema_delete_out` on `APIViewSet`. Each mutating endpoint can return a distinct schema; `schema_delete_out` switches delete from 204 to 200 with the serialized deleted object. |
 | 26 | ~~NinjaAIORouter~~ | `ninja_aio/router.py`, `ninja_aio/api.py` | v2.32.0 | Composable router with `.view()` and `.viewset()` decorators. Attach via `api.add_router()` or `@api.router()`. Enables versioned and domain-separated API layouts. |
+| 27 | ~~Field selection~~ | `ninja_aio/views/mixins.py` | v2.33.0 | `FieldSelectionViewSetMixin` — `?fields=id,name,email` on list and retrieve. Reduces payload. Unknown field names ignored; falls back to full response. |
+| 28 | ~~`@on` detail action shorthand~~ | `ninja_aio/decorators/actions.py`, `ninja_aio/views/api.py` | v2.33.0 | `@on("publish")` pre-fetches the object, runs `on_before_operation` + `on_before_object_operation`, passes `obj` to the handler — zero boilerplate. |
 
 ---
 
@@ -41,10 +43,8 @@
 
 | # | Task | File(s) | Description |
 |---|------|---------|-------------|
-| 23 | `@on` detail action shorthand | `decorators/actions.py` | `@on("publish", detail=True)` — pre-fetches object, runs hooks, you write only the logic. Wrapper over `@action` with zero boilerplate. |
 | 24 | Multi-tenancy mixin | `views/mixins.py` | `TenantViewSetMixin` — auto tenant filtering on all queries from header or JWT claim. |
 | 25 | Aggregation endpoints | `views/mixins.py` | `AggregationViewSetMixin` — COUNT, SUM, AVG, MIN, MAX on list views for dashboards. |
-| 26 | Field selection | `views/api.py` | `?fields=id,name,email` — select only needed fields in response. Reduces payload, improves performance. |
 | 27 | Nested writes | `models/utils.py`, `views/api.py` | Create parent + children in one atomic request. `POST /order` with `{"items": [...]}`. |
 | 28 | File upload mixin | `views/mixins.py` | `FileUploadViewSetMixin` — `POST /{pk}/upload` with `multipart/form-data`, configurable storage (local, S3). |
 | 29 | Auto admin inlines | `admin.py` | Extend `@register_admin` to auto-generate `InlineModelAdmin` for FK/M2M relations. |

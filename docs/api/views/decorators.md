@@ -10,6 +10,12 @@ Django Ninja AIO provides decorator utilities for composing view behavior and at
 
     Custom actions for ViewSets
 
+-   :material-lightning-bolt:{ .lg .middle } **`@on`**
+
+    ---
+
+    Detail actions with automatic object pre-fetch
+
 -   :material-layers:{ .lg .middle } **`decorate_view`**
 
     ---
@@ -91,6 +97,65 @@ from ninja_aio.decorators import action
 - Multiple methods create separate routes: `methods=["get", "post"]`
 
 See [APIViewSet @action](api_view_set.md#recommended-action-decorator) for full parameter reference.
+
+---
+
+## :material-lightning-bolt: `@on` (detail action shorthand)
+
+Shorthand over `@action` for detail endpoints that operate on a pre-fetched model instance. Instead of manually fetching the object and running permission hooks, `@on` does it automatically — your handler receives `obj` ready to use.
+
+```python
+from ninja_aio.decorators import on
+```
+
+**Comparison with `@action`:**
+
+=== "`@on` (zero boilerplate)"
+
+    ```python
+    @on("publish", methods=["post"], response={200: ArticleSchema})
+    async def publish(self, request, obj):
+        obj.status = "published"
+        await obj.asave(update_fields=["status"])
+        return Status(200, await self.model_util.read_s(self.schema_out, request, obj))
+    ```
+
+=== "`@action` (manual)"
+
+    ```python
+    @action(detail=True, methods=["post"], url_path="publish", response={200: ArticleSchema})
+    async def publish(self, request, pk):
+        await self.on_before_operation(request, "publish")
+        obj = await self.model_util.get_object(request, pk)
+        await self.on_before_object_permission(request, "publish", obj)
+        obj.status = "published"
+        await obj.asave(update_fields=["status"])
+        return Status(200, await self.model_util.read_s(self.schema_out, request, obj))
+    ```
+
+**What `@on` does automatically:**
+
+1. Calls `on_before_operation(request, action_name)` — view-level hooks/permissions
+2. Fetches `obj = await model_util.get_object(request, pk)` — raises 404 if not found
+3. Calls `on_before_object_operation(request, action_name, obj)` — object-level hooks/permissions
+4. Passes `obj` to your handler
+
+**Parameters:**
+
+| Parameter | Default | Description |
+|---|---|---|
+| `action_name` | required | URL path segment and operation name |
+| `methods` | `["post"]` | HTTP methods |
+| `url_path` | `action_name` | Override the URL segment |
+| `auth` | `NOT_SET` | Inherits from viewset per-verb auth |
+| `response` | `NOT_SET` | Response schema |
+| `summary`, `description`, `tags`, `deprecated`, `decorators`, `throttle`, `include_in_schema`, `openapi_extra` | — | Standard Ninja endpoint metadata |
+
+!!! note
+    `@on` always sets `detail=True`. The handler **must** be `async` since object fetching is async.
+
+!!! tip
+    Works seamlessly with `PermissionViewSetMixin` — `on_before_object_operation` is always called regardless of `_has_object_hooks`.
 
 ---
 

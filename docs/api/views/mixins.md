@@ -469,6 +469,82 @@ class GroupBasedAPI(PermissionViewSetMixin, APIViewSet):
 
 ---
 
+## FieldSelectionViewSetMixin
+
+Adds `?fields=` support to **list** and **retrieve** endpoints. Clients can request a comma-separated subset of response fields; unknown names are silently ignored. When no valid fields are requested the full response is returned unchanged.
+
+| Attribute | Type | Default | Description |
+|---|---|---|---|
+| `_fields_param` | `str` | `"fields"` | Query parameter name |
+
+```python
+from ninja_aio.views.mixins import FieldSelectionViewSetMixin
+from ninja_aio.views import APIViewSet
+
+class ArticleAPI(FieldSelectionViewSetMixin, APIViewSet):
+    model = Article
+```
+
+```
+GET /articles/?fields=id,title,author
+GET /articles/5?fields=id,title
+```
+
+=== "List with field selection"
+
+    ```python
+    # Returns only id + title for each item; count is preserved
+    GET /articles/?fields=id,title
+    # → {"items": [{"id": 1, "title": "Hello"}], "count": 42}
+    ```
+
+=== "Retrieve with field selection"
+
+    ```python
+    # Returns only the requested subset for the single object
+    GET /articles/5?fields=id,title
+    # → {"id": 5, "title": "Hello"}
+    ```
+
+=== "Unknown fields ignored"
+
+    ```python
+    # Only 'id' is valid — 'nonexistent' is dropped silently
+    GET /articles/?fields=id,nonexistent
+    # → {"items": [{"id": 1}], "count": 42}
+    ```
+
+=== "All-unknown falls back"
+
+    ```python
+    # No valid fields found → full response returned as usual
+    GET /articles/?fields=foo,bar
+    # → {"items": [{"id": 1, "title": "Hello", ...}], "count": 42}
+    ```
+
+**Composability — put `FieldSelectionViewSetMixin` first:**
+
+```python
+class ArticleAPI(
+    FieldSelectionViewSetMixin,
+    IcontainsFilterViewSetMixin,
+    SearchViewSetMixin,
+    APIViewSet,
+):
+    model = Article
+    search_fields = ["title", "content"]
+    query_params = {"title": (str, None)}
+```
+
+```
+GET /articles/?fields=id,title&search=django&title=tutorial
+```
+
+!!! note
+    OpenAPI schema always documents the **full** response shape. Field selection is a response-shaping hint — the schema remains authoritative for what fields *can* appear.
+
+---
+
 ## SoftDeleteViewSetMixin
 
 Replaces hard deletes with a boolean flag. Soft-deleted records are excluded from list and single-object endpoints. Provides restore and permanent delete endpoints.

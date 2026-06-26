@@ -1,10 +1,10 @@
 from collections.abc import Callable
-from typing import TypeVar
+from typing import List, TypeVar
 
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Model, QuerySet, Q
-from django.http import HttpRequest
-from ninja import Path, Schema, Status
+from django.http import HttpRequest, JsonResponse
+from ninja import Path, Query, Schema, Status
 from pydantic import create_model
 
 from ninja_aio.views.api import APIViewSet
@@ -12,6 +12,7 @@ from ninja_aio.decorators import unique_view, decorate_view, aatomic
 from ninja_aio.exceptions import ForbiddenError, NotFoundError
 from ninja_aio.schemas import GenericMessageSchema, RelationFilterSchema, MatchCaseFilterSchema
 from ninja_aio.schemas.api import BulkResultSchema
+from ninja_aio.schemas.helpers import QuerySchema
 
 # TypeVar for generic model typing in mixins
 ModelT = TypeVar("ModelT", bound=Model)
@@ -807,3 +808,153 @@ class SoftDeleteViewSetMixin(APIViewSet[ModelT]):
             _pk = self._get_pk(pk)
             await self.model_util.delete_s(request, _pk)
             return Status(204, None)
+
+
+class FieldSelectionViewSetMixin(APIViewSet[ModelT]):
+    """
+    Mixin adding ``?fields=`` support to list and retrieve endpoints.
+
+    Allows clients to request a subset of response fields:
+
+    - ``GET /items/?fields=id,name``
+    - ``GET /items/1?fields=id,name``
+
+    Only fields present in the response schema are included; unknown
+    names are silently ignored. When no valid fields are requested the
+    full response is returned unchanged.
+
+    Usage::
+
+        class ArticleAPI(FieldSelectionViewSetMixin, APIViewSet):
+            model = Article
+
+    Requests::
+
+        GET /articles/?fields=id,title,author
+        GET /articles/5?fields=id,title
+    """
+
+    _fields_param: str = "fields"
+
+    def _generate_filters_schema(self) -> Schema:
+        """Extend the filters schema with the ``fields`` query parameter."""
+        schema = super()._generate_filters_schema()
+        return create_model(
+            f"{self.model_util.model_name}FiltersSchema",
+            __base__=schema,
+            **{self._fields_param: (str | None, None)},
+        )
+
+    def _parse_requested_fields(self, raw: str | None, schema: type) -> set[str] | None:
+        """Return a validated set of field names from the raw query value, or None."""
+        if not raw:
+            return None
+        available = set(schema.model_fields.keys())
+        requested = {f.strip() for f in raw.split(",") if f.strip()}
+        valid = requested & available
+        return valid or None
+
+    def list_view(self) -> Callable:
+        """Register list endpoint with optional field selection."""
+        _paginator = self.pagination_class()
+        _input_class = self.pagination_class.Input
+        _default_pagination = _input_class()
+        _paginated_schema = create_model(
+            f"Paginated{self.schema_out.__name__}",
+            __base__=Schema,
+            items=(List[self.schema_out], ...),
+            count=(int, ...),
+        )
+        _fields_param = self._fields_param
+        _schema_out = self.schema_out
+
+        @self.router.get(
+            self.get_path,
+            auth=self.get_view_auth(),
+            summary=f"List {self.model_verbose_name_plural}",
+            description=self.list_docs,
+            response={200: _paginated_schema, self.error_codes: GenericMessageSchema},
+        )
+        @decorate_view(unique_view(self, plural=True), *self.extra_decorators.list)
+        async def list(
+            request: HttpRequest,
+            filters: Query[self.filters_schema] = None,  # type: ignore
+            ninja_pagination: _input_class = Query(_default_pagination),  # type: ignore
+        ):
+            if not isinstance(ninja_pagination, _input_class):
+                ninja_pagination = _default_pagination
+
+            requested_fields = self._parse_requested_fields(
+                getattr(filters, _fields_param, None), _schema_out
+            )
+
+            await self.on_before_operation(request, "list")
+
+            qs = await self.model_util.get_objects(
+                request, query_data=self._get_query_data(), is_for="read",
+            )
+            qs = self.on_list_queryset(request, qs)
+            qs = await self._apply_list_filters(qs, filters)
+
+            count = await qs.acount()
+            offset, page_size = self._get_page_params(_paginator, ninja_pagination)
+            sliced_qs = qs[offset : offset + page_size]
+
+            items = await self.model_util.list_read_s(
+                _schema_out, request, sliced_qs, is_for="read"
+            )
+
+            if requested_fields is not None:
+                items = [
+                    {k: v for k, v in item.items() if k in requested_fields}
+                    for item in items
+                ]
+                return JsonResponse({"items": items, "count": count})
+
+            return Status(200, {"items": items, "count": count})
+
+        return list
+
+    def retrieve_view(self) -> Callable:
+        """Register retrieve endpoint with optional field selection."""
+        retrieve_schema = self._get_retrieve_schema()
+        _fields_param = self._fields_param
+
+        @self.router.get(
+            self.get_path_retrieve,
+            auth=self.get_view_auth(),
+            summary=f"Retrieve {self.model_verbose_name}",
+            description=self.retrieve_docs,
+            response={200: retrieve_schema, self.error_codes: GenericMessageSchema},
+        )
+        @decorate_view(unique_view(self), *self.extra_decorators.retrieve)
+        async def retrieve(
+            request: HttpRequest,
+            pk: Path[self.path_schema],  # type: ignore
+            fields: Query[str] = None,  # type: ignore
+        ):
+            _pk = self._get_pk(pk)
+            _is_for = "detail" if self.schema_detail else "read"
+            obj = await self._run_object_hooks(request, "retrieve", _pk, is_for=_is_for)
+
+            requested_fields = self._parse_requested_fields(fields, retrieve_schema)
+
+            if obj is not None:
+                data = await self.model_util.read_s(retrieve_schema, request, obj)
+            else:
+                query_data = self._get_query_data()
+                data = await self.model_util.read_s(
+                    retrieve_schema,
+                    request,
+                    query_data=QuerySchema(
+                        getters={"pk": _pk}, **query_data.model_dump()
+                    ),
+                    is_for=_is_for,
+                )
+
+            if requested_fields is not None:
+                return JsonResponse({k: v for k, v in data.items() if k in requested_fields})
+
+            return Status(200, data)
+
+        return retrieve
