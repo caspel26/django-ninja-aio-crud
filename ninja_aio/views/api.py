@@ -1129,6 +1129,41 @@ class APIViewSet(API, Generic[ModelT]):
         ]
         handler.__signature__ = sig.replace(parameters=params)
 
+    def _build_on_handler(self, name: str, method: Callable) -> Callable:
+        """
+        Build a handler for ``@on``-decorated detail methods.
+
+        Runs ``on_before_operation``, fetches the object by pk, runs
+        ``on_before_object_operation``, then calls ``method(self, request, obj)``.
+        The returned function carries a ``__signature__`` that exposes
+        ``(request, pk)`` to Ninja for URL-parameter extraction.
+        """
+        _viewset = self
+        _orig = method
+        pk_name = self.model_util.model_pk_name
+
+        @functools.wraps(method)
+        async def on_handler(request, **kwargs):
+            await _viewset.on_before_operation(request, name)
+            pk = kwargs.get(pk_name)
+            obj = await _viewset.model_util.get_object(request, pk)
+            await _viewset.on_before_object_operation(request, name, obj)
+            return await _orig(_viewset, request, obj)
+
+        on_handler.__signature__ = inspect.Signature([
+            inspect.Parameter(
+                "request",
+                inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                annotation=HttpRequest,
+            ),
+            inspect.Parameter(
+                pk_name,
+                inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                annotation=Path[self.path_schema],
+            ),
+        ])
+        return on_handler
+
     def _register_single_action(
         self, name: str, method: Callable, config: ActionConfig
     ) -> None:
@@ -1152,28 +1187,32 @@ class APIViewSet(API, Generic[ModelT]):
                 f" {self.model_verbose_name}"
             )
 
-            handler = factory._build_handler(self, method)
-            factory._apply_metadata(handler, method)
+            if config.prefetch_object and config.detail:
+                # @on shorthand: pre-fetch object, hooks built into handler
+                handler = self._build_on_handler(name, method)
+            else:
+                handler = factory._build_handler(self, method)
+                factory._apply_metadata(handler, method)
 
-            # Wrap handler with on_before_operation hook
-            original_handler = handler
+                # Wrap handler with on_before_operation hook
+                original_handler = handler
 
-            @functools.wraps(original_handler)
-            async def hooked_handler(
-                *args,
-                _action_name=name,
-                _viewset=self,
-                _orig=original_handler,
-                **kwargs,
-            ):
-                request = args[0] if args else kwargs.get("request")
-                await _viewset.on_before_operation(request, _action_name)
-                return await _orig(*args, **kwargs)
+                @functools.wraps(original_handler)
+                async def hooked_handler(
+                    *args,
+                    _action_name=name,
+                    _viewset=self,
+                    _orig=original_handler,
+                    **kwargs,
+                ):
+                    request = args[0] if args else kwargs.get("request")
+                    await _viewset.on_before_operation(request, _action_name)
+                    return await _orig(*args, **kwargs)
 
-            handler = hooked_handler
+                handler = hooked_handler
 
-            if config.detail:
-                self._rename_pk_param(handler)
+                if config.detail:
+                    self._rename_pk_param(handler)
 
             handler.__name__ = f"{name}_{http_method}_{self.model_util.model_name}"
 

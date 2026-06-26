@@ -1,7 +1,8 @@
 import datetime
 
 from django.db.models import Q
-from ninja_aio.decorators.actions import action
+from ninja import Status
+from ninja_aio.decorators.actions import action, on
 from ninja_aio.views import mixins
 from ninja_aio.schemas import (
     RelationFilterSchema,
@@ -539,3 +540,70 @@ class TestModelDeleteOutAPI(GenericAPIViewSet):
     schema_out = schema.TestModelSchemaOut
     schema_update = schema.TestModelSchemaPatch
     schema_delete_out = schema.TestModelDeleteOut
+
+
+# ==========================================================
+#              FIELD SELECTION APIS
+# ==========================================================
+
+
+class FieldSelectionTestAPI(mixins.FieldSelectionViewSetMixin, GenericAPIViewSet):
+    """ViewSet with field selection support."""
+
+    model = models.TestModel
+    schema_in = schema.TestModelSchemaIn
+    schema_out = schema.TestModelSchemaOut
+    schema_update = schema.TestModelSchemaPatch
+
+
+class FieldSelectionWithPermissionsTestAPI(
+    mixins.FieldSelectionViewSetMixin,
+    mixins.PermissionViewSetMixin,
+    GenericAPIViewSet,
+):
+    """Field selection combined with PermissionViewSetMixin (_has_object_hooks=True)."""
+
+    model = models.TestModel
+    schema_in = schema.TestModelSchemaIn
+    schema_out = schema.TestModelSchemaOut
+    schema_update = schema.TestModelSchemaPatch
+
+
+class FieldSelectionWithFiltersTestAPI(
+    mixins.FieldSelectionViewSetMixin,
+    mixins.IcontainsFilterViewSetMixin,
+    GenericAPIViewSet,
+):
+    """Field selection composed with icontains filters."""
+
+    model = models.TestModel
+    schema_in = schema.TestModelSchemaIn
+    schema_out = schema.TestModelSchemaOut
+    schema_update = schema.TestModelSchemaPatch
+    query_params = {"name": (str, None)}
+
+
+# ==========================================================
+#              @on SHORTHAND ACTION APIS
+# ==========================================================
+
+
+class OnActionTestAPI(GenericAPIViewSet):
+    """ViewSet with @on-decorated detail actions."""
+
+    model = models.TestModel
+    schema_in = schema.TestModelSchemaIn
+    schema_out = schema.TestModelSchemaOut
+    schema_update = schema.TestModelSchemaPatch
+
+    @on("activate", methods=["post"])
+    async def activate(self, request, obj):
+        obj.name = f"{obj.name}_activated"
+        await obj.asave(update_fields=["name"])
+        return Status(200, {"message": "activated", "name": obj.name})
+
+    @on("rename", methods=["patch"])
+    async def rename(self, request, obj):
+        obj.name = f"renamed_{obj.name}"
+        await obj.asave(update_fields=["name"])
+        return Status(200, await self.model_util.read_s(self.schema_out, request, obj))

@@ -8,7 +8,7 @@ from .operations import (
     api_options,
     api_head,
 )
-from .actions import action
+from .actions import action, on
 
 __all__ = [
     "decorate_view",
@@ -22,4 +22,5 @@ __all__ = [
     "api_options",
     "api_head",
     "action",
+    "on",
 ]

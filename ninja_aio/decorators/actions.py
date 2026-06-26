@@ -26,6 +26,7 @@ class ActionConfig:
     throttle: BaseThrottle | list[BaseThrottle] | NOT_SET_TYPE = NOT_SET
     include_in_schema: bool = True
     openapi_extra: dict[str, Any] | None = None
+    prefetch_object: bool = False
 
 
 def action(
@@ -103,6 +104,86 @@ def action(
             throttle=throttle,
             include_in_schema=include_in_schema,
             openapi_extra=openapi_extra,
+        )
+        return func
+
+    return decorator
+
+
+def on(
+    action_name: str,
+    *,
+    methods: list[str] | None = None,
+    url_path: str | None = None,
+    url_name: str | None = None,
+    auth: Any = NOT_SET,
+    response: Any = NOT_SET,
+    summary: str | None = None,
+    description: str | None = None,
+    tags: list[str] | None = None,
+    deprecated: bool | None = None,
+    decorators: list[Callable] | None = None,
+    throttle: BaseThrottle | list[BaseThrottle] | NOT_SET_TYPE = NOT_SET,
+    include_in_schema: bool = True,
+    openapi_extra: Optional[dict[str, Any]] = None,
+):
+    """
+    Shorthand decorator for detail actions that pre-fetches the model instance.
+
+    The decorated method receives ``(self, request, obj)`` instead of
+    ``(self, request, pk)``. ``on_before_operation`` and
+    ``on_before_object_operation`` are called automatically before the
+    handler runs, eliminating the common boilerplate found in ``@action``
+    detail handlers.
+
+    Parameters
+    ----------
+    action_name : str
+        URL path segment for this action (e.g. ``"publish"``).
+        Defaults to the ``url_path`` when not overridden.
+    methods : list[str], optional
+        HTTP methods. Defaults to ``["post"]``.
+    url_path : str, optional
+        Override the URL path segment. Defaults to *action_name*.
+    auth : Any
+        Auth override. ``NOT_SET`` inherits from the viewset's per-verb auth.
+    response : Any
+        Response schema. ``NOT_SET`` lets Django Ninja infer it.
+
+    Example
+    -------
+    ::
+
+        class ArticleAPI(APIViewSet):
+            model = Article
+
+            @on("publish", methods=["post"], response={200: ArticleReadSchema})
+            async def publish(self, request, obj):
+                obj.status = "published"
+                await obj.asave(update_fields=["status"])
+                return Status(200, await self.model_util.read_s(self.schema_out, request, obj))
+
+    .. note::
+        The handler **must** be ``async``.
+    """
+
+    def decorator(func):
+        func._action_config = ActionConfig(
+            detail=True,
+            methods=methods or ["post"],
+            url_path=url_path if url_path is not None else action_name,
+            url_name=url_name,
+            auth=auth,
+            response=response,
+            summary=summary,
+            description=description,
+            tags=tags,
+            deprecated=deprecated,
+            decorators=decorators,
+            throttle=throttle,
+            include_in_schema=include_in_schema,
+            openapi_extra=openapi_extra,
+            prefetch_object=True,
         )
         return func
 
