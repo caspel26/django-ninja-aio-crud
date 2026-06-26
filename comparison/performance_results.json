@@ -1,148 +1,148 @@
 {
   "runs": [
     {
-      "timestamp": "2026-06-26T11:13:46.153682",
+      "timestamp": "2026-06-26T11:15:39.463189",
       "python_version": "3.14.6",
       "results": {
         "CRUDPerformanceTest": {
           "create": {
             "iterations": 100,
-            "min_ms": 1.5728,
-            "max_ms": 2.7976,
-            "avg_ms": 1.6759,
-            "median_ms": 1.6542
+            "min_ms": 1.63,
+            "max_ms": 3.1758,
+            "avg_ms": 1.7445,
+            "median_ms": 1.7159
           },
           "delete": {
             "iterations": 100,
-            "min_ms": 1.7051,
-            "max_ms": 2.1486,
-            "avg_ms": 1.7744,
-            "median_ms": 1.7597
+            "min_ms": 1.7333,
+            "max_ms": 2.2353,
+            "avg_ms": 1.8182,
+            "median_ms": 1.8095
           },
           "list": {
             "iterations": 100,
-            "min_ms": 2.7813,
-            "max_ms": 3.1893,
-            "avg_ms": 2.8495,
-            "median_ms": 2.8426
+            "min_ms": 2.8407,
+            "max_ms": 3.9974,
+            "avg_ms": 2.9345,
+            "median_ms": 2.9103
           },
           "retrieve": {
             "iterations": 100,
-            "min_ms": 1.1117,
-            "max_ms": 1.3763,
-            "avg_ms": 1.1726,
-            "median_ms": 1.1658
+            "min_ms": 1.135,
+            "max_ms": 2.511,
+            "avg_ms": 1.2826,
+            "median_ms": 1.2146
           },
           "update": {
             "iterations": 100,
-            "min_ms": 2.0889,
-            "max_ms": 3.1165,
-            "avg_ms": 2.1624,
-            "median_ms": 2.1447
+            "min_ms": 2.145,
+            "max_ms": 5.724,
+            "avg_ms": 2.3378,
+            "median_ms": 2.2198
           }
         },
         "FilterPerformanceTest": {
           "boolean_filter": {
             "iterations": 100,
-            "min_ms": 3.0132,
-            "max_ms": 4.0351,
-            "avg_ms": 3.0892,
-            "median_ms": 3.0765
+            "min_ms": 3.0604,
+            "max_ms": 3.9439,
+            "avg_ms": 3.1524,
+            "median_ms": 3.1276
           },
           "combined_filters": {
             "iterations": 100,
-            "min_ms": 1.779,
-            "max_ms": 2.0516,
-            "avg_ms": 1.8308,
-            "median_ms": 1.8285
+            "min_ms": 1.7914,
+            "max_ms": 2.0784,
+            "avg_ms": 1.8576,
+            "median_ms": 1.8538
           },
           "icontains_filter": {
             "iterations": 100,
-            "min_ms": 1.7023,
-            "max_ms": 2.2021,
-            "avg_ms": 1.7814,
-            "median_ms": 1.7649
+            "min_ms": 1.7116,
+            "max_ms": 2.087,
+            "avg_ms": 1.8054,
+            "median_ms": 1.7952
           },
           "match_case_filter": {
             "iterations": 100,
-            "min_ms": 2.3888,
-            "max_ms": 2.9069,
-            "avg_ms": 2.4843,
-            "median_ms": 2.467
+            "min_ms": 2.4379,
+            "max_ms": 2.9296,
+            "avg_ms": 2.5348,
+            "median_ms": 2.5185
           },
           "numeric_filter": {
             "iterations": 100,
-            "min_ms": 1.4782,
-            "max_ms": 1.7045,
-            "avg_ms": 1.5285,
-            "median_ms": 1.5259
+            "min_ms": 1.4908,
+            "max_ms": 2.1983,
+            "avg_ms": 1.6107,
+            "median_ms": 1.575
           },
           "relation_filter": {
             "iterations": 100,
-            "min_ms": 16.3307,
-            "max_ms": 17.6317,
-            "avg_ms": 16.7646,
-            "median_ms": 16.7805
+            "min_ms": 16.5397,
+            "max_ms": 17.918,
+            "avg_ms": 16.9479,
+            "median_ms": 16.934
           }
         },
         "LargeListPerformanceTest": {
           "list_1000_page100": {
             "iterations": 100,
-            "min_ms": 2.7618,
-            "max_ms": 3.5245,
-            "avg_ms": 2.8462,
-            "median_ms": 2.8323
+            "min_ms": 2.8471,
+            "max_ms": 3.5163,
+            "avg_ms": 2.941,
+            "median_ms": 2.9312
           },
           "list_1000_page20": {
             "iterations": 100,
-            "min_ms": 1.6266,
-            "max_ms": 1.8456,
-            "avg_ms": 1.6913,
-            "median_ms": 1.6793
+            "min_ms": 1.6217,
+            "max_ms": 1.8603,
+            "avg_ms": 1.7075,
+            "median_ms": 1.6985
           }
         },
         "MultiFKPerformanceTest": {
           "bulk_create_50x3fk": {
             "iterations": 10,
-            "min_ms": 81.0338,
-            "max_ms": 102.5459,
-            "avg_ms": 90.6276,
-            "median_ms": 87.9065
+            "min_ms": 83.4536,
+            "max_ms": 86.6218,
+            "avg_ms": 84.6008,
+            "median_ms": 84.2951
           },
           "create_3fk": {
             "iterations": 50,
-            "min_ms": 2.7215,
-            "max_ms": 3.7342,
-            "avg_ms": 2.8525,
-            "median_ms": 2.8309
+            "min_ms": 2.773,
+            "max_ms": 3.8241,
+            "avg_ms": 2.9549,
+            "median_ms": 2.9266
           }
         },
         "SchemaGenerationPerformanceTest": {
           "meta_serializer_schema_generation": {
             "iterations": 100,
             "min_ms": 0.0006,
-            "max_ms": 3.2411,
-            "avg_ms": 0.0331,
+            "max_ms": 3.3675,
+            "avg_ms": 0.0343,
             "median_ms": 0.0006
           },
           "model_serializer_schema_generation": {
             "iterations": 100,
             "min_ms": 0.0007,
-            "max_ms": 0.0083,
-            "avg_ms": 0.0013,
-            "median_ms": 0.0013
+            "max_ms": 0.0086,
+            "avg_ms": 0.0009,
+            "median_ms": 0.0008
           },
           "schema_with_relations": {
             "iterations": 100,
             "min_ms": 0.0004,
-            "max_ms": 1.9204,
-            "avg_ms": 0.0197,
+            "max_ms": 1.8363,
+            "avg_ms": 0.0188,
             "median_ms": 0.0004
           },
           "schema_with_validators": {
             "iterations": 100,
             "min_ms": 0.0006,
-            "max_ms": 3.6222,
+            "max_ms": 3.629,
             "avg_ms": 0.0369,
             "median_ms": 0.0006
           }
@@ -150,38 +150,38 @@
         "SerializationPerformanceTest": {
           "bulk_serialization_100": {
             "iterations": 50,
-            "min_ms": 1.2346,
-            "max_ms": 2.7425,
-            "avg_ms": 1.3154,
-            "median_ms": 1.2789
+            "min_ms": 1.2868,
+            "max_ms": 2.6242,
+            "avg_ms": 1.3609,
+            "median_ms": 1.3275
           },
           "bulk_serialization_500": {
             "iterations": 50,
-            "min_ms": 4.0125,
-            "max_ms": 8.4466,
-            "avg_ms": 4.1554,
-            "median_ms": 4.0602
+            "min_ms": 4.0998,
+            "max_ms": 8.2467,
+            "avg_ms": 4.2629,
+            "median_ms": 4.1619
           },
           "input_parsing": {
             "iterations": 100,
-            "min_ms": 0.5505,
-            "max_ms": 0.8,
-            "avg_ms": 0.5976,
-            "median_ms": 0.5918
+            "min_ms": 0.5468,
+            "max_ms": 0.7998,
+            "avg_ms": 0.6061,
+            "median_ms": 0.6041
           },
           "relation_serialization": {
             "iterations": 100,
-            "min_ms": 0.5542,
-            "max_ms": 0.7821,
-            "avg_ms": 0.6056,
-            "median_ms": 0.5985
+            "min_ms": 0.5602,
+            "max_ms": 0.7006,
+            "avg_ms": 0.6132,
+            "median_ms": 0.6125
           },
           "single_object_serialization": {
             "iterations": 100,
-            "min_ms": 0.5491,
-            "max_ms": 0.8567,
-            "avg_ms": 0.5824,
-            "median_ms": 0.5791
+            "min_ms": 0.5573,
+            "max_ms": 0.8432,
+            "avg_ms": 0.6086,
+            "median_ms": 0.6032
           }
         }
       }
