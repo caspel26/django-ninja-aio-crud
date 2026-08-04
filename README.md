@@ -49,6 +49,18 @@
 
 ---
 
+## See It In Action
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/caspel26/django-ninja-aio-crud/main/docs/images/quickstart-demo.gif" alt="django-ninja-aio-crud quick start demo" width="720">
+</p>
+
+<p align="center">
+  A <code>ModelSerializer</code>-based model, wired to a viewset, serving full CRUD in a few lines — no manual schemas or endpoint wiring. See <a href="https://django-ninja-aio.com">the docs</a> for the full walkthrough.
+</p>
+
+---
+
 ## Quick Start
 
 ### Option A: Meta-driven Serializer (existing models)
