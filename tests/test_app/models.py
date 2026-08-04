@@ -643,3 +643,18 @@ class PerfArticle(models.Model):
     author = models.ForeignKey(PerfAuthor, on_delete=models.CASCADE)
     category = models.ForeignKey(PerfCategory, on_delete=models.CASCADE)
     publisher = models.ForeignKey(PerfPublisher, on_delete=models.CASCADE)
+
+
+# ==========================================================
+#                  AUTO ADMIN INLINE MODELS
+# ==========================================================
+
+
+class AdminInlinePlainChild(models.Model):
+    """Plain (non-ModelSerializer) reverse-FK child of TestModelSerializer,
+    exercising the default-admin-fields fallback in _inline_fields()."""
+
+    parent = models.ForeignKey(
+        TestModelSerializer, on_delete=models.CASCADE, related_name="plain_children"
+    )
+    label = models.CharField(max_length=50)

@@ -34,6 +34,8 @@ This auto-generates:
 | `search_fields` | `("title", "synopsis")` |
 | `list_filter` | `("author", "published")` |
 | `readonly_fields` | `("author", "published")` |
+| `inlines` | One `TabularInline`/`StackedInline` per reverse FK/O2O relation (e.g. `Chapter` if it has a FK to `Book`) |
+| `filter_horizontal` | One entry per forward `ManyToManyField` declared on `Book` |
 
 ### Option 2: `Model.as_admin()`
 
@@ -67,6 +69,73 @@ Override any auto-generated attribute:
     list_display=("title", "author"),  # Override auto list_display
     search_fields=("title", "author__name"),  # Add relation search
 )
+class Book(ModelSerializer): ...
+```
+
+---
+
+## Relations: Inlines & M2M Widgets
+
+`@register_admin` / `Model.as_admin()` also inspect the model's Django
+relation graph and wire up sensible relation widgets automatically — no
+separate `TabularInline` classes to write for the common case.
+
+- **Reverse ForeignKey** → `TabularInline` (a child editable in a table on
+  the parent's change page).
+- **Reverse OneToOne** → `StackedInline` (a single child form, since there's
+  at most one).
+- **Forward ManyToManyField** → `filter_horizontal` (Django's dual-list
+  widget), unless the field uses a custom `through` model with extra fields
+  (Django doesn't support `filter_horizontal` for those, so they're left for
+  you to configure explicitly).
+- **Reverse ManyToMany** is skipped — there's no owning FK to inline against.
+
+```python
+@register_admin
+class Book(ModelSerializer):
+    author = models.ForeignKey(Author, on_delete=models.CASCADE)
+    tags = models.ManyToManyField(Tag)
+
+    class ReadSerializer:
+        fields = ["id", "author", "tags"]
+
+@register_admin
+class Chapter(ModelSerializer):
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, related_name="chapters")
+    title = models.CharField(max_length=200)
+    number = models.PositiveIntegerField()
+
+    class ReadSerializer:
+        fields = ["id", "book", "title", "number"]
+
+    class UpdateSerializer:
+        fields = ["title", "number"]
+```
+
+Opening `Book` in the admin now shows a `Chapters` inline table (fields
+`title`, `number` — taken from `Chapter.UpdateSerializer.fields`, since
+that's what should be editable in place) and a dual-list widget for `tags`.
+No `admin.py` boilerplate required.
+
+**The inline's field list:**
+
+- Uses the child's `UpdateSerializer.fields` when defined, falling back to
+  `CreateSerializer.fields`.
+- Always drops the FK field pointing back at the parent (`book` above) — it
+  is supplied via Django's inline formset (`fk_name`), so listing it
+  explicitly raises a `FieldError`.
+- Falls back to Django Admin's own default (all editable fields) for plain
+  (non-`ModelSerializer`) child models.
+
+**Overriding:** pass `inlines=(...)` or `filter_horizontal=(...)` like any
+other override — it replaces the auto-generated value entirely:
+
+```python
+@register_admin(inlines=(MyCustomChapterInline,))
+class Book(ModelSerializer): ...
+
+# Disable auto-inlines entirely
+@register_admin(inlines=())
 class Book(ModelSerializer): ...
 ```
 

@@ -2,7 +2,12 @@ from django.contrib import admin
 from django.contrib.admin import AdminSite
 from django.test import TestCase, tag
 
-from ninja_aio.admin import _classify_fields, model_admin_factory, register_admin
+from ninja_aio.admin import (
+    _classify_fields,
+    _classify_relations,
+    model_admin_factory,
+    register_admin,
+)
 from tests.test_app import models
 
 
@@ -185,3 +190,76 @@ class AsAdminTestCase(TestCase):
     def test_fk_model_as_admin(self):
         admin_cls = models.TestModelSerializerForeignKey.as_admin()
         self.assertIn("test_model_serializer", admin_cls.list_filter)
+
+
+@tag("admin")
+class ClassifyRelationsTestCase(TestCase):
+    """Test _classify_relations auto-generates inlines and filter_horizontal."""
+
+    def test_reverse_fk_becomes_tabular_inline(self):
+        config = _classify_relations(models.TestModelSerializerReverseForeignKey)
+        inline_models = {inl.model for inl in config["inlines"]}
+        self.assertIn(models.TestModelSerializerForeignKey, inline_models)
+        inline = next(
+            inl
+            for inl in config["inlines"]
+            if inl.model is models.TestModelSerializerForeignKey
+        )
+        self.assertTrue(issubclass(inline, admin.TabularInline))
+        self.assertEqual(inline.fk_name, "test_model_serializer")
+
+    def test_reverse_one_to_one_becomes_stacked_inline(self):
+        config = _classify_relations(models.TestModelSerializerReverseOneToOne)
+        inline = next(
+            inl
+            for inl in config["inlines"]
+            if inl.model is models.TestModelSerializerOneToOne
+        )
+        self.assertTrue(issubclass(inline, admin.StackedInline))
+        self.assertEqual(inline.fk_name, "test_model_serializer")
+
+    def test_inline_excludes_fk_field_from_fields(self):
+        config = _classify_relations(models.TestModelSerializerReverseForeignKey)
+        inline = next(
+            inl
+            for inl in config["inlines"]
+            if inl.model is models.TestModelSerializerForeignKey
+        )
+        self.assertNotIn("test_model_serializer", inline.fields or ())
+
+    def test_plain_model_child_uses_admin_default_fields(self):
+        """A reverse FK from a plain (non-ModelSerializer) model should get
+        an inline with no explicit `fields`, letting Django Admin show all
+        editable fields by default."""
+        config = _classify_relations(models.TestModelSerializer)
+        inline = next(
+            inl
+            for inl in config["inlines"]
+            if inl.model is models.AdminInlinePlainChild
+        )
+        self.assertIsNone(inline.fields)
+
+    def test_reverse_m2m_has_no_inline(self):
+        config = _classify_relations(models.TestModelSerializerReverseManyToMany)
+        inline_models = {inl.model for inl in config["inlines"]}
+        self.assertNotIn(models.TestModelSerializerManyToMany, inline_models)
+
+    def test_forward_m2m_gets_filter_horizontal(self):
+        config = _classify_relations(models.TestModelSerializerManyToMany)
+        self.assertIn("test_model_serializers", config["filter_horizontal"])
+
+    def test_no_relations_is_empty(self):
+        config = _classify_relations(models.TestModelSerializerWithReadOptionals)
+        self.assertEqual(config["inlines"], ())
+        self.assertEqual(config["filter_horizontal"], ())
+
+    def test_model_admin_factory_wires_inlines(self):
+        admin_cls = model_admin_factory(models.TestModelSerializerReverseForeignKey)
+        inline_models = {inl.model for inl in admin_cls.inlines}
+        self.assertIn(models.TestModelSerializerForeignKey, inline_models)
+
+    def test_overrides_replace_auto_inlines(self):
+        admin_cls = model_admin_factory(
+            models.TestModelSerializerReverseForeignKey, inlines=()
+        )
+        self.assertEqual(admin_cls.inlines, ())

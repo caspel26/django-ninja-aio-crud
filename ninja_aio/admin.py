@@ -96,6 +96,73 @@ def _classify_fields(model: type) -> dict:
     }
 
 
+def _inline_fields(child_model: type, fk_field_name: str) -> tuple[str, ...] | None:
+    """
+    Fields to display on an auto-generated inline for a reverse FK/O2O child.
+
+    Prefers `UpdateSerializer` fields (what should be editable in place),
+    falling back to `CreateSerializer` fields when the child has no
+    `UpdateSerializer`. The FK field back to the parent is always dropped --
+    Django's inline formset excludes it from the form already (it's supplied
+    via `fk_name`), so listing it explicitly would raise a `FieldError`.
+    Returns None for plain Django models, letting Django Admin fall back to
+    its own default (all editable fields).
+    """
+    if not isinstance(child_model, ModelSerializerMeta):
+        return None
+    names = list(
+        dict.fromkeys(child_model.get_fields("update") or child_model.get_fields("create"))
+    )
+    names = [n for n in names if n != fk_field_name]
+    return tuple(names) or None
+
+
+def _build_inline(rel) -> type[admin.TabularInline]:
+    """Build a TabularInline/StackedInline class for one reverse FK/O2O relation."""
+    child_model = rel.related_model
+    fk_field_name = rel.field.name
+    base = admin.StackedInline if rel.one_to_one else admin.TabularInline
+    attrs: dict = {"model": child_model, "fk_name": fk_field_name, "extra": 0}
+    fields = _inline_fields(child_model, fk_field_name)
+    if fields:
+        attrs["fields"] = fields
+    return type(f"{child_model.__name__}Inline", (base,), attrs)
+
+
+def _is_plain_m2m(field: ManyToManyField) -> bool:
+    """
+    Check a M2M field uses Django's auto-created through table.
+
+    `filter_horizontal` raises a admin.E013 check error for M2M fields with a
+    custom `through` model carrying extra fields, so those are left alone.
+    """
+    return bool(getattr(field.remote_field.through._meta, "auto_created", False))
+
+
+def _classify_relations(model: type) -> dict:
+    """
+    Derive Django Admin relation config from the model's Django relation graph.
+
+    - Reverse FK relations (other models pointing a FK at this one) become
+      `TabularInline`; reverse one-to-one becomes `StackedInline`. Reverse
+      M2M is skipped -- there's no owning FK to inline against.
+    - Forward M2M fields declared on this model get `filter_horizontal`'s
+      dual-list widget, unless they use a custom `through` model.
+    """
+    inlines = [
+        _build_inline(rel)
+        for rel in model._meta.related_objects
+        if not rel.many_to_many
+    ]
+    filter_horizontal = tuple(
+        f.name for f in model._meta.many_to_many if _is_plain_m2m(f)
+    )
+    return {
+        "inlines": tuple(inlines),
+        "filter_horizontal": filter_horizontal,
+    }
+
+
 def model_admin_factory(model: type, **overrides) -> type[admin.ModelAdmin]:
     """
     Create a ModelAdmin class from a ModelSerializer's field config.
@@ -104,8 +171,13 @@ def model_admin_factory(model: type, **overrides) -> type[admin.ModelAdmin]:
 
         AdminClass = model_admin_factory(Book, list_per_page=50)
         admin.site.register(Book, AdminClass)
+
+    Reverse FK/O2O relations are auto-registered as inlines and forward M2M
+    fields get the `filter_horizontal` widget -- pass `inlines=(...)` or
+    `filter_horizontal=(...)` to override either.
     """
     config = _classify_fields(model)
+    config.update(_classify_relations(model))
     config.update(overrides)
     return type(f"{model.__name__}Admin", (admin.ModelAdmin,), config)
 
