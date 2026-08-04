@@ -328,6 +328,24 @@ class ModelUtil(Generic[ModelT]):
         """
         return self.model._meta.pk.attname
 
+    @cached_property
+    def nested_fields(self) -> dict[str, tuple[type, str]]:
+        """
+        Nested-write configuration for this model's create schema.
+
+        Returns
+        -------
+        dict[str, tuple[type, str]]
+            Mapping of reverse accessor name -> (child_serializer, fk_field_name).
+            Empty when the model has no ``CreateSerializer.nested`` config.
+        """
+        if not isinstance(self.model, ModelSerializerMeta):
+            return {}
+        return {
+            field_name: (child_serializer, self.model._get_nested_fk_field(field_name))
+            for field_name, child_serializer in self.model.get_nested_fields().items()
+        }
+
     @property
     def model_verbose_name(self) -> str:
         """
@@ -1067,8 +1085,8 @@ class ModelUtil(Generic[ModelT]):
 
         Returns
         -------
-        tuple[dict, dict]
-            (payload_without_customs, customs_dict)
+        tuple[dict, dict, dict]
+            (payload_without_customs, customs_dict, nested_data)
 
         Raises
         ------
@@ -1076,6 +1094,14 @@ class ModelUtil(Generic[ModelT]):
             On base64 decoding failure or invalid field names.
         """
         payload = data.model_dump(mode="json")
+
+        # Nested reverse-FK children are lists of dicts, not scalar/FK values -
+        # pull them out before any other field processing sees them.
+        nested_data = {
+            field_name: payload.pop(field_name)
+            for field_name in self.nested_fields
+            if field_name in payload
+        }
 
         is_serializer = (
             isinstance(self.model, ModelSerializerMeta) or self.with_serializer
@@ -1101,9 +1127,14 @@ class ModelUtil(Generic[ModelT]):
         exclude_keys = customs.keys() or optionals
         new_payload = {k: v for k, v in payload.items() if k not in exclude_keys}
 
-        return new_payload, customs
+        return new_payload, customs, nested_data
 
-    async def _create_instance(self, request: HttpRequest, data: Schema):
+    async def _create_instance(
+        self,
+        request: HttpRequest,
+        data: Schema,
+        extra_fields: dict[str, Any] | None = None,
+    ):
         """
         Create a new instance and run hooks.
 
@@ -1115,6 +1146,10 @@ class ModelUtil(Generic[ModelT]):
         request : HttpRequest
         data : Schema
             Input schema instance.
+        extra_fields : dict[str, Any], optional
+            Fields merged into the payload before creation, bypassing schema
+            validation. Used to inject the parent instance's FK when creating
+            a nested child (see ``CreateSerializer.nested``).
 
         Returns
         -------
@@ -1126,7 +1161,9 @@ class ModelUtil(Generic[ModelT]):
         )
 
         logger.info(f"Creating {self.model.__name__}")
-        payload, customs = await self.parse_input_data(request, data)
+        payload, customs, nested_data = await self.parse_input_data(request, data)
+        if extra_fields:
+            payload.update(extra_fields)
         async with suppress_signals():
             obj = (
                 await self.model.objects.acreate(**payload)
@@ -1144,7 +1181,47 @@ class ModelUtil(Generic[ModelT]):
                 self.serializer.custom_actions(customs, obj),
                 self.serializer.post_create(obj),
             )
+        if nested_data:
+            await self._create_nested_children(request, obj, nested_data)
         return obj
+
+    async def _create_nested_children(
+        self, request: HttpRequest, obj: ModelT, nested_data: dict[str, list[dict]]
+    ) -> None:
+        """
+        Create reverse-FK children declared via ``CreateSerializer.nested``.
+
+        Each child payload is re-validated against the child's own create
+        schema and persisted through ``ModelUtil._create_instance`` (so the
+        child's own FK resolution, custom_actions, post_create and reactive
+        hooks all run normally), with the parent's FK injected via
+        ``extra_fields``. Runs inside the caller's transaction (create is
+        already wrapped in ``aatomic``).
+
+        Parameters
+        ----------
+        request : HttpRequest
+        obj : ModelT
+            The newly created parent instance.
+        nested_data : dict[str, list[dict]]
+            Mapping of reverse accessor name -> list of raw child payload dicts.
+        """
+        for field_name, child_payloads in nested_data.items():
+            if not child_payloads:
+                continue
+            child_serializer, fk_field_name = self.nested_fields[field_name]
+            child_util = ModelUtil(child_serializer)
+            child_schema = child_serializer.generate_nested_child_schema(fk_field_name)
+            await asyncio.gather(
+                *[
+                    child_util._create_instance(
+                        request,
+                        child_schema(**child_payload),
+                        extra_fields={fk_field_name: obj},
+                    )
+                    for child_payload in child_payloads
+                ]
+            )
 
     async def create_s(self, request: HttpRequest, data: Schema, obj_schema: Schema):
         """
@@ -1360,7 +1437,7 @@ class ModelUtil(Generic[ModelT]):
 
         logger.info(f"Updating {self.model.__name__} (pk={pk})")
         obj = await self.get_object(request, pk, is_for="read")
-        payload, customs = await self.parse_input_data(request, data)
+        payload, customs, _nested_data = await self.parse_input_data(request, data)
         if require_fields and not payload and not customs:
             raise SerializeError("No fields provided for update.")
 

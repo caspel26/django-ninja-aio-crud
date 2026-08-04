@@ -36,6 +36,7 @@
 | 26 | ~~NinjaAIORouter~~ | `ninja_aio/router.py`, `ninja_aio/api.py` | v2.32.0 | Composable router with `.view()` and `.viewset()` decorators. Attach via `api.add_router()` or `@api.router()`. Enables versioned and domain-separated API layouts. |
 | 27 | ~~Field selection~~ | `ninja_aio/views/mixins.py` | v2.33.0 | `FieldSelectionViewSetMixin` — `?fields=id,name,email` on list and retrieve. Reduces payload. Unknown field names ignored; falls back to full response. |
 | 28 | ~~`@on` detail action shorthand~~ | `ninja_aio/decorators/actions.py`, `ninja_aio/views/api.py` | v2.33.0 | `@on("publish")` pre-fetches the object, runs `on_before_operation` + `on_before_object_operation`, passes `obj` to the handler — zero boilerplate. |
+| 29 | ~~Nested writes~~ | `ninja_aio/models/serializers.py`, `ninja_aio/models/utils.py` | unreleased | `CreateSerializer.nested = {"items": ChildSerializer}` — create parent + reverse-FK children atomically in one request. Child's FK back to parent auto-excluded from the generated nested schema and injected at creation time; each child goes through its own full create pipeline (validators, `custom_actions`, `post_create`, reactive hooks). Create-only by design; runs inside the existing `aatomic()` transaction. M2M relations remain out of scope (already served by `ManyToManyAPI`). |
 
 ---
 
@@ -45,7 +46,6 @@
 |---|------|---------|-------------|
 | 24 | Multi-tenancy mixin | `views/mixins.py` | `TenantViewSetMixin` — auto tenant filtering on all queries from header or JWT claim. |
 | 25 | Aggregation endpoints | `views/mixins.py` | `AggregationViewSetMixin` — COUNT, SUM, AVG, MIN, MAX on list views for dashboards. |
-| 27 | Nested writes | `models/utils.py`, `views/api.py` | Create parent + children in one atomic request. `POST /order` with `{"items": [...]}`. |
 | 28 | File upload mixin | `views/mixins.py` | `FileUploadViewSetMixin` — `POST /{pk}/upload` with `multipart/form-data`, configurable storage (local, S3). |
 | 29 | Auto admin inlines | `admin.py` | Extend `@register_admin` to auto-generate `InlineModelAdmin` for FK/M2M relations. |
 | 30 | Admin actions from ViewSet | `admin.py` | `@action` endpoints become available as Django Admin actions. `@action("publish")` → admin "Publish selected" action. |

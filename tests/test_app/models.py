@@ -643,3 +643,55 @@ class PerfArticle(models.Model):
     author = models.ForeignKey(PerfAuthor, on_delete=models.CASCADE)
     category = models.ForeignKey(PerfCategory, on_delete=models.CASCADE)
     publisher = models.ForeignKey(PerfPublisher, on_delete=models.CASCADE)
+
+
+# ==========================================================
+#                  NESTED WRITES MODELS
+# ==========================================================
+
+
+class NestedOrderItem(BaseTestModelSerializer):
+    """Child model created atomically as part of a parent nested write."""
+
+    order = models.ForeignKey(
+        "NestedOrder",
+        on_delete=models.CASCADE,
+        related_name="items",
+    )
+    quantity = models.PositiveIntegerField(default=1)
+
+    class ReadSerializer:
+        fields = BaseTestModelSerializer.ReadSerializer.fields + [
+            "order",
+            "quantity",
+        ]
+
+    class CreateSerializer:
+        # "order" intentionally omitted: it is injected by the nested-write
+        # parent and must not be supplied by the client.
+        fields = BaseTestModelSerializer.CreateSerializer.fields + ["quantity"]
+
+
+class NestedOrderTag(BaseTestModelSerializer):
+    """Child model with no explicit CreateSerializer.fields, exercising the
+    auto-exclude-injected-fk fallback in generate_nested_child_schema()."""
+
+    order = models.ForeignKey(
+        "NestedOrder",
+        on_delete=models.CASCADE,
+        related_name="tags",
+    )
+
+    class CreateSerializer:
+        fields = []
+
+
+class NestedOrder(BaseTestModelSerializer):
+    """Parent model exercising nested creation of NestedOrderItem children."""
+
+    class ReadSerializer:
+        fields = BaseTestModelSerializer.ReadSerializer.fields + ["items"]
+
+    class CreateSerializer:
+        fields = BaseTestModelSerializer.CreateSerializer.fields
+        nested = {"items": NestedOrderItem, "tags": NestedOrderTag}

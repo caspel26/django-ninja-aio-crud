@@ -67,12 +67,12 @@ class ModelUtilParseInputTestCase(TestCase):
 
     async def test_parse_input_custom_and_optional(self):
         data = self.schema_create(name="n", description="d", extra="Z")
-        payload, customs = await self.util_custom.parse_input_data(None, data)
+        payload, customs, _ = await self.util_custom.parse_input_data(None, data)
         self.assertNotIn("extra", payload)
         self.assertEqual(customs["extra"], "Z")
         # optional exclusion when None on update
         upd = self.schema_update()
-        payload_u, customs_u = await self.util_custom.parse_input_data(None, upd)
+        payload_u, customs_u, _ = await self.util_custom.parse_input_data(None, upd)
         self.assertNotIn("description", payload_u)
         self.assertEqual(customs_u, {})
 
@@ -80,7 +80,7 @@ class ModelUtilParseInputTestCase(TestCase):
         data = self.fk_schema_in(
             name="fk", description="fk", test_model_serializer_id=self.fk_rev.pk
         )
-        payload, _ = await self.util_fk.parse_input_data(None, data)
+        payload, _, _ = await self.util_fk.parse_input_data(None, data)
         self.assertIsInstance(
             payload["test_model_serializer"],
             app_models.TestModelSerializerReverseForeignKey,
@@ -104,7 +104,7 @@ class ModelUtilParseInputTestCase(TestCase):
         good_bytes = b"hello"
         b64 = base64.b64encode(good_bytes).decode()
         data_good = schema_in(data=b64)
-        payload, _ = await util.parse_input_data(None, data_good)
+        payload, _, _ = await util.parse_input_data(None, data_good)
         self.assertEqual(payload["data"], good_bytes)
         # bad base64
         data_bad = schema_in(data="$$invalid$$")

@@ -57,6 +57,7 @@ Describes how to build a create (input) schema for a model.
 | `optionals` | `list[tuple[str, type]]` | Optional model fields: `(field_name, python_type)`                                                                                |
 | `customs`   | `list[tuple]`            | Synthetic inputs. Tuple forms: `(name, type)` = required (no default); `(name, type, default)` = optional (literal or callable)   |
 | `excludes`  | `list[str]`              | Field names rejected on create                                                                                                    |
+| `nested`    | `dict[str, type[ModelSerializer]]` | Reverse-FK child relations created atomically with the parent. See [Nested Writes](#nested-writes) below.                |
 
 **Example:**
 
@@ -114,6 +115,94 @@ class UserIn(ModelSchema):
         model = User
         fields = ["username", "email"]
 ```
+
+### Nested Writes
+
+`CreateSerializer.nested` lets a parent create endpoint accept and persist its
+reverse-FK children in the same request, atomically. This is distinct from
+M2M relations (`ManyToManyAPI`, see [Views: Mixins](../views/mixins.md)),
+which link *existing* objects — nested writes *create new owned children*
+that don't exist yet.
+
+```python
+class OrderItem(ModelSerializer):
+    order = models.ForeignKey(
+        "Order", on_delete=models.CASCADE, related_name="items"
+    )
+    product = models.ForeignKey(Product, on_delete=models.PROTECT)
+    quantity = models.PositiveIntegerField(default=1)
+
+    class CreateSerializer:
+        # "order" is intentionally omitted: it is injected by the parent
+        # and must never be supplied by the client.
+        fields = ["product", "quantity"]
+
+
+class Order(ModelSerializer):
+    customer = models.ForeignKey(Customer, on_delete=models.PROTECT)
+
+    class ReadSerializer:
+        fields = ["id", "customer", "items"]
+
+    class CreateSerializer:
+        fields = ["customer"]
+        nested = {"items": OrderItem}
+```
+
+A single request now creates the order and all of its items in one atomic
+transaction:
+
+```http
+POST /orders/
+Content-Type: application/json
+
+{
+  "customer": 5,
+  "items": [
+    {"product": 1, "quantity": 2},
+    {"product": 3, "quantity": 1}
+  ]
+}
+```
+
+```json
+{
+  "id": 42,
+  "customer": 5,
+  "items": [
+    {"id": 101, "order": 42, "product": 1, "quantity": 2},
+    {"id": 102, "order": 42, "product": 3, "quantity": 1}
+  ]
+}
+```
+
+**Key `dict` is the reverse accessor / `related_name`** on the parent model
+(`"items"` above matches `related_name="items"` on `OrderItem.order`). The
+value is the child's `ModelSerializer` class.
+
+**Rules:**
+
+- The child's FK back to the parent (`order` above) must **not** appear in
+  the child's `CreateSerializer.fields` — it is resolved automatically via
+  `related_name` and injected before the child is created. If omitted, the
+  framework also excludes it defensively even without an explicit `fields`
+  list.
+- Each child payload is validated against the *child's own* create schema
+  (minus the injected FK), so the child's own custom fields, optionals,
+  validators, `custom_actions`, `post_create`, and reactive hooks (`@on_create`,
+  etc.) all run normally for every nested item.
+- Creation runs inside the same `aatomic()` transaction as the parent — if
+  any child fails validation or persistence, the parent create is rolled
+  back too.
+- Omitting the nested key from the payload defaults to an empty list (no
+  children created); it is never required.
+- **Create-only.** There is no update/patch equivalent — updating a
+  collection of children (replace vs. merge vs. diff-by-pk) has ambiguous
+  semantics, so it's intentionally out of scope. Manage children via their
+  own CRUD endpoints after creation.
+- Only reverse-FK relations are supported. M2M relations should continue to
+  use `ManyToManyAPI` (`m2m_relations` on `APIViewSet`), since linking
+  existing rows is a different operation from creating owned children.
 
 ### ReadSerializer
 
@@ -1149,10 +1238,11 @@ Convert incoming schema to model-ready dict.
 
 **Transformations:**
 
-1. Strips custom fields (stored separately)
-2. Removes optional fields with `None` value
-3. Decodes BinaryField (base64 → bytes)
-4. Resolves FK IDs to model instances
+1. Strips nested-write fields (see `CreateSerializer.nested`), returned separately
+2. Strips custom fields (stored separately)
+3. Removes optional fields with `None` value
+4. Decodes BinaryField (base64 → bytes)
+5. Resolves FK IDs to model instances
 
 ```python
 from ninja import Schema
@@ -1172,7 +1262,7 @@ data = UserCreateSchema(
     send_welcome=True
 )
 
-payload, customs = await util.parse_input_data(request, data)
+payload, customs, nested = await util.parse_input_data(request, data)
 
 # payload = {
 #     "username": "john",
@@ -1181,7 +1271,15 @@ payload, customs = await util.parse_input_data(request, data)
 #     "avatar": b'\x89PNG\r\n...'
 # }
 # customs = {"send_welcome": True}
+# nested = {}  # populated only when CreateSerializer.nested is configured
 ```
+
+!!! note "Return signature"
+    `parse_input_data` returns a 3-tuple: `(payload, customs, nested)`. `nested`
+    is a `dict[str, list[dict]]` mapping each `CreateSerializer.nested` key to
+    its raw child payloads, already popped out of `payload` before FK
+    resolution runs. It is consumed internally by `create_s()` — most callers
+    can ignore it (`payload, customs, _ = await util.parse_input_data(...)`).
 
 #### `parse_output_data(request, data)`
 

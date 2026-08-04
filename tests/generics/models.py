@@ -166,7 +166,7 @@ class Tests:
             )
 
         async def test_parse_input_data(self):
-            payload, customs = await self.model_util.parse_input_data(
+            payload, customs, _ = await self.model_util.parse_input_data(
                 self.request.post(), self.data_in
             )
             self.assertEqual(payload, self.parsed_input_data.get("payload", {}))
