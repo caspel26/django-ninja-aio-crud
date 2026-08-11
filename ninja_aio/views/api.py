@@ -320,6 +320,7 @@ class APIViewSet(API, Generic[ModelT]):
             if not isinstance(self.model, ModelSerializerMeta)
             else self.model.util
         )
+        self._operations: dict[str, Callable] = {}
         (
             self.schema_out,
             self.schema_detail,
@@ -1220,7 +1221,7 @@ class APIViewSet(API, Generic[ModelT]):
                 for dec in reversed(config.decorators):
                     handler = dec(handler)
 
-            getattr(self.router, http_method)(
+            registered_handler = getattr(self.router, http_method)(
                 path=path,
                 auth=auth,
                 throttle=config.throttle,
@@ -1233,6 +1234,7 @@ class APIViewSet(API, Generic[ModelT]):
                 include_in_schema=config.include_in_schema,
                 openapi_extra=config.openapi_extra,
             )(handler)
+            self._operations[name] = registered_handler
 
             logger.debug(
                 f"Registered action {http_method.upper()} {path} "
@@ -1261,7 +1263,7 @@ class APIViewSet(API, Generic[ModelT]):
             if bulk_key not in self.disable and (
                 schema is not None or bulk_type == "delete"
             ):
-                view()
+                self._operations[bulk_key] = view()
                 logger.debug(
                     f"Registered bulk_{bulk_type} view for {self.model.__name__}"
                 )
@@ -1280,7 +1282,7 @@ class APIViewSet(API, Generic[ModelT]):
             if views_type not in self.disable and (
                 schema is not None or views_type == "delete"
             ):
-                view()
+                self._operations[views_type] = view()
                 logger.debug(
                     f"Registered {views_type} view for {self.model.__name__}"
                 )

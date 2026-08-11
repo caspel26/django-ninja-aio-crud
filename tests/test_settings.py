@@ -2,6 +2,7 @@ SECRET_KEY = "SECRET_KEY_FOR_TESTING"
 INSTALLED_APPS = [
     "django.contrib.auth",
     "django.contrib.contenttypes",
+    "ninja_aio",
     "tests.test_app",
 ]
 DATABASES = {
