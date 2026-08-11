@@ -36,6 +36,7 @@
 | 26 | ~~NinjaAIORouter~~ | `ninja_aio/router.py`, `ninja_aio/api.py` | v2.32.0 | Composable router with `.view()` and `.viewset()` decorators. Attach via `api.add_router()` or `@api.router()`. Enables versioned and domain-separated API layouts. |
 | 27 | ~~Field selection~~ | `ninja_aio/views/mixins.py` | v2.33.0 | `FieldSelectionViewSetMixin` — `?fields=id,name,email` on list and retrieve. Reduces payload. Unknown field names ignored; falls back to full response. |
 | 28 | ~~`@on` detail action shorthand~~ | `ninja_aio/decorators/actions.py`, `ninja_aio/views/api.py` | v2.33.0 | `@on("publish")` pre-fetches the object, runs `on_before_operation` + `on_before_object_operation`, passes `obj` to the handler — zero boilerplate. |
+| 29 | ~~AI Agent Integration (MCP)~~ | `ninja_aio/mcp/`, `ninja_aio/apps.py`, `ninja_aio/management/` | v2.34.0 | Exposes registered `APIViewSet`s (CRUD, bulk, `@action`/`@on`) and `APIView`s as MCP tools for any MCP client. `NinjaAIOMCPServer`/`run_mcp_server`, `python manage.py mcp_server`. |
 
 ---
 

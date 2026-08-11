@@ -1,5 +1,100 @@
 # 📋 Release Notes
 
+## 🏷️ [v2.34.0] - 2026-08-11
+
+---
+
+### ✨ New Features
+
+#### 🤖 AI Agent Integration (MCP)
+> `ninja_aio/mcp/`, `ninja_aio/apps.py`, `ninja_aio/management/commands/mcp_server.py`
+
+Every registered `APIViewSet` (CRUD, bulk operations, `@action`/`@on` custom endpoints) and `APIView` (custom hand-registered endpoints) can now be exposed as [MCP](https://modelcontextprotocol.io) (Model Context Protocol) tools, so any MCP client — Claude Code, Claude Desktop, or any other client speaking the protocol — can list and call them directly against a real project. No glue code required: tools are generated from the ViewSets/Views you already wrote and stay in sync automatically.
+
+```python
+# my_project/api.py
+from ninja_aio import NinjaAIO
+from ninja_aio.views import APIViewSet
+
+api = NinjaAIO()
+
+@api.viewset(Book)
+class BookViewSet(APIViewSet):
+    bulk_operations = ["create", "update", "delete"]
+
+    @action(detail=True, methods=["post"], url_path="publish")
+    async def publish(self, request, pk):
+        book = await self.model_util.get_object(request, pk)
+        book.published = True
+        await book.asave()
+        return Status(200, {"message": "published"})
+```
+
+```sh
+pip install "django-ninja-aio-crud[mcp]"
+python manage.py mcp_server my_project.api.api
+```
+
+Exposes `book_create`, `book_list`, `book_retrieve`, `book_update`, `book_delete`, `book_bulk_create`, `book_bulk_update`, `book_bulk_delete`, and `book_publish` as MCP tools — each with a JSON Schema `inputSchema` built straight from the viewset's own serializers/filters.
+
+Tool calls invoke the *exact same* registered handler functions the HTTP layer uses — pagination, filters, and `on_before_operation`/`on_before_object_operation`/`query_params_handler`/`on_list_queryset` hooks all run identically, not a re-implementation. Framework errors (`ninja_aio.exceptions.BaseException` subclasses, pydantic `ValidationError`) are converted to structured MCP error results instead of crashing the server.
+
+**Running the server:**
+
+| Option | Usage |
+|---|---|
+| `manage.py mcp_server` (recommended) | Add `"ninja_aio"` to `INSTALLED_APPS`, then `python manage.py mcp_server myproject.api.api` |
+| Standalone script | `django.setup()` + `asyncio.run(run_mcp_server(api))` — no `INSTALLED_APPS` changes needed |
+
+**New public API:**
+
+| Name | Description |
+|---|---|
+| `NinjaAIOMCPServer` | Builds and runs the MCP server; auto-discovers `@api.viewset(...)`/`@api.view(...)` registrations via `api._viewsets`/`api._views`, or accepts explicit `viewsets=`/`views=` |
+| `run_mcp_server(api, **kwargs)` | One-line coroutine wrapping `NinjaAIOMCPServer(...).run_stdio()` |
+| `describe_viewset(viewset)` / `describe_api_view(view)` | Build the list of `ToolSpec`s a viewset/view exposes, for programmatic use |
+| `invoke_tool(spec, arguments)` | Invoke a single tool call outside the MCP protocol layer (e.g. in tests) |
+| `ToolInvocationError` | Raised with a structured, JSON-serializable `.payload`/`.status_code` instead of letting framework exceptions propagate raw |
+
+⚠️ **Auth caveat:** tool calls bypass django-ninja's router-level `auth=` wiring, since that check happens in `Operation.run`, not inside the handler itself. Pass `request_factory` to `NinjaAIOMCPServer` to attach your own `request.user`/auth context for `on_before_operation` hooks to check. See `docs/mcp.md` for the full write-up, including the auth caveat, protocol-level JSON examples, and an end-to-end agent transcript.
+
+---
+
+### 🔧 Improvements
+
+#### 📦 `ninja_aio` can now be installed as a Django app
+> `ninja_aio/__init__.py`, `ninja_aio/apps.py`
+
+`ninja_aio`'s public names (`NinjaAIO`, `APIViewSet`, `register_admin`, `Branding`, ...) now resolve lazily instead of being imported eagerly at package load. This is what makes `manage.py mcp_server` possible: previously, listing `"ninja_aio"` in `INSTALLED_APPS` raised `AppRegistryNotReady` (`ModelSerializer` is a `django.db.models.Model` subclass defined at import time, and Django imports the app module before its own registry is ready). It's also a prerequisite for overriding `BrandedSwagger`'s bundled Swagger UI template via Django's standard app-directories template loader — previously only achievable by subclassing in Python. Existing `from ninja_aio import NinjaAIO`-style usage is unaffected.
+
+#### 🧪 More stable performance CI
+> `tests/performance/test_scalability.py`, `tests/performance/check_regression.py`, `.github/workflows/performance.yml`
+
+`test_async_overhead_within_threshold` now compares the median of 3 timing iterations instead of a single unaveraged sample, which was too noise-sensitive on shared CI hardware to reliably distinguish a real regression from runner jitter. `check_regression.py` (the CI-only regression gate) now skips sub-microsecond benchmarks, where percentage swings are pure measurement noise rather than signal.
+
+---
+
+### 📚 Documentation
+
+- New `docs/mcp.md` — full MCP integration guide: setup (both the management command and standalone-script options), tool naming/discovery rules for ViewSets and Views, protocol-level JSON examples (`tools/list`/`tools/call`), an end-to-end agent transcript, the auth caveat, and the `NinjaAIOMCPServer` API reference.
+- README — new "AI Agent Integration (MCP)" section and Features table entry.
+- `.github/workflows/coverage.yml`/`performance.yml`/`publish.yml` — pinned `flit_core<4` after an upstream `flit` release dropped support for this project's `[tool.flit.metadata]` table, which was breaking dependency installation in CI.
+
+---
+
+### 🎯 Summary
+
+v2.34.0's headline feature is AI agent integration via MCP: any project built on django-ninja-aio-crud can now be operated on directly by an MCP client, with zero custom integration code — the same ViewSets and Views already serving HTTP traffic become the agent's tools.
+
+**Key benefits:**
+- 🤖 **Zero-config discovery** — `@api.viewset(...)`/`@api.view(...)` registrations are picked up automatically
+- 🔁 **Real behavior, not a re-implementation** — tool calls reuse the exact registered handlers, hooks included
+- 🧩 **Everything is covered** — CRUD, bulk operations, `@action`/`@on` custom endpoints, and plain `APIView` endpoints
+- 📦 **Convenient to run** — `manage.py mcp_server` once `ninja_aio` is an installed app, or a standalone script otherwise
+- 🛡️ **Auth caveat documented up front** — router-level `auth=` doesn't apply to tool calls; `request_factory` + viewset hooks are the documented way to enforce it
+
+---
+
 ## 🏷️ [v2.33.0] - 2026-06-26
 
 ---
