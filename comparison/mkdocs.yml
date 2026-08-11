@@ -47,11 +47,12 @@ nav:
   - Benchmarks:
       - Framework Comparison: comparison.md
       - Performance: performance.md
-  - Logging: logging.md
-  - Deployment: deployment.md
-  - Troubleshooting: troubleshooting.md
-  - Contributing: contributing.md
-  - Release Notes: release_notes.md
+  - Resources:
+      - Logging: logging.md
+      - Deployment: deployment.md
+      - Troubleshooting: troubleshooting.md
+      - Contributing: contributing.md
+      - Release Notes: release_notes.md
 
 theme:
   custom_dir: overrides
