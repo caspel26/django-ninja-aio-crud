@@ -1143,6 +1143,53 @@ button[data-clipboard-target].md-clipboard:hover {
   left: 0;
 }
 
+/*
+ * Nav tabs already scroll horizontally when they overflow (Material's own
+ * .md-tabs__list has overflow:auto) — but the default scrollbar-width:none
+ * hides any sign of that, so overflowing items (e.g. the last tab) just
+ * look clipped/broken instead of "scroll for more". Make the affordance
+ * visible: a slim themed scrollbar, plus edge fades hinting more content.
+ */
+.md-tabs__list {
+  scrollbar-width: thin;
+  scrollbar-color: var(--md-accent-fg-color) transparent;
+}
+
+.md-tabs__list::-webkit-scrollbar {
+  height: 4px;
+  display: block;
+}
+
+.md-tabs__list::-webkit-scrollbar-thumb {
+  background: var(--md-accent-fg-color);
+  border-radius: 2px;
+}
+
+.md-tabs {
+  position: relative;
+}
+
+.md-tabs::before,
+.md-tabs::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1.5rem;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.md-tabs::before {
+  left: 0;
+  background: linear-gradient(to right, var(--md-primary-fg-color), transparent);
+}
+
+.md-tabs::after {
+  right: 0;
+  background: linear-gradient(to left, var(--md-primary-fg-color), transparent);
+}
+
 /* Reduce motion for accessibility */
 @media (prefers-reduced-motion: reduce) {
   .md-typeset .hero,
