@@ -13,7 +13,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
       - name: Install Flit
-        run: pip install flit
+        run: pip install "flit_core<4" flit
       - name: Install Dependencies
         run: flit install --symlink
       - name: Publish
