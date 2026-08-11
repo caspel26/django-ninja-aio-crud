@@ -41,6 +41,8 @@ class NinjaAIO(NinjaAPI):
         branding: Branding | None = None,
     ):
         self.branding = branding or Branding()
+        self._viewsets: list[APIViewSet] = []
+        self._views: list[APIView] = []
         if docs is None:
             docs = BrandedSwagger() if branding else Swagger()
         super().__init__(
@@ -69,6 +71,7 @@ class NinjaAIO(NinjaAPI):
         def wrapper(view: type[APIView]):
             instance = view(api=self, prefix=prefix, tags=tags)
             instance.add_views_to_route()
+            self._views.append(instance)
             return instance
 
         return wrapper
@@ -96,6 +99,7 @@ class NinjaAIO(NinjaAPI):
                 api=self, model=model, prefix=prefix, tags=tags
             )
             instance.add_views_to_route()
+            self._viewsets.append(instance)
             return instance
 
         return wrapper

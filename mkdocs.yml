@@ -43,6 +43,7 @@ nav:
   - Authentication:
       - JWT & AsyncJwtBearer: auth.md
       - Cookie Auth (BFF): auth_cookie.md
+  - AI Agent Integration (MCP): mcp.md
   - Benchmarks:
       - Framework Comparison: comparison.md
       - Performance: performance.md

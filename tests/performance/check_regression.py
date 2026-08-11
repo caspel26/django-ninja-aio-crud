@@ -17,6 +17,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CURRENT = PROJECT_ROOT / "performance_results.json"
 DEFAULT_THRESHOLD = 20.0  # percent
 
+# Benchmarks this fast are dominated by measurement/scheduler noise on shared
+# CI runners — a swing from 0.0003ms to 0.0006ms is "+100%" but meaningless.
+# Matches the noise floor already used by tools/detect_regression.py.
+MIN_MEANINGFUL_MS = 0.001
+
 
 def load_results(path: Path) -> dict:
     """Load performance results JSON file."""
@@ -69,6 +74,11 @@ def compare_runs(baseline: dict, current: dict, threshold: float) -> tuple[bool,
 
             baseline_median = baseline_stats["median_ms"]
             current_median = stats["median_ms"]
+
+            if baseline_median < MIN_MEANINGFUL_MS:
+                # Sub-microsecond benchmark: percent swings here are noise,
+                # not signal — skip rather than flag a false regression.
+                continue
 
             # Calculate percent change (positive = regression/slower)
             if baseline_median == 0:

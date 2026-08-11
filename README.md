@@ -46,6 +46,7 @@
 | **Lifecycle Hooks** | Extensible | `before_save`, `after_save`, `custom_actions`, `on_delete`, and more |
 | **Schema Validators** | Pydantic validators | `@field_validator` and `@model_validator` on serializer classes |
 | **ORJSON Renderer** | Performance | Built-in fast JSON rendering via `NinjaAIO` |
+| **AI Agent Integration** | MCP tools | Expose ViewSets as [MCP](https://modelcontextprotocol.io) tools for any MCP client |
 
 ---
 
@@ -275,6 +276,93 @@ class BookViewSet(APIViewSet):
     async def stats(self, request):
         total = await Book.objects.acount()
         return {"total": total}
+```
+
+---
+
+## AI Agent Integration (MCP)
+
+Expose every registered `APIViewSet` — CRUD, bulk operations, and custom `@action`/`@on` endpoints — as well as any custom `APIView`, as [MCP](https://modelcontextprotocol.io) tools any MCP client can call directly.
+
+```sh
+pip install "django-ninja-aio-crud[mcp]"
+```
+
+### Option A: `manage.py mcp_server` (recommended)
+
+Add `"ninja_aio"` to `INSTALLED_APPS` to pick up the bundled management command:
+
+```python
+INSTALLED_APPS = [
+    ...,
+    "ninja_aio",
+]
+```
+
+```sh
+python manage.py mcp_server myproject.api.api
+```
+
+Or set a default so you can drop the argument:
+
+```python
+# settings.py
+NINJA_AIO_MCP_API = "myproject.api.api"
+```
+
+```json
+{
+  "mcpServers": {
+    "myproject": {
+      "type": "stdio",
+      "command": "python",
+      "args": ["manage.py", "mcp_server"]
+    }
+  }
+}
+```
+
+### Option B: standalone script
+
+```python
+# mcp_server.py
+import asyncio
+import django
+django.setup()
+
+from myproject.api import api  # your NinjaAIO() instance with @api.viewset(...) registered
+from ninja_aio.mcp import run_mcp_server
+
+if __name__ == "__main__":
+    asyncio.run(run_mcp_server(api))
+```
+
+```json
+{
+  "mcpServers": {
+    "myproject": {
+      "type": "stdio",
+      "command": "python",
+      "args": ["mcp_server.py"]
+    }
+  }
+}
+```
+
+Every `@api.viewset(...)`-registered ViewSet and `@api.view(...)`-registered View is picked up automatically (or pass `viewsets=[...]`/`views=[...]` explicitly). Tools are named `<model>_<operation>` for ViewSets — e.g. `book_create`, `book_list`, `book_retrieve`, `book_update`, `book_delete`, `book_bulk_create`, `book_publish` — and `<viewclass>_<function>_<method>` for plain Views — e.g. `bookview_stats_get`.
+
+> **⚠️ Auth caveat:** tool calls invoke the same registered view logic as HTTP requests (filters, pagination, and `on_before_operation`/`on_before_object_operation`/`query_params_handler` hooks all run identically) but bypass django-ninja's `auth=` wiring, since that applies at the router layer, not inside the handler. Pass `request_factory` to attach your own `request.user`/auth context, and use viewset hooks to enforce authorization for MCP-driven calls:
+
+```python
+from ninja_aio.mcp import NinjaAIOMCPServer
+
+def mcp_request_factory():
+    from django.test.client import AsyncRequestFactory
+    request = AsyncRequestFactory().get("/mcp/")
+    request.user = get_service_account_user()  # your own resolution logic
+    return request
+
+server = NinjaAIOMCPServer(api, request_factory=mcp_request_factory)
 ```
 
 ---
