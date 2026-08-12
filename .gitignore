@@ -300,3 +300,4 @@ comparison_report.html
 devdashboard/
 .devdashboard.json
 coverage.json
+.claude/
