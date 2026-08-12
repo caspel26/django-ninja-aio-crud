@@ -20,7 +20,7 @@ jobs:
         with:
           python-version: "3.14"
       - name: Install Flit
-        run: pip install "flit_core<4" flit
+        run: pip install flit
       - name: Install Dependencies
         run: flit install --symlink
       - name: Install Comparison Dependencies
