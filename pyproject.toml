@@ -47,7 +47,7 @@ comparison = [
     "fastapi>=0.100.0"
 ]
 mcp = [
-    "mcp>=1.2.0, <2.0.0"
+    "mcp>=1.28.1, <2.0.0"
 ]
 
 [tool.flit.metadata.urls]

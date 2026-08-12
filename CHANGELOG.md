@@ -1,5 +1,26 @@
 # 📋 Release Notes
 
+## 🏷️ [v2.34.1] - 2026-08-12
+
+---
+
+### 🔒 Security
+
+#### ⬆️ Raised minimum `mcp` version to `1.28.1`
+> `pyproject.toml`
+
+The optional `mcp` extra's floor (`mcp>=1.2.0, <2.0.0`) allowed installing versions affected by six published GitHub Security Advisories against the `mcp` PyPI package — all **High** severity (CVSS 7.1–8.7): denial-of-service via uncaught exceptions ([CVE-2025-53365](https://github.com/advisories/GHSA-j975-95f5-7wqh), [CVE-2025-53366](https://github.com/advisories/GHSA-3qhf-m339-9g5v)), DNS-rebinding auth bypass on HTTP transports ([CVE-2025-66416](https://github.com/advisories/GHSA-9h52-p55h-vw2f)), cross-client access to the opt-in experimental task-handler feature ([CVE-2026-52870](https://github.com/advisories/GHSA-hvrp-rf83-w775)), session hijacking via guessable session IDs ([CVE-2026-52869](https://github.com/advisories/GHSA-jpw9-pfvf-9f58)), and missing origin validation on the deprecated websocket transport ([CVE-2026-59950](https://github.com/advisories/GHSA-vj7q-gjh5-988w)).
+
+`ninja_aio.mcp` only uses stdio transport with no experimental features enabled, so none of these were reachable through this project's code path — but the permissive floor still allowed installing vulnerable versions. The `mcp` extra now requires `mcp>=1.28.1, <2.0.0`, which is patched against all six.
+
+---
+
+### 🎯 Summary
+
+Dependency-floor security patch — no functional or API changes. If you installed `django-ninja-aio-crud[mcp]` previously, run `pip install -U "django-ninja-aio-crud[mcp]"` to pick up a patched `mcp` version.
+
+---
+
 ## 🏷️ [v2.34.0] - 2026-08-11
 
 ---
