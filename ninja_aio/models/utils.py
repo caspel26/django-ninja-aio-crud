@@ -427,12 +427,18 @@ class ModelUtil(Generic[ModelT]):
             else await self.serializer_class.queryset_request(request)
         )
 
-        # Apply query optimizations
-        obj_qs = self._apply_query_optimizations(obj_qs, query_data, is_for)
-
-        # Apply queryset_request hook if available
+        # Apply queryset_request hook if available. This may return an entirely
+        # different queryset (e.g. request-scoped filtering), so it must run
+        # before the read/detail-scoped optimizations below, or those would be
+        # silently discarded.
         if isinstance(self.model, ModelSerializerMeta) and with_qs_request:
             obj_qs = await self.model.queryset_request(request)
+
+        # Apply query optimizations for the requested scope. select_related/
+        # prefetch_related are additive, so re-applying them here on top of
+        # whatever the hook returned is safe even if it already optimized
+        # for its own (queryset_request) scope.
+        obj_qs = self._apply_query_optimizations(obj_qs, query_data, is_for)
 
         # Apply filters if present (supports dict or Q object)
         if hasattr(query_data, "filters") and query_data.filters:
@@ -969,6 +975,7 @@ class ModelUtil(Generic[ModelT]):
         k: str,
         v: Any,
         field_obj: models.ForeignKey,
+        fk_cache: dict[tuple[type, Any], Any] | None = None,
     ) -> None:
         """Resolve foreign key ID to model instance in place.
 
@@ -988,33 +995,50 @@ class ModelUtil(Generic[ModelT]):
         In every scoped path, a row outside the caller's scope raises the
         standard ``NotFoundError(rel_model)`` — indistinguishable from a real
         404, so cross-tenant probing cannot leak existence.
+
+        Parameters
+        ----------
+        fk_cache : dict[tuple[type, Any], Any], optional
+            Request-scoped cache of already-resolved ``(rel_model, pk)`` ->
+            instance pairs, shared across the items of a single bulk
+            create/update call. Avoids re-fetching the same related object
+            once per item when the same FK value repeats across the batch.
+            ``None`` (the default, used by single create/update) disables
+            caching entirely.
         """
         rel_model = field_obj.related_model
+        cache_key = (rel_model, v) if fk_cache is not None else None
+        if cache_key is not None and cache_key in fk_cache:
+            payload[k] = fk_cache[cache_key]
+            return
+
         logger.debug(
             f"Resolving FK '{k}' -> {rel_model.__name__} (pk={v}) for {self.model.__name__}"
         )
 
         if isinstance(rel_model, ModelSerializerMeta):
             payload[k] = await ModelUtil(rel_model).get_object(request, pk=v)
-            return
-
-        rel_serializer_cls = get_serializer_for_model(rel_model)
-        if rel_serializer_cls is not None:
+        elif (
+            rel_serializer_cls := get_serializer_for_model(rel_model)
+        ) is not None:
             payload[k] = await ModelUtil(
                 rel_model, serializer_class=rel_serializer_cls
             ).get_object(request, pk=v)
-            return
+        else:
+            try:
+                payload[k] = await rel_model.objects.aget(pk=v)
+            except rel_model.DoesNotExist:
+                raise NotFoundError(rel_model)
 
-        try:
-            payload[k] = await rel_model.objects.aget(pk=v)
-        except rel_model.DoesNotExist:
-            raise NotFoundError(rel_model)
+        if cache_key is not None:
+            fk_cache[cache_key] = payload[k]
 
     async def _process_payload_fields(
         self,
         request: HttpRequest,
         payload: dict,
         fields_to_process: list[tuple[str, Any]],
+        fk_cache: dict[tuple[type, Any], Any] | None = None,
     ) -> None:
         """
         Process payload fields: decode binary and resolve foreign keys.
@@ -1030,6 +1054,8 @@ class ModelUtil(Generic[ModelT]):
             Payload dict to modify in place.
         fields_to_process : list[tuple[str, Any]]
             List of (field_name, field_value) tuples to process.
+        fk_cache : dict[tuple[type, Any], Any], optional
+            Request-scoped FK resolution cache, see ``_resolve_fk``.
         """
         if not fields_to_process:
             return
@@ -1042,12 +1068,19 @@ class ModelUtil(Generic[ModelT]):
         for (k, v), field_obj in zip(fields_to_process, field_objs):
             self._decode_binary(payload, k, v, field_obj)
             if isinstance(field_obj, models.ForeignKey) and v is not None:
-                fk_tasks.append(self._resolve_fk(request, payload, k, v, field_obj))
+                fk_tasks.append(
+                    self._resolve_fk(request, payload, k, v, field_obj, fk_cache)
+                )
 
         if fk_tasks:
             await asyncio.gather(*fk_tasks)
 
-    async def parse_input_data(self, request: HttpRequest, data: Schema):
+    async def parse_input_data(
+        self,
+        request: HttpRequest,
+        data: Schema,
+        fk_cache: dict[tuple[type, Any], Any] | None = None,
+    ):
         """
         Transform inbound schema data to a model-ready payload.
 
@@ -1064,6 +1097,9 @@ class ModelUtil(Generic[ModelT]):
         request : HttpRequest
         data : Schema
             Incoming validated schema instance.
+        fk_cache : dict[tuple[type, Any], Any], optional
+            Request-scoped cache of already-resolved FK instances, shared
+            across items of a bulk create/update call. See ``_resolve_fk``.
 
         Returns
         -------
@@ -1095,7 +1131,9 @@ class ModelUtil(Generic[ModelT]):
 
         # Process payload fields - gather field objects in parallel for better performance
         fields_to_process = [(k, v) for k, v in payload.items() if k not in skip_keys]
-        await self._process_payload_fields(request, payload, fields_to_process)
+        await self._process_payload_fields(
+            request, payload, fields_to_process, fk_cache
+        )
 
         # Preserve original exclusion semantics (customs if present else optionals)
         exclude_keys = customs.keys() or optionals
@@ -1103,7 +1141,12 @@ class ModelUtil(Generic[ModelT]):
 
         return new_payload, customs
 
-    async def _create_instance(self, request: HttpRequest, data: Schema):
+    async def _create_instance(
+        self,
+        request: HttpRequest,
+        data: Schema,
+        fk_cache: dict[tuple[type, Any], Any] | None = None,
+    ):
         """
         Create a new instance and run hooks.
 
@@ -1115,6 +1158,9 @@ class ModelUtil(Generic[ModelT]):
         request : HttpRequest
         data : Schema
             Input schema instance.
+        fk_cache : dict[tuple[type, Any], Any], optional
+            Request-scoped cache of already-resolved FK instances, shared
+            across items of a bulk create call. See ``_resolve_fk``.
 
         Returns
         -------
@@ -1126,7 +1172,7 @@ class ModelUtil(Generic[ModelT]):
         )
 
         logger.info(f"Creating {self.model.__name__}")
-        payload, customs = await self.parse_input_data(request, data)
+        payload, customs = await self.parse_input_data(request, data, fk_cache)
         async with suppress_signals():
             obj = (
                 await self.model.objects.acreate(**payload)
@@ -1332,6 +1378,7 @@ class ModelUtil(Generic[ModelT]):
         data: Schema,
         pk: int | str,
         require_fields: bool = False,
+        fk_cache: dict[tuple[type, Any], Any] | None = None,
     ):
         """
         Update an existing instance and run hooks.
@@ -1348,6 +1395,9 @@ class ModelUtil(Generic[ModelT]):
             Primary key of target object.
         require_fields : bool
             When True, raises SerializeError if no fields are provided.
+        fk_cache : dict[tuple[type, Any], Any], optional
+            Request-scoped cache of already-resolved FK instances, shared
+            across items of a bulk update call. See ``_resolve_fk``.
 
         Returns
         -------
@@ -1360,7 +1410,7 @@ class ModelUtil(Generic[ModelT]):
 
         logger.info(f"Updating {self.model.__name__} (pk={pk})")
         obj = await self.get_object(request, pk, is_for="read")
-        payload, customs = await self.parse_input_data(request, data)
+        payload, customs = await self.parse_input_data(request, data, fk_cache)
         if require_fields and not payload and not customs:
             raise SerializeError("No fields provided for update.")
 
@@ -1426,7 +1476,9 @@ class ModelUtil(Generic[ModelT]):
         )
         return await self.read_s(obj_schema, request, updated_object)
 
-    async def delete_s(self, request: HttpRequest, pk: int | str):
+    async def delete_s(
+        self, request: HttpRequest, pk: int | str, instance: ModelT | None = None
+    ):
         """
         Delete an instance by primary key.
 
@@ -1435,6 +1487,11 @@ class ModelUtil(Generic[ModelT]):
         request : HttpRequest
         pk : int | str
             Primary key.
+        instance : ModelT, optional
+            Already-fetched instance to delete. When provided, skips the
+            lookup query entirely (e.g. the caller already fetched the object
+            to serialize it before deletion, as ``delete_view`` does when
+            ``schema_delete_out`` is set).
 
         Returns
         -------
@@ -1445,7 +1502,7 @@ class ModelUtil(Generic[ModelT]):
         )
 
         logger.info(f"Deleting {self.model.__name__} (pk={pk})")
-        obj = await self.get_object(request, pk)
+        obj = instance if instance is not None else await self.get_object(request, pk)
         async with suppress_signals():
             await obj.adelete()
         logger.debug(f"Deleted {self.model.__name__} (pk={pk})")
@@ -1509,10 +1566,14 @@ class ModelUtil(Generic[ModelT]):
         extractor = detail_extractor or (lambda obj: obj.pk)
         success_details = []
         error_details = []
+        # Request-scoped cache: repeated FK values across items in the batch
+        # (e.g. many rows sharing the same category/tenant) are resolved once
+        # instead of once per item. See `_resolve_fk`.
+        fk_cache: dict[tuple[type, Any], Any] = {}
 
         for data in data_list:
             try:
-                obj = await self._create_instance(request, data)
+                obj = await self._create_instance(request, data, fk_cache)
                 success_details.append(extractor(obj))
             except (SerializeError, NotFoundError) as e:
                 error_details.append(self._format_bulk_error(e))
@@ -1558,11 +1619,14 @@ class ModelUtil(Generic[ModelT]):
         extractor = detail_extractor or (lambda obj: obj.pk)
         success_details = []
         error_details = []
+        # Request-scoped cache: repeated FK values across items in the batch
+        # are resolved once instead of once per item. See `_resolve_fk`.
+        fk_cache: dict[tuple[type, Any], Any] = {}
 
         for pk, data in data_list:
             try:
                 obj = await self._update_instance(
-                    request, data, pk, require_fields
+                    request, data, pk, require_fields, fk_cache
                 )
                 success_details.append(extractor(obj))
             except (SerializeError, NotFoundError) as e:

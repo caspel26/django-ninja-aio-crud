@@ -5,11 +5,46 @@ This module tests that the FK resolution optimization in create_s and update_s
 maintains correct functionality while reducing redundant database queries.
 """
 
+from contextlib import contextmanager
+from unittest import mock
+
 from django.test import TestCase, tag
 from asgiref.sync import async_to_sync
+from ninja import Schema
 
 from tests.test_app import models
 from ninja_aio.models import ModelUtil
+
+
+class _FKCreateSchema(Schema):
+    name: str
+    description: str
+    test_model_serializer: int
+
+
+class _FKUpdateSchema(Schema):
+    name: str | None = None
+    description: str | None = None
+    test_model_serializer: int | None = None
+
+
+@contextmanager
+def _count_fk_resolutions(target_model):
+    """Patch ModelUtil.get_object to record every pk resolved for
+    `target_model`, without altering the real resolution behavior.
+
+    Yields the list of resolved pks, appended to in call order.
+    """
+    resolved_pks = []
+    original_get_object = ModelUtil.get_object
+
+    async def counting_get_object(self, request, pk=None, **kwargs):
+        if self.model is target_model:
+            resolved_pks.append(pk)
+        return await original_get_object(self, request, pk=pk, **kwargs)
+
+    with mock.patch.object(ModelUtil, "get_object", counting_get_object):
+        yield resolved_pks
 
 
 @tag("fk_optimization")
@@ -356,3 +391,131 @@ class FKOptimizationTestCase(TestCase):
         self.assertEqual(result["test_model_serializer"]["id"], self.rev_fk_1.id)
         # Verify description updated
         self.assertEqual(result["description"], "Updated description")
+
+
+@tag("fk_optimization", "bulk_fk_cache")
+class BulkFKCacheOptimizationTestCase(TestCase):
+    """Regression tests for the per-batch FK resolution cache.
+
+    `bulk_create_s`/`bulk_update_s` share a request-scoped `fk_cache` across
+    the items of a single batch (`ninja_aio/models/utils.py::_resolve_fk`), so
+    a FK value repeated across items is resolved once instead of once per
+    item. Single `create_s`/`update_s` calls are unaffected (fk_cache=None).
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.rev_fk_1 = models.TestModelSerializerReverseForeignKey.objects.create(
+            name="reverse_fk_1", description="First reverse FK"
+        )
+        cls.rev_fk_2 = models.TestModelSerializerReverseForeignKey.objects.create(
+            name="reverse_fk_2", description="Second reverse FK"
+        )
+
+    def setUp(self):
+        self.model_util = ModelUtil(models.TestModelSerializerForeignKey)
+
+    @async_to_sync
+    async def test_bulk_create_dedupes_repeated_fk_resolution(self):
+        """10 items sharing the same FK value must resolve that FK once, not
+        once per item."""
+        request = mock.Mock()
+        data_list = [
+            _FKCreateSchema(
+                name=f"item_{i}", description="d", test_model_serializer=self.rev_fk_1.id
+            )
+            for i in range(10)
+        ]
+
+        with _count_fk_resolutions(
+            models.TestModelSerializerReverseForeignKey
+        ) as resolved_pks:
+            success, errors = await self.model_util.bulk_create_s(request, data_list)
+
+        self.assertEqual(errors, [])
+        self.assertEqual(len(success), 10)
+        # Without the cache this would be 10 - one resolution per item.
+        self.assertEqual(resolved_pks, [self.rev_fk_1.id])
+
+    @async_to_sync
+    async def test_bulk_create_resolves_each_distinct_fk_once(self):
+        """Two distinct FK values across a batch must each resolve exactly
+        once, regardless of how many items reference them."""
+        request = mock.Mock()
+        data_list = [
+            _FKCreateSchema(
+                name=f"item_{i}",
+                description="d",
+                test_model_serializer=(
+                    self.rev_fk_1.id if i % 2 == 0 else self.rev_fk_2.id
+                ),
+            )
+            for i in range(10)
+        ]
+
+        with _count_fk_resolutions(
+            models.TestModelSerializerReverseForeignKey
+        ) as resolved_pks:
+            success, errors = await self.model_util.bulk_create_s(request, data_list)
+
+        self.assertEqual(errors, [])
+        self.assertEqual(len(success), 10)
+        self.assertEqual(sorted(resolved_pks), sorted([self.rev_fk_1.id, self.rev_fk_2.id]))
+
+    @async_to_sync
+    async def test_bulk_update_dedupes_repeated_fk_resolution(self):
+        """bulk_update_s items sharing the same new FK value must resolve
+        that FK once, not once per item."""
+        objs = [
+            await models.TestModelSerializerForeignKey.objects.acreate(
+                name=f"existing_{i}", description="d", test_model_serializer=self.rev_fk_1
+            )
+            for i in range(5)
+        ]
+        request = mock.Mock()
+        data_list = [
+            (obj.pk, _FKUpdateSchema(test_model_serializer=self.rev_fk_2.id))
+            for obj in objs
+        ]
+
+        with _count_fk_resolutions(
+            models.TestModelSerializerReverseForeignKey
+        ) as resolved_pks:
+            success, errors = await self.model_util.bulk_update_s(request, data_list)
+
+        self.assertEqual(errors, [])
+        self.assertEqual(len(success), 5)
+        # One resolution for the shared new FK value (get_object calls from
+        # fetching each target object itself are for a different model and
+        # are filtered out by _count_fk_resolutions).
+        self.assertEqual(resolved_pks, [self.rev_fk_2.id])
+
+    @async_to_sync
+    async def test_single_create_does_not_share_cache_across_calls(self):
+        """create_s (no batch) must not accidentally cache across independent
+        calls: two sequential single creates for two different FK values must
+        each resolve their own FK."""
+        request = mock.Mock()
+        read_schema = models.TestModelSerializerForeignKey.generate_read_s()
+
+        with _count_fk_resolutions(
+            models.TestModelSerializerReverseForeignKey
+        ) as resolved_pks:
+            await self.model_util.create_s(
+                request,
+                _FKCreateSchema(
+                    name="a", description="d", test_model_serializer=self.rev_fk_1.id
+                ),
+                read_schema,
+            )
+            await self.model_util.create_s(
+                request,
+                _FKCreateSchema(
+                    name="b", description="d", test_model_serializer=self.rev_fk_1.id
+                ),
+                read_schema,
+            )
+
+        # Each independent create_s call resolves the FK on its own; there is
+        # no cross-request cache leaking state between unrelated calls.
+        self.assertEqual(resolved_pks, [self.rev_fk_1.id, self.rev_fk_1.id])

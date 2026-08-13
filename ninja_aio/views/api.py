@@ -934,7 +934,7 @@ class APIViewSet(API, Generic[ModelT]):
             if _delete_schema:
                 obj = await self.model_util.get_object(request, _pk)
                 serialized = await self.model_util.read_s(_delete_schema, request, obj)
-                await self.model_util.delete_s(request, _pk)
+                await self.model_util.delete_s(request, _pk, instance=obj)
                 return Status(200, serialized)
             return Status(
                 204, await self.model_util.delete_s(request, _pk)
