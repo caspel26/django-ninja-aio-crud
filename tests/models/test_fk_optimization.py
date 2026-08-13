@@ -5,13 +5,46 @@ This module tests that the FK resolution optimization in create_s and update_s
 maintains correct functionality while reducing redundant database queries.
 """
 
+from contextlib import contextmanager
 from unittest import mock
 
 from django.test import TestCase, tag
 from asgiref.sync import async_to_sync
+from ninja import Schema
 
 from tests.test_app import models
 from ninja_aio.models import ModelUtil
+
+
+class _FKCreateSchema(Schema):
+    name: str
+    description: str
+    test_model_serializer: int
+
+
+class _FKUpdateSchema(Schema):
+    name: str | None = None
+    description: str | None = None
+    test_model_serializer: int | None = None
+
+
+@contextmanager
+def _count_fk_resolutions(target_model):
+    """Patch ModelUtil.get_object to record every pk resolved for
+    `target_model`, without altering the real resolution behavior.
+
+    Yields the list of resolved pks, appended to in call order.
+    """
+    resolved_pks = []
+    original_get_object = ModelUtil.get_object
+
+    async def counting_get_object(self, request, pk=None, **kwargs):
+        if self.model is target_model:
+            resolved_pks.append(pk)
+        return await original_get_object(self, request, pk=pk, **kwargs)
+
+    with mock.patch.object(ModelUtil, "get_object", counting_get_object):
+        yield resolved_pks
 
 
 @tag("fk_optimization")
@@ -386,36 +419,18 @@ class BulkFKCacheOptimizationTestCase(TestCase):
     async def test_bulk_create_dedupes_repeated_fk_resolution(self):
         """10 items sharing the same FK value must resolve that FK once, not
         once per item."""
-        from django.http import HttpRequest
-        from ninja import Schema
-
-        class CreateSchema(Schema):
-            name: str
-            description: str
-            test_model_serializer: int
-
-        request = HttpRequest()
-        resolved_pks = []
-        original_get_object = ModelUtil.get_object
-
-        async def counting_get_object(self, request, pk=None, **kwargs):
-            if self.model is models.TestModelSerializerReverseForeignKey:
-                resolved_pks.append(pk)
-            return await original_get_object(self, request, pk=pk, **kwargs)
-
+        request = mock.Mock()
         data_list = [
-            CreateSchema(
-                name=f"item_{i}",
-                description="d",
-                test_model_serializer=self.rev_fk_1.id,
+            _FKCreateSchema(
+                name=f"item_{i}", description="d", test_model_serializer=self.rev_fk_1.id
             )
             for i in range(10)
         ]
 
-        with mock.patch.object(ModelUtil, "get_object", counting_get_object):
-            success, errors = await self.model_util.bulk_create_s(
-                request, data_list
-            )
+        with _count_fk_resolutions(
+            models.TestModelSerializerReverseForeignKey
+        ) as resolved_pks:
+            success, errors = await self.model_util.bulk_create_s(request, data_list)
 
         self.assertEqual(errors, [])
         self.assertEqual(len(success), 10)
@@ -426,25 +441,9 @@ class BulkFKCacheOptimizationTestCase(TestCase):
     async def test_bulk_create_resolves_each_distinct_fk_once(self):
         """Two distinct FK values across a batch must each resolve exactly
         once, regardless of how many items reference them."""
-        from django.http import HttpRequest
-        from ninja import Schema
-
-        class CreateSchema(Schema):
-            name: str
-            description: str
-            test_model_serializer: int
-
-        request = HttpRequest()
-        resolved_pks = []
-        original_get_object = ModelUtil.get_object
-
-        async def counting_get_object(self, request, pk=None, **kwargs):
-            if self.model is models.TestModelSerializerReverseForeignKey:
-                resolved_pks.append(pk)
-            return await original_get_object(self, request, pk=pk, **kwargs)
-
+        request = mock.Mock()
         data_list = [
-            CreateSchema(
+            _FKCreateSchema(
                 name=f"item_{i}",
                 description="d",
                 test_model_serializer=(
@@ -454,10 +453,10 @@ class BulkFKCacheOptimizationTestCase(TestCase):
             for i in range(10)
         ]
 
-        with mock.patch.object(ModelUtil, "get_object", counting_get_object):
-            success, errors = await self.model_util.bulk_create_s(
-                request, data_list
-            )
+        with _count_fk_resolutions(
+            models.TestModelSerializerReverseForeignKey
+        ) as resolved_pks:
+            success, errors = await self.model_util.bulk_create_s(request, data_list)
 
         self.assertEqual(errors, [])
         self.assertEqual(len(success), 10)
@@ -467,44 +466,28 @@ class BulkFKCacheOptimizationTestCase(TestCase):
     async def test_bulk_update_dedupes_repeated_fk_resolution(self):
         """bulk_update_s items sharing the same new FK value must resolve
         that FK once, not once per item."""
-        from ninja import Schema
-
         objs = [
             await models.TestModelSerializerForeignKey.objects.acreate(
-                name=f"existing_{i}",
-                description="d",
-                test_model_serializer=self.rev_fk_1,
+                name=f"existing_{i}", description="d", test_model_serializer=self.rev_fk_1
             )
             for i in range(5)
         ]
-
-        class UpdateSchema(Schema):
-            name: str | None = None
-            description: str | None = None
-            test_model_serializer: int | None = None
-
         request = mock.Mock()
-        resolved_pks = []
-        original_get_object = ModelUtil.get_object
-
-        async def counting_get_object(self, request, pk=None, **kwargs):
-            if self.model is models.TestModelSerializerReverseForeignKey:
-                resolved_pks.append(pk)
-            return await original_get_object(self, request, pk=pk, **kwargs)
-
         data_list = [
-            (obj.pk, UpdateSchema(test_model_serializer=self.rev_fk_2.id))
+            (obj.pk, _FKUpdateSchema(test_model_serializer=self.rev_fk_2.id))
             for obj in objs
         ]
 
-        with mock.patch.object(ModelUtil, "get_object", counting_get_object):
+        with _count_fk_resolutions(
+            models.TestModelSerializerReverseForeignKey
+        ) as resolved_pks:
             success, errors = await self.model_util.bulk_update_s(request, data_list)
 
         self.assertEqual(errors, [])
         self.assertEqual(len(success), 5)
         # One resolution for the shared new FK value (get_object calls from
         # fetching each target object itself are for a different model and
-        # are filtered out above).
+        # are filtered out by _count_fk_resolutions).
         self.assertEqual(resolved_pks, [self.rev_fk_2.id])
 
     @async_to_sync
@@ -512,35 +495,22 @@ class BulkFKCacheOptimizationTestCase(TestCase):
         """create_s (no batch) must not accidentally cache across independent
         calls: two sequential single creates for two different FK values must
         each resolve their own FK."""
-        from ninja import Schema
-
-        class CreateSchema(Schema):
-            name: str
-            description: str
-            test_model_serializer: int
-
         request = mock.Mock()
-        resolved_pks = []
-        original_get_object = ModelUtil.get_object
-
-        async def counting_get_object(self, request, pk=None, **kwargs):
-            if self.model is models.TestModelSerializerReverseForeignKey:
-                resolved_pks.append(pk)
-            return await original_get_object(self, request, pk=pk, **kwargs)
-
         read_schema = models.TestModelSerializerForeignKey.generate_read_s()
 
-        with mock.patch.object(ModelUtil, "get_object", counting_get_object):
+        with _count_fk_resolutions(
+            models.TestModelSerializerReverseForeignKey
+        ) as resolved_pks:
             await self.model_util.create_s(
                 request,
-                CreateSchema(
+                _FKCreateSchema(
                     name="a", description="d", test_model_serializer=self.rev_fk_1.id
                 ),
                 read_schema,
             )
             await self.model_util.create_s(
                 request,
-                CreateSchema(
+                _FKCreateSchema(
                     name="b", description="d", test_model_serializer=self.rev_fk_1.id
                 ),
                 read_schema,
