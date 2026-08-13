@@ -1,4 +1,5 @@
 import datetime
+from unittest import mock
 
 from django.db.models import Q
 from django.test import tag, TestCase
@@ -1531,4 +1532,30 @@ class PerOperationOutSchemaTestCase(TestCase):
         self.assertIn("name", content)
         self.assertEqual(content["name"], "to_delete_out")
         self.assertNotIn("description", content)
+        self.assertFalse(await self.model.objects.filter(pk=pk).aexists())
+
+    async def test_delete_with_schema_out_fetches_object_only_once(self):
+        """Regression test: delete_view with schema_delete_out must fetch the
+        object once (to serialize it), not once for serialization and again
+        inside delete_s to perform the delete."""
+        obj = await self.model.objects.acreate(name="fetch_once", description="d")
+        pk = obj.pk
+        view = self.delete_out_viewset.delete_view()
+        path_schema = self.delete_out_viewset.path_schema(**{self.pk_att: pk})
+
+        original_get_object = ModelUtil.get_object
+        call_count = 0
+
+        async def counting_get_object(self, *args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            return await original_get_object(self, *args, **kwargs)
+
+        with mock.patch.object(ModelUtil, "get_object", counting_get_object):
+            result = await view(self.request.delete(), path_schema)
+
+        self.assertEqual(result.status_code, 200)
+        # Previously 2: one in delete_view to fetch+serialize, one inside
+        # delete_s to re-fetch the same object just to delete it.
+        self.assertEqual(call_count, 1)
         self.assertFalse(await self.model.objects.filter(pk=pk).aexists())

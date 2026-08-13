@@ -1,5 +1,48 @@
 # 📋 Release Notes
 
+## 🏷️ [v2.34.2] - 2026-08-13
+
+---
+
+### 🐛 Bug Fix
+
+#### ⚡ N+1 query on every list/retrieve using `select_related`/`prefetch_related`
+> `ninja_aio/models/utils.py`
+
+`_get_base_queryset` applied the `read`/`detail`-scoped `select_related`/`prefetch_related` optimizations and then unconditionally replaced the queryset with whatever the default `queryset_request` hook returned — silently discarding those optimizations for any `ModelSerializer` that declares `QuerySet.read`/`QuerySet.detail` without also duplicating the same config under `QuerySet.queryset_request`. Every row with a serialized relation field paid one extra query. Fixed by applying the scoped optimizations *after* the hook runs, on top of its result (`select_related`/`prefetch_related` are additive, so this is safe either way).
+
+Profiled repro (300 list calls, 50 rows/page, one relation field): **3.54s → 0.635s (~5.6x faster)**. Benchmark suite: `FilterPerformanceTest.relation_filter` **-63.09%** (2.72ms → 1.00ms).
+
+---
+
+#### ⚡ Duplicate FK resolution query on every item in bulk create/update
+> `ninja_aio/models/utils.py`
+
+`_resolve_fk` re-resolved a foreign key ID to its related instance independently for every item in a `bulk_create_s`/`bulk_update_s` batch, even when many items shared the same FK value (e.g. a batch of rows all pointing at the same category or tenant). Fixed with a request-scoped `fk_cache` dict shared across the items of a single bulk call — a repeated `(model, pk)` pair now resolves once instead of once per item. Single `create_s`/`update_s` calls are unaffected (`fk_cache=None` by default).
+
+Benchmark suite: `MultiFKPerformanceTest.bulk_create_50x3fk` **-33.01%** (26.35ms → 17.66ms).
+
+---
+
+#### ⚡ Duplicate object fetch on delete when `schema_delete_out` is set
+> `ninja_aio/views/api.py`, `ninja_aio/models/utils.py`
+
+`delete_view` fetched the target object once to serialize it for the `schema_delete_out` response, then `delete_s` fetched the *same* object again internally just to call `.adelete()` on it. `delete_s` now accepts an optional `instance=` — when the caller already has the object, it deletes it directly instead of re-querying. Default behavior (`instance=None`, used by `hard_delete`, plain `DELETE`, and every other caller) is unchanged. Verified via a `get_object` call-count spy: 2 → 1 fetch per request.
+
+---
+
+### 🎯 Summary
+
+Three targeted bug fixes, all the same shape: redundant or dropped database work in the framework's own query/serialization glue, found and confirmed with `cProfile` and the project's own benchmark suite rather than assumed. No public API changes; all fixes are backward compatible (new parameters default to prior behavior).
+
+**Key benefits:**
+- ⚡ List/retrieve endpoints serializing relations no longer pay an extra query per row
+- ⚡ Bulk create/update with repeated FK values no longer re-resolves the same related object per item
+- ⚡ Delete-with-response (`schema_delete_out`) no longer fetches the object twice
+- ✅ Full regression coverage added for all three fixes; 100% coverage maintained on both changed files; zero performance regressions detected by the statistical regression tool
+
+---
+
 ## 🏷️ [v2.34.1] - 2026-08-12
 
 ---

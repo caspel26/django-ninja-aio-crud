@@ -200,10 +200,10 @@ class BulkModelViewSetTestCase(TestCase):
 
         original = self.viewset.model_util._create_instance
 
-        async def mock_create(request, data):
+        async def mock_create(request, data, *args, **kwargs):
             if data.name == "bad_item":
                 raise SerializeError("create failed")
-            return await original(request, data)
+            return await original(request, data, *args, **kwargs)
 
         with patch.object(
             self.viewset.model_util, "_create_instance", side_effect=mock_create

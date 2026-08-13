@@ -236,6 +236,93 @@ class ModelUtilQObjectFiltersTestCase(TestCase):
             )
 
 
+@tag("model_util_delete_s_instance")
+class ModelUtilDeleteSInstanceTestCase(TestCase):
+    """delete_s(instance=...) must delete the given instance directly, without
+    an extra lookup query, while still running the normal delete hooks."""
+
+    async def test_delete_s_with_instance_skips_lookup(self):
+        obj = await models.TestModel.objects.acreate(name="x", description="d")
+        util = ModelUtil(models.TestModel)
+        request = mock.Mock()
+
+        with mock.patch.object(
+            util, "get_object", side_effect=AssertionError("should not be called")
+        ):
+            await util.delete_s(request, obj.pk, instance=obj)
+
+        self.assertFalse(
+            await models.TestModel.objects.filter(pk=obj.pk).aexists()
+        )
+
+    async def test_delete_s_without_instance_still_looks_up(self):
+        """Backward-compatible default: no instance -> falls back to get_object."""
+        obj = await models.TestModel.objects.acreate(name="y", description="d")
+        util = ModelUtil(models.TestModel)
+        request = mock.Mock()
+
+        await util.delete_s(request, obj.pk)
+
+        self.assertFalse(
+            await models.TestModel.objects.filter(pk=obj.pk).aexists()
+        )
+
+
+@tag("model_util_queryset_optimizations_preserved")
+class ModelUtilQuerysetOptimizationsPreservedTestCase(TestCase):
+    """Regression test for ninja_aio/models/utils.py `_get_base_queryset`.
+
+    `select_related`/`prefetch_related` declared under `QuerySet.read`/`QuerySet.detail`
+    must survive the default `queryset_request` hook. Previously, the read/detail-scoped
+    optimizations were applied and then unconditionally discarded by replacing the
+    queryset with whatever the (default, unrelated-scope) `queryset_request` hook
+    returned — causing an N+1 query per row for any relation field in the output schema.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.parent = models.TestModelSerializerReverseForeignKey.objects.create(
+            name="parent", description="parent_desc"
+        )
+        models.TestModelSerializerForeignKey.objects.bulk_create(
+            [
+                models.TestModelSerializerForeignKey(
+                    name=f"child_{i}",
+                    description="d",
+                    test_model_serializer=cls.parent,
+                )
+                for i in range(5)
+            ]
+        )
+
+    async def test_select_related_survives_default_queryset_request_hook(self):
+        """select_related declared in QuerySet.read must be applied to the queryset
+        returned by get_objects, even though the default queryset_request hook runs
+        (with_qs_request defaults to True for list/retrieve)."""
+        util = models.TestModelSerializerForeignKey.util
+        request = mock.Mock()
+
+        qs = await util.get_objects(request, is_for="read")
+
+        self.assertIn("test_model_serializer", qs.query.select_related)
+
+    async def test_relation_access_does_not_trigger_extra_queries(self):
+        """Rows from get_objects() must come back with the FK relation already
+        cached by the JOIN (select_related), so accessing it needs no extra query
+        (N+1) now that the optimization survives the queryset_request hook."""
+        util = models.TestModelSerializerForeignKey.util
+        request = mock.Mock()
+
+        qs = await util.get_objects(request, is_for="read")
+        objs = [obj async for obj in qs]
+
+        self.assertEqual(len(objs), 5)
+        for obj in objs:
+            # Populated by the JOIN only if select_related actually ran;
+            # otherwise Django would need a fresh query to resolve this.
+            self.assertIn("test_model_serializer", obj._state.fields_cache)
+
+
 # ============================================================
 # Coverage test for models/utils.py — line 791
 # ============================================================
