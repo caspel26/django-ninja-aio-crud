@@ -301,3 +301,4 @@ devdashboard/
 .devdashboard.json
 coverage.json
 .claude/
+graphify-out/

@@ -607,7 +607,7 @@ class ModelUtilHelperMethodsTestCase(TestCase):
     async def test_process_payload_fields_with_binary(self):
         """_process_payload_fields should decode binary fields."""
 
-        class BinSerializer(ModelSerializer):
+        class ProcessPayloadBinSerializer(ModelSerializer):
             data = models.BinaryField()
 
             class CreateSerializer:
@@ -616,7 +616,7 @@ class ModelUtilHelperMethodsTestCase(TestCase):
             class Meta:
                 app_label = app_models.TestModelSerializer._meta.app_label
 
-        util = ModelUtil(BinSerializer)
+        util = ModelUtil(ProcessPayloadBinSerializer)
         good_bytes = b"hello"
         b64 = base64.b64encode(good_bytes).decode()
         payload = {"data": b64}
