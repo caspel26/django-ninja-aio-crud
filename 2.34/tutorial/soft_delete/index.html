@@ -2132,7 +2132,7 @@ Replace hard deletes with a soft delete flag — keep your data safe and recover
 <p>If your boolean field is named differently:</p>
 <div class="language-python highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">ArticleAPI</span><span class="p">(</span><span class="n">SoftDeleteViewSetMixin</span><span class="p">,</span> <span class="n">APIViewSet</span><span class="p">):</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="n">model</span> <span class="o">=</span> <span class="n">Article</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">soft_delete_field</span> <span class="o">=</span> <span class="s2">&quot;deleted&quot;</span>  <span class="c1"># (1)!</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">soft_delete_field</span> <span class="o">=</span> <span class="s2">"deleted"</span>  <span class="c1"># (1)!</span>
 </span></code></pre></div>
 <ol>
 <li>Must match the actual <code>BooleanField</code> name on the model.</li>
@@ -2157,7 +2157,7 @@ Replace hard deletes with a soft delete flag — keep your data safe and recover
 <div class="language-http highlight"><span class="filename">HTTP</span><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="err">DELETE /articles/bulk/</span>
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="err">Content-Type: application/json</span>
 </span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="err">{&quot;ids&quot;: [1, 2, 3]}</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="err">{"ids": [1, 2, 3]}</span>
 </span></code></pre></div>
 <p>Uses a single <code>UPDATE ... SET is_deleted=True WHERE pk IN (...)</code> query. Returns the standard <code>BulkResultSchema</code> with partial success semantics.</p>
 <h3 id="restore">Restore<a class="headerlink" href="#restore" title="Permanent link">&para;</a></h3>
@@ -2178,10 +2178,10 @@ Replace hard deletes with a soft delete flag — keep your data safe and recover
 </span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>    <span class="n">APIViewSet</span><span class="p">,</span>
 </span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="p">):</span>
 </span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>    <span class="n">model</span> <span class="o">=</span> <span class="n">Article</span>
-</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>    <span class="n">query_params</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;title&quot;</span><span class="p">:</span> <span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="kc">None</span><span class="p">)}</span>
+</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>    <span class="n">query_params</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"title"</span><span class="p">:</span> <span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="kc">None</span><span class="p">)}</span>
 </span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>
 </span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">has_permission</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">request</span><span class="p">,</span> <span class="n">operation</span><span class="p">):</span>
-</span><span id="__span-8-11"><a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>        <span class="k">if</span> <span class="n">operation</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;hard_delete&quot;</span><span class="p">,</span> <span class="s2">&quot;restore&quot;</span><span class="p">):</span>
+</span><span id="__span-8-11"><a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>        <span class="k">if</span> <span class="n">operation</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"hard_delete"</span><span class="p">,</span> <span class="s2">"restore"</span><span class="p">):</span>
 </span><span id="__span-8-12"><a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a>            <span class="k">return</span> <span class="n">request</span><span class="o">.</span><span class="n">auth</span><span class="o">.</span><span class="n">is_staff</span>
 </span><span id="__span-8-13"><a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a>        <span class="k">return</span> <span class="kc">True</span>
 </span></code></pre></div>
@@ -2195,7 +2195,7 @@ Replace hard deletes with a soft delete flag — keep your data safe and recover
 <h2 id="validation">Validation<a class="headerlink" href="#validation" title="Permanent link">&para;</a></h2>
 <p>The mixin validates at initialization that the model has the configured field. If the field is missing, a clear error is raised immediately:</p>
 <div class="language-text highlight"><span class="filename">Text Only</span><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>django.core.exceptions.ImproperlyConfigured:
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>Article does not have a &#39;is_deleted&#39; field.
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>Article does not have a 'is_deleted' field.
 </span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>Add a BooleanField or set soft_delete_field to the correct name.
 </span></code></pre></div>
 <hr />
