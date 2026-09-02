@@ -1,5 +1,14 @@
 # 📋 Release Notes
 
+## 🏷️ [v2.34.3] - 2026-09-02
+
+---
+
+### 🔧 Maintenance
+
+- Added Django Ninja 1.7 support, widened the supported dependency range to
+  `django-ninja>=1.3.0,<1.8.0`, and refreshed `uv.lock` to resolve 1.7.0.
+
 ## 🏷️ [v2.34.2] - 2026-08-13
 
 ---

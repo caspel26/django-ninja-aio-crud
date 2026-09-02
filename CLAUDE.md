@@ -4,7 +4,7 @@
 
 **django-ninja-aio-crud** is an async CRUD framework built on Django Ninja. It provides automated REST API generation with async support, authentication, filtering, pagination, and serialization.
 
-- **Framework:** Django Ninja (>=1.3.0, <1.6)
+- **Framework:** Django Ninja (>=1.3.0, <1.8; tested through 1.7.0)
 - **Python:** 3.10 - 3.14
 - **Build system:** Flit
 - **Linter/Formatter:** Ruff
