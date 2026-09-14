@@ -9,10 +9,10 @@ from ninja import Schema
 from ninja.orm import fields
 from ninja.errors import ConfigError
 
-from django.db import models
+from django.db import models, router
 from django.db.models import Q, aprefetch_related_objects
 from django.http import HttpRequest
-from django.core.exceptions import ObjectDoesNotExist
+from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist
 from asgiref.sync import sync_to_async
 from django.db.models.fields.related_descriptors import (
     ReverseManyToOneDescriptor,
@@ -23,6 +23,7 @@ from django.db.models.fields.related_descriptors import (
 )
 
 from ninja_aio.exceptions import SerializeError, NotFoundError
+from ninja_aio.decorators.views import AsyncAtomicContextManager
 from ninja_aio.types import ModelSerializerMeta, get_ninja_aio_meta_attr
 
 from ninja_aio.schemas.helpers import (
@@ -1075,6 +1076,16 @@ class ModelUtil(Generic[ModelT]):
         if fk_tasks:
             await asyncio.gather(*fk_tasks)
 
+    @cached_property
+    def nested_fields(self) -> dict[str, tuple[type, str]]:
+        """Validated reverse-FK relations enabled for nested creation."""
+        if not isinstance(self.model, ModelSerializerMeta):
+            return {}
+        return {
+            name: (child, self.model._get_nested_fk_field(name))
+            for name, child in self.model.get_nested_fields().items()
+        }
+
     async def parse_input_data(
         self,
         request: HttpRequest,
@@ -1113,6 +1124,11 @@ class ModelUtil(Generic[ModelT]):
         """
         payload = data.model_dump(mode="json")
 
+        # Keep the public two-tuple return contract. Nested values are consumed
+        # separately by _create_instance, never treated as scalar model fields.
+        for name in self.nested_fields:
+            payload.pop(name, None)
+
         is_serializer = (
             isinstance(self.model, ModelSerializerMeta) or self.with_serializer
         )
@@ -1146,6 +1162,43 @@ class ModelUtil(Generic[ModelT]):
         request: HttpRequest,
         data: Schema,
         fk_cache: dict[tuple[type, Any], Any] | None = None,
+        extra_fields: dict[str, Any] | None = None,
+    ):
+        """Create an owned object graph atomically, including direct/bulk calls."""
+        if not self.nested_fields:
+            return await self._persist_instance(request, data, fk_cache, extra_fields)
+        using = router.db_for_write(self.model)
+        if any(
+            router.db_for_write(child) != using
+            for child, _ in self.nested_fields.values()
+        ):
+            raise ImproperlyConfigured(
+                "Nested writes require one database for the owned graph"
+            )
+        async with AsyncAtomicContextManager(using=using):
+            obj = await self._persist_instance(request, data, fk_cache, extra_fields)
+            for name, (child_model, fk_name) in self.nested_fields.items():
+                child_util = ModelUtil(child_model)
+                child_schema = child_model.generate_nested_child_schema(fk_name)
+                # Sequential writes ensure no child task survives a rollback.
+                for child_data in getattr(data, name, ()):
+                    if not isinstance(child_data, child_schema):
+                        child_data = child_schema.model_validate(
+                            child_data.model_dump(by_alias=True)
+                            if isinstance(child_data, Schema)
+                            else child_data
+                        )
+                    await child_util._create_instance(
+                        request, child_data, extra_fields={fk_name: obj}
+                    )
+            return obj
+
+    async def _persist_instance(
+        self,
+        request: HttpRequest,
+        data: Schema,
+        fk_cache: dict[tuple[type, Any], Any] | None = None,
+        extra_fields: dict[str, Any] | None = None,
     ):
         """
         Create a new instance and run hooks.
@@ -1168,11 +1221,18 @@ class ModelUtil(Generic[ModelT]):
             The created model instance.
         """
         from ninja_aio.models.hooks import (
-            suppress_signals, get_hooks, execute_reactive_hooks,
+            suppress_signals,
+            get_hooks,
+            execute_reactive_hooks,
         )
 
         logger.info(f"Creating {self.model.__name__}")
         payload, customs = await self.parse_input_data(request, data, fk_cache)
+        if extra_fields:
+            for name in extra_fields:
+                # The parent owns this FK, including its raw *_id alias.
+                payload.pop(self.model._meta.get_field(name).attname, None)
+            payload.update(extra_fields)
         async with suppress_signals():
             obj = (
                 await self.model.objects.acreate(**payload)
@@ -1181,7 +1241,12 @@ class ModelUtil(Generic[ModelT]):
             )
         logger.debug(f"Created {self.model.__name__} (pk={obj.pk})")
         if isinstance(self.model, ModelSerializerMeta):
-            await asyncio.gather(obj.custom_actions(customs), obj.post_create())
+            if self.nested_fields or extra_fields:
+                # Nested graph hooks must finish before rollback can begin.
+                await obj.custom_actions(customs)
+                await obj.post_create()
+            else:
+                await asyncio.gather(obj.custom_actions(customs), obj.post_create())
             hooks = get_hooks(self.model)
             if hooks and hooks["create"]:
                 await execute_reactive_hooks(obj, hooks["create"])

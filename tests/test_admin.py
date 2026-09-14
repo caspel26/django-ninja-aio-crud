@@ -1,8 +1,16 @@
+from unittest.mock import MagicMock, patch
+
 from django.contrib import admin
 from django.contrib.admin import AdminSite
-from django.test import TestCase, tag
+from django.test import RequestFactory, TestCase, tag
 
-from ninja_aio.admin import _classify_fields, model_admin_factory, register_admin
+from ninja_aio.admin import (
+    _classify_fields,
+    _classify_relations,
+    _inline_fields,
+    model_admin_factory,
+    register_admin,
+)
 from tests.test_app import models
 
 
@@ -185,3 +193,176 @@ class AsAdminTestCase(TestCase):
     def test_fk_model_as_admin(self):
         admin_cls = models.TestModelSerializerForeignKey.as_admin()
         self.assertIn("test_model_serializer", admin_cls.list_filter)
+
+
+@tag("admin")
+class ClassifyRelationsTestCase(TestCase):
+    """Test _classify_relations auto-generates inlines and filter_horizontal."""
+
+    def test_reverse_fk_becomes_tabular_inline(self):
+        config = _classify_relations(models.TestModelSerializerReverseForeignKey)
+        inline_models = {inl.model for inl in config["inlines"]}
+        self.assertIn(models.TestModelSerializerForeignKey, inline_models)
+        inline = next(
+            inl
+            for inl in config["inlines"]
+            if inl.model is models.TestModelSerializerForeignKey
+        )
+        self.assertTrue(issubclass(inline, admin.TabularInline))
+        self.assertEqual(inline.fk_name, "test_model_serializer")
+
+    def test_reverse_one_to_one_becomes_stacked_inline(self):
+        config = _classify_relations(models.TestModelSerializerReverseOneToOne)
+        inline = next(
+            inl
+            for inl in config["inlines"]
+            if inl.model is models.TestModelSerializerOneToOne
+        )
+        self.assertTrue(issubclass(inline, admin.StackedInline))
+        self.assertEqual(inline.fk_name, "test_model_serializer")
+
+    def test_inline_excludes_fk_field_from_fields(self):
+        config = _classify_relations(models.TestModelSerializerReverseForeignKey)
+        inline = next(
+            inl
+            for inl in config["inlines"]
+            if inl.model is models.TestModelSerializerForeignKey
+        )
+        self.assertNotIn("test_model_serializer", inline.fields or ())
+
+    def test_plain_model_child_uses_admin_default_fields(self):
+        """A reverse FK from a plain (non-ModelSerializer) model should get
+        an inline with no explicit `fields`, letting Django Admin show all
+        editable fields by default."""
+        config = _classify_relations(models.AdminRelationsParent)
+        inline = next(
+            inl
+            for inl in config["inlines"]
+            if inl.model is models.AdminInlinePlainChild
+        )
+        self.assertIsNone(inline.fields)
+
+    def test_reverse_m2m_has_no_inline(self):
+        config = _classify_relations(models.TestModelSerializerReverseManyToMany)
+        inline_models = {inl.model for inl in config["inlines"]}
+        self.assertNotIn(models.TestModelSerializerManyToMany, inline_models)
+
+    def test_forward_m2m_gets_filter_horizontal(self):
+        config = _classify_relations(models.TestModelSerializerManyToMany)
+        self.assertIn("test_model_serializers", config["filter_horizontal"])
+
+    def test_no_relations_is_empty(self):
+        config = _classify_relations(models.TestModelSerializerWithReadOptionals)
+        self.assertEqual(config["inlines"], ())
+        self.assertEqual(config["filter_horizontal"], ())
+
+    def test_model_admin_factory_wires_inlines(self):
+        admin_cls = model_admin_factory(models.TestModelSerializerReverseForeignKey)
+        inline_models = {inl.model for inl in admin_cls.inlines}
+        self.assertIn(models.TestModelSerializerForeignKey, inline_models)
+
+    def test_overrides_replace_auto_inlines(self):
+        admin_cls = model_admin_factory(
+            models.TestModelSerializerReverseForeignKey, inlines=()
+        )
+        self.assertEqual(admin_cls.inlines, ())
+
+    def test_custom_through_and_noneditable_m2m_skip_widget(self):
+        config = _classify_relations(models.AdminRelationsParent)
+        self.assertEqual(config["filter_horizontal"], ("links",))
+        self.assertIn(
+            models.AdminRelationLink, {inline.model for inline in config["inlines"]}
+        )
+
+    def test_inline_filters_nonmodel_noneditable_and_primary_key_fields(self):
+        self.assertEqual(
+            _inline_fields(models.AdminDualChild, "left"), ("description", "name")
+        )
+
+    def test_inline_falls_back_to_create_fields(self):
+        with patch.object(models.NestedOrderItem.UpdateSerializer, "fields", []):
+            fields = _inline_fields(models.NestedOrderItem, "order")
+        self.assertIn("name", fields)
+        self.assertIn("quantity", fields)
+        self.assertNotIn("order", fields)
+
+    def test_same_child_multiple_fks_build_distinct_valid_formsets(self):
+        request = RequestFactory().get("/")
+        request.user = MagicMock(is_active=True, is_staff=True, is_superuser=True)
+        config = _classify_relations(models.AdminRelationsParent)
+        inline_classes = [
+            inline
+            for inline in config["inlines"]
+            if inline.model is models.AdminDualChild
+        ]
+        self.assertEqual(
+            {inline.fk_name for inline in inline_classes}, {"left", "right"}
+        )
+        self.assertEqual(len({inline.__name__ for inline in inline_classes}), 2)
+        for inline_class in inline_classes:
+            inline = inline_class(models.AdminRelationsParent, AdminSite(name="forms"))
+            self.assertEqual(inline.check(), [])
+            formset = inline.get_formset(request)
+            self.assertEqual(formset.fk.name, inline.fk_name)
+            self.assertNotIn(inline.fk_name, formset.form.base_fields)
+            self.assertEqual(set(formset.form.base_fields), {"description", "name"})
+
+    def test_o2o_formset_has_single_object_limit(self):
+        request = RequestFactory().get("/")
+        request.user = MagicMock(is_superuser=True)
+        config = _classify_relations(models.TestModelSerializerReverseOneToOne)
+        inline_class = next(
+            inline
+            for inline in config["inlines"]
+            if inline.model is models.TestModelSerializerOneToOne
+        )
+        formset = inline_class(
+            models.TestModelSerializerReverseOneToOne, AdminSite()
+        ).get_formset(request)
+        self.assertEqual(formset.max_num, 1)
+
+    def test_generated_admin_passes_django_checks(self):
+        for model in (
+            models.AdminRelationsParent,
+            models.TestModelSerializerReverseForeignKey,
+        ):
+            generated = model_admin_factory(model)(model, AdminSite(name="checks"))
+            self.assertEqual(generated.check(), [])
+
+    def test_relation_generation_is_deferred_until_models_ready(self):
+        registry = models.AdminRelationsParent._meta.apps
+        with patch.object(registry, "models_ready", False):
+            generated = model_admin_factory(models.AdminRelationsParent)
+            self.assertEqual(generated.inlines, ())
+            self.assertEqual(generated.filter_horizontal, ())
+            self.assertEqual(generated.list_display, ())
+        self.assertTrue(generated.inlines)
+        self.assertEqual(generated.filter_horizontal, ("links",))
+        self.assertIsInstance(generated.inlines, tuple)
+        self.assertIn("name", generated.list_display)
+        self.assertNotIn("left_children", generated.list_display)
+
+    def test_overrides_disable_deferred_relation_generation(self):
+        with patch.object(
+            models.AdminRelationsParent._meta.apps, "models_ready", False
+        ):
+            generated = model_admin_factory(
+                models.AdminRelationsParent, inlines=(), filter_horizontal=()
+            )
+        self.assertEqual(generated.inlines, ())
+        self.assertEqual(generated.filter_horizontal, ())
+
+    def test_model_decorator_discovers_children_declared_later_at_startup(self):
+        registered = models.startup_admin_site._registry[models.AdminRelationsParent]
+        self.assertIn(
+            models.AdminDualChild, {inline.model for inline in registered.inlines}
+        )
+        self.assertEqual(registered.filter_horizontal, ("links",))
+        self.assertNotIn("left_children", registered.readonly_fields)
+        self.assertEqual(registered.check(), [])
+
+    def test_filter_horizontal_override_replaces_default(self):
+        generated = model_admin_factory(
+            models.AdminRelationsParent, filter_horizontal=()
+        )
+        self.assertEqual(generated.filter_horizontal, ())

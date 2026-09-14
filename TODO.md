@@ -40,6 +40,8 @@
 | 30 | ~~Performance: dropped select_related/prefetch_related~~ | `models/utils.py` | v2.34.2 | `queryset_request` hook no longer discards read/detail-scoped query optimizations; fixed N+1 on list/retrieve with relations. |
 | 31 | ~~Performance: duplicate FK resolution in bulk ops~~ | `models/utils.py` | v2.34.2 | Request-scoped `fk_cache` dedupes repeated FK lookups across a `bulk_create_s`/`bulk_update_s` batch. |
 | 32 | ~~Performance: duplicate fetch on delete~~ | `views/api.py`, `models/utils.py` | v2.34.2 | `delete_s(instance=...)` skips the redundant re-fetch when `schema_delete_out` is set. |
+| 33 | ~~Nested writes~~ | `models/serializers.py`, `models/utils.py` | unreleased | `CreateSerializer.nested` creates owned reverse-FK children atomically, including grandchildren, validation, hooks, and per-parent rollback in bulk calls. Create-only. |
+| 34 | ~~Auto admin inlines~~ | `admin.py` | unreleased | Reverse FK/O2O inlines with explicit `fk_name`, editable child fields, standard M2M widgets, and deferred relation discovery during app startup. |
 
 ---
 
@@ -49,9 +51,7 @@
 |---|------|---------|-------------|
 | 24 | Multi-tenancy mixin | `views/mixins.py` | `TenantViewSetMixin` — auto tenant filtering on all queries from header or JWT claim. |
 | 25 | Aggregation endpoints | `views/mixins.py` | `AggregationViewSetMixin` — COUNT, SUM, AVG, MIN, MAX on list views for dashboards. |
-| 27 | Nested writes | `models/utils.py`, `views/api.py` | Create parent + children in one atomic request. `POST /order` with `{"items": [...]}`. |
 | 28 | File upload mixin | `views/mixins.py` | `FileUploadViewSetMixin` — `POST /{pk}/upload` with `multipart/form-data`, configurable storage (local, S3). |
-| 29 | Auto admin inlines | `admin.py` | Extend `@register_admin` to auto-generate `InlineModelAdmin` for FK/M2M relations. |
 | 30 | Admin actions from ViewSet | `admin.py` | `@action` endpoints become available as Django Admin actions. `@action("publish")` → admin "Publish selected" action. |
 | 31 | ETag / Conditional requests | `views/api.py` | HTTP caching with `ETag`, `If-None-Match`, `If-Modified-Since` on retrieve/list. |
 | 32 | Deadlock retry in `aatomic` | `decorators/views.py` | Configurable exponential backoff with deadlock detection. |

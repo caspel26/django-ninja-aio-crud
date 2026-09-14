@@ -1,8 +1,11 @@
 import uuid
 
-from pydantic import ConfigDict
+from pydantic import ConfigDict, field_validator
 
 from ninja_aio.models import ModelSerializer
+from ninja_aio.admin import register_admin
+from ninja_aio.models.hooks import on_create
+from django.contrib.admin import AdminSite
 from django.db import models
 
 from ninja_aio.schemas.helpers import ModelQuerySetExtraSchema, ModelQuerySetSchema
@@ -643,3 +646,170 @@ class PerfArticle(models.Model):
     author = models.ForeignKey(PerfAuthor, on_delete=models.CASCADE)
     category = models.ForeignKey(PerfCategory, on_delete=models.CASCADE)
     publisher = models.ForeignKey(PerfPublisher, on_delete=models.CASCADE)
+
+
+# ==========================================================
+#                  AUTO ADMIN INLINE MODELS
+# ==========================================================
+
+
+class AdminInlinePlainChild(models.Model):
+    """Plain (non-ModelSerializer) reverse-FK child of AdminRelationsParent,
+    exercising the default-admin-fields fallback in _inline_fields()."""
+
+    parent = models.ForeignKey(
+        "AdminRelationsParent", on_delete=models.CASCADE, related_name="plain_children"
+    )
+    label = models.CharField(max_length=50)
+
+
+class AdminRelationTarget(models.Model):
+    label = models.CharField(max_length=50)
+
+
+startup_admin_site = AdminSite(name="auto_relations_startup")
+
+
+@register_admin(site=startup_admin_site)
+class AdminRelationsParent(BaseTestModelSerializer):
+    links = models.ManyToManyField(AdminRelationTarget, related_name="admin_links")
+    custom_links = models.ManyToManyField(
+        AdminRelationTarget,
+        through="AdminRelationLink",
+        related_name="admin_custom_links",
+    )
+    immutable_links = models.ManyToManyField(
+        AdminRelationTarget, editable=False, related_name="admin_immutable_links"
+    )
+
+    class ReadSerializer:
+        fields = BaseTestModelSerializer.ReadSerializer.fields + ["left_children"]
+
+
+class AdminRelationLink(models.Model):
+    parent = models.ForeignKey(AdminRelationsParent, on_delete=models.CASCADE)
+    target = models.ForeignKey(AdminRelationTarget, on_delete=models.CASCADE)
+    weight = models.IntegerField(default=1)
+
+
+class AdminDualChild(BaseTestModelSerializer):
+    left = models.ForeignKey(
+        AdminRelationsParent, on_delete=models.CASCADE, related_name="left_children"
+    )
+    right = models.ForeignKey(
+        AdminRelationsParent, on_delete=models.CASCADE, related_name="right_children"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class CreateSerializer:
+        fields = ["name", "description", "left", "right"]
+
+    class UpdateSerializer:
+        fields = ["description", "missing", "created_at", "id", ("computed", str)]
+        optionals = [("name", str)]
+
+
+# ==========================================================
+#                  NESTED WRITES MODELS
+# ==========================================================
+
+
+class NestedLinkedObject(BaseTestModelSerializer):
+    pass
+
+
+class NestedItemNote(BaseTestModelSerializer):
+    item = models.ForeignKey(
+        "NestedOrderItem", on_delete=models.CASCADE, related_name="notes"
+    )
+
+
+class NestedOrderItem(BaseTestModelSerializer):
+    """Child model created atomically as part of a parent nested write."""
+
+    order = models.ForeignKey(
+        "NestedOrder",
+        on_delete=models.CASCADE,
+        related_name="items",
+        related_query_name="order_items",
+    )
+    quantity = models.PositiveIntegerField(default=1)
+    linked = models.ForeignKey(
+        NestedLinkedObject, null=True, blank=True, on_delete=models.PROTECT
+    )
+    hooked = models.BooleanField(default=False)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["order", "name"], name="nested_item_name")
+        ]
+
+    @on_create
+    async def nested_created(self):
+        await type(self).objects.filter(pk=self.pk).aupdate(hooked=True)
+
+    class ReadSerializer:
+        fields = BaseTestModelSerializer.ReadSerializer.fields + [
+            "order",
+            "quantity",
+        ]
+
+    class CreateSerializer:
+        # Standalone creation accepts order; nesting always removes/injects it.
+        fields = BaseTestModelSerializer.CreateSerializer.fields + [
+            "order",
+            "quantity",
+            "linked",
+        ]
+        nested = {"notes": NestedItemNote}
+        customs = [("note", str, "")]
+        model_config = ConfigDict(extra="forbid")
+
+        @field_validator("name")
+        @classmethod
+        def strip_name(cls, value):
+            return value.strip()
+
+        @field_validator("quantity")
+        @classmethod
+        def positive_quantity(cls, value):
+            if value <= 0:
+                raise ValueError("quantity must be positive")
+            return value
+
+
+class NestedOrderTag(BaseTestModelSerializer):
+    """Child model with no explicit CreateSerializer.fields, exercising the
+    auto-exclude-injected-fk fallback in generate_nested_child_schema()."""
+
+    order = models.ForeignKey(
+        "NestedOrder",
+        on_delete=models.CASCADE,
+        related_name="tags",
+    )
+
+    class CreateSerializer:
+        fields = []
+
+
+class NestedOrder(BaseTestModelSerializer):
+    """Parent model exercising nested creation of NestedOrderItem children."""
+
+    class ReadSerializer:
+        fields = BaseTestModelSerializer.ReadSerializer.fields + ["items"]
+
+    class CreateSerializer:
+        fields = BaseTestModelSerializer.CreateSerializer.fields
+        nested = {"items": NestedOrderItem, "tags": NestedOrderTag}
+
+
+class NestedNode(BaseTestModelSerializer):
+    parent = models.ForeignKey(
+        "self", null=True, on_delete=models.CASCADE, related_name="children"
+    )
+
+    class CreateSerializer:
+        fields = ["name", "description"]
+
+
+NestedNode.CreateSerializer.nested = {"children": NestedNode}
