@@ -20,6 +20,7 @@ from asgiref.sync import sync_to_async
 
 from django.conf import settings
 from ninja import Schema
+from django.core.exceptions import FieldDoesNotExist, ImproperlyConfigured
 from ninja.orm import create_schema
 from django.db import models
 from django.http import HttpRequest
@@ -48,6 +49,8 @@ from ninja_aio.schemas.helpers import (
 
 # TypeVar for generic model typing in Serializers
 ModelT = TypeVar("ModelT", bound=models.Model)
+
+_nested_schema_state = threading.local()
 
 
 def _extract_pk(v: Any) -> Any:
@@ -1182,6 +1185,22 @@ class BaseSerializer:
         return cls._apply_validators(schema, validators, model_config, schema_overrides)
 
     @classmethod
+    def get_nested_customs(cls) -> list[tuple[str, Any, Any]]:
+        """
+        Return synthetic custom field tuples for nested-write relations.
+
+        Overridden by ``ModelSerializer`` to translate ``CreateSerializer.nested``
+        into ``(field_name, list[ChildInSchema], default)`` tuples consumable by
+        ``create_schema``. The base implementation is a no-op so ``Serializer``
+        (Meta-driven) does not need to support nested writes.
+
+        Returns
+        -------
+        list[tuple[str, Any, Any]]
+        """
+        return []
+
+    @classmethod
     def _create_in_or_patch_schema(
         cls,
         schema_type: type[SCHEMA_TYPES],
@@ -1197,6 +1216,8 @@ class BaseSerializer:
         customs = (
             cls.get_custom_fields(s_type) + optionals + cls.get_inline_customs(s_type)
         )
+        if schema_type == "In":
+            customs = customs + cls.get_nested_customs()
         excludes = cls.get_excluded_fields(s_type)
 
         # If no explicit fields and no excludes specified
@@ -1467,12 +1488,21 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
             Synthetic input fields (non-model).
         excludes : list[str]
             Disallowed model fields on create (e.g., id, timestamps).
+        nested : dict[str, type[ModelSerializer]]
+            Reverse-FK child relations to create atomically with the parent.
+            Key is the reverse accessor / ``related_name`` on the parent model
+            (e.g. ``"items"``); value is the child ``ModelSerializer`` class.
+            The child's own FK back to the parent is auto-excluded from the
+            generated nested input schema and injected at creation time --
+            it may still be listed in the child's standalone create fields.
+            Only supported for create (not update).
         """
 
         fields: list[str | tuple[str, Any, Any] | tuple[str, Any]] = []
         customs: list[tuple[str, Any, Any] | tuple[str, Any]] = []
         optionals: list[tuple[str, Any]] = []
         excludes: list[str] = []
+        nested: dict[str, type["ModelSerializer"]] = {}
 
     class ReadSerializer:
         """Configuration describing how to build a read (output) schema.
@@ -1629,6 +1659,156 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
             Field names whose related objects should be serialized as IDs.
         """
         return getattr(cls.ReadSerializer, "relations_as_id", [])
+
+    @classmethod
+    def get_nested_fields(cls) -> dict[str, type["ModelSerializer"]]:
+        """
+        Return the reverse-FK relations declared for nested creation.
+
+        Reads the ``nested`` attribute from ``CreateSerializer``.
+
+        Returns
+        -------
+        dict[str, type[ModelSerializer]]
+            Mapping of reverse accessor name -> child ``ModelSerializer`` class.
+        """
+        nested = getattr(cls.CreateSerializer, "nested", {}) or {}
+        if not isinstance(nested, dict):
+            raise ImproperlyConfigured("CreateSerializer.nested must be a dict")
+        return nested
+
+    @classmethod
+    def _get_nested_fk_field(cls, field_name: str) -> str:
+        """
+        Resolve the FK field name on the child model for a nested relation.
+
+        Parameters
+        ----------
+        field_name : str
+            Reverse accessor / ``related_name`` declared in ``nested``.
+
+        Returns
+        -------
+        str
+            Name of the FK field on the child model pointing back to ``cls``.
+        """
+        try:
+            relation = cls._meta.get_field(field_name)
+        except FieldDoesNotExist as exc:
+            # An explicit related_query_name can differ from the accessor.
+            relation = next(
+                (
+                    r
+                    for r in cls._meta.related_objects
+                    if r.get_accessor_name() == field_name
+                ),
+                None,
+            )
+            if relation is None:
+                raise ImproperlyConfigured(
+                    f"{cls.__name__}.CreateSerializer.nested: unknown relation '{field_name}'"
+                ) from exc
+        child = cls.get_nested_fields()[field_name]
+        if (
+            not relation.auto_created
+            or not relation.one_to_many
+            or not isinstance(child, ModelSerializerMeta)
+            or relation.related_model is not child
+            or relation.get_accessor_name() != field_name
+        ):
+            raise ImproperlyConfigured(
+                f"{cls.__name__}.CreateSerializer.nested['{field_name}'] must "
+                "reference the ModelSerializer for a reverse ForeignKey relation"
+            )
+        return relation.field.name
+
+    @classmethod
+    @lru_cache(maxsize=128)
+    def generate_nested_child_schema(cls, fk_field_name: str) -> type[Schema]:
+        """
+        Build the create-input schema used for this model as a nested child.
+
+        Identical to ``generate_create_s()`` except ``fk_field_name`` (the FK
+        pointing back at the nested-write parent) is always excluded, since it
+        is injected programmatically rather than supplied by the client.
+        Used both to type the parent's nested custom field and to re-validate
+        each child payload before creation, so the two stay consistent.
+
+        Parameters
+        ----------
+        fk_field_name : str
+            Name of the FK field on this model pointing back at the parent.
+
+        Returns
+        -------
+        Schema
+        """
+        injected_names = {fk_field_name, cls._meta.get_field(fk_field_name).attname}
+        fields = [f for f in cls.get_fields("create") if f not in injected_names]
+        excludes = [
+            f for f in cls.get_excluded_fields("create") if f not in injected_names
+        ]
+        if not fields:
+            excludes = list(dict.fromkeys(excludes + [fk_field_name]))
+
+        optionals = cls.get_optional_fields("create")
+        inline_customs = (
+            cls.get_custom_fields("create")
+            + optionals
+            + cls.get_inline_customs("create")
+            + cls.get_nested_customs()
+        )
+        inline_customs = [f for f in inline_customs if f[0] not in injected_names]
+
+        schema = create_schema(
+            model=cls._get_model(),
+            name=f"{cls.__name__}{fk_field_name.title()}NestedIn",
+            fields=fields or None,
+            custom_fields=inline_customs,
+            exclude=excludes if not fields else None,
+        )
+        return cls._apply_validators(
+            schema,
+            cls._get_validators("In"),
+            cls._get_model_config("In"),
+            cls._get_schema_overrides("In"),
+        )
+
+    @classmethod
+    def get_nested_customs(cls) -> list[tuple[str, Any, Any]]:
+        """
+        Build ``(field_name, list[ChildInSchema], default)`` tuples for nested writes.
+
+        For each entry in ``CreateSerializer.nested``, generates a dedicated
+        input schema for the child model that excludes the FK field pointing
+        back at the parent (it is injected at creation time, not supplied by
+        the client).
+
+        Returns
+        -------
+        list[tuple[str, Any, Any]]
+            Custom field tuples consumable by ``create_schema``.
+        """
+        nested = cls.get_nested_fields()
+        if not nested:
+            return []
+        path = getattr(_nested_schema_state, "path", ())
+        if cls in path:
+            raise ImproperlyConfigured("Cyclic CreateSerializer.nested configuration")
+        _nested_schema_state.path = path + (cls,)
+        try:
+            customs = []
+            for field_name, child_serializer in nested.items():
+                fk_field_name = cls._get_nested_fk_field(field_name)
+                child_schema = child_serializer.generate_nested_child_schema(
+                    fk_field_name
+                )
+                customs.append(
+                    (field_name, list[child_schema], Field(default_factory=list))
+                )
+            return customs
+        finally:
+            _nested_schema_state.path = path
 
     @classmethod
     def _get_fields(cls, s_type: type[S_TYPES], f_type: type[F_TYPES]):

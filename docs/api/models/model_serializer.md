@@ -57,6 +57,7 @@ Describes how to build a create (input) schema for a model.
 | `optionals` | `list[tuple[str, type]]` | Optional model fields: `(field_name, python_type)`                                                                                |
 | `customs`   | `list[tuple]`            | Synthetic inputs. Tuple forms: `(name, type)` = required (no default); `(name, type, default)` = optional (literal or callable)   |
 | `excludes`  | `list[str]`              | Field names rejected on create                                                                                                    |
+| `nested`    | `dict[str, type[ModelSerializer]]` | Reverse-FK child relations created atomically with the parent. See [Nested Writes](#nested-writes) below.                |
 
 **Example:**
 
@@ -114,6 +115,115 @@ class UserIn(ModelSchema):
         model = User
         fields = ["username", "email"]
 ```
+
+### Nested Writes
+
+`CreateSerializer.nested` lets a parent create endpoint accept and persist its
+reverse-FK children in the same request, atomically. This is distinct from
+M2M relations (`ManyToManyAPI`, see [Views: Mixins](../views/mixins.md)),
+which link *existing* objects — nested writes *create new owned children*
+that don't exist yet.
+
+```python
+class OrderItem(ModelSerializer):
+    order = models.ForeignKey(
+        "Order", on_delete=models.CASCADE, related_name="items"
+    )
+    product = models.ForeignKey(Product, on_delete=models.PROTECT)
+    quantity = models.PositiveIntegerField(default=1)
+
+    class CreateSerializer:
+        # Standalone creation needs order; nesting removes and injects it.
+        fields = ["order", "product", "quantity"]
+
+    class ReadSerializer:
+        fields = ["id", "product", "quantity"]
+        relations_as_id = ["product"]
+
+
+class Order(ModelSerializer):
+    customer = models.ForeignKey(Customer, on_delete=models.PROTECT)
+
+    class ReadSerializer:
+        fields = ["id", "customer", "items"]
+        relations_as_id = ["customer"]
+
+    class CreateSerializer:
+        fields = ["customer"]
+        nested = {"items": OrderItem}
+```
+
+A single request now creates the order and all of its items in one atomic
+transaction:
+
+```http
+POST /orders/
+Content-Type: application/json
+
+{
+  "customer_id": 5,
+  "items": [
+    {"product_id": 1, "quantity": 2},
+    {"product_id": 3, "quantity": 1}
+  ]
+}
+```
+
+```json
+{
+  "id": 42,
+  "customer": 5,
+  "items": [
+    {"id": 101, "product": 1, "quantity": 2},
+    {"id": 102, "product": 3, "quantity": 1}
+  ]
+}
+```
+
+**Key `dict` is the reverse accessor / `related_name`** on the parent model
+(`"items"` above matches `related_name="items"` on `OrderItem.order`). The
+value is the child's `ModelSerializer` class.
+
+**Rules:**
+
+- The child's FK back to the parent (`order` above) is always excluded from
+  the nested input schema and injected before persistence. It may remain in
+  the child's `CreateSerializer.fields` for standalone creation. The nested
+  payload cannot override this FK; use `model_config = ConfigDict(extra="forbid")`
+  on the child's create config if unknown input fields should be rejected
+  rather than ignored.
+- Each child payload is validated against the *child's own* create schema
+  (minus the injected FK), so the child's own custom fields, optionals,
+  validators, `custom_actions`, `post_create`, and reactive hooks (`@on_create`,
+  etc.) all run normally for every nested item.
+- Each parent and its owned children are persisted inside one atomic
+  transaction, including direct `ModelUtil.create_s()` and bulk calls. Child
+  validation, persistence, or lifecycle-hook failures roll back that graph.
+  Bulk creation still commits successful parent graphs independently.
+  Parent and children must route to the same database; cross-database owned
+  graphs are rejected before persistence rather than claiming a distributed
+  transaction.
+- Omitting the nested key from the payload defaults to an empty list (no
+  children created); it is never required.
+- **Create-only.** There is no update/patch equivalent — updating a
+  collection of children (replace vs. merge vs. diff-by-pk) has ambiguous
+  semantics, so it's intentionally out of scope. Manage children via their
+  own CRUD endpoints after creation.
+- Only reverse-FK relations are supported. M2M relations should continue to
+  use `ManyToManyAPI` (`m2m_relations` on `APIViewSet`), since linking
+  existing rows is a different operation from creating owned children.
+- A child may declare its own nested relations, allowing multiple levels.
+  Cyclic configurations and mismatched relation/model mappings raise
+  `ImproperlyConfigured` during schema generation.
+- Nested writes currently require the `ModelSerializer` pattern; Meta-driven
+  `Serializer` classes are unchanged. `parse_input_data()` still returns
+  `(payload, customs)` and excludes nested values from the model payload.
+- Parent lifecycle hooks run before child creation. Database writes roll back
+  on failure, but external effects (emails, webhooks) do not; schedule those
+  with Django's `transaction.on_commit()` when they must follow a commit.
+- Child ViewSet authentication/permission hooks are not called: the parent's
+  create endpoint authorizes the owned graph. Other FK lookups still use the
+  child's normal request-scoped `ModelUtil` resolution.
 
 ### ReadSerializer
 

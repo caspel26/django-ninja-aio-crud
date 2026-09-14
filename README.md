@@ -41,6 +41,8 @@
 | **Async Pagination** | Customizable | `PageNumberPagination`, `CursorPagination`, or custom — DB-level slicing |
 | **M2M Relations** | Add/remove/list | Endpoints via `M2MRelationSchema` with filtering support |
 | **Reverse Relations** | Nested serialization | Automatic handling of reverse FK and M2M |
+| **Nested Writes** | Atomic creation | Create a parent and owned reverse-FK children in one request |
+| **Auto Admin Relations** | Inlines and widgets | Generate FK/O2O inlines and standard M2M dual-list widgets |
 | **Bulk Operations** | Create/update/delete | Opt-in bulk endpoints with partial success semantics and configurable response fields |
 | **Custom Actions** | `@action` decorator | Detail and list actions with auth inheritance, custom decorators, and auto URL generation |
 | **Lifecycle Hooks** | Extensible | `before_save`, `after_save`, `custom_actions`, `on_delete`, and more |
@@ -192,6 +194,29 @@ class ArticleViewSet(APIViewSet):
 GET  /article/{pk}/tag?name=dev
 POST /article/{pk}/tag/    body: {"add": [1, 2], "remove": [3]}
 ```
+
+---
+
+## Nested Creation
+
+Declare owned child relations on the parent's create config:
+
+```python
+class Order(ModelSerializer):
+    name = models.CharField(max_length=120)
+
+    class CreateSerializer:
+        fields = ["name"]
+        nested = {"items": OrderItem}
+```
+
+`OrderItem` must be a `ModelSerializer` with a foreign key to `Order` and
+`related_name="items"`. Its parent FK is excluded from the nested input and
+injected automatically. One request creates the order and its items, rolling
+back the whole graph if a child fails. Nested writes are currently create-only.
+
+See [Nested Writes](docs/api/models/model_serializer.md#nested-writes) and
+[Auto Admin Relations](docs/api/admin.md#relations-inlines--m2m-widgets).
 
 ---
 
