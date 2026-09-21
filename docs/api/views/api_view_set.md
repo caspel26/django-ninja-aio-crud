@@ -1141,7 +1141,26 @@ Available decorator fields:
 
 ## :material-alert-circle: Error Handling
 
-All CRUD and M2M endpoints may respond with `GenericMessageSchema` for error codes: 400 (validation), 401 (auth), 404 (not found).
+All CRUD and M2M endpoints may respond with `error_schema` (default `GenericMessageSchema`) for error codes: 400 (validation), 401 (auth), 403 (forbidden), 404 (not found).
+
+`error_schema` is a class attribute on `API` (the common base of `APIView` and `APIViewSet`), so it's inherited by every view/viewset. Override it once, on your own shared base class, to make every generated endpoint's OpenAPI schema document *your* project's error contract instead of the generic default — without touching a single `response=` declaration by hand:
+
+```python
+from ninja import Schema
+from ninja_aio.views import APIViewSet
+
+class ErrorResponse(Schema):
+    error_id: str
+    error_description: str
+
+class MyBaseViewSet(APIViewSet):
+    error_schema = ErrorResponse  # every generated endpoint documents this instead
+
+class BookAPI(MyBaseViewSet):
+    model = Book
+```
+
+This only changes what the OpenAPI/Swagger schema *documents* for those status codes — it has no effect on the actual response your exception handlers produce at runtime.
 
 ## :material-lightning-bolt: Performance Tips
 

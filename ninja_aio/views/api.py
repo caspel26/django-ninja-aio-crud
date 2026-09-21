@@ -49,6 +49,11 @@ class API:
     api_route_path: str = ""
     auth: list | None = NOT_SET
     router: Router = None
+    # Schema used for the generic error responses declared alongside every
+    # generated endpoint's success response (see `error_codes`). Override on
+    # a subclass to replace GenericMessageSchema with your own project-wide
+    # error contract without having to redeclare every view's `response=`.
+    error_schema: type[Schema] = GenericMessageSchema
 
     def views(self) -> None:
         """
@@ -132,6 +137,8 @@ class APIView(API):
         auth: Default auth list or NOT_SET for unauthenticated endpoints.
         router: Router instance where views are registered.
         error_codes: Common error codes returned by endpoints.
+        error_schema: Schema documented for those error codes (default GenericMessageSchema);
+            override on a subclass to use your own project-wide error contract.
 
     Overridable methods:
         views(): Register your endpoints using self.router.get/post/patch/delete.
@@ -260,7 +267,9 @@ class APIViewSet(API, Generic[ModelT]):
         <related_name>_query_params_handler(queryset, filters): Async hook for per-M2M filtering.
 
     Error responses:
-        All endpoints may return GenericMessageSchema for codes in ERROR_CODES (400,401,404).
+        All endpoints may return `error_schema` (default GenericMessageSchema) for codes
+        in ERROR_CODES (400,401,404). Override `error_schema` on a subclass to document
+        your own error contract instead, without redeclaring every view's `response=`.
 
     Internal:
         Dynamic path/filter schemas built with pydantic.create_model.
@@ -751,7 +760,7 @@ class APIViewSet(API, Generic[ModelT]):
             auth=self.post_view_auth(),
             summary=f"Create {self.model_verbose_name}",
             description=self.create_docs,
-            response={201: self.schema_create_out, self.error_codes: GenericMessageSchema},
+            response={201: self.schema_create_out, self.error_codes: self.error_schema},
         )
         @decorate_view(aatomic, unique_view(self), *self.extra_decorators.create)
         async def create(request: HttpRequest, data: self.schema_in):  # type: ignore
@@ -786,7 +795,7 @@ class APIViewSet(API, Generic[ModelT]):
             description=self.list_docs,
             response={
                 200: _paginated_schema,
-                self.error_codes: GenericMessageSchema,
+                self.error_codes: self.error_schema,
             },
         )
         @decorate_view(
@@ -843,7 +852,7 @@ class APIViewSet(API, Generic[ModelT]):
             auth=self.get_view_auth(),
             summary=f"Retrieve {self.model_verbose_name}",
             description=self.retrieve_docs,
-            response={200: retrieve_schema, self.error_codes: GenericMessageSchema},
+            response={200: retrieve_schema, self.error_codes: self.error_schema},
         )
         @decorate_view(unique_view(self), *self.extra_decorators.retrieve)
         async def retrieve(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
@@ -882,7 +891,7 @@ class APIViewSet(API, Generic[ModelT]):
             auth=self.patch_view_auth(),
             summary=f"Update {self.model_verbose_name}",
             description=self.update_docs,
-            response={200: self.schema_update_out, self.error_codes: GenericMessageSchema},
+            response={200: self.schema_update_out, self.error_codes: self.error_schema},
         )
         @decorate_view(aatomic, unique_view(self), *self.extra_decorators.update)
         async def update(
@@ -915,9 +924,9 @@ class APIViewSet(API, Generic[ModelT]):
         """
         _delete_schema = self.schema_delete_out
         _response = (
-            {200: _delete_schema, self.error_codes: GenericMessageSchema}
+            {200: _delete_schema, self.error_codes: self.error_schema}
             if _delete_schema
-            else {204: None, self.error_codes: GenericMessageSchema}
+            else {204: None, self.error_codes: self.error_schema}
         )
 
         @self.router.delete(
@@ -1011,7 +1020,7 @@ class APIViewSet(API, Generic[ModelT]):
             auth=self.post_view_auth(),
             summary=f"Bulk Create {self.model_verbose_name_plural}",
             description=self.bulk_create_docs,
-            response={200: BulkResultSchema, self.error_codes: GenericMessageSchema},
+            response={200: BulkResultSchema, self.error_codes: self.error_schema},
         )
         @decorate_view(
             unique_view(self, plural=True), *self.extra_decorators.bulk_create
@@ -1040,7 +1049,7 @@ class APIViewSet(API, Generic[ModelT]):
             description=self.bulk_update_docs,
             response={
                 200: BulkResultSchema,
-                self.error_codes: GenericMessageSchema,
+                self.error_codes: self.error_schema,
             },
         )
         @decorate_view(
@@ -1079,7 +1088,7 @@ class APIViewSet(API, Generic[ModelT]):
             auth=self.delete_view_auth(),
             summary=f"Bulk Delete {self.model_verbose_name_plural}",
             description=self.bulk_delete_docs,
-            response={200: BulkResultSchema, self.error_codes: GenericMessageSchema},
+            response={200: BulkResultSchema, self.error_codes: self.error_schema},
         )
         @decorate_view(
             unique_view(self, plural=True), *self.extra_decorators.bulk_delete
