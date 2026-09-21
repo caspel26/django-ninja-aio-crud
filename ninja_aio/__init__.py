@@ -1,6 +1,6 @@
 """Django Ninja AIO CRUD - Rest Framework"""
 
-__version__ = "2.35.0"
+__version__ = "2.36.0"
 
 __all__ = ["NinjaAIO", "NinjaAIORouter", "register_admin", "Branding"]
 

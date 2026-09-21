@@ -42,6 +42,7 @@
 | 32 | ~~Performance: duplicate fetch on delete~~ | `views/api.py`, `models/utils.py` | v2.34.2 | `delete_s(instance=...)` skips the redundant re-fetch when `schema_delete_out` is set. |
 | 33 | ~~Nested writes~~ | `models/serializers.py`, `models/utils.py` | v2.35.0 | `CreateSerializer.nested` creates owned reverse-FK children atomically, including grandchildren, validation, hooks, and per-parent rollback in bulk calls. Create-only. |
 | 34 | ~~Auto admin inlines~~ | `admin.py` | v2.35.0 | Reverse FK/O2O inlines with explicit `fk_name`, editable child fields, standard M2M widgets, and deferred relation discovery during app startup. |
+| 35 | ~~Configurable error schema~~ | `views/api.py`, `views/mixins.py`, `helpers/api.py` | v2.36.0 | `API.error_schema` (default `GenericMessageSchema`) replaces the hardcoded schema in every generated CRUD/M2M endpoint's error responses — override once on a shared base class to document a project's own error contract. |
 
 ---
 
