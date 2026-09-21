@@ -10,7 +10,7 @@ from pydantic import create_model
 from ninja_aio.views.api import APIViewSet
 from ninja_aio.decorators import unique_view, decorate_view, aatomic
 from ninja_aio.exceptions import ForbiddenError, NotFoundError
-from ninja_aio.schemas import GenericMessageSchema, RelationFilterSchema, MatchCaseFilterSchema
+from ninja_aio.schemas import RelationFilterSchema, MatchCaseFilterSchema
 from ninja_aio.schemas.api import BulkResultSchema
 from ninja_aio.schemas.helpers import QuerySchema
 
@@ -698,7 +698,7 @@ class SoftDeleteViewSetMixin(APIViewSet[ModelT]):
             auth=self.delete_view_auth(),
             summary=f"Delete {self.model_verbose_name}",
             description=self.delete_docs,
-            response={204: None, self.error_codes: GenericMessageSchema},
+            response={204: None, self.error_codes: self.error_schema},
         )
         @decorate_view(aatomic, unique_view(self), *self.extra_decorators.delete)
         async def delete(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
@@ -722,7 +722,7 @@ class SoftDeleteViewSetMixin(APIViewSet[ModelT]):
             auth=self.delete_view_auth(),
             summary=f"Bulk Delete {self.model_verbose_name_plural}",
             description=self.bulk_delete_docs,
-            response={200: BulkResultSchema, self.error_codes: GenericMessageSchema},
+            response={200: BulkResultSchema, self.error_codes: self.error_schema},
         )
         @decorate_view(
             unique_view(self, plural=True), *self.extra_decorators.bulk_delete
@@ -778,7 +778,7 @@ class SoftDeleteViewSetMixin(APIViewSet[ModelT]):
             auth=self.patch_view_auth(),
             summary=f"Restore {self.model_verbose_name}",
             description=f"Restore a soft-deleted {self.model_verbose_name}.",
-            response={200: self.schema_out, self.error_codes: GenericMessageSchema},
+            response={200: self.schema_out, self.error_codes: self.error_schema},
         )
         @decorate_view(aatomic, unique_view(self))
         async def restore(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
@@ -800,7 +800,7 @@ class SoftDeleteViewSetMixin(APIViewSet[ModelT]):
             auth=self.delete_view_auth(),
             summary=f"Hard Delete {self.model_verbose_name}",
             description=f"Permanently delete a {self.model_verbose_name}.",
-            response={204: None, self.error_codes: GenericMessageSchema},
+            response={204: None, self.error_codes: self.error_schema},
         )
         @decorate_view(aatomic, unique_view(self))
         async def hard_delete(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
@@ -873,7 +873,7 @@ class FieldSelectionViewSetMixin(APIViewSet[ModelT]):
             auth=self.get_view_auth(),
             summary=f"List {self.model_verbose_name_plural}",
             description=self.list_docs,
-            response={200: _paginated_schema, self.error_codes: GenericMessageSchema},
+            response={200: _paginated_schema, self.error_codes: self.error_schema},
         )
         @decorate_view(unique_view(self, plural=True), *self.extra_decorators.list)
         async def list(
@@ -925,7 +925,7 @@ class FieldSelectionViewSetMixin(APIViewSet[ModelT]):
             auth=self.get_view_auth(),
             summary=f"Retrieve {self.model_verbose_name}",
             description=self.retrieve_docs,
-            response={200: retrieve_schema, self.error_codes: GenericMessageSchema},
+            response={200: retrieve_schema, self.error_codes: self.error_schema},
         )
         @decorate_view(unique_view(self), *self.extra_decorators.retrieve)
         async def retrieve(

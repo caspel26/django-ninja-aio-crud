@@ -9,7 +9,6 @@ from pydantic import create_model
 from ninja_aio.decorators import unique_view, decorate_view
 from ninja_aio.models import ModelSerializer, ModelUtil
 from ninja_aio.schemas import (
-    GenericMessageSchema,
     M2MRelationSchema,
     M2MSchemaIn,
     M2MSchemaOut,
@@ -401,7 +400,7 @@ class ManyToManyAPI:
             self._get_api_path(rel_path, append_slash=append_slash),
             response={
                 200: _paginated_schema,
-                self.view_set.error_codes: GenericMessageSchema,
+                self.view_set.error_codes: self.view_set.error_schema,
             },
             auth=m2m_auth,
             summary=f"Get {verbose_name_plural}",
@@ -465,7 +464,7 @@ class ManyToManyAPI:
             self._get_api_path(rel_path),
             response={
                 200: M2MSchemaOut,
-                self.view_set.error_codes: GenericMessageSchema,
+                self.view_set.error_codes: self.view_set.error_schema,
             },
             auth=m2m_auth,
             summary=summary,
