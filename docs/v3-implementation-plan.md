@@ -27,14 +27,14 @@ Application code should call operations on its concrete `ModelSerializer` or
 book = Book.create(data, request=request)
 book = Book.get(pk=book.pk, request=request)
 book = Book.update(book, data, request=request)
-payload = Book.dump(book)
+payload = Book.model_dump(book)
 Book.destroy(book, request=request)
 
 # Async
 book = await Book.acreate(data, request=request)
 book = await Book.aget(pk=book.pk, request=request)
 book = await Book.aupdate(book, data, request=request)
-payload = await Book.adump(book)
+payload = await Book.amodel_dump(book)
 await Book.adestroy(book, request=request)
 ```
 
@@ -53,8 +53,8 @@ Follow Django's convention: the unprefixed method is synchronous and the
 | Retrieve | `get()` | `aget()` |
 | Update | `update()` | `aupdate()` |
 | Delete | `destroy()` | `adestroy()` |
-| Serialize one | `dump()` | `adump()` |
-| Serialize many | `dumps()` | `adumps()` |
+| Serialize one | `model_dump()` | `amodel_dump()` |
+| Serialize many | `model_dumps()` | `amodel_dumps()` |
 | Bulk create | `bulk_create()` | `abulk_create()` |
 | Bulk update | `bulk_update()` | `abulk_update()` |
 | Bulk delete | `bulk_destroy()` | `abulk_destroy()` |
@@ -74,26 +74,43 @@ Keep persistence and representation separate:
 - `get`/`aget` return a model instance.
 - `update`/`aupdate` return a model instance.
 - `destroy`/`adestroy` return `None`.
-- `dump`/`adump` return `dict[str, Any]`.
-- `dumps`/`adumps` return `list[dict[str, Any]]`.
+- `model_dump`/`amodel_dump` return `dict[str, Any]`.
+- `model_dumps`/`amodel_dumps` return `list[dict[str, Any]]`.
 - Bulk operations return a typed `BulkResult`, not a tuple.
 
 This prevents a method from returning a model in one context and serialized
 data in another. Generated viewsets will compose persistence and dumping.
 
-### Schema method names
+### Lazy schema attributes
 
-Replace the `_s` schema methods with descriptive names:
+Replace the `_s` schema methods with descriptive class attributes:
 
 | Version 2 | Version 3 |
 | --- | --- |
-| `generate_create_s()` | `create_schema()` |
-| `generate_update_s()` | `update_schema()` |
-| `generate_read_s()` | `read_schema()` |
-| `generate_detail_s()` | `detail_schema()` |
-| `generate_related_s()` | `related_schema()` |
+| `generate_create_s()` | `create_schema` |
+| `generate_update_s()` | `update_schema` |
+| `generate_read_s()` | `read_schema` |
+| `generate_detail_s()` | `detail_schema` |
+| `generate_related_s()` | `related_schema` |
 
-Schema generation remains synchronous because it performs no database I/O.
+The attributes are lazy descriptors, not eagerly generated values. Their
+first access dynamically generates and caches the schema from the current
+serializer configuration, model metadata, and relations:
+
+```python
+response={200: ApplicationSerializer.detail_schema}
+```
+
+Parameterized generation remains available through one explicit method:
+
+```python
+ApplicationSerializer.get_schema("detail", depth=2)
+```
+
+Serializer subclasses may override an attribute with a custom schema class.
+`clear_schema_cache()` provides explicit invalidation for tests and supported
+runtime configuration changes. Schema generation remains synchronous because
+it performs no database I/O.
 
 ### Optional request context
 
@@ -230,16 +247,20 @@ compare results, database state, hook order, exceptions, and query counts.
 
 Deliverable: the sync and async contract suites cover equivalent behavior.
 
-## Phase 4: Rename schema and dump APIs
+## Phase 4: Add lazy schema attributes and model dump APIs
 
-1. Add `create_schema`, `update_schema`, `read_schema`, `detail_schema`, and
-   `related_schema`.
-2. Add `dump`/`dumps` and `adump`/`adumps`.
-3. Update internal schema generation, nested relations, views, MCP
+1. Add lazy `create_schema`, `update_schema`, `read_schema`, `detail_schema`,
+   and `related_schema` class attributes.
+2. Add `get_schema()` and `clear_schema_cache()` for parameterized generation
+   and explicit invalidation.
+3. Preserve `model_dump`, rename collection dumping to `model_dumps`, and add
+   `amodel_dump`/`amodel_dumps`.
+4. Update internal schema generation, nested relations, views, MCP
    introspection, tests, examples, and documentation.
-4. Ensure generated schemas preserve their existing names so OpenAPI client
+5. Ensure generated schemas preserve their existing names so OpenAPI client
    generation does not change accidentally.
-5. Add cache-equivalence tests for every renamed schema factory.
+6. Add lazy-generation, override, depth, invalidation, and cache-equivalence
+   tests for every schema attribute.
 
 Deliverable: no internal production code depends on an `_s` method.
 
@@ -523,6 +544,16 @@ Each step must leave the branch in a coherent, testable state.
 - Commit and push the plan as the branch baseline.
 - No production behavior changes.
 
+### Step 0.1: Refine naming and dynamic schema access
+
+- Keep `destroy`/`adestroy` distinct from Django instances'
+  `delete`/`adelete` methods.
+- Replace proposed schema methods with lazy class attributes plus
+  `get_schema()` for parameterized generation.
+- Preserve the `model_dump` name and use `model_dumps` for collections, with
+  `amodel_dump` and `amodel_dumps` as their async counterparts.
+- Update the roadmap before freezing the public contracts.
+
 ### Step 1: Freeze the public contracts
 
 - Add the public API signature and return-type specification.
@@ -530,10 +561,12 @@ Each step must leave the branch in a coherent, testable state.
 - Record compatibility decisions for every version 2 public method.
 - Capture baseline tests, query counts, OpenAPI snapshots, and benchmarks.
 
-### Step 2: Add the new schema factory names
+### Step 2: Add lazy schema attributes
 
-- Add `create_schema`, `update_schema`, `read_schema`, `detail_schema`, and
-  `related_schema` as additive APIs.
+- Add lazy `create_schema`, `update_schema`, `read_schema`, `detail_schema`,
+  and `related_schema` as additive APIs.
+- Add `get_schema()` for parameterized depth and `clear_schema_cache()` for
+  explicit invalidation.
 - Preserve generated schema identity, caching, and OpenAPI names.
 - Keep old `_s` methods functional until the removal step.
 
@@ -558,9 +591,10 @@ Each step must leave the branch in a coherent, testable state.
 - Add sync/async parity tests for state, hooks, errors, transactions, and
   queries.
 
-### Step 6: Add the dump APIs
+### Step 6: Add the model dump APIs
 
-- Add `dump`, `dumps`, `adump`, and `adumps`.
+- Preserve `model_dump`, rename `models_dump` to `model_dumps`, and add
+  `amodel_dump` and `amodel_dumps`.
 - Define and test relation-loading behavior explicitly.
 - Preserve custom fields, nested output, optional schemas, and output
   transformations.
@@ -677,8 +711,10 @@ Version 3.0 is complete when:
 - Common application code does not need `.util` or `ModelUtil`.
 - Every supported database operation has an intentional sync/async contract.
 - Public CRUD methods return predictable model-oriented results.
-- Serialization uses `dump`/`dumps` and `adump`/`adumps` consistently.
-- Schema factories no longer use the `_s` suffix.
+- Serialization uses `model_dump`/`model_dumps` and
+  `amodel_dump`/`amodel_dumps` consistently.
+- Lazy schema attributes replace public `_s` factories while retaining
+  dynamic generation, caching, overrides, and depth-aware access.
 - Django model instance behavior remains intact.
 - Generated viewsets and integrations use the new public contract.
 - Errors, hooks, transactions, and query behavior have sync/async parity.
