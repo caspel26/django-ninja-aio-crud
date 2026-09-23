@@ -567,6 +567,8 @@ Each step must leave the branch in a coherent, testable state.
   and `related_schema` as additive APIs.
 - Add `get_schema()` for parameterized depth and `clear_schema_cache()` for
   explicit invalidation.
+- Provide precise public annotations for schema kinds, schema-class return
+  values, optional schemas, overrides, descriptors, and cache operations.
 - Preserve generated schema identity, caching, and OpenAPI names.
 - Keep old `_s` methods functional until the removal step.
 
@@ -692,6 +694,9 @@ Each step must leave the branch in a coherent, testable state.
 - Run the complete functional, parity, typing, packaging, documentation,
   accessibility, visual, performance, and supported-version matrices.
 - Migrate the sample application.
+- Remove the internal version 3 implementation plan, contract, and baseline
+  documents before release; retain only user-facing documentation, the
+  migration guide, and executable regression tests.
 - Update version, changelog, and release notes only after every gate passes.
 
 ## Explicit non-goals for 3.0

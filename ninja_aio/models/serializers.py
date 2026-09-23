@@ -1,20 +1,25 @@
 from typing import (
     Annotated,
     Any,
+    ClassVar,
     Generic,
     List,
     Literal,
     Optional,
+    TypeAlias,
     TypeVar,
     Union,
+    cast,
     get_args,
     get_origin,
     ForwardRef,
+    overload,
 )
 import types
 import warnings
 import sys
 import threading
+from collections import OrderedDict
 from functools import lru_cache
 from asgiref.sync import sync_to_async
 
@@ -51,6 +56,56 @@ from ninja_aio.schemas.helpers import (
 ModelT = TypeVar("ModelT", bound=models.Model)
 
 _nested_schema_state = threading.local()
+
+SchemaKind: TypeAlias = Literal["create", "update", "read", "detail", "related"]
+SchemaType: TypeAlias = type[Schema]
+SchemaCacheKey: TypeAlias = tuple[type["BaseSerializer"], SchemaKind, int]
+
+_SCHEMA_CACHE_MAXSIZE = 640
+_SCHEMA_TYPE_BY_KIND: dict[SchemaKind, SCHEMA_TYPES] = {
+    "create": "In",
+    "update": "Patch",
+    "read": "Out",
+    "detail": "Detail",
+    "related": "Related",
+}
+_schema_cache: OrderedDict[SchemaCacheKey, SchemaType | None] = OrderedDict()
+_schema_cache_lock = threading.RLock()
+
+
+class _LazySchemaAttribute:
+    """Resolve a serializer's default schema on first class-level access."""
+
+    kind: SchemaKind
+
+    def __init__(self, kind: SchemaKind) -> None:
+        self.kind = kind
+
+    @overload
+    def __get__(
+        self,
+        instance: None,
+        owner: type["BaseSerializer"],
+    ) -> SchemaType | None: ...
+
+    @overload
+    def __get__(
+        self,
+        instance: "BaseSerializer",
+        owner: Optional[type["BaseSerializer"]] = None,
+    ) -> SchemaType | None: ...
+
+    def __get__(
+        self,
+        instance: Optional["BaseSerializer"],
+        owner: Optional[type["BaseSerializer"]] = None,
+    ) -> SchemaType | None:
+        if owner is None:
+            if instance is None:
+                raise AttributeError("Lazy schema access requires a serializer class")
+            owner = type(instance)
+        serializer_class = owner
+        return serializer_class.get_schema(self.kind)
 
 
 def _extract_pk(v: Any) -> Any:
@@ -92,6 +147,20 @@ class BaseSerializer:
     - _get_model(): return the Django model class associated with the serializer
     - _get_relations_serializers(): optional mapping of relation field -> serializer (may be empty)
     """
+
+    create_schema: ClassVar[SchemaType | None] = cast(
+        Any, _LazySchemaAttribute("create")
+    )
+    update_schema: ClassVar[SchemaType | None] = cast(
+        Any, _LazySchemaAttribute("update")
+    )
+    read_schema: ClassVar[SchemaType | None] = cast(Any, _LazySchemaAttribute("read"))
+    detail_schema: ClassVar[SchemaType | None] = cast(
+        Any, _LazySchemaAttribute("detail")
+    )
+    related_schema: ClassVar[SchemaType | None] = cast(
+        Any, _LazySchemaAttribute("related")
+    )
 
     class QuerySet:
         """
@@ -307,7 +376,7 @@ class BaseSerializer:
         return subclass
 
     @classmethod
-    def _get_validators(cls, schema_type: type[SCHEMA_TYPES]) -> dict:
+    def _get_validators(cls, schema_type: SCHEMA_TYPES) -> dict:
         """
         Return collected validators for the given schema type.
 
@@ -327,7 +396,7 @@ class BaseSerializer:
         return {}
 
     @classmethod
-    def _get_model_config(cls, schema_type: type[SCHEMA_TYPES]) -> dict | None:
+    def _get_model_config(cls, schema_type: SCHEMA_TYPES) -> dict | None:
         """
         Return Pydantic ``ConfigDict`` for the given schema type.
 
@@ -347,7 +416,7 @@ class BaseSerializer:
         return None
 
     @classmethod
-    def _get_schema_overrides(cls, schema_type: type[SCHEMA_TYPES]) -> dict:
+    def _get_schema_overrides(cls, schema_type: SCHEMA_TYPES) -> dict:
         """
         Return collected schema method overrides for the given schema type.
 
@@ -367,7 +436,7 @@ class BaseSerializer:
         return {}
 
     @classmethod
-    def _get_fields(cls, s_type: type[S_TYPES], f_type: type[F_TYPES]):
+    def _get_fields(cls, s_type: S_TYPES, f_type: F_TYPES):
         """
         Return raw configuration list for the given serializer/field category.
 
@@ -664,9 +733,7 @@ class BaseSerializer:
             cls._pop_resolution()
 
     @classmethod
-    def _is_special_field(
-        cls, s_type: type[S_TYPES], field: str, f_type: type[F_TYPES]
-    ) -> bool:
+    def _is_special_field(cls, s_type: S_TYPES, field: str, f_type: F_TYPES) -> bool:
         """
         Check whether a field appears in the given category for a serializer type.
 
@@ -688,7 +755,7 @@ class BaseSerializer:
         return any(field in special_f for special_f in special_fields)
 
     @classmethod
-    def get_custom_fields(cls, s_type: type[S_TYPES]) -> list[tuple[str, type, Any]]:
+    def get_custom_fields(cls, s_type: S_TYPES) -> list[tuple[str, type, Any]]:
         """
         Normalize declared custom field specs into ``(name, py_type, default)`` tuples.
 
@@ -731,7 +798,7 @@ class BaseSerializer:
         return normalized
 
     @classmethod
-    def get_optional_fields(cls, s_type: type[S_TYPES]):
+    def get_optional_fields(cls, s_type: S_TYPES):
         """
         Return optional field specs normalized to ``(name, type, None)`` tuples.
 
@@ -1144,13 +1211,13 @@ class BaseSerializer:
     @classmethod
     def _create_out_or_detail_schema(
         cls,
-        schema_type: type[SCHEMA_TYPES],
-        model,
-        validators,
-        depth: int = None,
-        model_config: dict = None,
-        schema_overrides: dict = None,
-    ) -> Schema | None:
+        schema_type: SCHEMA_TYPES,
+        model: type[models.Model],
+        validators: dict[str, Any],
+        depth: int | None = None,
+        model_config: dict[str, Any] | None = None,
+        schema_overrides: dict[str, Any] | None = None,
+    ) -> SchemaType | None:
         """Create schema for Out or Detail types."""
         fields, reverse_rels, excludes, customs, optionals = cls.get_schema_out_data(
             schema_type
@@ -1170,8 +1237,12 @@ class BaseSerializer:
 
     @classmethod
     def _create_related_schema(
-        cls, model, validators, model_config: dict = None, schema_overrides: dict = None
-    ) -> Schema | None:
+        cls,
+        model: type[models.Model],
+        validators: dict[str, Any],
+        model_config: dict[str, Any] | None = None,
+        schema_overrides: dict[str, Any] | None = None,
+    ) -> SchemaType | None:
         """Create schema for Related type."""
         fields, customs = cls.get_related_schema_data()
         if not fields and not customs:
@@ -1203,12 +1274,12 @@ class BaseSerializer:
     @classmethod
     def _create_in_or_patch_schema(
         cls,
-        schema_type: type[SCHEMA_TYPES],
-        model,
-        validators,
-        model_config: dict = None,
-        schema_overrides: dict = None,
-    ) -> Schema | None:
+        schema_type: SCHEMA_TYPES,
+        model: type[models.Model],
+        validators: dict[str, Any],
+        model_config: dict[str, Any] | None = None,
+        schema_overrides: dict[str, Any] | None = None,
+    ) -> SchemaType | None:
         """Create schema for In or Patch types."""
         s_type = "create" if schema_type == "In" else "update"
         fields = cls.get_fields(s_type)
@@ -1249,9 +1320,9 @@ class BaseSerializer:
     @classmethod
     def _generate_model_schema(
         cls,
-        schema_type: type[SCHEMA_TYPES],
-        depth: int = None,
-    ) -> Schema:
+        schema_type: SCHEMA_TYPES,
+        depth: int | None = None,
+    ) -> SchemaType | None:
         """
         Core schema factory bridging serializer configuration to ``ninja.orm.create_schema``.
 
@@ -1325,8 +1396,91 @@ class BaseSerializer:
         return non_relation_fields, customs
 
     @classmethod
-    @lru_cache(maxsize=128)
-    def generate_read_s(cls, depth: int = 1) -> Schema:
+    def _schema_override(cls, kind: SchemaKind) -> tuple[bool, SchemaType | None]:
+        """Return an explicit schema attribute override from the serializer MRO."""
+        attribute = f"{kind}_schema"
+        for base in cls.__mro__:
+            if attribute not in base.__dict__:
+                continue
+            value = base.__dict__[attribute]
+            if isinstance(value, _LazySchemaAttribute):
+                return False, None
+            if value is not None and not (
+                isinstance(value, type) and issubclass(value, Schema)
+            ):
+                raise ImproperlyConfigured(
+                    f"{cls.__name__}.{attribute} must be a Schema subclass or None"
+                )
+            return True, cast(SchemaType | None, value)
+        return False, None
+
+    @classmethod
+    def get_schema(
+        cls,
+        kind: SchemaKind,
+        *,
+        depth: int = 1,
+    ) -> SchemaType | None:
+        """Return a generated or explicitly overridden serializer schema.
+
+        Default schema attributes such as ``detail_schema`` delegate here.
+        Read and detail schemas accept a non-negative relation depth; other
+        schema kinds do not use depth and require its default value.
+        """
+        schema_kinds: tuple[SchemaKind, ...] = tuple(_SCHEMA_TYPE_BY_KIND)
+        if kind not in schema_kinds:
+            expected = ", ".join(schema_kinds)
+            raise ValueError(
+                f"Unknown schema kind {kind!r}; expected one of: {expected}"
+            )
+        if isinstance(depth, bool) or not isinstance(depth, int) or depth < 0:
+            raise ValueError("Schema depth must be a non-negative integer")
+        if kind not in ("read", "detail") and depth != 1:
+            raise ValueError(f"Schema kind {kind!r} does not support custom depth")
+
+        has_override, override = cls._schema_override(kind)
+        if has_override:
+            return override
+
+        return cls._get_cached_schema(kind, depth)
+
+    @classmethod
+    def _get_cached_schema(
+        cls,
+        kind: SchemaKind,
+        depth: int,
+    ) -> SchemaType | None:
+        """Generate a schema once and retain it in the bounded shared LRU."""
+        cache_depth = depth if kind in ("read", "detail") else 1
+        key: SchemaCacheKey = (cls, kind, cache_depth)
+        with _schema_cache_lock:
+            if key in _schema_cache:
+                schema = _schema_cache.pop(key)
+                _schema_cache[key] = schema
+                return schema
+
+            schema = cls._generate_model_schema(
+                _SCHEMA_TYPE_BY_KIND[kind],
+                cache_depth if kind in ("read", "detail") else None,
+            )
+            if kind == "detail" and schema is None:
+                schema = cls._get_cached_schema("read", cache_depth)
+
+            _schema_cache[key] = schema
+            while len(_schema_cache) > _SCHEMA_CACHE_MAXSIZE:
+                _schema_cache.popitem(last=False)
+            return schema
+
+    @classmethod
+    def clear_schema_cache(cls) -> None:
+        """Clear generated schemas cached for this serializer class."""
+        with _schema_cache_lock:
+            keys = [key for key in _schema_cache if key[0] is cls]
+            for key in keys:
+                del _schema_cache[key]
+
+    @classmethod
+    def generate_read_s(cls, depth: int = 1) -> SchemaType | None:
         """
         Generate the read (Out) schema for list responses.
 
@@ -1342,11 +1496,10 @@ class BaseSerializer:
         Schema | None
             Generated Pydantic schema, or ``None`` if no read fields are configured.
         """
-        return cls._generate_model_schema("Out", depth)
+        return cls.get_schema("read", depth=depth)
 
     @classmethod
-    @lru_cache(maxsize=128)
-    def generate_detail_s(cls, depth: int = 1) -> Schema:
+    def generate_detail_s(cls, depth: int = 1) -> SchemaType | None:
         """
         Generate the detail (single-object) read schema.
 
@@ -1365,11 +1518,10 @@ class BaseSerializer:
         Schema
             Generated Pydantic schema (never ``None``; falls back to read schema).
         """
-        return cls._generate_model_schema("Detail", depth) or cls.generate_read_s(depth)
+        return cls.get_schema("detail", depth=depth)
 
     @classmethod
-    @lru_cache(maxsize=128)
-    def generate_create_s(cls) -> Schema:
+    def generate_create_s(cls) -> SchemaType | None:
         """
         Generate the create (In) schema for input validation.
 
@@ -1380,11 +1532,10 @@ class BaseSerializer:
         Schema | None
             Generated Pydantic schema, or ``None`` if no create fields are configured.
         """
-        return cls._generate_model_schema("In")
+        return cls.get_schema("create")
 
     @classmethod
-    @lru_cache(maxsize=128)
-    def generate_update_s(cls) -> Schema:
+    def generate_update_s(cls) -> SchemaType | None:
         """
         Generate the update (Patch) schema for partial updates.
 
@@ -1395,11 +1546,10 @@ class BaseSerializer:
         Schema | None
             Generated Pydantic schema, or ``None`` if no update fields are configured.
         """
-        return cls._generate_model_schema("Patch")
+        return cls.get_schema("update")
 
     @classmethod
-    @lru_cache(maxsize=128)
-    def generate_related_s(cls) -> Schema:
+    def generate_related_s(cls) -> SchemaType | None:
         """
         Generate the related (nested) schema for embedding in parent schemas.
 
@@ -1413,7 +1563,7 @@ class BaseSerializer:
         Schema | None
             Generated Pydantic schema, or ``None`` if no fields are configured.
         """
-        return cls._generate_model_schema("Related")
+        return cls.get_schema("related")
 
     @classmethod
     async def queryset_request(cls, request: HttpRequest):
@@ -1585,7 +1735,7 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
     }
 
     @classmethod
-    def _get_validators(cls, schema_type: type[SCHEMA_TYPES]) -> dict:
+    def _get_validators(cls, schema_type: SCHEMA_TYPES) -> dict:
         """
         Collect validators from the inner serializer class for the given schema type.
 
@@ -1605,7 +1755,7 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
         return cls._collect_validators(config_class)
 
     @classmethod
-    def _get_model_config(cls, schema_type: type[SCHEMA_TYPES]) -> dict | None:
+    def _get_model_config(cls, schema_type: SCHEMA_TYPES) -> dict | None:
         """
         Return Pydantic ``ConfigDict`` from the inner serializer class.
 
@@ -1627,7 +1777,7 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
         return getattr(config_class, "model_config", None)
 
     @classmethod
-    def _get_schema_overrides(cls, schema_type: type[SCHEMA_TYPES]) -> dict:
+    def _get_schema_overrides(cls, schema_type: SCHEMA_TYPES) -> dict:
         """
         Collect schema method overrides from the inner serializer class.
 
@@ -1811,7 +1961,7 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
             _nested_schema_state.path = path
 
     @classmethod
-    def _get_fields(cls, s_type: type[S_TYPES], f_type: type[F_TYPES]):
+    def _get_fields(cls, s_type: S_TYPES, f_type: F_TYPES):
         """
         Internal accessor for raw configuration lists.
 
@@ -2177,7 +2327,7 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         return payload.model_dump() if isinstance(payload, Schema) else payload
 
     @classmethod
-    def _get_validators(cls, schema_type: type[SCHEMA_TYPES]) -> dict:
+    def _get_validators(cls, schema_type: SCHEMA_TYPES) -> dict:
         """
         Collect validators from the inner validators class for the given schema type.
 
@@ -2199,7 +2349,7 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         return cls._collect_validators(validators_class)
 
     @classmethod
-    def _get_model_config(cls, schema_type: type[SCHEMA_TYPES]) -> dict | None:
+    def _get_model_config(cls, schema_type: SCHEMA_TYPES) -> dict | None:
         """
         Return Pydantic ``ConfigDict`` from the ``SchemaModelConfig`` for the given schema type.
 
@@ -2229,7 +2379,7 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         return getattr(schema_meta, "model_config_override", None)
 
     @classmethod
-    def _get_schema_overrides(cls, schema_type: type[SCHEMA_TYPES]) -> dict:
+    def _get_schema_overrides(cls, schema_type: SCHEMA_TYPES) -> dict:
         """
         Collect schema method overrides from the validator inner class.
 
@@ -2354,7 +2504,7 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         return model
 
     @classmethod
-    def _get_fields(cls, s_type: type[S_TYPES], f_type: type[F_TYPES]):
+    def _get_fields(cls, s_type: S_TYPES, f_type: F_TYPES):
         """
         Return raw configuration list from the Meta schema for the given categories.
 

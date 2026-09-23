@@ -1,6 +1,8 @@
 # Version 3 Public API Contract
 
-Status: proposed contract for implementation on `feat/v3-api-redesign`.
+Status: internal implementation contract for `feat/v3-api-redesign`. Remove
+this file before the final version 3 release after its stable content has been
+transferred to the user-facing API reference and migration guide.
 
 This document defines the public serializer API that version 3 must implement.
 It is intentionally narrower than the version 2 surface: model inspection,
@@ -295,6 +297,9 @@ entries marked "remove" before the final release.
 
 - Public names are documented and exported deliberately; lack of a leading
   underscore alone does not make an internal helper public in version 3.
+- Every public API has complete parameter and return annotations. Lazy
+  descriptors must expose the resolved value type to static analyzers rather
+  than leaking their internal descriptor type.
 - Sync and async pairs must have equivalent outcomes, exceptions, hook order,
   and transaction semantics.
 - Performance improvements may reduce query counts; regressions require an

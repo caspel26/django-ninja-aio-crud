@@ -1,5 +1,8 @@
 # Version 3 Baseline
 
+> Internal implementation artifact. Remove this file before the final version
+> 3 release after release-regression data has moved to its permanent home.
+
 This baseline records the version 2.36 behavior against which version 3 work
 is reviewed. It is not a promise that every number must remain identical:
 approved improvements may reduce queries or latency, while intentional HTTP
@@ -71,6 +74,13 @@ Schema generation medians are approximately 0.0002 ms because the benchmark
 measures the existing warm cache. Step 2 must add cold-cache measurements for
 the new lazy schema attributes rather than treating this number as generation
 cost.
+
+Step 2 added and executed isolated cold-cache benchmarks with 100 iterations:
+
+| Lazy schema scenario | Median |
+| --- | ---: |
+| ModelSerializer, four default schemas | 0.0154 ms |
+| Standalone Serializer, four default schemas | 0.0224 ms |
 
 ## Query-count baseline
 

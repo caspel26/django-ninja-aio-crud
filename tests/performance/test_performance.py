@@ -120,6 +120,32 @@ class SchemaGenerationPerformanceTest(PerformanceMixin, TestCase):
         stats = self._benchmark(gen)
         self._record("meta_serializer_schema_generation", stats)
 
+    def test_model_serializer_lazy_schema_cold_cache(self):
+        """Benchmark lazy attributes when the ModelSerializer cache is cold."""
+
+        def gen() -> None:
+            models.TestModelSerializer.clear_schema_cache()
+            _ = models.TestModelSerializer.read_schema
+            _ = models.TestModelSerializer.create_schema
+            _ = models.TestModelSerializer.update_schema
+            _ = models.TestModelSerializer.detail_schema
+
+        stats = self._benchmark(gen)
+        self._record("model_serializer_lazy_schema_cold_cache", stats)
+
+    def test_meta_serializer_lazy_schema_cold_cache(self):
+        """Benchmark lazy attributes when the standalone cache is cold."""
+
+        def gen() -> None:
+            serializers.TestModelForeignKeySerializer.clear_schema_cache()
+            _ = serializers.TestModelForeignKeySerializer.read_schema
+            _ = serializers.TestModelForeignKeySerializer.create_schema
+            _ = serializers.TestModelForeignKeySerializer.update_schema
+            _ = serializers.TestModelForeignKeySerializer.detail_schema
+
+        stats = self._benchmark(gen)
+        self._record("meta_serializer_lazy_schema_cold_cache", stats)
+
     def test_schema_with_relations(self):
         """Benchmark schema generation for models with FK relations."""
 
