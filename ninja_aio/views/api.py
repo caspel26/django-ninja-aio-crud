@@ -746,7 +746,7 @@ class APIViewSet(API, Generic[ModelT]):
         await self.on_before_operation(request, operation)
         if not self._has_object_hooks:
             return None
-        obj = await self.model_util.get_object(request, pk, is_for=is_for)
+        obj = await self.model_util.aget_object(request, pk, is_for=is_for)
         await self.on_before_object_operation(request, operation, obj)
         return obj
 
@@ -812,7 +812,7 @@ class APIViewSet(API, Generic[ModelT]):
 
             await self.on_before_operation(request, "list")
 
-            qs = await self.model_util.get_objects(
+            qs = await self.model_util.aget_objects(
                 request,
                 query_data=self._get_query_data(),
                 is_for="read",
@@ -941,7 +941,7 @@ class APIViewSet(API, Generic[ModelT]):
             _pk = self._get_pk(pk)
             await self._run_object_hooks(request, "delete", _pk)
             if _delete_schema:
-                obj = await self.model_util.get_object(request, _pk)
+                obj = await self.model_util.aget_object(request, _pk)
                 serialized = await self.model_util.read_s(_delete_schema, request, obj)
                 await self.model_util.delete_s(request, _pk, instance=obj)
                 return Status(200, serialized)
@@ -1156,7 +1156,7 @@ class APIViewSet(API, Generic[ModelT]):
         async def on_handler(request, **kwargs):
             await _viewset.on_before_operation(request, name)
             pk = kwargs.get(pk_name)
-            obj = await _viewset.model_util.get_object(request, pk)
+            obj = await _viewset.model_util.aget_object(request, pk)
             await _viewset.on_before_object_operation(request, name, obj)
             return await _orig(_viewset, request, obj)
 

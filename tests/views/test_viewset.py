@@ -1543,7 +1543,7 @@ class PerOperationOutSchemaTestCase(TestCase):
         view = self.delete_out_viewset.delete_view()
         path_schema = self.delete_out_viewset.path_schema(**{self.pk_att: pk})
 
-        original_get_object = ModelUtil.get_object
+        original_get_object = ModelUtil.aget_object
         call_count = 0
 
         async def counting_get_object(self, *args, **kwargs):
@@ -1551,7 +1551,7 @@ class PerOperationOutSchemaTestCase(TestCase):
             call_count += 1
             return await original_get_object(self, *args, **kwargs)
 
-        with mock.patch.object(ModelUtil, "get_object", counting_get_object):
+        with mock.patch.object(ModelUtil, "aget_object", counting_get_object):
             result = await view(self.request.delete(), path_schema)
 
         self.assertEqual(result.status_code, 200)

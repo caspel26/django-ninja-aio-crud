@@ -433,22 +433,38 @@ class ModelUtil(Generic[ModelT]):
         if isinstance(self.model, ModelSerializerMeta) and with_qs_request:
             obj_qs = await self.model.queryset_request(request)
 
-        # Apply query optimizations for the requested scope. select_related/
-        # prefetch_related are additive, so re-applying them here on top of
-        # whatever the hook returned is safe even if it already optimized
-        # for its own (queryset_request) scope.
-        obj_qs = self._apply_query_optimizations(obj_qs, query_data, is_for)
+        return self._finalize_queryset(obj_qs, query_data, is_for)
 
-        # Apply filters if present (supports dict or Q object)
-        if hasattr(query_data, "filters") and query_data.filters:
-            if isinstance(query_data.filters, Q):
-                obj_qs = obj_qs.filter(query_data.filters)
-            else:
-                obj_qs = obj_qs.filter(**query_data.filters)
+    def _finalize_queryset(
+        self,
+        queryset: models.QuerySet[ModelT],
+        query_data: QuerySchema,
+        is_for: Literal["read", "detail"] | None,
+    ) -> models.QuerySet[ModelT]:
+        """Apply execution-mode-independent optimizations and filters."""
+        queryset = self._apply_query_optimizations(queryset, query_data, is_for)
+        filters = getattr(query_data, "filters", None)
+        if isinstance(filters, Q):
+            return queryset.filter(filters)
+        if filters:
+            return queryset.filter(**filters)
+        return queryset
 
-        return obj_qs
+    def _apply_object_lookup(
+        self,
+        queryset: models.QuerySet[ModelT],
+        pk: PrimaryKey | None,
+        getters: dict[str, Any] | Q,
+    ) -> tuple[models.QuerySet[ModelT], dict[str, Any]]:
+        """Apply a Q lookup or build keyword lookup criteria for one object."""
+        if isinstance(getters, Q):
+            queryset = queryset.filter(getters)
+            if pk is not None:
+                queryset = queryset.filter(**{self.model_pk_name: pk})
+            return queryset, {}
+        return queryset, self._build_lookup_query(pk, getters)
 
-    async def get_objects(
+    async def aget_objects(
         self,
         request: HttpRequest | None,
         query_data: ObjectsQuerySchema = None,
@@ -493,7 +509,24 @@ class ModelUtil(Generic[ModelT]):
             request, query_data, with_qs_request, is_for
         )
 
-    async def get_object(
+    def get_objects(
+        self,
+        request: HttpRequest | None,
+        query_data: ObjectsQuerySchema | None = None,
+        with_qs_request: bool = True,
+        is_for: Literal["read", "detail"] | None = None,
+    ) -> models.QuerySet[ModelT]:
+        """Retrieve an optimized queryset using only synchronous ORM operations."""
+        query_data = query_data or ObjectsQuerySchema()
+        queryset = self.model._default_manager.all()
+        if with_qs_request:
+            if self.serializer_class is not None:
+                queryset = self.serializer_class.queryset_request_sync(request)
+            elif isinstance(self.model, ModelSerializerMeta):
+                queryset = self.model.queryset_request_sync(request)
+        return self._finalize_queryset(queryset, query_data, is_for)
+
+    async def aget_object(
         self,
         request: HttpRequest | None,
         pk: PrimaryKey | None = None,
@@ -556,25 +589,38 @@ class ModelUtil(Generic[ModelT]):
             request, query_data, with_qs_request, is_for
         )
 
-        # Apply getters (supports dict or Q object)
-        if isinstance(query_data.getters, Q):
-            obj_qs = obj_qs.filter(query_data.getters)
-            if pk is not None:
-                obj_qs = obj_qs.filter(**{self.model_pk_name: pk})
-            try:
-                obj = await obj_qs.aget()
-            except ObjectDoesNotExist:
-                logger.debug(f"{self.model.__name__} not found (pk={pk})")
-                raise NotFoundError(self.model)
-        else:
-            get_q = self._build_lookup_query(pk, query_data.getters)
-            try:
-                obj = await obj_qs.aget(**get_q)
-            except ObjectDoesNotExist:
-                logger.debug(f"{self.model.__name__} not found (pk={pk})")
-                raise NotFoundError(self.model)
+        obj_qs, lookup = self._apply_object_lookup(obj_qs, pk, query_data.getters)
+        try:
+            return await obj_qs.aget(**lookup)
+        except ObjectDoesNotExist:
+            logger.debug(f"{self.model.__name__} not found (pk={pk})")
+            raise NotFoundError(self.model)
 
-        return obj
+    def get_object(
+        self,
+        request: HttpRequest | None,
+        pk: PrimaryKey | None = None,
+        query_data: ObjectQuerySchema | None = None,
+        with_qs_request: bool = True,
+        is_for: Literal["read", "detail"] | None = None,
+    ) -> ModelT:
+        """Retrieve one object using only synchronous ORM operations."""
+        query_data = query_data or ObjectQuerySchema()
+        if not query_data.getters and pk is None:
+            raise ValueError(
+                "Either pk or getters must be provided for single object retrieval."
+            )
+        queryset = self.get_objects(
+            request,
+            query_data=query_data,
+            with_qs_request=with_qs_request,
+            is_for=is_for,
+        )
+        queryset, lookup = self._apply_object_lookup(queryset, pk, query_data.getters)
+        try:
+            return queryset.get(**lookup)
+        except ObjectDoesNotExist as exc:
+            raise NotFoundError(self.model) from exc
 
     def _build_lookup_query(
         self,
@@ -876,7 +922,7 @@ class ModelUtil(Generic[ModelT]):
         is_for: Literal["read", "detail"] | None = None,
     ):
         """Serialize a queryset of objects."""
-        objs = await self.get_objects(request, query_data=query_data, is_for=is_for)
+        objs = await self.aget_objects(request, query_data=query_data, is_for=is_for)
         return await self._bump_queryset_from_schema(objs, schema)
 
     async def _serialize_single_object(
@@ -887,7 +933,7 @@ class ModelUtil(Generic[ModelT]):
         is_for: Literal["read", "detail"] | None = None,
     ):
         """Serialize a single object."""
-        obj = await self.get_object(request, query_data=query_data, is_for=is_for)
+        obj = await self.aget_object(request, query_data=query_data, is_for=is_for)
         return await self._bump_object_from_schema(obj, obj_schema)
 
     def _collect_custom_and_optional_fields(
@@ -949,6 +995,15 @@ class ModelUtil(Generic[ModelT]):
             ).skip_keys
         )
 
+    @staticmethod
+    def _scoped_fk_util(rel_model: type[models.Model]) -> "ModelUtil | None":
+        if isinstance(rel_model, ModelSerializerMeta):
+            return ModelUtil(rel_model)
+        serializer_class = get_serializer_for_model(rel_model)
+        if serializer_class is not None:
+            return ModelUtil(rel_model, serializer_class=serializer_class)
+        return None
+
     async def _resolve_fk(
         self,
         request: HttpRequest | None,
@@ -997,12 +1052,9 @@ class ModelUtil(Generic[ModelT]):
             f"Resolving FK '{k}' -> {rel_model.__name__} (pk={v}) for {self.model.__name__}"
         )
 
-        if isinstance(rel_model, ModelSerializerMeta):
-            payload[k] = await ModelUtil(rel_model).get_object(request, pk=v)
-        elif (rel_serializer_cls := get_serializer_for_model(rel_model)) is not None:
-            payload[k] = await ModelUtil(
-                rel_model, serializer_class=rel_serializer_cls
-            ).get_object(request, pk=v)
+        related_util = self._scoped_fk_util(rel_model)
+        if related_util is not None:
+            payload[k] = await related_util.aget_object(request, pk=v)
         else:
             try:
                 payload[k] = await rel_model.objects.aget(pk=v)
@@ -1100,25 +1152,102 @@ class ModelUtil(Generic[ModelT]):
         SerializeError
             On base64 decoding failure or invalid field names.
         """
-        payload = model_transformations.schema_to_payload(data, self.nested_fields)
+        payload, plan = self._prepare_input_payload(data)
+        await self._process_payload_fields(
+            request, payload, plan.fields_to_process, fk_cache
+        )
+        return plan.model_payload(), plan.customs
 
+    def _prepare_input_payload(
+        self, data: Schema
+    ) -> tuple[dict[str, Any], model_transformations.InputPayloadPlan]:
+        """Dump and classify validated input before execution-mode-specific work."""
+        payload = model_transformations.schema_to_payload(data, self.nested_fields)
         is_serializer = (
             isinstance(self.model, ModelSerializerMeta) or self.with_serializer
         )
         serializer = self.serializer if self.with_serializer else self.model
-
-        # Note: Field validation is handled by Pydantic during schema deserialization
-        # No additional validation needed here since data is already a validated Schema instance
-
         plan = model_transformations.plan_input_payload(
             payload,
             model_fields=self.model_fields,
             field_policy=serializer if is_serializer else None,
         )
-        await self._process_payload_fields(
-            request, payload, plan.fields_to_process, fk_cache
+        return payload, plan
+
+    def parse_input_data_sync(
+        self,
+        request: HttpRequest | None,
+        data: Schema,
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Transform input data using only synchronous field resolution."""
+        payload, plan = self._prepare_input_payload(data)
+        fields_to_process = plan.fields_to_process
+        fields = model_transformations.resolve_model_fields(
+            self.model, [name for name, _ in fields_to_process]
         )
+        for (name, value), field in zip(fields_to_process, fields):
+            self._decode_binary(payload, name, value, field)
+            if isinstance(field, models.ForeignKey) and value is not None:
+                related_model = field.related_model
+                related_util = self._scoped_fk_util(related_model)
+                if related_util is not None:
+                    payload[name] = related_util.get_object(request, pk=value)
+                else:
+                    try:
+                        payload[name] = related_model._default_manager.get(pk=value)
+                    except related_model.DoesNotExist as exc:
+                        raise NotFoundError(related_model) from exc
         return plan.model_payload(), plan.customs
+
+    def create_instance(
+        self,
+        request: HttpRequest | None,
+        data: Schema,
+    ) -> ModelT:
+        """Create one model instance with Django's synchronous ORM."""
+        if self.nested_fields:
+            raise ImproperlyConfigured(
+                "Synchronous nested writes are not available before hook normalization"
+            )
+        payload, customs = self.parse_input_data_sync(request, data)
+        obj = self.model._default_manager.create(**payload)
+        if self.with_serializer:
+            self.serializer.custom_actions_sync(customs, obj)
+            self.serializer.post_create_sync(obj)
+        elif isinstance(self.model, ModelSerializerMeta):
+            obj.custom_actions_sync(customs)
+            obj.post_create_sync()
+        return obj
+
+    def update_instance(
+        self,
+        request: HttpRequest | None,
+        data: Schema,
+        pk: PrimaryKey,
+        instance: ModelT | None = None,
+    ) -> ModelT:
+        """Update one model instance with Django's synchronous ORM."""
+        obj = instance or self.get_object(request, pk, is_for="read")
+        payload, customs = self.parse_input_data_sync(request, data)
+        for name, value in payload.items():
+            if value is not None:
+                setattr(obj, name, value)
+        obj.save()
+        if self.with_serializer:
+            self.serializer.custom_actions_sync(customs, obj)
+        elif isinstance(self.model, ModelSerializerMeta):
+            obj.custom_actions_sync(customs)
+        return obj
+
+    def destroy_instance(
+        self,
+        request: HttpRequest | None,
+        pk: PrimaryKey,
+        instance: ModelT | None = None,
+    ) -> None:
+        """Destroy one model instance with Django's synchronous ORM."""
+        obj = instance or self.get_object(request, pk)
+        obj.delete()
 
     async def _create_instance(
         self,
@@ -1444,7 +1573,7 @@ class ModelUtil(Generic[ModelT]):
         obj = (
             instance
             if instance is not None
-            else await self.get_object(request, pk, is_for="read")
+            else await self.aget_object(request, pk, is_for="read")
         )
         payload, customs = await self.parse_input_data(request, data, fk_cache)
         if require_fields and not payload and not customs:
@@ -1543,7 +1672,7 @@ class ModelUtil(Generic[ModelT]):
         )
 
         logger.info(f"Deleting {self.model.__name__} (pk={pk})")
-        obj = instance if instance is not None else await self.get_object(request, pk)
+        obj = instance if instance is not None else await self.aget_object(request, pk)
         async with suppress_signals():
             await obj.adelete()
         logger.debug(f"Deleted {self.model.__name__} (pk={pk})")
@@ -1696,9 +1825,12 @@ class ModelUtil(Generic[ModelT]):
             is None.
         """
         if not detail_fields:
-            existing_pks: set = set()
-            async for pk_val in matched_qs.values_list(self.model_pk_name, flat=True):
-                existing_pks.add(pk_val)
+            existing_pks = {
+                pk_val
+                async for pk_val in matched_qs.values_list(
+                    self.model_pk_name, flat=True
+                )
+            }
             return existing_pks, {}
 
         fields_with_pk = list(dict.fromkeys([self.model_pk_name] + detail_fields))
@@ -1754,7 +1886,7 @@ class ModelUtil(Generic[ModelT]):
         if not pks:
             return [], []
 
-        qs = await self.get_objects(request, is_for="read")
+        qs = await self.aget_objects(request, is_for="read")
         matched_qs = qs.filter(**{f"{self.model_pk_name}__in": pks})
 
         existing_pks, detail_map = await self._resolve_existing_pks(

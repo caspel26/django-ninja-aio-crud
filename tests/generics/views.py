@@ -301,7 +301,7 @@ class Tests:
             cls.relation_pk = async_to_sync(cls._create_relation)(cls.relation_data)
             cls.relation_util = ModelUtil(cls.relation_viewset.model)
             cls.relation_request = cls.request.get(cls.relation_viewset.path)
-            cls.relation_obj = async_to_sync(cls.relation_util.get_object)(
+            cls.relation_obj = async_to_sync(cls.relation_util.aget_object)(
                 cls.relation_request, cls.relation_pk
             )
             cls.relation_read_s = async_to_sync(cls.relation_util.read_s)(

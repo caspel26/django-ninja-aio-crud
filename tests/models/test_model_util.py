@@ -142,7 +142,7 @@ class ModelUtilObjectsQueryDefaultTestCase(TestCase):
         request = mock.Mock()
 
         # Call get_objects with query_data=None (will use default ObjectsQuerySchema)
-        qs = await util.get_objects(request, query_data=None)
+        qs = await util.aget_objects(request, query_data=None)
 
         # Should return a queryset
         count = await qs.acount()
@@ -166,7 +166,7 @@ class ModelUtilQObjectFiltersTestCase(TestCase):
         request = mock.Mock()
         query_data = ObjectsQuerySchema(filters=Q(name="alpha"))
 
-        qs = await util.get_objects(request, query_data, with_qs_request=False)
+        qs = await util.aget_objects(request, query_data, with_qs_request=False)
         self.assertEqual(await qs.acount(), 1)
         self.assertEqual(await qs.afirst(), obj1)
 
@@ -181,7 +181,7 @@ class ModelUtilQObjectFiltersTestCase(TestCase):
         request = mock.Mock()
         query_data = ObjectsQuerySchema(filters=Q(name="alpha") | Q(name="beta"))
 
-        qs = await util.get_objects(request, query_data, with_qs_request=False)
+        qs = await util.aget_objects(request, query_data, with_qs_request=False)
         self.assertEqual(await qs.acount(), 2)
         results = [obj async for obj in qs]
         self.assertIn(obj1, results)
@@ -199,7 +199,7 @@ class ModelUtilQObjectFiltersTestCase(TestCase):
         request = mock.Mock()
         query_data = ObjectQuerySchema(getters=Q(name="target"))
 
-        result = await util.get_object(
+        result = await util.aget_object(
             request, pk=obj.pk, query_data=query_data, with_qs_request=False
         )
         self.assertEqual(result, obj)
@@ -215,7 +215,7 @@ class ModelUtilQObjectFiltersTestCase(TestCase):
         request = mock.Mock()
         query_data = ObjectQuerySchema(getters=Q(name="unique"))
 
-        result = await util.get_object(
+        result = await util.aget_object(
             request, pk=None, query_data=query_data, with_qs_request=False
         )
         self.assertEqual(result, obj)
@@ -231,7 +231,7 @@ class ModelUtilQObjectFiltersTestCase(TestCase):
         query_data = ObjectQuerySchema(getters=Q(name="nonexistent"))
 
         with self.assertRaises(NotFoundError):
-            await util.get_object(
+            await util.aget_object(
                 request, pk=None, query_data=query_data, with_qs_request=False
             )
 
@@ -302,7 +302,7 @@ class ModelUtilQuerysetOptimizationsPreservedTestCase(TestCase):
         util = models.TestModelSerializerForeignKey.util
         request = mock.Mock()
 
-        qs = await util.get_objects(request, is_for="read")
+        qs = await util.aget_objects(request, is_for="read")
 
         self.assertIn("test_model_serializer", qs.query.select_related)
 
@@ -313,7 +313,7 @@ class ModelUtilQuerysetOptimizationsPreservedTestCase(TestCase):
         util = models.TestModelSerializerForeignKey.util
         request = mock.Mock()
 
-        qs = await util.get_objects(request, is_for="read")
+        qs = await util.aget_objects(request, is_for="read")
         objs = [obj async for obj in qs]
 
         self.assertEqual(len(objs), 5)

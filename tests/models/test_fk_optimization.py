@@ -13,6 +13,7 @@ from asgiref.sync import async_to_sync
 from ninja import Schema
 
 from tests.test_app import models
+from tests.test_app.serializers import TestModelForeignKeySerializer
 from ninja_aio.models import ModelUtil
 
 
@@ -30,20 +31,20 @@ class _FKUpdateSchema(Schema):
 
 @contextmanager
 def _count_fk_resolutions(target_model):
-    """Patch ModelUtil.get_object to record every pk resolved for
+    """Patch ModelUtil.aget_object to record every pk resolved for
     `target_model`, without altering the real resolution behavior.
 
     Yields the list of resolved pks, appended to in call order.
     """
     resolved_pks = []
-    original_get_object = ModelUtil.get_object
+    original_get_object = ModelUtil.aget_object
 
     async def counting_get_object(self, request, pk=None, **kwargs):
         if self.model is target_model:
             resolved_pks.append(pk)
         return await original_get_object(self, request, pk=pk, **kwargs)
 
-    with mock.patch.object(ModelUtil, "get_object", counting_get_object):
+    with mock.patch.object(ModelUtil, "aget_object", counting_get_object):
         yield resolved_pks
 
 
@@ -69,6 +70,32 @@ class FKOptimizationTestCase(TestCase):
         self.request = HttpRequest()
         self.model_util = ModelUtil(models.TestModelSerializerForeignKey)
 
+    def test_sync_fk_uses_model_serializer_scope(self):
+        obj = self.model_util.create_instance(
+            self.request,
+            _FKCreateSchema(
+                name="sync-fk",
+                description="scoped model serializer",
+                test_model_serializer=self.rev_fk_1.pk,
+            ),
+        )
+
+        self.assertEqual(obj.test_model_serializer, self.rev_fk_1)
+
+    def test_sync_fk_uses_registered_serializer_scope(self):
+        parent = models.TestModelReverseForeignKey.objects.create(
+            name="parent", description="registered serializer"
+        )
+        obj = TestModelForeignKeySerializer.create(
+            {
+                "name": "sync-fk",
+                "description": "registered serializer",
+                "test_model_id": parent.pk,
+            }
+        )
+
+        self.assertEqual(obj.test_model, parent)
+
     @async_to_sync
     async def test_create_s_with_fk_returns_correct_data(self):
         """
@@ -92,9 +119,7 @@ class FKOptimizationTestCase(TestCase):
 
         read_schema = models.TestModelSerializerForeignKey.generate_read_s()
 
-        result = await self.model_util.create_s(
-            self.request, create_data, read_schema
-        )
+        result = await self.model_util.create_s(self.request, create_data, read_schema)
 
         # Verify result correctness
         self.assertEqual(result["name"], "test_fk")
@@ -130,9 +155,7 @@ class FKOptimizationTestCase(TestCase):
 
         read_schema = models.TestModelSerializerForeignKey.generate_read_s()
 
-        result = await self.model_util.create_s(
-            self.request, create_data, read_schema
-        )
+        result = await self.model_util.create_s(self.request, create_data, read_schema)
 
         # Verify FK data is in the result (not just the ID)
         self.assertIn("test_model_serializer", result)
@@ -269,9 +292,7 @@ class FKOptimizationTestCase(TestCase):
 
         read_schema = models.TestModelSerializerForeignKey.generate_read_s()
 
-        result = await self.model_util.create_s(
-            self.request, create_data, read_schema
-        )
+        result = await self.model_util.create_s(self.request, create_data, read_schema)
 
         # Verify forward FK is loaded
         self.assertEqual(result["test_model_serializer"]["id"], parent.id)
@@ -422,7 +443,9 @@ class BulkFKCacheOptimizationTestCase(TestCase):
         request = mock.Mock()
         data_list = [
             _FKCreateSchema(
-                name=f"item_{i}", description="d", test_model_serializer=self.rev_fk_1.id
+                name=f"item_{i}",
+                description="d",
+                test_model_serializer=self.rev_fk_1.id,
             )
             for i in range(10)
         ]
@@ -460,7 +483,9 @@ class BulkFKCacheOptimizationTestCase(TestCase):
 
         self.assertEqual(errors, [])
         self.assertEqual(len(success), 10)
-        self.assertEqual(sorted(resolved_pks), sorted([self.rev_fk_1.id, self.rev_fk_2.id]))
+        self.assertEqual(
+            sorted(resolved_pks), sorted([self.rev_fk_1.id, self.rev_fk_2.id])
+        )
 
     @async_to_sync
     async def test_bulk_update_dedupes_repeated_fk_resolution(self):
@@ -468,7 +493,9 @@ class BulkFKCacheOptimizationTestCase(TestCase):
         that FK once, not once per item."""
         objs = [
             await models.TestModelSerializerForeignKey.objects.acreate(
-                name=f"existing_{i}", description="d", test_model_serializer=self.rev_fk_1
+                name=f"existing_{i}",
+                description="d",
+                test_model_serializer=self.rev_fk_1,
             )
             for i in range(5)
         ]

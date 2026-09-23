@@ -308,6 +308,24 @@ entries marked "remove" before the final release.
 | `ModelSerializer.as_admin()` | Keep |
 | Django model `save()`/`delete()` | Keep Django behavior unchanged |
 
+## Generated API execution mode
+
+`APIViewSet.execution_mode` selects `"sync"` or `"async"` for the generated
+HTTP endpoints of a viewset. The default remains `"async"` so existing routes
+retain their execution behavior. Sync mode registers regular Django Ninja view
+functions and uses native synchronous serializer/ORM operations; async mode
+registers coroutine view functions and uses their `a`-prefixed counterparts.
+The selection applies to generated CRUD, bulk, and M2M endpoints together; it
+must not silently mix modes or wrap an entire endpoint in `async_to_sync()` or
+`sync_to_async()`. Custom `APIView` routes continue to use the `def` or
+`async def` declared by their author.
+
+Both modes preserve the same HTTP paths, schemas, status codes, authorization,
+filtering, pagination, error responses, and OpenAPI operation IDs. Viewset
+hooks and decorators must execute in the selected mode with equivalent ordering
+and transaction semantics. Sync mode becomes available only after synchronous
+serialization, bulk operations, and hook parity are implemented and tested.
+
 ## Stability rules
 
 - Public names are documented and exported deliberately; lack of a leading

@@ -116,3 +116,16 @@ Step 4 added the asynchronous serializer facade with these query counts:
 The loaded-target paths deliberately avoid a redundant lookup. After Step 4,
 the broader non-performance regression suite completed with 1,172 passing
 tests.
+
+Step 5 added native synchronous serializer CRUD with the same query counts:
+
+| Version 3 sync operation | Primary-key target | Loaded target |
+| --- | ---: | ---: |
+| `create()` | 1 | N/A |
+| `get()` | 1 | N/A |
+| `update()` | 2 | 1 |
+| `destroy()` | 2 | 1 |
+
+The synchronous executor uses Django's synchronous ORM directly. Its internal
+counterparts are `get_object()` and `get_objects()`; asynchronous retrieval is
+explicitly named `aget_object()` and `aget_objects()`.

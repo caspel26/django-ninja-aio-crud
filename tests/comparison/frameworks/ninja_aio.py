@@ -118,7 +118,7 @@ class NinjaAIOBenchmark(FrameworkBenchmark):
         util = ModelUtil(TestModelSerializerForeignKey)
         schema = TestModelSerializerForeignKey.generate_read_s()
         # Your framework's QuerySet config automatically handles select_related
-        instance = await util.get_object(self.request.get(), item_id, is_for="read")
+        instance = await util.aget_object(self.request.get(), item_id, is_for="read")
         return await util.read_s(
             schema=schema,
             request=self.request.get(),
@@ -136,7 +136,7 @@ class NinjaAIOBenchmark(FrameworkBenchmark):
         util = ModelUtil(TestModelSerializerReverseForeignKey)
         schema = TestModelSerializerReverseForeignKey.generate_read_s()
         # Your framework's _prefetch_reverse_relations handles this automatically
-        instance = await util.get_object(self.request.get(), item_id, is_for="read")
+        instance = await util.aget_object(self.request.get(), item_id, is_for="read")
         return await util.read_s(
             schema=schema,
             request=self.request.get(),
@@ -152,7 +152,7 @@ class NinjaAIOBenchmark(FrameworkBenchmark):
 
         util = ModelUtil(TestModelSerializerManyToMany)
         schema = TestModelSerializerManyToMany.generate_read_s()
-        instance = await util.get_object(self.request.get(), item_id, is_for="read")
+        instance = await util.aget_object(self.request.get(), item_id, is_for="read")
         return await util.read_s(
             schema=schema,
             request=self.request.get(),

@@ -25,7 +25,7 @@ class ActionTestViewSet(APIViewSet):
 
     @action(detail=True, methods=["post"], url_path="activate")
     async def activate(self, request, pk):
-        obj = await self.model_util.get_object(request, pk)
+        obj = await self.model_util.aget_object(request, pk)
         obj.name = f"{obj.name}_activated"
         await obj.asave()
         return Status(200, {"message": "activated"})

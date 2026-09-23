@@ -314,7 +314,7 @@ class ManyToManyAPI:
         else:
             # No custom handler: single batched query for all PKs
             pk_name = pk_field.attname
-            qs = await ModelUtil(related_model).get_objects(request)
+            qs = await ModelUtil(related_model).aget_objects(request)
             resolved = {}
             async for obj in qs.filter(**{f"{pk_name}__in": objs_pks}):
                 resolved[obj.pk] = obj
@@ -419,7 +419,7 @@ class ManyToManyAPI:
             if not isinstance(ninja_pagination, _input_class):
                 ninja_pagination = _default_pagination
 
-            obj = await self.related_model_util.get_object(
+            obj = await self.related_model_util.aget_object(
                 request, self.view_set._get_pk(pk)
             )
             related_manager = getattr(obj, related_name)
@@ -479,7 +479,7 @@ class ManyToManyAPI:
             pk: Path[self.path_schema],  # type: ignore
             data: schema_in,  # type: ignore
         ):
-            obj = await self.related_model_util.get_object(
+            obj = await self.related_model_util.aget_object(
                 request, self.view_set._get_pk(pk)
             )
             related_manager: QuerySet = getattr(obj, related_name)

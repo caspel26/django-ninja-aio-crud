@@ -705,7 +705,7 @@ class SoftDeleteViewSetMixin(APIViewSet[ModelT]):
             _pk = self._get_pk(pk)
             obj = await self._run_object_hooks(request, "delete", _pk)
             if obj is None:
-                obj = await self.model_util.get_object(request, _pk)
+                obj = await self.model_util.aget_object(request, _pk)
             setattr(obj, self.soft_delete_field, True)
             await obj.asave(update_fields=[self.soft_delete_field])
             return Status(204, None)
@@ -735,7 +735,7 @@ class SoftDeleteViewSetMixin(APIViewSet[ModelT]):
             if not pks:
                 return Status(200, self._bulk_result([], []))
 
-            qs = await self.model_util.get_objects(request, is_for="read")
+            qs = await self.model_util.aget_objects(request, is_for="read")
             matched_qs = qs.filter(
                 **{f"{self.model_util.model_pk_name}__in": pks}
             )
@@ -784,7 +784,7 @@ class SoftDeleteViewSetMixin(APIViewSet[ModelT]):
         async def restore(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
             await self.on_before_operation(request, "restore")
             _pk = self._get_pk(pk)
-            obj = await self.model_util.get_object(request, _pk)
+            obj = await self.model_util.aget_object(request, _pk)
             setattr(obj, self.soft_delete_field, False)
             await obj.asave(update_fields=[self.soft_delete_field])
             return Status(
@@ -890,7 +890,7 @@ class FieldSelectionViewSetMixin(APIViewSet[ModelT]):
 
             await self.on_before_operation(request, "list")
 
-            qs = await self.model_util.get_objects(
+            qs = await self.model_util.aget_objects(
                 request, query_data=self._get_query_data(), is_for="read",
             )
             qs = self.on_list_queryset(request, qs)

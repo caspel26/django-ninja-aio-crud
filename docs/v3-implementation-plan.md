@@ -623,10 +623,16 @@ Each step must leave the branch in a coherent, testable state.
 
 ### Step 10: Migrate generated viewsets
 
-- Switch CRUD and bulk views to the async serializer facade.
+- Add `APIViewSet.execution_mode = "async" | "sync"`, defaulting to `"async"`;
+   use the selected mode for generated CRUD, bulk, and M2M endpoints.
+- Switch async CRUD and bulk views to the async serializer facade; implement
+   sync views with native synchronous serializer/ORM operations, without wrapping
+   whole views in sync/async adapters.
 - Remove routine `model_util` use from view code.
-- Verify response schemas, status codes, permissions, filters, pagination,
-  field selection, soft delete, and OpenAPI snapshots.
+- Verify matching response schemas, status codes, permissions, filters,
+   pagination, field selection, soft delete, hook/transaction behavior, and
+   OpenAPI snapshots in both modes. Keep custom `APIView` handlers selectable
+   through their existing `def`/`async def` declarations.
 
 ### Step 11: Migrate framework integrations
 

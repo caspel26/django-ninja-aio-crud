@@ -31,9 +31,19 @@ class V2QueryCountBaselineTests(TestCase):
         )
         return result
 
+    def assertSyncQueryCount(self, expected, operation):
+        with CaptureQueriesContext(connection) as queries:
+            result = operation()
+        self.assertEqual(
+            len(queries),
+            expected,
+            msg="\n".join(query["sql"] for query in queries.captured_queries),
+        )
+        return result
+
     def test_get_object_query_count(self):
         async def operation():
-            return await self.util.get_object(self.request.get(), self.obj.pk)
+            return await self.util.aget_object(self.request.get(), self.obj.pk)
 
         self.assertAsyncQueryCount(1, operation)
 
@@ -148,3 +158,48 @@ class V2QueryCountBaselineTests(TestCase):
             return await TestModelSerializer.adestroy(doomed)
 
         self.assertAsyncQueryCount(1, operation)
+
+    def test_sync_facade_create_query_count(self):
+        self.assertSyncQueryCount(
+            1,
+            lambda: TestModelSerializer.create(
+                {"name": "facade-create-sync", "description": "facade-create-sync"}
+            ),
+        )
+
+    def test_sync_facade_get_query_count(self):
+        self.assertSyncQueryCount(1, lambda: TestModelSerializer.get(self.obj.pk))
+
+    def test_sync_facade_update_by_pk_query_count(self):
+        self.assertSyncQueryCount(
+            2,
+            lambda: TestModelSerializer.update(
+                self.obj.pk,
+                {"description": "facade-update-pk-sync"},
+            ),
+        )
+
+    def test_sync_facade_update_loaded_instance_query_count(self):
+        self.assertSyncQueryCount(
+            1,
+            lambda: TestModelSerializer.update(
+                self.obj,
+                {"description": "facade-update-instance-sync"},
+            ),
+        )
+
+    def test_sync_facade_destroy_by_pk_query_count(self):
+        doomed = TestModelSerializer.objects.create(
+            name="facade-destroy-pk-sync",
+            description="facade-destroy-pk-sync",
+        )
+
+        self.assertSyncQueryCount(2, lambda: TestModelSerializer.destroy(doomed.pk))
+
+    def test_sync_facade_destroy_loaded_instance_query_count(self):
+        doomed = TestModelSerializer.objects.create(
+            name="facade-destroy-instance-sync",
+            description="facade-destroy-instance-sync",
+        )
+
+        self.assertSyncQueryCount(1, lambda: TestModelSerializer.destroy(doomed))

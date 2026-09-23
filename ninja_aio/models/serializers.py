@@ -114,6 +114,19 @@ class _LazySchemaAttribute:
         return serializer_class.get_schema(self.kind)
 
 
+class _ClassOrInstanceOperation:
+    """Expose a class-level v3 operation and retain an instance-level v2 helper."""
+
+    def __init__(self, class_method: str, instance_method: str) -> None:
+        self.class_method = class_method
+        self.instance_method = instance_method
+
+    def __get__(self, instance: object | None, owner: type) -> Any:
+        if instance is None:
+            return getattr(owner, self.class_method)
+        return getattr(instance, self.instance_method)
+
+
 def _extract_pk(v: Any) -> Any:
     """Extract primary key from a model instance or return value as-is."""
     if hasattr(v, "pk"):
@@ -1608,6 +1621,16 @@ class BaseSerializer:
             raise TypeError("target must be a model instance or primary key")
         return target, None
 
+    @staticmethod
+    def _operation_lookup_query(
+        pk: PrimaryKey | None, lookups: dict[str, Any]
+    ) -> ObjectQuerySchema | None:
+        if pk is None and not lookups:
+            raise ValueError("Exactly one of pk or keyword lookups must be provided")
+        if pk is not None and lookups:
+            raise ValueError("pk and keyword lookups cannot be combined")
+        return ObjectQuerySchema(getters=lookups) if lookups else None
+
     @classmethod
     async def _acreate_operation(
         cls,
@@ -1628,15 +1651,10 @@ class BaseSerializer:
         lookups: dict[str, Any],
     ) -> models.Model:
         """Execute one request-aware asynchronous lookup."""
-        if pk is None and not lookups:
-            raise ValueError("Exactly one of pk or keyword lookups must be provided")
-        if pk is not None and lookups:
-            raise ValueError("pk and keyword lookups cannot be combined")
-        query_data = ObjectQuerySchema(getters=lookups) if lookups else None
-        return await cls.util.get_object(
+        return await cls.util.aget_object(
             request,
             pk=pk,
-            query_data=query_data,
+            query_data=cls._operation_lookup_query(pk, lookups),
         )
 
     @classmethod
@@ -1667,6 +1685,61 @@ class BaseSerializer:
         """Execute asynchronous deletion without refetching loaded targets."""
         pk, instance = cls._resolve_operation_target(target)
         await cls.util.delete_s(request, pk, instance=instance)
+
+    @classmethod
+    def _create_operation(
+        cls,
+        data: InputData,
+        *,
+        request: HttpRequest | None,
+    ) -> models.Model:
+        """Execute synchronous creation for a concrete serializer class."""
+        return cls.util.create_instance(
+            request, cls._validate_operation_data("create", data)
+        )
+
+    @classmethod
+    def _get_operation(
+        cls,
+        pk: PrimaryKey | None,
+        *,
+        request: HttpRequest | None,
+        lookups: dict[str, Any],
+    ) -> models.Model:
+        """Execute one request-aware synchronous lookup."""
+        return cls.util.get_object(
+            request,
+            pk=pk,
+            query_data=cls._operation_lookup_query(pk, lookups),
+        )
+
+    @classmethod
+    def _update_operation(
+        cls,
+        target: models.Model | PrimaryKey,
+        data: InputData,
+        *,
+        request: HttpRequest | None,
+    ) -> models.Model:
+        """Execute synchronous update without refetching loaded targets."""
+        pk, instance = cls._resolve_operation_target(target)
+        return cls.util.update_instance(
+            request,
+            cls._validate_operation_data("update", data),
+            pk,
+            instance=instance,
+        )
+
+    @classmethod
+    def _destroy_operation(
+        cls,
+        target: models.Model | PrimaryKey,
+        *,
+        request: HttpRequest | None,
+    ) -> None:
+        """Execute synchronous deletion without refetching loaded targets."""
+        pk, instance = cls._resolve_operation_target(target)
+        cls.util.destroy_instance(request, pk, instance=instance)
 
     @classmethod
     async def queryset_request(
@@ -1723,6 +1796,54 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
 
     class Meta:
         abstract = True
+
+    @classmethod
+    def create(
+        cls: type[ModelSerializerT],
+        data: InputData,
+        *,
+        request: HttpRequest | None = None,
+    ) -> ModelSerializerT:
+        """Create and return one model instance synchronously."""
+        return cast(ModelSerializerT, cls._create_operation(data, request=request))
+
+    @classmethod
+    def get(
+        cls: type[ModelSerializerT],
+        pk: PrimaryKey | None = None,
+        *,
+        request: HttpRequest | None = None,
+        **lookups: Any,
+    ) -> ModelSerializerT:
+        """Retrieve and return one model instance synchronously."""
+        return cast(
+            ModelSerializerT,
+            cls._get_operation(pk, request=request, lookups=lookups),
+        )
+
+    @classmethod
+    def update(
+        cls: type[ModelSerializerT],
+        target: ModelSerializerT | PrimaryKey,
+        data: InputData,
+        *,
+        request: HttpRequest | None = None,
+    ) -> ModelSerializerT:
+        """Update and return one model instance synchronously."""
+        return cast(
+            ModelSerializerT,
+            cls._update_operation(target, data, request=request),
+        )
+
+    @classmethod
+    def destroy(
+        cls: type[ModelSerializerT],
+        target: ModelSerializerT | PrimaryKey,
+        *,
+        request: HttpRequest | None = None,
+    ) -> None:
+        """Destroy one model instance synchronously."""
+        cls._destroy_operation(target, request=request)
 
     @classmethod
     async def acreate(
@@ -2222,6 +2343,16 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
             scope=cls.query_util.SCOPES.QUERYSET_REQUEST,
         )
 
+    @classmethod
+    def queryset_request_sync(
+        cls, request: HttpRequest | None
+    ) -> models.QuerySet["ModelSerializer"]:
+        """Synchronous counterpart for request-scoped query construction."""
+        return cls.query_util.apply_queryset_optimizations(
+            queryset=cls.objects.all(),
+            scope=cls.query_util.SCOPES.QUERYSET_REQUEST,
+        )
+
     async def post_create(self) -> None:
         """
         Async hook executed after first persistence (create path).
@@ -2237,6 +2368,14 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
         payload : dict
             Custom field name/value pairs.
         """
+        pass
+
+    def post_create_sync(self) -> None:
+        """Synchronous counterpart for post-create lifecycle work."""
+        pass
+
+    def custom_actions_sync(self, payload: dict[str, Any]) -> None:
+        """Synchronous counterpart for custom field handling."""
         pass
 
     def after_save(self):
@@ -2434,6 +2573,51 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
             ``None`` (no bound instance).
         """
         self.instance = instance
+
+    @classmethod
+    def _create_sync(
+        cls: type["Serializer[ModelT]"],
+        data: InputData,
+        *,
+        request: HttpRequest | None = None,
+    ) -> ModelT:
+        """Create and return one model instance synchronously."""
+        return cast(ModelT, cls._create_operation(data, request=request))
+
+    @classmethod
+    def get(
+        cls: type["Serializer[ModelT]"],
+        pk: PrimaryKey | None = None,
+        *,
+        request: HttpRequest | None = None,
+        **lookups: Any,
+    ) -> ModelT:
+        """Retrieve and return one model instance synchronously."""
+        return cast(ModelT, cls._get_operation(pk, request=request, lookups=lookups))
+
+    @classmethod
+    def _update_sync(
+        cls: type["Serializer[ModelT]"],
+        target: ModelT | PrimaryKey,
+        data: InputData,
+        *,
+        request: HttpRequest | None = None,
+    ) -> ModelT:
+        """Update and return one model instance synchronously."""
+        return cast(ModelT, cls._update_operation(target, data, request=request))
+
+    @classmethod
+    def destroy(
+        cls: type["Serializer[ModelT]"],
+        target: ModelT | PrimaryKey,
+        *,
+        request: HttpRequest | None = None,
+    ) -> None:
+        """Destroy one model instance synchronously."""
+        cls._destroy_operation(target, request=request)
+
+    create = _ClassOrInstanceOperation("_create_sync", "_create_legacy")
+    update = _ClassOrInstanceOperation("_update_sync", "_update_legacy")
 
     @classmethod
     async def acreate(
@@ -2753,6 +2937,16 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
             scope=cls.query_util.SCOPES.QUERYSET_REQUEST,
         )
 
+    @classmethod
+    def queryset_request_sync(
+        cls, request: HttpRequest | None
+    ) -> models.QuerySet[ModelT]:
+        """Synchronous counterpart for request-scoped query construction."""
+        return cls.query_util.apply_queryset_optimizations(
+            queryset=cls.model._default_manager.all(),
+            scope=cls.query_util.SCOPES.QUERYSET_REQUEST,
+        )
+
     def has_changed(self, field: str, instance: Optional[ModelT] = None) -> bool:
         """
         Check if a model field has changed compared to the persisted value.
@@ -2823,6 +3017,16 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         """
         pass
 
+    def post_create_sync(self, instance: models.Model) -> None:
+        """Synchronous counterpart for post-create lifecycle work."""
+        pass
+
+    def custom_actions_sync(
+        self, payload: dict[str, Any], instance: models.Model
+    ) -> None:
+        """Synchronous counterpart for custom field handling."""
+        pass
+
     async def save(self, instance: Optional[ModelT] = None) -> ModelT:
         """
         Async helper to save a model instance with lifecycle hooks.
@@ -2871,7 +3075,7 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
 
         return instance
 
-    async def create(self, payload: dict[str, Any] | Schema) -> ModelT:
+    async def _create_legacy(self, payload: dict[str, Any] | Schema) -> ModelT:
         """
         Create a new model instance from the provided payload.
 
@@ -2888,7 +3092,7 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         instance: ModelT = self.model(**self._parse_payload(payload))
         return await self.save(instance)
 
-    async def update(
+    async def _update_legacy(
         self,
         payload: dict[str, Any] | Schema,
         instance: Optional[ModelT] = None,

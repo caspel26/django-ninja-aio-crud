@@ -113,7 +113,7 @@ class Tests:
 
         async def test_get_object_not_found(self):
             with self.assertRaises(NotFoundError) as exc:
-                await self.model_util.get_object(self.request.get(), 0)
+                await self.model_util.aget_object(self.request.get(), 0)
             self.assertEqual(
                 exc.exception.error,
                 {self.model._meta.verbose_name.replace(" ", "_"): NOT_FOUND},
@@ -126,7 +126,7 @@ class Tests:
         )
         async def test_get_object(self, mock_queryset_request: mock.AsyncMock):
             mock_queryset_request.return_value = self.model.objects.select_related()
-            obj = await self.model_util.get_object(self.request.get(), self.obj.pk)
+            obj = await self.model_util.aget_object(self.request.get(), self.obj.pk)
             self.assertEqual(obj, self.obj)
             if isinstance(self.model, ModelSerializerMeta):
                 mock_queryset_request.assert_awaited_once()
@@ -143,7 +143,7 @@ class Tests:
             mock_queryset_request.return_value = (
                 self.model.objects.select_related().all()
             )
-            obj = await self.model_util.get_object(
+            obj = await self.model_util.aget_object(
                 self.request.get(),
                 query_data=QuerySchema(
                     filters=self.additional_filters, getters=self.additional_getters
@@ -222,7 +222,7 @@ class Tests:
                 await self.model_util.read_s(None, self.request.get(), self.obj)
 
         async def test_get_object_filters_and_getters(self):
-            obj = await self.model_util.get_object(
+            obj = await self.model_util.aget_object(
                 self.request.get(),
                 query_data=QuerySchema(filters={}, getters={self.pk_att: self.obj.pk}),
             )
@@ -230,7 +230,7 @@ class Tests:
 
         async def test_get_object_not_found_with_getters(self):
             with self.assertRaises(NotFoundError):
-                await self.model_util.get_object(
+                await self.model_util.aget_object(
                     self.request.get(),
                     query_data=QuerySchema(getters={self.pk_att: 999999}),
                 )
@@ -242,7 +242,7 @@ class Tests:
                 ValueError,
                 msg="Either pk or getters must be provided for single object retrieval.",
             ):
-                await self.model_util.get_object(
+                await self.model_util.aget_object(
                     self.request.get(),
                     query_data=QuerySchema(),
                     with_qs_request=False,
@@ -255,7 +255,7 @@ class Tests:
                 "ninja_aio.models.ModelSerializer.queryset_request",
                 new_callable=mock.AsyncMock,
             ) as m_qs:
-                await self.model_util.get_object(
+                await self.model_util.aget_object(
                     self.request.get(),
                     self.obj.pk,
                     query_data=QuerySchema(),
@@ -284,7 +284,7 @@ class Tests:
                     autospec=True,
                 ) as m_pref,
             ):
-                await self.model_util.get_object(
+                await self.model_util.aget_object(
                     self.request.get(),
                     query_data=query_data,
                     is_for="read",

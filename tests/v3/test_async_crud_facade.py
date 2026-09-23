@@ -78,7 +78,7 @@ class AsyncCrudFacadeContractMixin:
 
         with mock.patch.object(
             self.serializer_class.util,
-            "get_object",
+            "aget_object",
             side_effect=AssertionError("loaded instances must not be refetched"),
         ):
             updated = await self.serializer_class.aupdate(
@@ -123,7 +123,7 @@ class AsyncCrudFacadeContractMixin:
 
         with mock.patch.object(
             self.serializer_class.util,
-            "get_object",
+            "aget_object",
             side_effect=AssertionError("loaded instances must not be refetched"),
         ):
             result = await self.serializer_class.adestroy(obj)
