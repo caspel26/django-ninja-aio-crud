@@ -94,3 +94,57 @@ class V2QueryCountBaselineTests(TestCase):
             )
 
         self.assertAsyncQueryCount(1, operation)
+
+    def test_async_facade_create_query_count(self):
+        async def operation():
+            return await TestModelSerializer.acreate(
+                {"name": "facade-create", "description": "facade-create"}
+            )
+
+        self.assertAsyncQueryCount(1, operation)
+
+    def test_async_facade_get_query_count(self):
+        async def operation():
+            return await TestModelSerializer.aget(self.obj.pk)
+
+        self.assertAsyncQueryCount(1, operation)
+
+    def test_async_facade_update_by_pk_query_count(self):
+        async def operation():
+            return await TestModelSerializer.aupdate(
+                self.obj.pk,
+                {"description": "facade-update-pk"},
+            )
+
+        self.assertAsyncQueryCount(2, operation)
+
+    def test_async_facade_update_loaded_instance_query_count(self):
+        async def operation():
+            return await TestModelSerializer.aupdate(
+                self.obj,
+                {"description": "facade-update-instance"},
+            )
+
+        self.assertAsyncQueryCount(1, operation)
+
+    def test_async_facade_destroy_by_pk_query_count(self):
+        doomed = TestModelSerializer.objects.create(
+            name="facade-destroy-pk",
+            description="facade-destroy-pk",
+        )
+
+        async def operation():
+            return await TestModelSerializer.adestroy(doomed.pk)
+
+        self.assertAsyncQueryCount(2, operation)
+
+    def test_async_facade_destroy_loaded_instance_query_count(self):
+        doomed = TestModelSerializer.objects.create(
+            name="facade-destroy-instance",
+            description="facade-destroy-instance",
+        )
+
+        async def operation():
+            return await TestModelSerializer.adestroy(doomed)
+
+        self.assertAsyncQueryCount(1, operation)

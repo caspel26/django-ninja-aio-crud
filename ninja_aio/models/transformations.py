@@ -7,7 +7,7 @@ executor introduced by version 3.
 
 import base64
 from dataclasses import dataclass
-from typing import Any, Iterable, Mapping, Protocol, Sequence, TypeAlias, TypeVar
+from typing import Any, Iterable, Mapping, Protocol, Sequence, TypeVar
 
 from django.db import models
 from django.db.models.fields.related_descriptors import (
@@ -22,11 +22,10 @@ from ninja import Schema
 
 from ninja_aio.exceptions import SerializeError
 from ninja_aio.schemas.helpers import QuerySchema
+from ninja_aio.types import Payload, PrimaryKey, SchemaType
 
 
 ModelT = TypeVar("ModelT", bound=models.Model)
-Payload: TypeAlias = dict[str, Any]
-SchemaType: TypeAlias = type[Schema]
 
 
 class FieldPolicy(Protocol):
@@ -129,7 +128,7 @@ def resolve_model_fields(
 
 def build_lookup_query(
     pk_name: str,
-    pk: int | str | None = None,
+    pk: PrimaryKey | None = None,
     getters: Mapping[str, Any] | None = None,
 ) -> Payload:
     """Build lookup criteria without evaluating a queryset."""

@@ -15,7 +15,11 @@ from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist
 from asgiref.sync import sync_to_async
 from ninja_aio.exceptions import SerializeError, NotFoundError
 from ninja_aio.decorators.views import AsyncAtomicContextManager
-from ninja_aio.types import ModelSerializerMeta, get_ninja_aio_meta_attr
+from ninja_aio.types import (
+    ModelSerializerMeta,
+    PrimaryKey,
+    get_ninja_aio_meta_attr,
+)
 
 from ninja_aio.schemas.helpers import (
     ModelQuerySetSchema,
@@ -47,7 +51,9 @@ logger = logging.getLogger("ninja_aio.models")
 _SERIALIZER_REGISTRY: dict[type[models.Model], type] = {}
 
 
-def register_serializer_for_model(model: type[models.Model], serializer_cls: type) -> None:
+def register_serializer_for_model(
+    model: type[models.Model], serializer_cls: type
+) -> None:
     """Register *serializer_cls* as the FK-resolution scope for *model*.
 
     Called automatically by `ModelSerializer` and `Serializer` subclasses.
@@ -388,7 +394,7 @@ class ModelUtil(Generic[ModelT]):
 
     async def _get_base_queryset(
         self,
-        request: HttpRequest,
+        request: HttpRequest | None,
         query_data: QuerySchema,
         with_qs_request: bool,
         is_for: Literal["read", "detail"] | None = None,
@@ -444,7 +450,7 @@ class ModelUtil(Generic[ModelT]):
 
     async def get_objects(
         self,
-        request: HttpRequest,
+        request: HttpRequest | None,
         query_data: ObjectsQuerySchema = None,
         with_qs_request=True,
         is_for: Literal["read", "detail"] | None = None,
@@ -489,8 +495,8 @@ class ModelUtil(Generic[ModelT]):
 
     async def get_object(
         self,
-        request: HttpRequest,
-        pk: int | str = None,
+        request: HttpRequest | None,
+        pk: PrimaryKey | None = None,
         query_data: ObjectQuerySchema = None,
         with_qs_request=True,
         is_for: Literal["read", "detail"] | None = None,
@@ -572,7 +578,7 @@ class ModelUtil(Generic[ModelT]):
 
     def _build_lookup_query(
         self,
-        pk: int | str | None = None,
+        pk: PrimaryKey | None = None,
         getters: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """
@@ -844,7 +850,7 @@ class ModelUtil(Generic[ModelT]):
 
     async def _handle_query_mode(
         self,
-        request: HttpRequest,
+        request: HttpRequest | None,
         query_data: QuerySchema,
         schema: Schema,
         is_for: Literal["read", "detail"] | None = None,
@@ -864,7 +870,7 @@ class ModelUtil(Generic[ModelT]):
 
     async def _serialize_queryset(
         self,
-        request: HttpRequest,
+        request: HttpRequest | None,
         query_data: QuerySchema,
         schema: Schema,
         is_for: Literal["read", "detail"] | None = None,
@@ -875,7 +881,7 @@ class ModelUtil(Generic[ModelT]):
 
     async def _serialize_single_object(
         self,
-        request: HttpRequest,
+        request: HttpRequest | None,
         query_data: QuerySchema,
         obj_schema: Schema,
         is_for: Literal["read", "detail"] | None = None,
@@ -945,7 +951,7 @@ class ModelUtil(Generic[ModelT]):
 
     async def _resolve_fk(
         self,
-        request: HttpRequest,
+        request: HttpRequest | None,
         payload: dict,
         k: str,
         v: Any,
@@ -993,9 +999,7 @@ class ModelUtil(Generic[ModelT]):
 
         if isinstance(rel_model, ModelSerializerMeta):
             payload[k] = await ModelUtil(rel_model).get_object(request, pk=v)
-        elif (
-            rel_serializer_cls := get_serializer_for_model(rel_model)
-        ) is not None:
+        elif (rel_serializer_cls := get_serializer_for_model(rel_model)) is not None:
             payload[k] = await ModelUtil(
                 rel_model, serializer_class=rel_serializer_cls
             ).get_object(request, pk=v)
@@ -1010,7 +1014,7 @@ class ModelUtil(Generic[ModelT]):
 
     async def _process_payload_fields(
         self,
-        request: HttpRequest,
+        request: HttpRequest | None,
         payload: dict,
         fields_to_process: list[tuple[str, Any]],
         fk_cache: dict[tuple[type, Any], Any] | None = None,
@@ -1062,7 +1066,7 @@ class ModelUtil(Generic[ModelT]):
 
     async def parse_input_data(
         self,
-        request: HttpRequest,
+        request: HttpRequest | None,
         data: Schema,
         fk_cache: dict[tuple[type, Any], Any] | None = None,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -1118,11 +1122,11 @@ class ModelUtil(Generic[ModelT]):
 
     async def _create_instance(
         self,
-        request: HttpRequest,
+        request: HttpRequest | None,
         data: Schema,
         fk_cache: dict[tuple[type, Any], Any] | None = None,
         extra_fields: dict[str, Any] | None = None,
-    ):
+    ) -> ModelT:
         """Create an owned object graph atomically, including direct/bulk calls."""
         if not self.nested_fields:
             return await self._persist_instance(request, data, fk_cache, extra_fields)
@@ -1154,11 +1158,11 @@ class ModelUtil(Generic[ModelT]):
 
     async def _persist_instance(
         self,
-        request: HttpRequest,
+        request: HttpRequest | None,
         data: Schema,
         fk_cache: dict[tuple[type, Any], Any] | None = None,
         extra_fields: dict[str, Any] | None = None,
-    ):
+    ) -> ModelT:
         """
         Create a new instance and run hooks.
 
@@ -1398,12 +1402,13 @@ class ModelUtil(Generic[ModelT]):
 
     async def _update_instance(
         self,
-        request: HttpRequest,
+        request: HttpRequest | None,
         data: Schema,
-        pk: int | str,
+        pk: PrimaryKey,
         require_fields: bool = False,
         fk_cache: dict[tuple[type, Any], Any] | None = None,
-    ):
+        instance: ModelT | None = None,
+    ) -> ModelT:
         """
         Update an existing instance and run hooks.
 
@@ -1429,11 +1434,18 @@ class ModelUtil(Generic[ModelT]):
             The updated model instance.
         """
         from ninja_aio.models.hooks import (
-            suppress_signals, get_hooks, detect_changed_fields, fire_update_hooks,
+            suppress_signals,
+            get_hooks,
+            detect_changed_fields,
+            fire_update_hooks,
         )
 
         logger.info(f"Updating {self.model.__name__} (pk={pk})")
-        obj = await self.get_object(request, pk, is_for="read")
+        obj = (
+            instance
+            if instance is not None
+            else await self.get_object(request, pk, is_for="read")
+        )
         payload, customs = await self.parse_input_data(request, data, fk_cache)
         if require_fields and not payload and not customs:
             raise SerializeError("No fields provided for update.")
@@ -1501,7 +1513,10 @@ class ModelUtil(Generic[ModelT]):
         return await self.read_s(obj_schema, request, updated_object)
 
     async def delete_s(
-        self, request: HttpRequest, pk: int | str, instance: ModelT | None = None
+        self,
+        request: HttpRequest | None,
+        pk: PrimaryKey,
+        instance: ModelT | None = None,
     ):
         """
         Delete an instance by primary key.
@@ -1522,7 +1537,9 @@ class ModelUtil(Generic[ModelT]):
         None
         """
         from ninja_aio.models.hooks import (
-            suppress_signals, get_hooks, execute_reactive_hooks,
+            suppress_signals,
+            get_hooks,
+            execute_reactive_hooks,
         )
 
         logger.info(f"Deleting {self.model.__name__} (pk={pk})")
@@ -1680,15 +1697,11 @@ class ModelUtil(Generic[ModelT]):
         """
         if not detail_fields:
             existing_pks: set = set()
-            async for pk_val in matched_qs.values_list(
-                self.model_pk_name, flat=True
-            ):
+            async for pk_val in matched_qs.values_list(self.model_pk_name, flat=True):
                 existing_pks.add(pk_val)
             return existing_pks, {}
 
-        fields_with_pk = list(
-            dict.fromkeys([self.model_pk_name] + detail_fields)
-        )
+        fields_with_pk = list(dict.fromkeys([self.model_pk_name] + detail_fields))
         detail_map: dict = {}
         single_field = len(detail_fields) == 1
         async for row in matched_qs.values(*fields_with_pk):
@@ -1749,19 +1762,13 @@ class ModelUtil(Generic[ModelT]):
         )
 
         error_details = [
-            NotFoundError(self.model).error
-            for pk in pks
-            if pk not in existing_pks
+            NotFoundError(self.model).error for pk in pks if pk not in existing_pks
         ]
 
         success_details: list = []
         if existing_pks:
-            await qs.filter(
-                **{f"{self.model_pk_name}__in": existing_pks}
-            ).adelete()
-            success_details = self._build_success_details(
-                pks, existing_pks, detail_map
-            )
+            await qs.filter(**{f"{self.model_pk_name}__in": existing_pks}).adelete()
+            success_details = self._build_success_details(pks, existing_pks, detail_map)
 
         logger.debug(
             f"Bulk delete {self.model.__name__}: "

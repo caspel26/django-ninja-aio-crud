@@ -43,23 +43,28 @@ from ninja_aio.types import (
     S_TYPES,
     F_TYPES,
     SCHEMA_TYPES,
+    InputData,
     ModelSerializerMeta,
+    PrimaryKey,
+    SchemaKind,
+    SchemaType,
     SerializerMeta,
     get_ninja_aio_meta_attr,
 )
 from ninja_aio.schemas.helpers import (
     ModelQuerySetSchema,
     ModelQuerySetExtraSchema,
+    ObjectQuerySchema,
 )
 from ninja_aio.models import transformations as model_transformations
+from ninja_aio.models.utils import ModelUtil
 
 # TypeVar for generic model typing in Serializers
 ModelT = TypeVar("ModelT", bound=models.Model)
+ModelSerializerT = TypeVar("ModelSerializerT", bound="ModelSerializer")
 
 _nested_schema_state = threading.local()
 
-SchemaKind: TypeAlias = Literal["create", "update", "read", "detail", "related"]
-SchemaType: TypeAlias = type[Schema]
 SchemaCacheKey: TypeAlias = tuple[type["BaseSerializer"], SchemaKind, int]
 
 _SCHEMA_CACHE_MAXSIZE = 640
@@ -162,6 +167,7 @@ class BaseSerializer:
     related_schema: ClassVar[SchemaType | None] = cast(
         Any, _LazySchemaAttribute("related")
     )
+    util: ClassVar["ModelUtil[models.Model]"]
 
     class QuerySet:
         """
@@ -461,7 +467,7 @@ class BaseSerializer:
         raise NotImplementedError
 
     @classmethod
-    def _get_model(cls) -> models.Model:
+    def _get_model(cls) -> type[models.Model]:
         """
         Return the Django model class associated with this serializer.
 
@@ -1567,7 +1573,105 @@ class BaseSerializer:
         return cls.get_schema("related")
 
     @classmethod
-    async def queryset_request(cls, request: HttpRequest):
+    def _validate_operation_data(
+        cls,
+        kind: Literal["create", "update"],
+        data: InputData,
+    ) -> Schema:
+        """Validate direct-operation input against the configured schema."""
+        schema = cls.get_schema(kind)
+        if schema is None:
+            raise ImproperlyConfigured(
+                f"{cls.__name__} does not define a {kind} schema"
+            )
+        if isinstance(data, schema):
+            return data
+        payload = data.model_dump(by_alias=True) if isinstance(data, Schema) else data
+        return schema.model_validate(payload)
+
+    @classmethod
+    def _resolve_operation_target(
+        cls,
+        target: models.Model | PrimaryKey,
+    ) -> tuple[PrimaryKey, models.Model | None]:
+        """Return a target primary key and its optional loaded instance."""
+        model = cls._get_model()
+        if isinstance(target, model):
+            if target.pk is None:
+                raise ValueError("A persisted model instance is required")
+            return cast(PrimaryKey, target.pk), target
+        if isinstance(target, models.Model):
+            raise TypeError(
+                f"target must be a {model.__name__} instance or primary key"
+            )
+        if not isinstance(target, PrimaryKey):
+            raise TypeError("target must be a model instance or primary key")
+        return target, None
+
+    @classmethod
+    async def _acreate_operation(
+        cls,
+        data: InputData,
+        *,
+        request: HttpRequest | None,
+    ) -> models.Model:
+        """Execute asynchronous creation for a concrete serializer class."""
+        validated = cls._validate_operation_data("create", data)
+        return await cls.util._create_instance(request, validated)
+
+    @classmethod
+    async def _aget_operation(
+        cls,
+        pk: PrimaryKey | None,
+        *,
+        request: HttpRequest | None,
+        lookups: dict[str, Any],
+    ) -> models.Model:
+        """Execute one request-aware asynchronous lookup."""
+        if pk is None and not lookups:
+            raise ValueError("Exactly one of pk or keyword lookups must be provided")
+        if pk is not None and lookups:
+            raise ValueError("pk and keyword lookups cannot be combined")
+        query_data = ObjectQuerySchema(getters=lookups) if lookups else None
+        return await cls.util.get_object(
+            request,
+            pk=pk,
+            query_data=query_data,
+        )
+
+    @classmethod
+    async def _aupdate_operation(
+        cls,
+        target: models.Model | PrimaryKey,
+        data: InputData,
+        *,
+        request: HttpRequest | None,
+    ) -> models.Model:
+        """Execute asynchronous update without refetching loaded targets."""
+        pk, instance = cls._resolve_operation_target(target)
+        validated = cls._validate_operation_data("update", data)
+        return await cls.util._update_instance(
+            request,
+            validated,
+            pk,
+            instance=instance,
+        )
+
+    @classmethod
+    async def _adestroy_operation(
+        cls,
+        target: models.Model | PrimaryKey,
+        *,
+        request: HttpRequest | None,
+    ) -> None:
+        """Execute asynchronous deletion without refetching loaded targets."""
+        pk, instance = cls._resolve_operation_target(target)
+        await cls.util.delete_s(request, pk, instance=instance)
+
+    @classmethod
+    async def queryset_request(
+        cls, request: HttpRequest | None
+    ) -> models.QuerySet[models.Model]:
         """
         Override to return a request-scoped filtered queryset.
 
@@ -1619,6 +1723,56 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
 
     class Meta:
         abstract = True
+
+    @classmethod
+    async def acreate(
+        cls: type[ModelSerializerT],
+        data: InputData,
+        *,
+        request: HttpRequest | None = None,
+    ) -> ModelSerializerT:
+        """Create and return one model instance asynchronously."""
+        return cast(
+            ModelSerializerT, await cls._acreate_operation(data, request=request)
+        )
+
+    @classmethod
+    async def aget(
+        cls: type[ModelSerializerT],
+        pk: PrimaryKey | None = None,
+        *,
+        request: HttpRequest | None = None,
+        **lookups: Any,
+    ) -> ModelSerializerT:
+        """Retrieve and return one model instance asynchronously."""
+        return cast(
+            ModelSerializerT,
+            await cls._aget_operation(pk, request=request, lookups=lookups),
+        )
+
+    @classmethod
+    async def aupdate(
+        cls: type[ModelSerializerT],
+        target: ModelSerializerT | PrimaryKey,
+        data: InputData,
+        *,
+        request: HttpRequest | None = None,
+    ) -> ModelSerializerT:
+        """Update and return one model instance asynchronously."""
+        return cast(
+            ModelSerializerT,
+            await cls._aupdate_operation(target, data, request=request),
+        )
+
+    @classmethod
+    async def adestroy(
+        cls: type[ModelSerializerT],
+        target: ModelSerializerT | PrimaryKey,
+        *,
+        request: HttpRequest | None = None,
+    ) -> None:
+        """Destroy one model instance asynchronously."""
+        await cls._adestroy_operation(target, request=request)
 
     class CreateSerializer:
         """Configuration container describing how to build a create (input) schema for a model.
@@ -1988,7 +2142,7 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
         return fields
 
     @classmethod
-    def _get_model(cls) -> "ModelSerializer":
+    def _get_model(cls) -> type["ModelSerializer"]:
         """
         Return the model class itself.
 
@@ -2060,7 +2214,9 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
         return await sync_to_async(self.has_changed)(field)
 
     @classmethod
-    async def queryset_request(cls, request: HttpRequest):
+    async def queryset_request(
+        cls, request: HttpRequest | None
+    ) -> models.QuerySet["ModelSerializer"]:
         return cls.query_util.apply_queryset_optimizations(
             queryset=cls.objects.all(),
             scope=cls.query_util.SCOPES.QUERYSET_REQUEST,
@@ -2230,6 +2386,8 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         "Related": "ReadValidators",
     }
 
+    model: type[ModelT]
+
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         from ninja_aio.models.utils import ModelUtil, register_serializer_for_model
@@ -2276,6 +2434,50 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
             ``None`` (no bound instance).
         """
         self.instance = instance
+
+    @classmethod
+    async def acreate(
+        cls: type["Serializer[ModelT]"],
+        data: InputData,
+        *,
+        request: HttpRequest | None = None,
+    ) -> ModelT:
+        """Create and return one model instance asynchronously."""
+        return cast(ModelT, await cls._acreate_operation(data, request=request))
+
+    @classmethod
+    async def aget(
+        cls: type["Serializer[ModelT]"],
+        pk: PrimaryKey | None = None,
+        *,
+        request: HttpRequest | None = None,
+        **lookups: Any,
+    ) -> ModelT:
+        """Retrieve and return one model instance asynchronously."""
+        return cast(
+            ModelT, await cls._aget_operation(pk, request=request, lookups=lookups)
+        )
+
+    @classmethod
+    async def aupdate(
+        cls: type["Serializer[ModelT]"],
+        target: ModelT | PrimaryKey,
+        data: InputData,
+        *,
+        request: HttpRequest | None = None,
+    ) -> ModelT:
+        """Update and return one model instance asynchronously."""
+        return cast(ModelT, await cls._aupdate_operation(target, data, request=request))
+
+    @classmethod
+    async def adestroy(
+        cls: type["Serializer[ModelT]"],
+        target: ModelT | PrimaryKey,
+        *,
+        request: HttpRequest | None = None,
+    ) -> None:
+        """Destroy one model instance asynchronously."""
+        await cls._adestroy_operation(target, request=request)
 
     def _resolve_instance(self, instance: Optional[ModelT]) -> ModelT:
         """
@@ -2431,7 +2633,7 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         return getattr(cls.Meta, attr_name, None)
 
     @classmethod
-    def _get_model(cls) -> models.Model:
+    def _get_model(cls) -> type[models.Model]:
         """
         Return the Django model class from ``Meta.model``.
 
@@ -2543,7 +2745,9 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         return schema
 
     @classmethod
-    async def queryset_request(cls, request: HttpRequest):
+    async def queryset_request(
+        cls, request: HttpRequest | None
+    ) -> models.QuerySet[ModelT]:
         return cls.query_util.apply_queryset_optimizations(
             queryset=cls.model._default_manager.all(),
             scope=cls.query_util.SCOPES.QUERYSET_REQUEST,

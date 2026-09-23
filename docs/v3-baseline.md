@@ -103,3 +103,16 @@ relation planning, read validation, and output transformation into typed,
 execution-mode-independent helpers. The frozen query-count suite retained all
 six values above. The broader non-performance regression suite completed with
 1,146 passing tests, including ten new no-database transformation tests.
+
+Step 4 added the asynchronous serializer facade with these query counts:
+
+| Version 3 async operation | Primary-key target | Loaded target |
+| --- | ---: | ---: |
+| `acreate()` | 1 | N/A |
+| `aget()` | 1 | N/A |
+| `aupdate()` | 2 | 1 |
+| `adestroy()` | 2 | 1 |
+
+The loaded-target paths deliberately avoid a redundant lookup. After Step 4,
+the broader non-performance regression suite completed with 1,172 passing
+tests.

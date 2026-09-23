@@ -1,12 +1,18 @@
-from typing import Literal
+from typing import Any, Literal, TypeAlias
+from uuid import UUID
 
-from joserfc import jwk
 from django.db.models import Model
-from typing import TypeAlias
+from joserfc import jwk
+from ninja import Schema
 
 S_TYPES = Literal["read", "detail", "create", "update"]
 F_TYPES = Literal["fields", "customs", "optionals", "excludes"]
 SCHEMA_TYPES = Literal["In", "Out", "Detail", "Patch", "Related"]
+SchemaKind: TypeAlias = Literal["create", "update", "read", "detail", "related"]
+SchemaType: TypeAlias = type[Schema]
+InputData: TypeAlias = dict[str, Any] | Schema
+Payload: TypeAlias = dict[str, Any]
+PrimaryKey: TypeAlias = int | str | UUID
 VIEW_TYPES = Literal[
     "list",
     "retrieve",

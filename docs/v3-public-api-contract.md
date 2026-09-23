@@ -69,6 +69,11 @@ Creation validates and transforms input, persists one model instance, executes
 the applicable hooks, and returns the model instance. It never returns a
 serialized dictionary.
 
+Dictionary input is validated with `create_schema`. Passing any `Schema`
+instance revalidates its aliased payload with `create_schema`. A serializer
+without a configured create schema raises `ImproperlyConfigured` before any
+database access.
+
 ### Retrieve
 
 ```python
@@ -89,6 +94,9 @@ await BookSerializer.aget(
 
 Exactly one lookup strategy must be supplied: `pk` or keyword lookups. Missing
 objects raise the version 3 not-found exception in both modes.
+
+Omitting both strategies or combining them raises `ValueError` before any
+database access.
 
 ### Update
 
@@ -112,6 +120,10 @@ Passing an instance avoids a redundant lookup. Passing a primary key performs
 the request-aware lookup before applying the update. The returned value is the
 updated model instance.
 
+Update data follows the same validation rules through `update_schema`. An
+unsaved target raises `ValueError`; an instance of the wrong model raises
+`TypeError`.
+
 ### Destroy
 
 ```python
@@ -131,6 +143,9 @@ await BookSerializer.adestroy(
 Passing an instance avoids a redundant lookup. This operation owns framework
 hooks, soft-delete integration, error normalization, and transaction policy;
 native Django `delete()`/`adelete()` remain untouched.
+
+As with update, an unsaved target raises `ValueError` and an instance of the
+wrong model raises `TypeError`.
 
 ## Serialization facade
 
