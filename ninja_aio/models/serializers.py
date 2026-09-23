@@ -51,6 +51,7 @@ from ninja_aio.schemas.helpers import (
     ModelQuerySetSchema,
     ModelQuerySetExtraSchema,
 )
+from ninja_aio.models import transformations as model_transformations
 
 # TypeVar for generic model typing in Serializers
 ModelT = TypeVar("ModelT", bound=models.Model)
@@ -2324,7 +2325,7 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         dict
             Parsed payload.
         """
-        return payload.model_dump() if isinstance(payload, Schema) else payload
+        return model_transformations.serializer_payload(payload)
 
     @classmethod
     def _get_validators(cls, schema_type: SCHEMA_TYPES) -> dict:

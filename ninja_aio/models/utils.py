@@ -1,9 +1,8 @@
 import asyncio
-import base64
 import logging
 from collections import OrderedDict
 from functools import cached_property
-from typing import Any, Generic, Literal, TypeVar
+from typing import Any, Generic, Iterable, Literal, TypeVar
 
 from ninja import Schema
 from ninja.orm import fields
@@ -14,14 +13,6 @@ from django.db.models import Q, aprefetch_related_objects
 from django.http import HttpRequest
 from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist
 from asgiref.sync import sync_to_async
-from django.db.models.fields.related_descriptors import (
-    ReverseManyToOneDescriptor,
-    ReverseOneToOneDescriptor,
-    ManyToManyDescriptor,
-    ForwardManyToOneDescriptor,
-    ForwardOneToOneDescriptor,
-)
-
 from ninja_aio.exceptions import SerializeError, NotFoundError
 from ninja_aio.decorators.views import AsyncAtomicContextManager
 from ninja_aio.types import ModelSerializerMeta, get_ninja_aio_meta_attr
@@ -32,6 +23,7 @@ from ninja_aio.schemas.helpers import (
     ObjectQuerySchema,
     ObjectsQuerySchema,
 )
+from ninja_aio.models import transformations as model_transformations
 
 # TypeVar for generic model typing
 ModelT = TypeVar("ModelT", bound=models.Model)
@@ -578,7 +570,11 @@ class ModelUtil(Generic[ModelT]):
 
         return obj
 
-    def _build_lookup_query(self, pk: int | str = None, getters: dict = None) -> dict:
+    def _build_lookup_query(
+        self,
+        pk: int | str | None = None,
+        getters: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Build lookup query dict from pk and additional getters.
 
@@ -594,17 +590,14 @@ class ModelUtil(Generic[ModelT]):
         dict
             Combined lookup criteria.
         """
-        get_q = {self.model_pk_name: pk} if pk is not None else {}
-        if getters:
-            get_q |= getters
-        return get_q
+        return model_transformations.build_lookup_query(self.model_pk_name, pk, getters)
 
     def _apply_query_optimizations(
         self,
-        queryset: models.QuerySet,
+        queryset: models.QuerySet[ModelT],
         query_data: QuerySchema,
         is_for: Literal["read", "detail"] | None = None,
-    ) -> models.QuerySet:
+    ) -> models.QuerySet[ModelT]:
         """
         Apply select_related and prefetch_related optimizations to queryset.
 
@@ -623,26 +616,27 @@ class ModelUtil(Generic[ModelT]):
         QuerySet
             Optimized queryset.
         """
-        select_related = (
-            query_data.select_related + self.get_select_relateds(is_for)
-            if is_for
-            else query_data.select_related
+        explicit_plan = model_transformations.RelationPlan(
+            tuple(query_data.select_related), tuple(query_data.prefetch_related)
         )
-        prefetch_related = (
-            query_data.prefetch_related + self.get_reverse_relations(is_for)
+        discovered_plan = (
+            model_transformations.RelationPlan(
+                tuple(self.get_select_relateds(is_for)),
+                tuple(self.get_reverse_relations(is_for)),
+            )
             if is_for
-            else query_data.prefetch_related
+            else None
         )
+        plan = model_transformations.combine_relation_plans(
+            explicit_plan, discovered_plan
+        )
+        queryset = model_transformations.apply_relation_plan(queryset, plan)
 
-        if select_related:
-            queryset = queryset.select_related(*select_related)
-        if prefetch_related:
-            queryset = queryset.prefetch_related(*prefetch_related)
-
-        if select_related or prefetch_related:
+        if plan.select_related or plan.prefetch_related:
             logger.debug(
                 f"Query optimizations for {self.model.__name__}:"
-                f" select_related={select_related}, prefetch_related={prefetch_related}"
+                f" select_related={list(plan.select_related)},"
+                f" prefetch_related={list(plan.prefetch_related)}"
             )
 
         return queryset
@@ -695,31 +689,29 @@ class ModelUtil(Generic[ModelT]):
         cache_key = (id(self.model), id(self.serializer_class), is_for)
         cached = self._relation_cache.get(cache_key)
         if cached is not None:
-            logger.debug(f"Reverse relations cache hit for {self.model.__name__} (is_for={is_for})")
+            logger.debug(
+                f"Reverse relations cache hit for {self.model.__name__} (is_for={is_for})"
+            )
             return cached
 
         config_rels = self._get_read_optimizations(is_for).prefetch_related
         if config_rels:
             self._relation_cache.set(cache_key, config_rels)
-            logger.debug(f"Reverse relations from config for {self.model.__name__}: {config_rels}")
+            logger.debug(
+                f"Reverse relations from config for {self.model.__name__}: {config_rels}"
+            )
             return config_rels
 
-        reverse_rels = []
-        serializable_fields = self._get_serializable_field_names(is_for)
-        for f in serializable_fields:
-            field_obj = getattr(self.model, f)
-            if isinstance(field_obj, ManyToManyDescriptor):
-                reverse_rels.append(f)
-                continue
-            if isinstance(field_obj, ReverseManyToOneDescriptor):
-                reverse_rels.append(field_obj.field._related_name)
-                continue
-            if isinstance(field_obj, ReverseOneToOneDescriptor):
-                reverse_rels.append(field_obj.related.name)
+        relation_plan = model_transformations.discover_relation_plan(
+            self.model, self._get_serializable_field_names(is_for)
+        )
+        reverse_rels = list(relation_plan.prefetch_related)
 
         # Cache the result
         self._relation_cache.set(cache_key, reverse_rels)
-        logger.debug(f"Reverse relations discovered for {self.model.__name__}: {reverse_rels}")
+        logger.debug(
+            f"Reverse relations discovered for {self.model.__name__}: {reverse_rels}"
+        )
         return reverse_rels
 
     def get_select_relateds(
@@ -745,58 +737,65 @@ class ModelUtil(Generic[ModelT]):
         cache_key = (id(self.model), id(self.serializer_class), "select", is_for)
         cached = self._relation_cache.get(cache_key)
         if cached is not None:
-            logger.debug(f"Select related cache hit for {self.model.__name__} (is_for={is_for})")
+            logger.debug(
+                f"Select related cache hit for {self.model.__name__} (is_for={is_for})"
+            )
             return cached
 
         config_rels = self._get_read_optimizations(is_for).select_related
         if config_rels:
             self._relation_cache.set(cache_key, config_rels)
-            logger.debug(f"Select related from config for {self.model.__name__}: {config_rels}")
+            logger.debug(
+                f"Select related from config for {self.model.__name__}: {config_rels}"
+            )
             return config_rels
 
-        select_rels = []
-        serializable_fields = self._get_serializable_field_names(is_for)
-        for f in serializable_fields:
-            field_obj = getattr(self.model, f)
-            if isinstance(field_obj, ForwardOneToOneDescriptor):
-                select_rels.append(f)
-                continue
-            if isinstance(field_obj, ForwardManyToOneDescriptor):
-                select_rels.append(f)
+        relation_plan = model_transformations.discover_relation_plan(
+            self.model, self._get_serializable_field_names(is_for)
+        )
+        select_rels = list(relation_plan.select_related)
 
         # Cache the result
         self._relation_cache.set(cache_key, select_rels)
-        logger.debug(f"Select related discovered for {self.model.__name__}: {select_rels}")
+        logger.debug(
+            f"Select related discovered for {self.model.__name__}: {select_rels}"
+        )
         return select_rels
 
     def _resolve_field_objects(self, field_names: list[str]) -> list[models.Field]:
         """Resolve Django field objects for a list of field names (sync)."""
-        return [getattr(self.model, k).field for k in field_names]
+        return model_transformations.resolve_model_fields(self.model, field_names)
 
-    def _serialize_queryset_sync(self, queryset, schema: Schema) -> list[dict]:
+    def _serialize_queryset_sync(
+        self,
+        queryset: Iterable[ModelT],
+        schema: type[Schema],
+    ) -> list[dict[str, Any]]:
         """Serialize a queryset to a list of dicts using Pydantic schema (sync)."""
-        return [schema.from_orm(obj).model_dump() for obj in queryset]
+        return model_transformations.dump_models(queryset, schema)
 
     def _decode_binary(
-        self, payload: dict, k: str, v: Any, field_obj: models.Field
+        self,
+        payload: dict[str, Any],
+        k: str,
+        v: Any,
+        field_obj: models.Field,
     ) -> None:
         """Decode base64-encoded binary field values in place."""
         if not isinstance(field_obj, models.BinaryField):
             return
-        try:
-            payload[k] = base64.b64decode(v)
-            logger.debug(f"Decoded binary field '{k}' for {self.model.__name__}")
-        except Exception as exc:
-            logger.warning(f"Failed to decode binary field '{k}' for {self.model.__name__}: {exc}")
-            raise SerializeError({k: ". ".join(exc.args)}, 400)
+        payload[k] = model_transformations.decode_binary_value(k, v)
+        logger.debug(f"Decoded binary field '{k}' for {self.model.__name__}")
 
-    async def _bump_object_from_schema(self, obj: ModelT, schema: Schema) -> dict:
+    async def _bump_object_from_schema(
+        self, obj: ModelT, schema: type[Schema]
+    ) -> dict[str, Any]:
         """Convert model instance to dict using Pydantic schema."""
-        return (await sync_to_async(schema.from_orm)(obj)).model_dump()
+        return await sync_to_async(model_transformations.dump_model)(obj, schema)
 
     async def _bump_queryset_from_schema(
-        self, queryset: models.QuerySet[ModelT], schema: Schema
-    ) -> list[dict]:
+        self, queryset: models.QuerySet[ModelT], schema: type[Schema]
+    ) -> list[dict[str, Any]]:
         """Convert a queryset to a list of dicts using Pydantic schema in a single sync_to_async call."""
 
         return await sync_to_async(self._serialize_queryset_sync)(queryset, schema)
@@ -836,28 +835,12 @@ class ModelUtil(Generic[ModelT]):
         return obj
 
     def _validate_read_params(
-        self, request: HttpRequest, query_data: QuerySchema
+        self,
+        request: HttpRequest | None,
+        query_data: QuerySchema | None,
     ) -> None:
         """Validate required parameters for read operations."""
-        if request is None:
-            raise SerializeError(
-                {"request": "must be provided when object is not given"}, 400
-            )
-
-        if query_data is None:
-            raise SerializeError(
-                {"query_data": "must be provided when object is not given"}, 400
-            )
-
-        if (
-            hasattr(query_data, "filters")
-            and hasattr(query_data, "getters")
-            and query_data.filters
-            and query_data.getters
-        ):
-            raise SerializeError(
-                {"query_data": "cannot contain both filters and getters"}, 400
-            )
+        model_transformations.validate_read_params(request, query_data)
 
     async def _handle_query_mode(
         self,
@@ -902,7 +885,10 @@ class ModelUtil(Generic[ModelT]):
         return await self._bump_object_from_schema(obj, obj_schema)
 
     def _collect_custom_and_optional_fields(
-        self, payload: dict, is_serializer: bool, serializer
+        self,
+        payload: dict[str, Any],
+        is_serializer: bool,
+        serializer: model_transformations.FieldPolicy | None,
     ) -> tuple[dict[str, Any], list[str]]:
         """
         Collect custom and optional fields from payload.
@@ -921,25 +907,17 @@ class ModelUtil(Generic[ModelT]):
         tuple[dict[str, Any], list[str]]
             (custom_fields_dict, optional_field_names)
         """
-        customs: dict[str, Any] = {}
-        optionals: list[str] = []
-
-        if not is_serializer:
-            return customs, optionals
-
-        customs = {
-            k: v
-            for k, v in payload.items()
-            if serializer.is_custom(k) and k not in self.model_fields
-        }
-        optionals = [
-            k for k, v in payload.items() if serializer.is_optional(k) and v is None
-        ]
-
-        return customs, optionals
+        policy = serializer if is_serializer else None
+        plan = model_transformations.plan_input_payload(
+            payload, model_fields=self.model_fields, field_policy=policy
+        )
+        return plan.customs, list(plan.optionals)
 
     def _determine_skip_keys(
-        self, payload: dict, is_serializer: bool, serializer
+        self,
+        payload: dict[str, Any],
+        is_serializer: bool,
+        serializer: model_transformations.FieldPolicy | None,
     ) -> set[str]:
         """
         Determine which keys to skip during model field processing.
@@ -958,16 +936,12 @@ class ModelUtil(Generic[ModelT]):
         set[str]
             Set of keys to skip.
         """
-        if not is_serializer:
-            return set()
-
-        skip_keys = {
-            k
-            for k, v in payload.items()
-            if (serializer.is_custom(k) and k not in self.model_fields)
-            or (serializer.is_optional(k) and v is None)
-        }
-        return skip_keys
+        policy = serializer if is_serializer else None
+        return set(
+            model_transformations.plan_input_payload(
+                payload, model_fields=self.model_fields, field_policy=policy
+            ).skip_keys
+        )
 
     async def _resolve_fk(
         self,
@@ -1062,7 +1036,7 @@ class ModelUtil(Generic[ModelT]):
             return
 
         field_names = [k for k, _ in fields_to_process]
-        field_objs = await sync_to_async(self._resolve_field_objects)(field_names)
+        field_objs = model_transformations.resolve_model_fields(self.model, field_names)
 
         # Single pass: decode binary + collect FK tasks
         fk_tasks = []
@@ -1091,7 +1065,7 @@ class ModelUtil(Generic[ModelT]):
         request: HttpRequest,
         data: Schema,
         fk_cache: dict[tuple[type, Any], Any] | None = None,
-    ):
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
         """
         Transform inbound schema data to a model-ready payload.
 
@@ -1122,12 +1096,7 @@ class ModelUtil(Generic[ModelT]):
         SerializeError
             On base64 decoding failure or invalid field names.
         """
-        payload = data.model_dump(mode="json")
-
-        # Keep the public two-tuple return contract. Nested values are consumed
-        # separately by _create_instance, never treated as scalar model fields.
-        for name in self.nested_fields:
-            payload.pop(name, None)
+        payload = model_transformations.schema_to_payload(data, self.nested_fields)
 
         is_serializer = (
             isinstance(self.model, ModelSerializerMeta) or self.with_serializer
@@ -1137,25 +1106,15 @@ class ModelUtil(Generic[ModelT]):
         # Note: Field validation is handled by Pydantic during schema deserialization
         # No additional validation needed here since data is already a validated Schema instance
 
-        # Collect custom and optional fields
-        customs, optionals = self._collect_custom_and_optional_fields(
-            payload, is_serializer, serializer
+        plan = model_transformations.plan_input_payload(
+            payload,
+            model_fields=self.model_fields,
+            field_policy=serializer if is_serializer else None,
         )
-
-        # Determine which keys to skip during model field processing
-        skip_keys = self._determine_skip_keys(payload, is_serializer, serializer)
-
-        # Process payload fields - gather field objects in parallel for better performance
-        fields_to_process = [(k, v) for k, v in payload.items() if k not in skip_keys]
         await self._process_payload_fields(
-            request, payload, fields_to_process, fk_cache
+            request, payload, plan.fields_to_process, fk_cache
         )
-
-        # Preserve original exclusion semantics (customs if present else optionals)
-        exclude_keys = customs.keys() or optionals
-        new_payload = {k: v for k, v in payload.items() if k not in exclude_keys}
-
-        return new_payload, customs
+        return plan.model_payload(), plan.customs
 
     async def _create_instance(
         self,

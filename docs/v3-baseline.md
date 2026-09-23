@@ -97,3 +97,9 @@ step.
 | `delete_s()` with primary-key lookup | 2 |
 | `read_s()` with an existing instance | 0 |
 | `list_read_s()` with a lazy queryset | 1 |
+
+Step 3 moved payload classification, field inspection, lookup construction,
+relation planning, read validation, and output transformation into typed,
+execution-mode-independent helpers. The frozen query-count suite retained all
+six values above. The broader non-performance regression suite completed with
+1,146 passing tests, including ten new no-database transformation tests.
