@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from collections import OrderedDict
+from contextlib import nullcontext
 from functools import cached_property
 from typing import Any, Generic, Iterable, Literal, TypeVar
 
@@ -8,7 +9,7 @@ from ninja import Schema
 from ninja.orm import fields
 from ninja.errors import ConfigError
 
-from django.db import models, router
+from django.db import models, router, transaction
 from django.db.models import Q, aprefetch_related_objects
 from django.http import HttpRequest
 from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist
@@ -1209,14 +1210,37 @@ class ModelUtil(Generic[ModelT]):
             raise ImproperlyConfigured(
                 "Synchronous nested writes are not available before hook normalization"
             )
+        from ninja_aio.models.hooks import (
+            OperationContext,
+            _execute_hooks_sync,
+            get_hooks,
+            invoke_hook_sync,
+            suppress_signals_sync,
+        )
+
         payload, customs = self.parse_input_data_sync(request, data)
-        obj = self.model._default_manager.create(**payload)
-        if self.with_serializer:
-            self.serializer.custom_actions_sync(customs, obj)
-            self.serializer.post_create_sync(obj)
-        elif isinstance(self.model, ModelSerializerMeta):
-            obj.custom_actions_sync(customs)
-            obj.post_create_sync()
+        hooks = get_hooks(self.serializer_class or self.model)
+        atomic = (
+            transaction.atomic(using=router.db_for_write(self.model))
+            if hooks
+            else nullcontext()
+        )
+        with atomic:
+            with suppress_signals_sync():
+                obj = self.model._default_manager.create(**payload)
+            context = OperationContext(
+                request, "create", self.serializer or obj, obj, payload
+            )
+            if self.with_serializer:
+                invoke_hook_sync(context, "custom_actions", customs, obj)
+                invoke_hook_sync(context, "post_create", obj)
+                if hooks:
+                    _execute_hooks_sync(self.serializer, hooks["create"], obj)
+            elif isinstance(self.model, ModelSerializerMeta):
+                invoke_hook_sync(context, "custom_actions", customs)
+                invoke_hook_sync(context, "post_create")
+                if hooks:
+                    _execute_hooks_sync(obj, hooks["create"])
         return obj
 
     def update_instance(
@@ -1227,16 +1251,48 @@ class ModelUtil(Generic[ModelT]):
         instance: ModelT | None = None,
     ) -> ModelT:
         """Update one model instance with Django's synchronous ORM."""
+        from ninja_aio.models.hooks import (
+            OperationContext,
+            detect_changed_fields,
+            fire_update_hooks_sync,
+            get_hooks,
+            invoke_hook_sync,
+            suppress_signals_sync,
+        )
+
         obj = instance or self.get_object(request, pk, is_for="read")
         payload, customs = self.parse_input_data_sync(request, data)
-        for name, value in payload.items():
-            if value is not None:
-                setattr(obj, name, value)
-        obj.save()
-        if self.with_serializer:
-            self.serializer.custom_actions_sync(customs, obj)
-        elif isinstance(self.model, ModelSerializerMeta):
-            obj.custom_actions_sync(customs)
+        hooks = get_hooks(self.serializer_class or self.model)
+        changed = (
+            detect_changed_fields(obj, payload, hooks["update_field"])
+            if hooks
+            else set()
+        )
+        context = OperationContext(
+            request, "update", self.serializer or obj, obj, payload, changed
+        )
+        atomic = (
+            transaction.atomic(using=router.db_for_write(self.model))
+            if hooks
+            else nullcontext()
+        )
+        with atomic:
+            for name, value in payload.items():
+                if value is not None:
+                    setattr(obj, name, value)
+            with suppress_signals_sync():
+                obj.save()
+            if self.with_serializer:
+                invoke_hook_sync(context, "custom_actions", customs, obj)
+            elif isinstance(self.model, ModelSerializerMeta):
+                invoke_hook_sync(context, "custom_actions", customs)
+            if hooks:
+                fire_update_hooks_sync(
+                    context.serializer,
+                    changed,
+                    hooks,
+                    obj if self.with_serializer else None,
+                )
         return obj
 
     def destroy_instance(
@@ -1246,8 +1302,28 @@ class ModelUtil(Generic[ModelT]):
         instance: ModelT | None = None,
     ) -> None:
         """Destroy one model instance with Django's synchronous ORM."""
+        from ninja_aio.models.hooks import (
+            _execute_hooks_sync,
+            get_hooks,
+            suppress_signals_sync,
+        )
+
         obj = instance or self.get_object(request, pk)
-        obj.delete()
+        hooks = get_hooks(self.serializer_class or self.model)
+        atomic = (
+            transaction.atomic(using=router.db_for_write(self.model))
+            if hooks
+            else nullcontext()
+        )
+        with atomic:
+            with suppress_signals_sync():
+                obj.delete()
+            if hooks:
+                _execute_hooks_sync(
+                    self.serializer or obj,
+                    hooks["delete"],
+                    obj if self.with_serializer else None,
+                )
 
     async def _create_instance(
         self,
@@ -1258,7 +1334,18 @@ class ModelUtil(Generic[ModelT]):
     ) -> ModelT:
         """Create an owned object graph atomically, including direct/bulk calls."""
         if not self.nested_fields:
-            return await self._persist_instance(request, data, fk_cache, extra_fields)
+            from ninja_aio.models.hooks import get_hooks
+
+            hooks = get_hooks(self.serializer_class or self.model)
+            atomic = (
+                AsyncAtomicContextManager(using=router.db_for_write(self.model))
+                if hooks
+                else nullcontext()
+            )
+            async with atomic:
+                return await self._persist_instance(
+                    request, data, fk_cache, extra_fields
+                )
         using = router.db_for_write(self.model)
         if any(
             router.db_for_write(child) != using
@@ -1313,6 +1400,8 @@ class ModelUtil(Generic[ModelT]):
             The created model instance.
         """
         from ninja_aio.models.hooks import (
+            OperationContext,
+            invoke_hook,
             suppress_signals,
             get_hooks,
             execute_reactive_hooks,
@@ -1332,21 +1421,18 @@ class ModelUtil(Generic[ModelT]):
                 else await self.serializer._acreate(payload)
             )
         logger.debug(f"Created {self.model.__name__} (pk={obj.pk})")
+        context = OperationContext(
+            request, "create", self.serializer or obj, obj, payload
+        )
         if isinstance(self.model, ModelSerializerMeta):
-            if self.nested_fields or extra_fields:
-                # Nested graph hooks must finish before rollback can begin.
-                await obj.custom_actions(customs)
-                await obj.post_create()
-            else:
-                await asyncio.gather(obj.custom_actions(customs), obj.post_create())
+            await invoke_hook(context, "custom_actions", customs)
+            await invoke_hook(context, "post_create")
             hooks = get_hooks(self.model)
             if hooks and hooks["create"]:
                 await execute_reactive_hooks(obj, hooks["create"])
         if self.with_serializer:
-            await asyncio.gather(
-                self.serializer.custom_actions(customs, obj),
-                self.serializer.post_create(obj),
-            )
+            await invoke_hook(context, "custom_actions", customs, obj)
+            await invoke_hook(context, "post_create", obj)
         return obj
 
     async def create_s(self, request: HttpRequest, data: Schema, obj_schema: Schema):
@@ -1563,6 +1649,8 @@ class ModelUtil(Generic[ModelT]):
             The updated model instance.
         """
         from ninja_aio.models.hooks import (
+            OperationContext,
+            invoke_hook,
             suppress_signals,
             get_hooks,
             detect_changed_fields,
@@ -1576,31 +1664,41 @@ class ModelUtil(Generic[ModelT]):
             else await self.aget_object(request, pk, is_for="read")
         )
         payload, customs = await self.parse_input_data(request, data, fk_cache)
+        context = OperationContext(
+            request, "update", self.serializer or obj, obj, payload
+        )
         if require_fields and not payload and not customs:
             raise SerializeError("No fields provided for update.")
 
-        hooks = get_hooks(self.model)
+        hooks = get_hooks(self.serializer_class or self.model)
         changed_fields = (
             detect_changed_fields(obj, payload, hooks.get("update_field", {}))
             if hooks
             else set()
         )
+        context.changed_fields = changed_fields
 
-        for k, v in payload.items():
-            if v is not None:
-                setattr(obj, k, v)
+        atomic = (
+            AsyncAtomicContextManager(using=router.db_for_write(self.model))
+            if hooks
+            else nullcontext()
+        )
+        async with atomic:
+            for k, v in payload.items():
+                if v is not None:
+                    setattr(obj, k, v)
 
-        async with suppress_signals():
-            if isinstance(self.model, ModelSerializerMeta):
-                await obj.custom_actions(customs)
-            if self.with_serializer:
-                await self.serializer.custom_actions(customs, obj)
-                await self.serializer.save(obj)
-            else:
-                await obj.asave()
+            async with suppress_signals():
+                if isinstance(self.model, ModelSerializerMeta):
+                    await invoke_hook(context, "custom_actions", customs)
+                if self.with_serializer:
+                    await invoke_hook(context, "custom_actions", customs, obj)
+                    await self.serializer.save(obj)
+                else:
+                    await obj.asave()
 
-        if isinstance(self.model, ModelSerializerMeta) and hooks:
-            await fire_update_hooks(obj, changed_fields, hooks)
+            if isinstance(self.model, ModelSerializerMeta) and hooks:
+                await fire_update_hooks(obj, changed_fields, hooks)
 
         logger.debug(f"Updated {self.model.__name__} (pk={pk})")
         return obj
@@ -1673,17 +1771,23 @@ class ModelUtil(Generic[ModelT]):
 
         logger.info(f"Deleting {self.model.__name__} (pk={pk})")
         obj = instance if instance is not None else await self.aget_object(request, pk)
-        async with suppress_signals():
-            await obj.adelete()
-        logger.debug(f"Deleted {self.model.__name__} (pk={pk})")
+        hooks = get_hooks(self.serializer_class or self.model)
+        atomic = (
+            AsyncAtomicContextManager(using=router.db_for_write(self.model))
+            if hooks
+            else nullcontext()
+        )
+        async with atomic:
+            async with suppress_signals():
+                await obj.adelete()
+            logger.debug(f"Deleted {self.model.__name__} (pk={pk})")
 
-        hooks = get_hooks(self.model)
-        if hooks and hooks["delete"]:
-            await execute_reactive_hooks(obj, hooks["delete"])
-        if self.with_serializer:
-            ser_hooks = get_hooks(self.serializer_class)
-            if ser_hooks and ser_hooks["delete"]:
-                await execute_reactive_hooks(self.serializer, ser_hooks["delete"], obj)
+            if hooks and hooks["delete"]:
+                await execute_reactive_hooks(
+                    self.serializer or obj,
+                    hooks["delete"],
+                    obj if self.with_serializer else None,
+                )
 
         return None
 

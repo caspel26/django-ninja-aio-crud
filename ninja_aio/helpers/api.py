@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 import logging
 from typing import Any, Coroutine, List
 
@@ -427,7 +428,7 @@ class ManyToManyAPI:
 
             query_handler = self._get_query_params_handler(related_name)
             if filters is not None and query_handler:
-                if asyncio.iscoroutinefunction(query_handler):
+                if inspect.iscoroutinefunction(query_handler):
                     related_qs = await query_handler(related_qs, filters.model_dump())
                 else:
                     related_qs = query_handler(related_qs, filters.model_dump())

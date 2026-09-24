@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from typing import (
     Callable,
@@ -143,7 +142,7 @@ class ApiMethodFactory:
         self.method_name = method_name
 
     def _build_handler(self, view_instance, original):
-        is_async = asyncio.iscoroutinefunction(original)
+        is_async = inspect.iscoroutinefunction(original)
 
         if is_async:
 

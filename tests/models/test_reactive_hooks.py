@@ -76,6 +76,67 @@ class SyncHookTestModel(ModelSerializer):
         _hook_calls.append(("sync_create", self.pk))
 
 
+class OrderedHookModel(ModelSerializer):
+    name = models.CharField(max_length=255)
+
+    class Meta:
+        app_label = "test_app"
+
+    class CreateSerializer:
+        fields = ["name"]
+
+    class UpdateSerializer:
+        optionals = [("name", str)]
+
+    def custom_actions(self, payload):
+        _hook_calls.append(("custom", self.pk))
+
+    def post_create(self):
+        _hook_calls.append(("post_create", self.pk))
+
+    @on_create
+    def created(self):
+        _hook_calls.append(("reactive", self.pk))
+
+    @on_update("name")
+    def name_changed(self):
+        _hook_calls.append(("changed", self.pk))
+
+    @on_update
+    def updated(self):
+        _hook_calls.append(("updated", self.pk))
+
+    @on_delete
+    def deleted(self):
+        _hook_calls.append(("deleted", self.pk))
+
+
+class FailingHookModel(ModelSerializer):
+    name = models.CharField(max_length=255)
+
+    class Meta:
+        app_label = "test_app"
+
+    class CreateSerializer:
+        fields = ["name"]
+
+    class UpdateSerializer:
+        optionals = [("name", str)]
+
+    @on_create
+    def fail_create(self):
+        if self.name == "fail-create":
+            raise ValueError("create hook failed")
+
+    @on_update
+    def fail_update(self):
+        raise ValueError("update hook failed")
+
+    @on_delete
+    def fail_delete(self):
+        raise ValueError("delete hook failed")
+
+
 # ─── Plain model + Serializer ────────────────────────────
 
 
@@ -268,6 +329,78 @@ class SyncHookTestCase(TestCase):
         self.assertEqual(_hook_calls[0][0], "sync_create")
 
 
+@tag("reactive_hooks")
+class OperationContextHookParityTests(TestCase):
+    def setUp(self):
+        _reset()
+
+    def test_sync_create_hook_order(self):
+        OrderedHookModel.create({"name": "sync"})
+        self.assertEqual(
+            [event for event, _ in _hook_calls],
+            ["custom", "post_create", "reactive"],
+        )
+
+    async def test_async_create_hook_order(self):
+        await OrderedHookModel.acreate({"name": "async"})
+        self.assertEqual(
+            [event for event, _ in _hook_calls],
+            ["custom", "post_create", "reactive"],
+        )
+
+    def test_sync_update_and_delete_hook_order(self):
+        obj = OrderedHookModel.objects.create(name="old")
+        _reset()
+        OrderedHookModel.update(obj, {"name": "new"})
+        OrderedHookModel.destroy(obj)
+        self.assertEqual(
+            [event for event, _ in _hook_calls],
+            ["custom", "changed", "updated", "deleted"],
+        )
+
+    async def test_async_update_and_delete_hook_order(self):
+        obj = await OrderedHookModel.objects.acreate(name="old")
+        _reset()
+        await OrderedHookModel.aupdate(obj, {"name": "new"})
+        await OrderedHookModel.adestroy(obj)
+        self.assertEqual(
+            [event for event, _ in _hook_calls],
+            ["custom", "changed", "updated", "deleted"],
+        )
+
+    def test_sync_create_rolls_back_on_hook_error(self):
+        with self.assertRaisesRegex(ValueError, "create hook failed"):
+            FailingHookModel.create({"name": "fail-create"})
+        self.assertFalse(FailingHookModel.objects.exists())
+
+    async def test_async_create_rolls_back_on_hook_error(self):
+        with self.assertRaisesRegex(ValueError, "create hook failed"):
+            await FailingHookModel.acreate({"name": "fail-create"})
+        self.assertFalse(await FailingHookModel.objects.aexists())
+
+    def test_sync_update_and_delete_roll_back_on_hook_error(self):
+        obj = FailingHookModel.objects.create(name="before")
+        pk = obj.pk
+        with self.assertRaisesRegex(ValueError, "update hook failed"):
+            FailingHookModel.update(obj, {"name": "after"})
+        obj.refresh_from_db()
+        self.assertEqual(obj.name, "before")
+        with self.assertRaisesRegex(ValueError, "delete hook failed"):
+            FailingHookModel.destroy(obj)
+        self.assertTrue(FailingHookModel.objects.filter(pk=pk).exists())
+
+    async def test_async_update_and_delete_roll_back_on_hook_error(self):
+        obj = await FailingHookModel.objects.acreate(name="before")
+        pk = obj.pk
+        with self.assertRaisesRegex(ValueError, "update hook failed"):
+            await FailingHookModel.aupdate(obj, {"name": "after"})
+        await obj.arefresh_from_db()
+        self.assertEqual(obj.name, "before")
+        with self.assertRaisesRegex(ValueError, "delete hook failed"):
+            await FailingHookModel.adestroy(obj)
+        self.assertTrue(await FailingHookModel.objects.filter(pk=pk).aexists())
+
+
 # ─── Tests: Serializer (Meta-driven) ────────────────────
 
 
@@ -286,6 +419,15 @@ class SerializerReactiveHooksTestCase(TestCase):
 
     def setUp(self):
         _reset()
+
+    def test_sync_serializer_reactive_hooks(self):
+        obj = HookPlainSerializer.create({"name": "sync", "status": "draft"})
+        HookPlainSerializer.update(obj, {"status": "published"})
+        HookPlainSerializer.destroy(obj)
+        self.assertEqual(
+            [event for event, *_ in _hook_calls],
+            ["ser_create", "ser_update_status", "ser_delete"],
+        )
 
     async def test_serializer_on_create_fires(self):
         """@on_create on Serializer fires with instance parameter."""
