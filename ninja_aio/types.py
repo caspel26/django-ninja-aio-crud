@@ -1,4 +1,5 @@
-from typing import Any, Literal, TypeAlias
+from dataclasses import dataclass, field
+from typing import Any, Generic, Literal, TypeAlias, TypeVar
 from uuid import UUID
 
 from django.db.models import Model
@@ -13,6 +14,35 @@ SchemaType: TypeAlias = type[Schema]
 InputData: TypeAlias = dict[str, Any] | Schema
 Payload: TypeAlias = dict[str, Any]
 PrimaryKey: TypeAlias = int | str | UUID
+BulkItemT = TypeVar("BulkItemT")
+
+
+@dataclass(frozen=True)
+class BulkFailure:
+    index: int
+    code: str
+    message: str
+    fields: dict[str, list[str]] = field(default_factory=dict)
+    pk: PrimaryKey | None = None
+
+
+@dataclass
+class BulkResult(Generic[BulkItemT]):
+    succeeded: list[BulkItemT] = field(default_factory=list)
+    failed: list[BulkFailure] = field(default_factory=list)
+
+    @property
+    def has_errors(self) -> bool:
+        return bool(self.failed)
+
+    @property
+    def success_count(self) -> int:
+        return len(self.succeeded)
+
+    @property
+    def failure_count(self) -> int:
+        return len(self.failed)
+
 VIEW_TYPES = Literal[
     "list",
     "retrieve",

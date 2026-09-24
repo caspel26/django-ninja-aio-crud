@@ -252,6 +252,14 @@ Bulk operations retain version 2's per-item partial-success behavior unless an
 explicit atomic policy is configured. They return typed results rather than
 tuples.
 
+`BulkResult.succeeded` contains model instances (or primary keys for destroy),
+and `BulkResult.failed` contains `BulkFailure` entries with the zero-based
+`index`, stable `code`, human-readable `message`, `fields` keyed by dotted
+nested paths, and `pk` when known. The result also exposes `has_errors`,
+`success_count`, and `failure_count`. The legacy `ModelUtil` bulk methods and
+generated HTTP bulk views retain their existing tuple/wire formats until their
+respective migration steps.
+
 ## Hooks and model helpers
 
 The following remain supported public extension points:

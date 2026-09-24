@@ -1,6 +1,7 @@
 import logging
 import re
 from functools import partial
+from typing import Any
 from joserfc.errors import JoseError
 from ninja import NinjaAPI
 from django.http import HttpRequest, HttpResponse
@@ -18,24 +19,35 @@ class BaseException(Exception):
 
     error: str | dict = ""
     status_code: int = 400
+    code: str = "operation_error"
 
     def __init__(
         self,
         error: str | dict = None,
         status_code: int | None = None,
-        details: str | None = None,
+        details: Any | None = None,
     ) -> None:
         """Initialize the exception with error content, optional HTTP status, and details.
 
         If `error` is a string, it is wrapped into a dict under the `error` key.
         If `error` is a dict, it is used directly. Optional `details` are merged.
         """
-        if isinstance(error, str):
-            self.error = {"error": error}
-        if isinstance(error, dict):
-            self.error = error
-        self.error |= {"details": details} if details else {}
+        self.error = (
+            {"error": error} if isinstance(error, str) else dict(error or {})
+        )
+        if details:
+            self.error["details"] = details
         self.status_code = status_code or self.status_code
+        self.message = str(self.error.get("error", next(iter(self.error.values()), "")))
+        self.field_errors: dict[str, list[str]] = {}
+        for key, value in self.error.items():
+            if key not in ("error", "details"):
+                self.field_errors[key] = [str(value)]
+        super().__init__(self.message)
+
+    @property
+    def status(self) -> int:
+        return self.status_code
 
     def get_error(self):
         """Return the error body and HTTP status code tuple for response creation."""
@@ -45,19 +57,20 @@ class BaseException(Exception):
 class SerializeError(BaseException):
     """Raised when serialization to or from request/response payloads fails."""
 
-    pass
+    code = "serialization_error"
 
 
 class AuthError(BaseException):
     """Raised when authentication or authorization fails."""
 
-    pass
+    code = "authentication_error"
 
 
 class NotFoundError(BaseException):
     """Raised when a requested model instance cannot be found."""
 
     status_code = 404
+    code = "not_found"
     error = "not found"
     use_verbose_name = getattr(
         settings, "NINJA_AIO_NOT_FOUND_ERROR_USE_VERBOSE_NAMES", True
@@ -86,6 +99,7 @@ class ForbiddenError(BaseException):
     """Raised when a user lacks permission for the requested operation (HTTP 403)."""
 
     status_code = 403
+    code = "forbidden"
     error = "forbidden"
 
     def __init__(
@@ -104,9 +118,22 @@ class ForbiddenError(BaseException):
 class PydanticValidationError(BaseException):
     """Wrapper for pydantic ValidationError to normalize the API error response."""
 
+    code = "validation_error"
+
     def __init__(self, details=None):
         """Create a validation error with 400 status and provided details list."""
         super().__init__("Validation Error", 400, details)
+
+
+class OperationValidationError(PydanticValidationError):
+    """Structured validation error from a direct serializer operation."""
+
+    def __init__(self, exc: ValidationError):
+        details = exc.errors(include_input=False)
+        super().__init__(details)
+        for detail in details:
+            path = ".".join(str(part) for part in detail["loc"])
+            self.field_errors.setdefault(path, []).append(detail["msg"])
 
 
 def _default_error(

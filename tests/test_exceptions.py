@@ -6,6 +6,7 @@ from ninja_aio.exceptions import (
     BaseException,
     SerializeError,
     NotFoundError,
+    OperationValidationError,
     PydanticValidationError,
     parse_jose_error,
     set_api_exception_handlers,
@@ -18,6 +19,10 @@ class DummyModel(BaseModel):
     a: int = Field(gt=0)
 
 
+class DummyNestedModel(BaseModel):
+    items: list[DummyModel]
+
+
 @tag("exceptions_base")
 class BaseExceptionTestCase(TestCase):
     def test_string_error_conversion(self):
@@ -27,10 +32,12 @@ class BaseExceptionTestCase(TestCase):
         self.assertEqual(exc.status_code, 418)
 
     def test_dict_error_preserved_and_details_merge(self):
-        exc = BaseException({"foo": "bar"}, details="more")
+        payload = {"foo": "bar"}
+        exc = BaseException(payload, details="more")
         self.assertEqual(exc.error["foo"], "bar")
         self.assertEqual(exc.error["details"], "more")
         self.assertEqual(exc.status_code, 400)
+        self.assertEqual(payload, {"foo": "bar"})
 
     def test_get_error(self):
         exc = BaseException("x")
@@ -107,6 +114,18 @@ class SubclassesTestCase(TestCase):
             p_exc = PydanticValidationError(ve.errors())
             self.assertEqual(p_exc.error["error"], "Validation Error")
             self.assertTrue(p_exc.error["details"])  # details list present
+
+    def test_operation_validation_error_retains_nested_paths_and_http_body(self):
+        with self.assertRaises(ValidationError) as raised:
+            DummyNestedModel.model_validate({"items": [{"a": 0}]})
+
+        exc = OperationValidationError(raised.exception)
+        self.assertEqual(exc.code, "validation_error")
+        self.assertEqual(exc.status, 400)
+        self.assertEqual(exc.message, "Validation Error")
+        self.assertIn("items.0.a", exc.field_errors)
+        self.assertEqual(exc.error["error"], "Validation Error")
+        self.assertEqual(exc.error["details"], raised.exception.errors(include_input=False))
 
 
 @tag("exceptions_parse_jose")

@@ -61,9 +61,9 @@ class NestedWritesTestCase(TestCase):
             app_models.NestedOrderItem, "post_create", autospec=True
         ) as hook:
             hook.side_effect = fail_bad_child
-            successes, errors = app_models.NestedOrder.bulk_create([valid, invalid])
-        self.assertEqual([obj.name for obj in successes], ["valid"])
-        self.assertEqual(len(errors), 1)
+            result = app_models.NestedOrder.bulk_create([valid, invalid])
+        self.assertEqual([obj.name for obj in result.succeeded], ["valid"])
+        self.assertEqual(result.failure_count, 1)
         self.assertEqual(
             list(app_models.NestedOrder.objects.values_list("name", flat=True)),
             ["valid"],
@@ -76,9 +76,9 @@ class NestedWritesTestCase(TestCase):
     def test_sync_nested_child_dict_is_validated(self):
         payload = self.payload("raw")
         payload.items.append({"name": "child", "description": "d"})
-        successes, errors = app_models.NestedOrder.bulk_create([payload])
-        self.assertEqual(errors, [])
-        self.assertEqual(len(successes), 1)
+        result = app_models.NestedOrder.bulk_create([payload])
+        self.assertEqual(result.failed, [])
+        self.assertEqual(result.success_count, 1)
         self.assertEqual(app_models.NestedOrderItem.objects.get().name, "child")
 
     def test_sync_cross_database_graph_is_rejected_before_writes(self):
@@ -88,9 +88,9 @@ class NestedWritesTestCase(TestCase):
             if model is app_models.NestedOrderItem
             else "default",
         ):
-            successes, errors = app_models.NestedOrder.bulk_create([self.payload()])
-        self.assertEqual(successes, [])
-        self.assertIn("one database", errors[0]["error"])
+            result = app_models.NestedOrder.bulk_create([self.payload()])
+        self.assertEqual(result.succeeded, [])
+        self.assertIn("one database", result.failed[0].message)
         self.assertFalse(app_models.NestedOrder.objects.exists())
 
     async def test_nested_child_schema_excludes_injected_fk(self):
@@ -316,7 +316,7 @@ class NestedWritesTestCase(TestCase):
         self.assertEqual(await app_models.NestedOrderItem.objects.acount(), 1)
 
     async def test_async_bulk_facade_rolls_back_only_failed_graph(self):
-        successes, errors = await app_models.NestedOrder.abulk_create(
+        result = await app_models.NestedOrder.abulk_create(
             [
                 self.payload(
                     "bad",
@@ -328,8 +328,8 @@ class NestedWritesTestCase(TestCase):
                 self.payload("good", items=[{"name": "item", "description": "d"}]),
             ]
         )
-        self.assertEqual([obj.name for obj in successes], ["good"])
-        self.assertEqual(len(errors), 1)
+        self.assertEqual([obj.name for obj in result.succeeded], ["good"])
+        self.assertEqual(result.failure_count, 1)
         self.assertEqual(
             [
                 name

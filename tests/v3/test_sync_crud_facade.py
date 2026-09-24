@@ -8,7 +8,8 @@ from django.test import TestCase
 from ninja import Schema
 from pydantic import ValidationError
 
-from ninja_aio.exceptions import NotFoundError
+from ninja_aio.exceptions import NotFoundError, OperationValidationError
+from ninja_aio.types import BulkResult
 from tests.test_app.models import (
     BookAsId,
     TestModel,
@@ -64,66 +65,87 @@ class SyncCrudFacadeContractMixin:
         self.assertIsNotNone(from_schema.pk)
 
     def test_create_validates_direct_input(self) -> None:
-        with self.assertRaises(ValidationError):
+        with self.assertRaises(OperationValidationError) as raised:
             self.serializer_class.create({"name": "missing-description"})
+        self.assertEqual(raised.exception.code, "validation_error")
+        self.assertIn("description", raised.exception.field_errors)
 
     def test_bulk_create_keeps_valid_rows_after_validation_failure(self) -> None:
-        successes, errors = self.serializer_class.bulk_create(
+        result = self.serializer_class.bulk_create(
             [
                 self.create_data("first"),
                 {"name": "missing-description"},
                 self.create_data("last"),
             ]
         )
-        self.assertEqual([obj.name for obj in successes], ["name-first", "name-last"])
-        self.assertEqual(len(errors), 1)
+        self.assertIsInstance(result, BulkResult)
+        self.assertEqual([obj.name for obj in result.succeeded], ["name-first", "name-last"])
+        self.assertTrue(result.has_errors)
+        self.assertEqual((result.success_count, result.failure_count), (2, 1))
+        self.assertEqual(result.failed[0].index, 1)
+        self.assertEqual(result.failed[0].code, "validation_error")
+        self.assertIn("description", result.failed[0].fields)
         self.assertEqual(self.model_class.objects.count(), 2)
+
+    def test_bulk_failure_classifies_validation_and_type_errors(self) -> None:
+        with self.assertRaises(ValidationError) as raised:
+            self.serializer_class.create_schema.model_validate({"name": "invalid"})
+        validation = self.serializer_class._bulk_failure(2, raised.exception)
+        self.assertEqual(validation.code, "validation_error")
+        self.assertIn("description", validation.fields)
+
+        invalid_type = self.serializer_class._bulk_failure(3, TypeError("bad target"))
+        self.assertEqual((invalid_type.index, invalid_type.code), (3, "invalid_type"))
 
     def test_bulk_update_and_destroy_preserve_partial_success(self) -> None:
         first = self.serializer_class.create(self.create_data("first"))
         second = self.serializer_class.create(self.create_data("second"))
-        updated, errors = self.serializer_class.bulk_update(
+        update_result = self.serializer_class.bulk_update(
             [
                 {"id": first.pk, "description": "changed"},
                 {"id": 999_999, "description": "missing"},
                 (second, {"description": "also changed"}),
             ]
         )
-        self.assertEqual([obj.pk for obj in updated], [first.pk, second.pk])
-        self.assertEqual(len(errors), 1)
+        self.assertEqual([obj.pk for obj in update_result.succeeded], [first.pk, second.pk])
+        self.assertEqual(update_result.failed[0].index, 1)
+        self.assertEqual(update_result.failed[0].pk, 999_999)
+        self.assertEqual(update_result.failed[0].code, "not_found")
         self.assertEqual(
             self.model_class.objects.get(pk=first.pk).description, "changed"
         )
 
         expected_pks = [first.pk, second.pk]
-        destroyed, errors = self.serializer_class.bulk_destroy(
+        destroy_result = self.serializer_class.bulk_destroy(
             [first, 999_999, second.pk]
         )
-        self.assertEqual(destroyed, expected_pks)
-        self.assertEqual(len(errors), 1)
+        self.assertEqual(destroy_result.succeeded, expected_pks)
+        self.assertEqual(destroy_result.failed[0].index, 1)
+        self.assertEqual(destroy_result.failed[0].pk, 999_999)
         self.assertFalse(self.model_class.objects.exists())
 
     async def test_async_bulk_partial_success(self) -> None:
-        created, errors = await self.serializer_class.abulk_create(
+        create_result = await self.serializer_class.abulk_create(
             [self.create_data("first"), {"name": "invalid"}, self.create_data("last")]
         )
+        created = create_result.succeeded
         self.assertEqual([obj.name for obj in created], ["name-first", "name-last"])
-        self.assertEqual(len(errors), 1)
-        updated, errors = await self.serializer_class.abulk_update(
+        self.assertEqual(create_result.failed[0].index, 1)
+        update_result = await self.serializer_class.abulk_update(
             [
                 {"id": created[0].pk, "description": "changed"},
                 {"id": 999_999, "description": "missing"},
                 (created[1], {"description": "also changed"}),
             ]
         )
-        self.assertEqual([obj.pk for obj in updated], [obj.pk for obj in created])
-        self.assertEqual(len(errors), 1)
+        self.assertEqual([obj.pk for obj in update_result.succeeded], [obj.pk for obj in created])
+        self.assertEqual(update_result.failed[0].pk, 999_999)
         expected_pks = [obj.pk for obj in created]
-        destroyed, errors = await self.serializer_class.abulk_destroy(
+        destroy_result = await self.serializer_class.abulk_destroy(
             [created[0], 999_999, created[1].pk]
         )
-        self.assertEqual(destroyed, expected_pks)
-        self.assertEqual(len(errors), 1)
+        self.assertEqual(destroy_result.succeeded, expected_pks)
+        self.assertEqual(destroy_result.failed[0].pk, 999_999)
         self.assertFalse(await self.model_class.objects.aexists())
 
     def test_get_supports_exactly_one_lookup_strategy(self) -> None:

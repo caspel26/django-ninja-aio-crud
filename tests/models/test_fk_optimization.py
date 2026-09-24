@@ -121,7 +121,7 @@ class FKOptimizationTestCase(TestCase):
             return original_get_object(util, request, pk=pk, **kwargs)
 
         with mock.patch.object(ModelUtil, "get_object", counting_get_object):
-            created, errors = models.TestModelSerializerForeignKey.bulk_create(
+            create_result = models.TestModelSerializerForeignKey.bulk_create(
                 [
                     {
                         "name": f"item-{index}",
@@ -131,11 +131,11 @@ class FKOptimizationTestCase(TestCase):
                     for index in range(3)
                 ]
             )
-            self.assertEqual(errors, [])
+            self.assertEqual(create_result.failed, [])
             self.assertEqual(resolved_pks, [self.rev_fk_1.pk])
 
             resolved_pks.clear()
-            updated, errors = models.TestModelSerializerForeignKey.bulk_update(
+            update_result = models.TestModelSerializerForeignKey.bulk_update(
                 [
                     (
                         obj,
@@ -144,11 +144,11 @@ class FKOptimizationTestCase(TestCase):
                             "test_model_serializer": self.rev_fk_2.pk,
                         },
                     )
-                    for obj in created
+                    for obj in create_result.succeeded
                 ]
             )
-        self.assertEqual(errors, [])
-        self.assertEqual(len(updated), 3)
+        self.assertEqual(update_result.failed, [])
+        self.assertEqual(update_result.success_count, 3)
         self.assertEqual(resolved_pks, [self.rev_fk_2.pk])
 
     @async_to_sync

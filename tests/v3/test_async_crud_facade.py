@@ -6,9 +6,8 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db import models
 from django.test import TestCase
 from ninja import Schema
-from pydantic import ValidationError
 
-from ninja_aio.exceptions import NotFoundError
+from ninja_aio.exceptions import NotFoundError, OperationValidationError
 from tests.test_app.models import (
     TestModel,
     TestModelForeignKey,
@@ -65,8 +64,10 @@ class AsyncCrudFacadeContractMixin:
         self.assertIsNotNone(from_schema.pk)
 
     async def test_acreate_validates_direct_input(self) -> None:
-        with self.assertRaises(ValidationError):
+        with self.assertRaises(OperationValidationError) as raised:
             await self.serializer_class.acreate({"name": "missing-description"})
+        self.assertEqual(raised.exception.code, "validation_error")
+        self.assertIn("description", raised.exception.field_errors)
 
     async def test_aget_supports_exactly_one_lookup_strategy(self) -> None:
         obj = await self.serializer_class.acreate(self.create_data("get"))
