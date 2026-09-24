@@ -29,7 +29,7 @@ from django.conf import settings
 from ninja import Schema
 from django.core.exceptions import FieldDoesNotExist, ImproperlyConfigured
 from ninja.orm import create_schema
-from django.db import connections, models
+from django.db import connections, models, router, transaction
 from django.db.models import aprefetch_related_objects
 from django.http import HttpRequest
 from django.db.models.fields.related_descriptors import (
@@ -61,6 +61,7 @@ from ninja_aio.schemas.helpers import (
 )
 from ninja_aio.models import transformations as model_transformations
 from ninja_aio.models.utils import ModelUtil
+from ninja_aio.decorators.views import AsyncAtomicContextManager
 
 # TypeVar for generic model typing in Serializers
 ModelT = TypeVar("ModelT", bound=models.Model)
@@ -1756,6 +1757,7 @@ class BaseSerializer:
         data: InputData,
         *,
         request: HttpRequest | None,
+        fk_cache: dict[tuple[type, Any], Any] | None = None,
     ) -> models.Model:
         """Execute asynchronous update without refetching loaded targets."""
         pk, instance = cls._resolve_operation_target(target)
@@ -1764,6 +1766,7 @@ class BaseSerializer:
             request,
             validated,
             pk,
+            fk_cache=fk_cache,
             instance=instance,
         )
 
@@ -1784,11 +1787,158 @@ class BaseSerializer:
         data: InputData,
         *,
         request: HttpRequest | None,
+        fk_cache: dict[tuple[type, Any], Any] | None = None,
     ) -> models.Model:
         """Execute synchronous creation for a concrete serializer class."""
         return cls.util.create_instance(
-            request, cls._validate_operation_data("create", data)
+            request, cls._validate_operation_data("create", data), fk_cache=fk_cache
         )
+
+    @classmethod
+    def _bulk_create_operation(
+        cls,
+        items: Iterable[InputData],
+        *,
+        request: HttpRequest | None,
+    ) -> tuple[list[models.Model], list[dict[str, str]]]:
+        """Create each item independently, retaining successful model instances."""
+        successes: list[models.Model] = []
+        errors: list[dict[str, str]] = []
+        fk_cache: dict[tuple[type, Any], Any] = {}
+        for data in items:
+            try:
+                with transaction.atomic(using=router.db_for_write(cls._get_model())):
+                    successes.append(
+                        cls._create_operation(data, request=request, fk_cache=fk_cache)
+                    )
+            except Exception as exc:
+                errors.append(cls.util._format_bulk_error(exc))
+        return successes, errors
+
+    @classmethod
+    def _bulk_update_item(
+        cls, item: InputData | tuple[models.Model | PrimaryKey, InputData]
+    ) -> tuple[models.Model | PrimaryKey, InputData]:
+        if isinstance(item, tuple):
+            return item
+        payload = (
+            item.model_dump(by_alias=True, exclude_unset=True)
+            if isinstance(item, Schema)
+            else dict(item)
+        )
+        target = payload.pop(cls._get_model()._meta.pk.name)
+        return target, payload
+
+    @classmethod
+    async def abulk_create(
+        cls,
+        items: Iterable[InputData],
+        *,
+        request: HttpRequest | None = None,
+    ) -> tuple[list[models.Model], list[dict[str, str]]]:
+        successes: list[models.Model] = []
+        errors: list[dict[str, str]] = []
+        fk_cache: dict[tuple[type, Any], Any] = {}
+        for data in items:
+            try:
+                async with AsyncAtomicContextManager(
+                    using=router.db_for_write(cls._get_model())
+                ):
+                    validated = cls._validate_operation_data("create", data)
+                    successes.append(
+                        await cls.util._create_instance(request, validated, fk_cache)
+                    )
+            except Exception as exc:
+                errors.append(cls.util._format_bulk_error(exc))
+        return successes, errors
+
+    @classmethod
+    def bulk_update(
+        cls,
+        items: Iterable[InputData | tuple[models.Model | PrimaryKey, InputData]],
+        *,
+        request: HttpRequest | None = None,
+    ) -> tuple[list[models.Model], list[dict[str, str]]]:
+        successes: list[models.Model] = []
+        errors: list[dict[str, str]] = []
+        fk_cache: dict[tuple[type, Any], Any] = {}
+        for item in items:
+            try:
+                target, data = cls._bulk_update_item(item)
+                with transaction.atomic(using=router.db_for_write(cls._get_model())):
+                    successes.append(
+                        cls._update_operation(
+                            target, data, request=request, fk_cache=fk_cache
+                        )
+                    )
+            except Exception as exc:
+                errors.append(cls.util._format_bulk_error(exc))
+        return successes, errors
+
+    @classmethod
+    async def abulk_update(
+        cls,
+        items: Iterable[InputData | tuple[models.Model | PrimaryKey, InputData]],
+        *,
+        request: HttpRequest | None = None,
+    ) -> tuple[list[models.Model], list[dict[str, str]]]:
+        successes: list[models.Model] = []
+        errors: list[dict[str, str]] = []
+        fk_cache: dict[tuple[type, Any], Any] = {}
+        for item in items:
+            try:
+                target, data = cls._bulk_update_item(item)
+                async with AsyncAtomicContextManager(
+                    using=router.db_for_write(cls._get_model())
+                ):
+                    successes.append(
+                        await cls._aupdate_operation(
+                            target, data, request=request, fk_cache=fk_cache
+                        )
+                    )
+            except Exception as exc:
+                errors.append(cls.util._format_bulk_error(exc))
+        return successes, errors
+
+    @classmethod
+    def bulk_destroy(
+        cls,
+        targets: Iterable[models.Model | PrimaryKey],
+        *,
+        request: HttpRequest | None = None,
+    ) -> tuple[list[PrimaryKey], list[dict[str, str]]]:
+        successes: list[PrimaryKey] = []
+        errors: list[dict[str, str]] = []
+        for target in targets:
+            try:
+                with transaction.atomic(using=router.db_for_write(cls._get_model())):
+                    pk, _ = cls._resolve_operation_target(target)
+                    cls._destroy_operation(target, request=request)
+                    successes.append(pk)
+            except Exception as exc:
+                errors.append(cls.util._format_bulk_error(exc))
+        return successes, errors
+
+    @classmethod
+    async def abulk_destroy(
+        cls,
+        targets: Iterable[models.Model | PrimaryKey],
+        *,
+        request: HttpRequest | None = None,
+    ) -> tuple[list[PrimaryKey], list[dict[str, str]]]:
+        successes: list[PrimaryKey] = []
+        errors: list[dict[str, str]] = []
+        for target in targets:
+            try:
+                async with AsyncAtomicContextManager(
+                    using=router.db_for_write(cls._get_model())
+                ):
+                    pk, _ = cls._resolve_operation_target(target)
+                    await cls._adestroy_operation(target, request=request)
+                    successes.append(pk)
+            except Exception as exc:
+                errors.append(cls.util._format_bulk_error(exc))
+        return successes, errors
 
     @classmethod
     def _get_operation(
@@ -1812,6 +1962,7 @@ class BaseSerializer:
         data: InputData,
         *,
         request: HttpRequest | None,
+        fk_cache: dict[tuple[type, Any], Any] | None = None,
     ) -> models.Model:
         """Execute synchronous update without refetching loaded targets."""
         pk, instance = cls._resolve_operation_target(target)
@@ -1820,6 +1971,7 @@ class BaseSerializer:
             cls._validate_operation_data("update", data),
             pk,
             instance=instance,
+            fk_cache=fk_cache,
         )
 
     @classmethod
@@ -1898,6 +2050,15 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
     ) -> ModelSerializerT:
         """Create and return one model instance synchronously."""
         return cast(ModelSerializerT, cls._create_operation(data, request=request))
+
+    @classmethod
+    def bulk_create(
+        cls: type[ModelSerializerT],
+        items: Iterable[InputData],
+        *,
+        request: HttpRequest | None = None,
+    ) -> tuple[list[ModelSerializerT], list[dict[str, str]]]:
+        return cls._bulk_create_operation(items, request=request)
 
     @classmethod
     def get(
@@ -2710,6 +2871,15 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
     ) -> ModelT:
         """Create and return one model instance synchronously."""
         return cast(ModelT, cls._create_operation(data, request=request))
+
+    @classmethod
+    def bulk_create(
+        cls: type["Serializer[ModelT]"],
+        items: Iterable[InputData],
+        *,
+        request: HttpRequest | None = None,
+    ) -> tuple[list[ModelT], list[dict[str, str]]]:
+        return cls._bulk_create_operation(items, request=request)
 
     @classmethod
     def get(

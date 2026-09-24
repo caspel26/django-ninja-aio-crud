@@ -1005,7 +1005,7 @@ class ModelUtil(Generic[ModelT]):
             return ModelUtil(rel_model, serializer_class=serializer_class)
         return None
 
-    async def _resolve_fk(
+    async def _aresolve_fk(
         self,
         request: HttpRequest | None,
         payload: dict,
@@ -1101,7 +1101,7 @@ class ModelUtil(Generic[ModelT]):
             self._decode_binary(payload, k, v, field_obj)
             if isinstance(field_obj, models.ForeignKey) and v is not None:
                 fk_tasks.append(
-                    self._resolve_fk(request, payload, k, v, field_obj, fk_cache)
+                    self._aresolve_fk(request, payload, k, v, field_obj, fk_cache)
                 )
 
         if fk_tasks:
@@ -1179,6 +1179,7 @@ class ModelUtil(Generic[ModelT]):
         self,
         request: HttpRequest | None,
         data: Schema,
+        fk_cache: dict[tuple[type, Any], Any] | None = None,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Transform input data using only synchronous field resolution."""
         payload, plan = self._prepare_input_payload(data)
@@ -1189,59 +1190,117 @@ class ModelUtil(Generic[ModelT]):
         for (name, value), field in zip(fields_to_process, fields):
             self._decode_binary(payload, name, value, field)
             if isinstance(field, models.ForeignKey) and value is not None:
-                related_model = field.related_model
-                related_util = self._scoped_fk_util(related_model)
-                if related_util is not None:
-                    payload[name] = related_util.get_object(request, pk=value)
-                else:
-                    try:
-                        payload[name] = related_model._default_manager.get(pk=value)
-                    except related_model.DoesNotExist as exc:
-                        raise NotFoundError(related_model) from exc
+                payload[name] = self._resolve_fk(
+                    request, field.related_model, value, fk_cache
+                )
         return plan.model_payload(), plan.customs
+
+    def _resolve_fk(
+        self,
+        request: HttpRequest | None,
+        related_model: type[models.Model],
+        value: Any,
+        fk_cache: dict[tuple[type, Any], Any] | None,
+    ) -> models.Model:
+        cache_key = (related_model, value)
+        if fk_cache is not None and cache_key in fk_cache:
+            return fk_cache[cache_key]
+
+        related_util = self._scoped_fk_util(related_model)
+        if related_util is not None:
+            obj = related_util.get_object(request, pk=value)
+        else:
+            try:
+                obj = related_model._default_manager.get(pk=value)
+            except related_model.DoesNotExist as exc:
+                raise NotFoundError(related_model) from exc
+        if fk_cache is not None:
+            fk_cache[cache_key] = obj
+        return obj
 
     def create_instance(
         self,
         request: HttpRequest | None,
         data: Schema,
+        fk_cache: dict[tuple[type, Any], Any] | None = None,
+        extra_fields: dict[str, Any] | None = None,
     ) -> ModelT:
         """Create one model instance with Django's synchronous ORM."""
-        if self.nested_fields:
+        using = router.db_for_write(self.model)
+        if any(
+            router.db_for_write(child) != using
+            for child, _ in self.nested_fields.values()
+        ):
             raise ImproperlyConfigured(
-                "Synchronous nested writes are not available before hook normalization"
+                "Nested writes require one database for the owned graph"
             )
         from ninja_aio.models.hooks import (
-            OperationContext,
-            _execute_hooks_sync,
             get_hooks,
-            invoke_hook_sync,
             suppress_signals_sync,
         )
 
-        payload, customs = self.parse_input_data_sync(request, data)
+        payload, customs = self.parse_input_data_sync(request, data, fk_cache)
+        if extra_fields:
+            for name in extra_fields:
+                payload.pop(self.model._meta.get_field(name).attname, None)
+            payload.update(extra_fields)
         hooks = get_hooks(self.serializer_class or self.model)
         atomic = (
-            transaction.atomic(using=router.db_for_write(self.model))
-            if hooks
+            transaction.atomic(using=using)
+            if hooks or self.nested_fields
             else nullcontext()
         )
         with atomic:
             with suppress_signals_sync():
                 obj = self.model._default_manager.create(**payload)
-            context = OperationContext(
-                request, "create", self.serializer or obj, obj, payload
-            )
-            if self.with_serializer:
-                invoke_hook_sync(context, "custom_actions", customs, obj)
-                invoke_hook_sync(context, "post_create", obj)
-                if hooks:
-                    _execute_hooks_sync(self.serializer, hooks["create"], obj)
-            elif isinstance(self.model, ModelSerializerMeta):
-                invoke_hook_sync(context, "custom_actions", customs)
-                invoke_hook_sync(context, "post_create")
-                if hooks:
-                    _execute_hooks_sync(obj, hooks["create"])
+            self._invoke_create_hooks(request, obj, payload, customs, hooks)
+            self._create_nested_children(request, data, obj)
         return obj
+
+    def _invoke_create_hooks(
+        self,
+        request: HttpRequest | None,
+        obj: ModelT,
+        payload: dict,
+        customs: dict,
+        hooks: dict | None,
+    ) -> None:
+        from ninja_aio.models.hooks import (
+            OperationContext,
+            _execute_hooks_sync,
+            invoke_hook_sync,
+        )
+
+        context = OperationContext(
+            request, "create", self.serializer or obj, obj, payload
+        )
+        if self.with_serializer:
+            invoke_hook_sync(context, "custom_actions", customs, obj)
+            invoke_hook_sync(context, "post_create", obj)
+            if hooks:
+                _execute_hooks_sync(self.serializer, hooks["create"], obj)
+        elif isinstance(self.model, ModelSerializerMeta):
+            invoke_hook_sync(context, "custom_actions", customs)
+            invoke_hook_sync(context, "post_create")
+            if hooks:
+                _execute_hooks_sync(obj, hooks["create"])
+
+    def _create_nested_children(
+        self, request: HttpRequest | None, data: Schema, obj: ModelT
+    ) -> None:
+        for name, (child_model, fk_name) in self.nested_fields.items():
+            child_util = ModelUtil(child_model)
+            child_schema = child_model.generate_nested_child_schema(fk_name)
+            for child_data in getattr(data, name, ()):
+                if not isinstance(child_data, child_schema):
+                    child_data = child_schema.model_validate(
+                        child_data.model_dump(by_alias=True)
+                        if isinstance(child_data, Schema)
+                        else child_data
+                    )
+                child_util.create_instance(
+                    request, child_data, extra_fields={fk_name: obj}
+                )
 
     def update_instance(
         self,
@@ -1249,6 +1308,7 @@ class ModelUtil(Generic[ModelT]):
         data: Schema,
         pk: PrimaryKey,
         instance: ModelT | None = None,
+        fk_cache: dict[tuple[type, Any], Any] | None = None,
     ) -> ModelT:
         """Update one model instance with Django's synchronous ORM."""
         from ninja_aio.models.hooks import (
@@ -1261,7 +1321,7 @@ class ModelUtil(Generic[ModelT]):
         )
 
         obj = instance or self.get_object(request, pk, is_for="read")
-        payload, customs = self.parse_input_data_sync(request, data)
+        payload, customs = self.parse_input_data_sync(request, data, fk_cache)
         hooks = get_hooks(self.serializer_class or self.model)
         changed = (
             detect_changed_fields(obj, payload, hooks["update_field"])

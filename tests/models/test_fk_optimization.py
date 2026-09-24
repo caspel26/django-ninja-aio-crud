@@ -15,6 +15,7 @@ from ninja import Schema
 from tests.test_app import models
 from tests.test_app.serializers import TestModelForeignKeySerializer
 from ninja_aio.models import ModelUtil
+from ninja_aio.exceptions import NotFoundError
 
 
 class _FKCreateSchema(Schema):
@@ -95,6 +96,60 @@ class FKOptimizationTestCase(TestCase):
         )
 
         self.assertEqual(obj.test_model, parent)
+
+    def test_sync_fk_without_serializer_uses_manager_and_reports_missing(self):
+        related = models.TestModel.objects.create(name="plain", description="d")
+        with mock.patch.object(ModelUtil, "_scoped_fk_util", return_value=None):
+            self.assertEqual(
+                self.model_util._resolve_fk(
+                    self.request, models.TestModel, related.pk, None
+                ),
+                related,
+            )
+            with self.assertRaises(NotFoundError):
+                self.model_util._resolve_fk(
+                    self.request, models.TestModel, 999_999, None
+                )
+
+    def test_bulk_sync_create_and_update_share_fk_cache_per_batch(self):
+        original_get_object = ModelUtil.get_object
+        resolved_pks = []
+
+        def counting_get_object(util, request, pk=None, **kwargs):
+            if util.model is models.TestModelSerializerReverseForeignKey:
+                resolved_pks.append(pk)
+            return original_get_object(util, request, pk=pk, **kwargs)
+
+        with mock.patch.object(ModelUtil, "get_object", counting_get_object):
+            created, errors = models.TestModelSerializerForeignKey.bulk_create(
+                [
+                    {
+                        "name": f"item-{index}",
+                        "description": "d",
+                        "test_model_serializer_id": self.rev_fk_1.pk,
+                    }
+                    for index in range(3)
+                ]
+            )
+            self.assertEqual(errors, [])
+            self.assertEqual(resolved_pks, [self.rev_fk_1.pk])
+
+            resolved_pks.clear()
+            updated, errors = models.TestModelSerializerForeignKey.bulk_update(
+                [
+                    (
+                        obj,
+                        {
+                            "description": "d",
+                            "test_model_serializer": self.rev_fk_2.pk,
+                        },
+                    )
+                    for obj in created
+                ]
+            )
+        self.assertEqual(errors, [])
+        self.assertEqual(len(updated), 3)
+        self.assertEqual(resolved_pks, [self.rev_fk_2.pk])
 
     @async_to_sync
     async def test_create_s_with_fk_returns_correct_data(self):

@@ -129,6 +129,10 @@ class TestModelSerializerForeignKey(BaseTestModelSerializer):
             "test_model_serializer"
         ]
 
+    class UpdateSerializer:
+        fields = BaseTestModelSerializer.UpdateSerializer.fields
+        optionals = [("test_model_serializer", int)]
+
 
 class TestModelSerializerReverseOneToOne(BaseTestModelSerializer):
     class ReadSerializer:

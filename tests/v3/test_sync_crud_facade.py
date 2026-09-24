@@ -67,6 +67,65 @@ class SyncCrudFacadeContractMixin:
         with self.assertRaises(ValidationError):
             self.serializer_class.create({"name": "missing-description"})
 
+    def test_bulk_create_keeps_valid_rows_after_validation_failure(self) -> None:
+        successes, errors = self.serializer_class.bulk_create(
+            [
+                self.create_data("first"),
+                {"name": "missing-description"},
+                self.create_data("last"),
+            ]
+        )
+        self.assertEqual([obj.name for obj in successes], ["name-first", "name-last"])
+        self.assertEqual(len(errors), 1)
+        self.assertEqual(self.model_class.objects.count(), 2)
+
+    def test_bulk_update_and_destroy_preserve_partial_success(self) -> None:
+        first = self.serializer_class.create(self.create_data("first"))
+        second = self.serializer_class.create(self.create_data("second"))
+        updated, errors = self.serializer_class.bulk_update(
+            [
+                {"id": first.pk, "description": "changed"},
+                {"id": 999_999, "description": "missing"},
+                (second, {"description": "also changed"}),
+            ]
+        )
+        self.assertEqual([obj.pk for obj in updated], [first.pk, second.pk])
+        self.assertEqual(len(errors), 1)
+        self.assertEqual(
+            self.model_class.objects.get(pk=first.pk).description, "changed"
+        )
+
+        expected_pks = [first.pk, second.pk]
+        destroyed, errors = self.serializer_class.bulk_destroy(
+            [first, 999_999, second.pk]
+        )
+        self.assertEqual(destroyed, expected_pks)
+        self.assertEqual(len(errors), 1)
+        self.assertFalse(self.model_class.objects.exists())
+
+    async def test_async_bulk_partial_success(self) -> None:
+        created, errors = await self.serializer_class.abulk_create(
+            [self.create_data("first"), {"name": "invalid"}, self.create_data("last")]
+        )
+        self.assertEqual([obj.name for obj in created], ["name-first", "name-last"])
+        self.assertEqual(len(errors), 1)
+        updated, errors = await self.serializer_class.abulk_update(
+            [
+                {"id": created[0].pk, "description": "changed"},
+                {"id": 999_999, "description": "missing"},
+                (created[1], {"description": "also changed"}),
+            ]
+        )
+        self.assertEqual([obj.pk for obj in updated], [obj.pk for obj in created])
+        self.assertEqual(len(errors), 1)
+        expected_pks = [obj.pk for obj in created]
+        destroyed, errors = await self.serializer_class.abulk_destroy(
+            [created[0], 999_999, created[1].pk]
+        )
+        self.assertEqual(destroyed, expected_pks)
+        self.assertEqual(len(errors), 1)
+        self.assertFalse(await self.model_class.objects.aexists())
+
     def test_get_supports_exactly_one_lookup_strategy(self) -> None:
         obj = self.serializer_class.create(self.create_data("get"))
 
