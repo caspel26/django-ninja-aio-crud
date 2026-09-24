@@ -184,7 +184,7 @@ class APIViewSet(API, Generic[ModelT]):
         class BookAPI(APIViewSet):  # No generic needed
             serializer_class = BookSerializer
             async def my_method(self, request, data):
-                book: Book = await self.serializer.create(data)  # Typed!
+                book: Book = await self.serializer.acreate(data)  # Typed!
 
     Basic Usage
     -----------

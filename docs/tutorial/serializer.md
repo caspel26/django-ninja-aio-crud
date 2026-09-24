@@ -590,19 +590,20 @@ class ArticleSerializer(serializers.Serializer):
 
 ## :material-pin: Instance Binding
 
-Instead of passing a model instance to every method call, you can bind it once to the serializer — either at construction time or via attribute assignment.
+For saving and change tracking, you can bind a model instance to the serializer at construction time or via attribute assignment. CRUD and dump facades require an explicit target.
 
 ### Bind at Construction
 
 ```python
 serializer = ArticleSerializer(instance=article)
 
-# All these use the bound instance — no need to pass it again
-await serializer.update({"title": "New title"})
+# These use the bound instance
 await serializer.save()
-data   = await serializer.model_dump()
 changed = serializer.has_changed("title")
 changed = await serializer.ahas_changed("title")
+
+article = await ArticleSerializer.aupdate(article, {"title": "New title"})
+data = await ArticleSerializer.amodel_dump(article)
 ```
 
 ### Assign After Construction
@@ -611,7 +612,7 @@ changed = await serializer.ahas_changed("title")
 serializer = ArticleSerializer()
 serializer.instance = article   # set later
 
-data = await serializer.model_dump()
+data = await ArticleSerializer.amodel_dump(article)
 ```
 
 ### Replacing the Bound Instance
@@ -622,11 +623,11 @@ serializer.instance = other_article   # replace with a different object
 
 ### Explicit Argument Takes Priority
 
-If you supply an instance directly to the method call, it takes priority over `self.instance`:
+Saving and change tracking accept an explicit instance, which takes priority over `self.instance`:
 
 ```python
 serializer = ArticleSerializer(instance=article_a)
-data = await serializer.model_dump(article_b)  # uses article_b, not article_a
+await serializer.save(article_b)  # uses article_b, not article_a
 ```
 
 ### Error When No Instance Is Available

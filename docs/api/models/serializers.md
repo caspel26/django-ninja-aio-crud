@@ -873,17 +873,18 @@ Behavior:
 
 ## :material-pin: Instance Binding
 
-You can bind a model instance to a serializer at construction time (or assign it later via attribute), so you don't have to pass it on every method call.
+You can bind a model instance to a serializer at construction time (or assign it later via attribute) for saving and change tracking. CRUD and dump methods require an explicit target.
 
 ```python
 # Bind at construction
 serializer = ArticleSerializer(instance=article)
 
-await serializer.update({"title": "New title"})   # uses bound instance
 await serializer.save()                             # uses bound instance
-data = await serializer.model_dump()                # uses bound instance
 changed = serializer.has_changed("title")           # uses bound instance
 changed = await serializer.ahas_changed("title")    # uses bound instance
+
+article = await ArticleSerializer.aupdate(article, {"title": "New title"})
+data = await ArticleSerializer.amodel_dump(article)
 
 # Assign or replace after construction
 serializer = ArticleSerializer()
@@ -926,32 +927,29 @@ When using a Serializer with APIViewSet, CRUD operations automatically invoke th
 
 ### Serialization Methods
 
-**`model_dump(instance=None, schema=None)`** — Serialize a single instance to dict.
-Falls back to the bound `self.instance` when `instance` is not supplied.
+**`model_dump(instance, *, schema=None)`** — Serialize an already-loaded instance without querying.
+Use `amodel_dump(instance, *, schema=None)` to load required relations asynchronously.
 
 ```python
-# Pass instance explicitly
-data = await serializer.model_dump(article)
-
-# Use bound instance
-serializer = ArticleSerializer(instance=article)
-data = await serializer.model_dump()
+data = ArticleSerializer.model_dump(article)
+data = await ArticleSerializer.amodel_dump(article)
 
 # Use a specific schema
 custom_schema = ArticleSerializer.generate_read_s()
-data = await serializer.model_dump(article, schema=custom_schema)
+data = await ArticleSerializer.amodel_dump(article, schema=custom_schema)
 ```
 
-**`models_dump(instances, schema=None)`** - Serialize multiple instances to list of dicts
+**`model_dumps(instances, *, schema=None)`** — Serialize evaluated instances without querying.
+Use `amodel_dumps(instances, *, schema=None)` for asynchronous queryset evaluation and relation loading.
 
 ```python
-# Use default schema
-articles = Article.objects.all()
-data = await serializer.models_dump(articles)
+articles = list(Article.objects.all())
+data = ArticleSerializer.model_dumps(articles)
+data = await ArticleSerializer.amodel_dumps(Article.objects.all())
 
 # Use a specific schema
 custom_schema = ArticleSerializer.generate_read_s()
-data = await serializer.models_dump(articles, schema=custom_schema)
+data = await ArticleSerializer.amodel_dumps(Article.objects.all(), schema=custom_schema)
 ```
 
 **`save(instance=None)`** — Save an instance with lifecycle hooks.
@@ -966,20 +964,12 @@ serializer = ArticleSerializer(instance=article)
 await serializer.save()
 ```
 
-**`update(payload, instance=None)`** — Apply payload to an instance and save.
-Falls back to the bound `self.instance` when `instance` is not supplied.
-
-!!! warning "Signature change in v2.24.0"
-    The parameter order changed: `payload` is now first, `instance` is the optional second argument.
-    Old: `update(instance, payload)` → New: `update(payload, instance=None)`.
+**`update(target, data, *, request=None)`** — Update an explicit instance or primary key synchronously.
+Use `aupdate(target, data, *, request=None)` asynchronously. Neither uses a bound instance implicitly.
 
 ```python
-# Pass instance explicitly
-await serializer.update({"title": "New"}, article)
-
-# Use bound instance
-serializer = ArticleSerializer(instance=article)
-await serializer.update({"title": "New"})
+article = ArticleSerializer.update(article, {"title": "New"})
+article = await ArticleSerializer.aupdate(article, {"title": "New"})
 ```
 
 ### Field Change Detection
@@ -1005,7 +995,7 @@ class ArticleViewSet(APIViewSet):
             await send_notification(f"Title updated: {article.title}")
 
         await article.asave()
-        return await self.serializer.model_dump(article)
+        return await self.serializer.amodel_dump(article)
 ```
 
 **`ahas_changed(field, instance=None)`** — Async version of `has_changed`. Use this inside async hooks or async views.

@@ -2410,23 +2410,23 @@ class SerializerCRUDMethodsTestCase(TestCase):
         self.serializer = SerializerForCRUD()
 
     async def test_serializer_update(self):
-        """Serializer.update sets attrs and saves (explicit instance arg)."""
+        """Serializer.aupdate sets attrs and saves an explicit instance."""
         instance = await app_models.TestModel.objects.aget(pk=self.obj.pk)
-        updated = await self.serializer.update(
-            {"name": "Updated", "description": "Updated desc"}, instance
+        updated = await self.serializer.aupdate(
+            instance, {"name": "Updated", "description": "Updated desc"}
         )
         self.assertEqual(updated.name, "Updated")
         self.assertEqual(updated.description, "Updated desc")
 
     async def test_serializer_model_dump(self):
         instance = await app_models.TestModel.objects.aget(pk=self.obj.pk)
-        data = await self.serializer.model_dump(instance)
+        data = await self.serializer.amodel_dump(instance)
         self.assertIn("id", data)
         self.assertIn("name", data)
 
     async def test_serializer_models_dump(self):
         qs = app_models.TestModel.objects.filter(pk=self.obj.pk)
-        data = await self.serializer.models_dump(qs)
+        data = await self.serializer.amodel_dumps(qs)
         self.assertIsInstance(data, list)
         self.assertEqual(len(data), 1)
 
@@ -2920,8 +2920,7 @@ class _InstanceBindingSerializer(serializers.Serializer):
 @tag("serializer_instance_binding", "serializers")
 class SerializerInstanceBindingTestCase(TestCase):
     """Verify that a Serializer can have a bound instance set at construction
-    or via attribute assignment, and that instance-dependent methods use it
-    when no explicit instance argument is supplied."""
+    or via attribute assignment for save and change tracking."""
 
     @classmethod
     def setUpTestData(cls):
@@ -3007,67 +3006,15 @@ class SerializerInstanceBindingTestCase(TestCase):
         with self.assertRaises(ValueError):
             await self.s.save()
 
-    # ------------------------------------------------------------------
-    # update() with bound instance
-    # ------------------------------------------------------------------
-
-    async def test_update_uses_bound_instance(self):
-        """update(payload) uses self.instance when no instance arg is given."""
-        obj = await TestModelForeignKey.objects.acreate(
-            name="before", description="d", test_model=self.parent
-        )
-        self.s.instance = obj
-        updated = await self.s.update({"name": "after", "description": "d"})
-        self.assertEqual(updated.name, "after")
-
-    async def test_update_explicit_instance_overrides_bound(self):
-        """update(payload, instance) uses the explicit instance, not self.instance."""
-        bound_obj = await TestModelForeignKey.objects.acreate(
+    def test_facade_operations_require_explicit_target_even_when_bound(self):
+        obj = TestModelForeignKey.objects.create(
             name="bound", description="d", test_model=self.parent
         )
-        explicit_obj = await TestModelForeignKey.objects.acreate(
-            name="explicit", description="d", test_model=self.parent
-        )
-        self.s.instance = bound_obj
-        updated = await self.s.update({"name": "changed"}, explicit_obj)
-        self.assertEqual(updated.pk, explicit_obj.pk)
-        self.assertEqual(updated.name, "changed")
-
-    async def test_update_raises_without_instance(self):
-        """update() raises ValueError when no instance is bound or supplied."""
-        with self.assertRaises(ValueError):
-            await self.s.update({"name": "x"})
-
-    # ------------------------------------------------------------------
-    # model_dump() with bound instance
-    # ------------------------------------------------------------------
-
-    async def test_model_dump_uses_bound_instance(self):
-        """model_dump() with no arg serializes self.instance."""
-        obj = await TestModelForeignKey.objects.acreate(
-            name="dump_bound", description="d", test_model=self.parent
-        )
         self.s.instance = obj
-        data = await self.s.model_dump()
-        self.assertEqual(data["id"], obj.pk)
-        self.assertEqual(data["name"], "dump_bound")
-
-    async def test_model_dump_explicit_instance_overrides_bound(self):
-        """model_dump(instance) uses the explicit instance, not self.instance."""
-        bound_obj = await TestModelForeignKey.objects.acreate(
-            name="bound_dump", description="d", test_model=self.parent
-        )
-        explicit_obj = await TestModelForeignKey.objects.acreate(
-            name="explicit_dump", description="d", test_model=self.parent
-        )
-        self.s.instance = bound_obj
-        data = await self.s.model_dump(explicit_obj)
-        self.assertEqual(data["id"], explicit_obj.pk)
-
-    async def test_model_dump_raises_without_instance(self):
-        """model_dump() raises ValueError when no instance is bound or supplied."""
-        with self.assertRaises(ValueError):
-            await self.s.model_dump()
+        with self.assertRaises(TypeError):
+            self.s.update(data={"name": "changed"})
+        with self.assertRaises(TypeError):
+            self.s.model_dump()
 
     # ------------------------------------------------------------------
     # has_changed() with bound instance
@@ -3217,28 +3164,21 @@ class SerializerGetModelConfigUnknownTypeTestCase(TestCase):
 
 @tag("serializers", "coverage", "dump_schema")
 class SerializerGetDumpSchemaTestCase(TestCase):
-    """Cover serializers.py:2185, 2187 — _get_dump_schema fallback and passthrough."""
+    """Verify the shared dump schema selection for a standalone serializer."""
 
-    def test_get_dump_schema_falls_back_to_read_when_no_detail(self):
-        """When generate_detail_s() returns None, _get_dump_schema should return read schema."""
-        s = TestModelForeignKeySerializer()
-        read_schema = TestModelForeignKeySerializer.generate_read_s()
-        # Mock generate_detail_s to return None to hit the fallback path
-        with mock.patch.object(
-            type(s), "generate_detail_s", return_value=None
-        ):
-            schema = s._get_dump_schema(None)
+    def test_get_dump_schema_uses_detail_schema(self):
+        """Default single-object dumps use the generated detail schema."""
+        detail_schema = TestModelForeignKeySerializer.generate_detail_s()
+        schema = TestModelForeignKeySerializer._dump_schema("detail", None)
         self.assertIsNotNone(schema)
-        self.assertEqual(schema, read_schema)
+        self.assertEqual(schema, detail_schema)
 
     def test_get_dump_schema_returns_provided_schema(self):
         """When a schema is explicitly provided, it should be returned as-is."""
         from ninja import Schema
 
-        s = TestModelForeignKeySerializer()
-
         class CustomSchema(Schema):
             id: int
 
-        result = s._get_dump_schema(CustomSchema)
+        result = TestModelForeignKeySerializer._dump_schema("detail", CustomSchema)
         self.assertEqual(result, CustomSchema)

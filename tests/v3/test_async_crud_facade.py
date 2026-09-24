@@ -5,12 +5,22 @@ from unittest import mock
 from django.core.exceptions import ImproperlyConfigured
 from django.db import models
 from django.test import TestCase
+from ninja import Schema
 from pydantic import ValidationError
 
 from ninja_aio.exceptions import NotFoundError
-from tests.test_app.models import TestModel, TestModelSerializer
+from tests.test_app.models import (
+    TestModel,
+    TestModelForeignKey,
+    TestModelReverseForeignKey,
+    TestModelSerializer,
+    TestModelSerializerForeignKey,
+    TestModelSerializerReverseForeignKey,
+    TestModelWithSchemaOverrides,
+)
 from tests.test_app.serializers import (
     BookAsIdMetaSerializer,
+    TestModelForeignKeySerializer,
     TestModelWithValidatorsMetaSerializer,
 )
 
@@ -147,6 +157,63 @@ class ModelSerializerAsyncCrudFacadeTests(
     serializer_class = TestModelSerializer
     model_class = TestModelSerializer
 
+    async def test_amodel_dump_loads_fk_and_applies_schema_override(self) -> None:
+        parent = await TestModelSerializerReverseForeignKey.objects.acreate(
+            **self.create_data("parent")
+        )
+        child = await TestModelSerializerForeignKey.objects.acreate(
+            **self.create_data("child"), test_model_serializer=parent
+        )
+        unloaded = await TestModelSerializerForeignKey.objects.aget(pk=child.pk)
+
+        result = await TestModelSerializerForeignKey.amodel_dump(unloaded)
+        many = await TestModelSerializerForeignKey.amodel_dumps(
+            TestModelSerializerForeignKey.objects.filter(pk=child.pk)
+        )
+
+        self.assertEqual(result["test_model_serializer"]["name"], parent.name)
+        self.assertEqual(many[0]["test_model_serializer"]["name"], parent.name)
+
+        overridden = await TestModelWithSchemaOverrides.objects.acreate(
+            **self.create_data("override")
+        )
+        self.assertEqual(
+            (
+                await TestModelWithSchemaOverrides.amodel_dump(
+                    overridden, schema=TestModelWithSchemaOverrides.read_schema
+                )
+            )["name"],
+            overridden.name.upper(),
+        )
+
+    async def test_amodel_dumps_accepts_loaded_instances_with_custom_schema(
+        self,
+    ) -> None:
+        class CustomSchema(Schema):
+            name: str
+            extra: int = 7
+
+        instance = await self.serializer_class.acreate(self.create_data("custom"))
+
+        result = await self.serializer_class.amodel_dumps(
+            [instance], schema=CustomSchema
+        )
+
+        self.assertEqual(result, [{"name": instance.name, "extra": 7}])
+
+    async def test_amodel_dump_prefetches_reverse_relation(self) -> None:
+        parent = await TestModelSerializerReverseForeignKey.objects.acreate(
+            **self.create_data("reverse")
+        )
+        await TestModelSerializerForeignKey.objects.acreate(
+            **self.create_data("child"), test_model_serializer=parent
+        )
+        unloaded = await TestModelSerializerReverseForeignKey.objects.aget(pk=parent.pk)
+
+        result = await TestModelSerializerReverseForeignKey.amodel_dump(unloaded)
+
+        self.assertEqual(len(result["test_model_serializer_foreign_keys"]), 1)
+
 
 class StandaloneSerializerAsyncCrudFacadeTests(
     AsyncCrudFacadeContractMixin,
@@ -155,10 +222,10 @@ class StandaloneSerializerAsyncCrudFacadeTests(
     serializer_class = TestModelWithValidatorsMetaSerializer
     model_class = TestModel
 
-    async def test_v2_instance_create_remains_available(self) -> None:
+    def test_instance_create_is_synchronous(self) -> None:
         serializer = self.serializer_class()
 
-        obj = await serializer.create(self.create_data("legacy"))
+        obj = serializer.create(self.create_data("instance"))
 
         self.assertIsInstance(obj, self.model_class)
         self.assertIsNotNone(obj.pk)
@@ -166,3 +233,27 @@ class StandaloneSerializerAsyncCrudFacadeTests(
     async def test_acreate_requires_a_configured_schema(self) -> None:
         with self.assertRaisesRegex(ImproperlyConfigured, "create schema"):
             await BookAsIdMetaSerializer.acreate({"name": "book"})
+
+    async def test_amodel_dump_and_amodel_dumps(self) -> None:
+        instance = await self.serializer_class.acreate(self.create_data("dump"))
+
+        single = await self.serializer_class.amodel_dump(instance)
+        many = await self.serializer_class.amodel_dumps(
+            self.model_class.objects.filter(pk=instance.pk)
+        )
+
+        self.assertEqual(single["name"], instance.name)
+        self.assertEqual(many[0]["name"], instance.name)
+
+    async def test_amodel_dump_loads_standalone_fk(self) -> None:
+        parent = await TestModelReverseForeignKey.objects.acreate(
+            **self.create_data("parent")
+        )
+        child = await TestModelForeignKey.objects.acreate(
+            **self.create_data("child"), test_model=parent
+        )
+        unloaded = await TestModelForeignKey.objects.aget(pk=child.pk)
+
+        result = await TestModelForeignKeySerializer.amodel_dump(unloaded)
+
+        self.assertEqual(result["test_model"]["name"], parent.name)

@@ -165,7 +165,10 @@ BookSerializer.model_dumps(
 
 The synchronous dump methods do not perform implicit database queries. The
 caller must provide instances with the relations required by the selected
-schema already loaded.
+schema already loaded. This includes relations represented as IDs by a Ninja
+schema, since schema validation still reads the related model attribute.
+Unevaluated querysets and instances with deferred fields or unloaded schema
+relations raise `ValueError` rather than issuing SQL during serialization.
 
 ```python
 await BookSerializer.amodel_dump(

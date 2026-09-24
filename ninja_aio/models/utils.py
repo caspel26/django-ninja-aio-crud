@@ -1329,7 +1329,7 @@ class ModelUtil(Generic[ModelT]):
             obj = (
                 await self.model.objects.acreate(**payload)
                 if not self.with_serializer
-                else await self.serializer.create(payload)
+                else await self.serializer._acreate(payload)
             )
         logger.debug(f"Created {self.model.__name__} (pk={obj.pk})")
         if isinstance(self.model, ModelSerializerMeta):

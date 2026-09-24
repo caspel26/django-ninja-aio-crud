@@ -20,6 +20,8 @@ import warnings
 import sys
 import threading
 from collections import OrderedDict
+from collections.abc import Iterable
+from contextlib import ExitStack
 from functools import lru_cache
 from asgiref.sync import sync_to_async
 
@@ -27,7 +29,8 @@ from django.conf import settings
 from ninja import Schema
 from django.core.exceptions import FieldDoesNotExist, ImproperlyConfigured
 from ninja.orm import create_schema
-from django.db import models
+from django.db import connections, models
+from django.db.models import aprefetch_related_objects
 from django.http import HttpRequest
 from django.db.models.fields.related_descriptors import (
     ReverseManyToOneDescriptor,
@@ -68,6 +71,7 @@ _nested_schema_state = threading.local()
 SchemaCacheKey: TypeAlias = tuple[type["BaseSerializer"], SchemaKind, int]
 
 _SCHEMA_CACHE_MAXSIZE = 640
+_DUMP_PRELOAD_ERROR = "Synchronous dump requires preloaded fields and relations"
 _SCHEMA_TYPE_BY_KIND: dict[SchemaKind, SCHEMA_TYPES] = {
     "create": "In",
     "update": "Patch",
@@ -112,19 +116,6 @@ class _LazySchemaAttribute:
             owner = type(instance)
         serializer_class = owner
         return serializer_class.get_schema(self.kind)
-
-
-class _ClassOrInstanceOperation:
-    """Expose a class-level v3 operation and retain an instance-level v2 helper."""
-
-    def __init__(self, class_method: str, instance_method: str) -> None:
-        self.class_method = class_method
-        self.instance_method = instance_method
-
-    def __get__(self, instance: object | None, owner: type) -> Any:
-        if instance is None:
-            return getattr(owner, self.class_method)
-        return getattr(instance, self.instance_method)
 
 
 def _extract_pk(v: Any) -> Any:
@@ -1603,6 +1594,107 @@ class BaseSerializer:
         return schema.model_validate(payload)
 
     @classmethod
+    def _dump_schema(
+        cls, kind: Literal["read", "detail"], schema: SchemaType | None
+    ) -> SchemaType:
+        selected = schema or cls.get_schema(kind)
+        if selected is None:
+            raise ImproperlyConfigured(
+                f"{cls.__name__} does not define a {kind} schema"
+            )
+        return selected
+
+    @classmethod
+    def _dump_models_sync(
+        cls,
+        instances: Iterable[models.Model],
+        schema: SchemaType | None,
+        kind: Literal["read", "detail"] = "read",
+    ) -> list[dict[str, Any]]:
+        if isinstance(instances, models.QuerySet) and instances._result_cache is None:
+            raise ValueError("Synchronous dump requires an evaluated queryset")
+        selected_schema = cls._dump_schema(kind, schema)
+        with ExitStack() as stack:
+            for connection in connections.all():
+                stack.enter_context(connection.execute_wrapper(cls._reject_dump_query))
+            result = []
+            for instance in instances:
+                cls._require_preloaded_fields(instance, selected_schema)
+                result.append(
+                    model_transformations.dump_model(instance, selected_schema)
+                )
+            return result
+
+    @staticmethod
+    def _require_preloaded_fields(instance: models.Model, schema: SchemaType) -> None:
+        if instance.get_deferred_fields():
+            raise ValueError(_DUMP_PRELOAD_ERROR)
+        for name in schema.model_fields:
+            try:
+                relation = instance._meta.get_field(name)
+            except FieldDoesNotExist:
+                continue
+            if not relation.is_relation:
+                continue
+            if relation.one_to_many or relation.many_to_many:
+                loaded = name in getattr(instance, "_prefetched_objects_cache", {})
+            elif (
+                getattr(relation, "attname", None)
+                and instance.__dict__.get(relation.attname) is None
+            ):
+                loaded = True
+            else:
+                loaded = relation.is_cached(instance)
+            if not loaded:
+                raise ValueError(_DUMP_PRELOAD_ERROR)
+
+    @staticmethod
+    def _reject_dump_query(execute, sql, params, many, context) -> None:
+        raise ValueError(_DUMP_PRELOAD_ERROR)
+
+    @classmethod
+    def _dump_relation_plan(
+        cls, schema: SchemaType
+    ) -> model_transformations.RelationPlan:
+        model = cls._get_model()
+        relation_names = []
+        for name in schema.model_fields:
+            try:
+                field = model._meta.get_field(name)
+            except FieldDoesNotExist:
+                continue
+            if field.is_relation:
+                relation_names.append(name)
+        return model_transformations.discover_relation_plan(model, relation_names)
+
+    @classmethod
+    async def _amodel_dump_operation(
+        cls, instance: models.Model, schema: SchemaType | None
+    ) -> dict[str, Any]:
+        selected = cls._dump_schema("detail", schema)
+        plan = cls._dump_relation_plan(selected)
+        relations = (*plan.select_related, *plan.prefetch_related)
+        if relations:
+            await aprefetch_related_objects([instance], *relations)
+        return await sync_to_async(model_transformations.dump_model)(instance, selected)
+
+    @classmethod
+    async def _amodel_dumps_operation(
+        cls, instances: Iterable[models.Model], schema: SchemaType | None
+    ) -> list[dict[str, Any]]:
+        selected = cls._dump_schema("read", schema)
+        plan = cls._dump_relation_plan(selected)
+        if isinstance(instances, models.QuerySet) and instances._result_cache is None:
+            queryset = model_transformations.apply_relation_plan(instances, plan)
+            loaded = [instance async for instance in queryset]
+        else:
+            loaded = list(instances)
+            relations = (*plan.select_related, *plan.prefetch_related)
+            if relations and loaded:
+                await aprefetch_related_objects(loaded, *relations)
+        return await sync_to_async(model_transformations.dump_models)(loaded, selected)
+
+    @classmethod
     def _resolve_operation_target(
         cls,
         target: models.Model | PrimaryKey,
@@ -1844,6 +1936,46 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
     ) -> None:
         """Destroy one model instance synchronously."""
         cls._destroy_operation(target, request=request)
+
+    @classmethod
+    def model_dump(
+        cls: type[ModelSerializerT],
+        instance: ModelSerializerT,
+        *,
+        schema: SchemaType | None = None,
+    ) -> dict[str, Any]:
+        """Serialize an already-loaded model instance without fetching relations."""
+        return cls._dump_models_sync((instance,), schema, "detail")[0]
+
+    @classmethod
+    def model_dumps(
+        cls: type[ModelSerializerT],
+        instances: Iterable[ModelSerializerT] | models.QuerySet[ModelSerializerT],
+        *,
+        schema: SchemaType | None = None,
+    ) -> list[dict[str, Any]]:
+        """Serialize an already-evaluated collection with the read schema."""
+        return cls._dump_models_sync(instances, schema)
+
+    @classmethod
+    async def amodel_dump(
+        cls: type[ModelSerializerT],
+        instance: ModelSerializerT,
+        *,
+        schema: SchemaType | None = None,
+    ) -> dict[str, Any]:
+        """Serialize one instance, loading relations required by the schema."""
+        return await cls._amodel_dump_operation(instance, schema)
+
+    @classmethod
+    async def amodel_dumps(
+        cls: type[ModelSerializerT],
+        instances: Iterable[ModelSerializerT] | models.QuerySet[ModelSerializerT],
+        *,
+        schema: SchemaType | None = None,
+    ) -> list[dict[str, Any]]:
+        """Serialize instances, loading relations required by the read schema."""
+        return await cls._amodel_dumps_operation(instances, schema)
 
     @classmethod
     async def acreate(
@@ -2470,8 +2602,8 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
     Generic, Meta-driven serializer for Django models providing type-safe CRUD operations.
 
     This class is generic over the model type, providing proper type hints for all
-    methods. When you specify the model type parameter, methods like create(), update(),
-    save(), and model_dump() are automatically typed to work with that specific model.
+    methods. When you specify the model type parameter, class-level operations
+    like create(), update(), and model_dump() are typed for that model.
 
     Type Safety Example
     -------------------
@@ -2480,21 +2612,17 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
     ...         model = Book
     ...         schema_in = SchemaModelConfig(fields=["title", "author"])
     ...
-    >>> serializer = BookSerializer()
-    >>> book: Book = await serializer.create({"title": "1984"})        # Returns Book
-    >>> book: Book = await serializer.save(book)                        # Accepts/returns Book
-    >>> data: dict = await serializer.model_dump(book)                  # Accepts Book
+    >>> book: Book = BookSerializer.create({"title": "1984"})
+    >>> book: Book = await BookSerializer.acreate({"title": "1984"})
+    >>> data: dict = BookSerializer.model_dump(book)
+    >>> data: dict = await BookSerializer.amodel_dump(book)
     >>>
-    >>> # Instance-bound usage — pass instance once, omit it from calls
+    >>> # Binding is supported for save and change tracking, not CRUD facades
     >>> serializer = BookSerializer(instance=book)
-    >>> book: Book = await serializer.update({"title": "New title"})   # Uses bound instance
-    >>> data: dict = await serializer.model_dump()                      # Uses bound instance
-    >>> changed: bool = serializer.has_changed("title")                 # Uses bound instance
+    >>> book: Book = await serializer.save()
+    >>> changed: bool = serializer.has_changed("title")
     >>>
-    >>> # Or assign after construction
-    >>> serializer = BookSerializer()
-    >>> serializer.instance = book
-    >>> data: dict = await serializer.model_dump()
+    >>> book: Book = await BookSerializer.aupdate(book, {"title": "New title"})
 
     Configuration
     -------------
@@ -2554,17 +2682,16 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         Initialize the serializer with an optional bound model instance.
 
         Binding an instance allows you to omit the ``instance`` argument on
-        ``save``, ``update``, ``model_dump``, ``has_changed``, and
-        ``ahas_changed`` calls made on this serializer object. The binding
+        ``save``, ``has_changed``, and ``ahas_changed`` calls. The binding
         can also be set or replaced at any time via attribute assignment::
 
             serializer = BookSerializer(instance=book)
-            await serializer.update({"title": "New title"})
+            await serializer.save()
 
             # or assign after construction
             serializer = BookSerializer()
             serializer.instance = book
-            data = await serializer.model_dump()
+            changed = serializer.has_changed("title")
 
         Parameters
         ----------
@@ -2575,7 +2702,7 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         self.instance = instance
 
     @classmethod
-    def _create_sync(
+    def create(
         cls: type["Serializer[ModelT]"],
         data: InputData,
         *,
@@ -2596,7 +2723,7 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         return cast(ModelT, cls._get_operation(pk, request=request, lookups=lookups))
 
     @classmethod
-    def _update_sync(
+    def update(
         cls: type["Serializer[ModelT]"],
         target: ModelT | PrimaryKey,
         data: InputData,
@@ -2616,8 +2743,45 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         """Destroy one model instance synchronously."""
         cls._destroy_operation(target, request=request)
 
-    create = _ClassOrInstanceOperation("_create_sync", "_create_legacy")
-    update = _ClassOrInstanceOperation("_update_sync", "_update_legacy")
+    @classmethod
+    def model_dump(
+        cls: type["Serializer[ModelT]"],
+        instance: ModelT,
+        *,
+        schema: SchemaType | None = None,
+    ) -> dict[str, Any]:
+        """Serialize an already-loaded model instance without querying."""
+        return cls._dump_models_sync((instance,), schema, "detail")[0]
+
+    @classmethod
+    def model_dumps(
+        cls: type["Serializer[ModelT]"],
+        instances: Iterable[ModelT] | models.QuerySet[ModelT],
+        *,
+        schema: SchemaType | None = None,
+    ) -> list[dict[str, Any]]:
+        """Serialize an already-evaluated collection with the read schema."""
+        return cls._dump_models_sync(instances, schema)
+
+    @classmethod
+    async def amodel_dump(
+        cls: type["Serializer[ModelT]"],
+        instance: ModelT,
+        *,
+        schema: SchemaType | None = None,
+    ) -> dict[str, Any]:
+        """Serialize one instance, loading relations required by the schema."""
+        return await cls._amodel_dump_operation(instance, schema)
+
+    @classmethod
+    async def amodel_dumps(
+        cls: type["Serializer[ModelT]"],
+        instances: Iterable[ModelT] | models.QuerySet[ModelT],
+        *,
+        schema: SchemaType | None = None,
+    ) -> list[dict[str, Any]]:
+        """Serialize instances, loading relations required by the read schema."""
+        return await cls._amodel_dumps_operation(instances, schema)
 
     @classmethod
     async def acreate(
@@ -2920,14 +3084,6 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
                 return []
         return getattr(schema, f_type, []) or []
 
-    def _get_dump_schema(self, schema: Schema = None) -> Schema:
-        if schema is None:
-            detail_schema = self.generate_detail_s()
-            if detail_schema is None:
-                return self.generate_read_s()
-            return detail_schema
-        return schema
-
     @classmethod
     async def queryset_request(
         cls, request: HttpRequest | None
@@ -3075,7 +3231,7 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
 
         return instance
 
-    async def _create_legacy(self, payload: dict[str, Any] | Schema) -> ModelT:
+    async def _acreate(self, payload: dict[str, Any] | Schema) -> ModelT:
         """
         Create a new model instance from the provided payload.
 
@@ -3091,85 +3247,6 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         """
         instance: ModelT = self.model(**self._parse_payload(payload))
         return await self.save(instance)
-
-    async def _update_legacy(
-        self,
-        payload: dict[str, Any] | Schema,
-        instance: Optional[ModelT] = None,
-    ) -> ModelT:
-        """
-        Update an existing model instance with the provided payload.
-
-        If *instance* is omitted the serializer's bound ``self.instance`` is
-        used.  A ``ValueError`` is raised when neither is available.
-
-        Parameters
-        ----------
-        payload : dict | Schema
-            Input data to apply to the instance.
-        instance : ModelT | None
-            The model instance to update. Falls back to ``self.instance``
-            when ``None``.
-
-        Returns
-        -------
-        ModelT
-            The updated model instance.
-        """
-        instance = self._resolve_instance(instance)
-        for attr, value in self._parse_payload(payload).items():
-            setattr(instance, attr, value)
-        return await self.save(instance)
-
-    async def model_dump(
-        self,
-        instance: Optional[ModelT] = None,
-        schema: Schema = None,
-    ) -> dict[str, Any]:
-        """
-        Serialize a model instance to a dictionary using the Out schema.
-
-        If *instance* is omitted the serializer's bound ``self.instance`` is
-        used.  A ``ValueError`` is raised when neither is available.
-
-        Parameters
-        ----------
-        instance : ModelT | None
-            The model instance to serialize. Falls back to ``self.instance``
-            when ``None``.
-        schema : Schema | None
-            The Pydantic schema to use for serialization. Defaults to the
-            detail schema if defined, otherwise the read schema.
-
-        Returns
-        -------
-        dict
-            Serialized data.
-        """
-        instance = self._resolve_instance(instance)
-        return await self.util.read_s(
-            schema=self._get_dump_schema(schema), instance=instance
-        )
-
-    async def models_dump(
-        self, instances: models.QuerySet[models.Model], schema: Schema = None
-    ) -> list[dict[str, Any]]:
-        """
-        Serialize a list of model instances to a list of dictionaries using the Out schema.
-
-        Parameters
-        ----------
-        instances : list[models.Model]
-            The list of model instances to serialize.
-
-        Returns
-        -------
-        list[dict]
-            List of serialized data.
-        """
-        return await self.util.list_read_s(
-            schema=self._get_dump_schema(schema), instances=instances
-        )
 
     def after_save(self, instance: models.Model):
         """

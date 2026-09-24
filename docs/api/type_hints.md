@@ -29,17 +29,17 @@ class BookSerializer(Serializer[Book]):  # 👈 Specify model type
 serializer = BookSerializer()
 
 # ✅ Type checker knows this returns Book
-book: Book = await serializer.create({"title": "1984", "author_id": 1})
+book: Book = await BookSerializer.acreate({"title": "1984", "author_id": 1})
 
 # ✅ Type checker knows this accepts and returns Book
 book: Book = await serializer.save(book)
 
 # ✅ Type checker knows this accepts Book
-data: dict = await serializer.model_dump(book)
+data: dict = await BookSerializer.amodel_dump(book)
 
 # ✅ Optional: specify custom schema for serialization
 custom_schema = BookSerializer.generate_read_s()
-data: dict = await serializer.model_dump(book, schema=custom_schema)
+data: dict = await BookSerializer.amodel_dump(book, schema=custom_schema)
 ```
 
 ### Benefits
@@ -88,9 +88,9 @@ class BookAPI(APIViewSet):  # No generic parameter needed!
 
     async def my_method(self, request, data):
         # ✅ All serializer methods are typed
-        book: Book = await self.serializer.create(data.model_dump())
+        book: Book = await self.serializer.acreate(data.model_dump())
         book: Book = await self.serializer.save(book)
-        return await self.serializer.model_dump(book)
+        return await self.serializer.amodel_dump(book)
 ```
 
 ### Option 3: Both (Maximum Type Safety)
@@ -112,7 +112,7 @@ class BookAPI(APIViewSet[Book]):  # Both are typed!
 
     async def method2(self, request, data):
         # ✅ serializer methods are typed
-        book = await self.serializer.create(data.model_dump())
+        book = await self.serializer.acreate(data.model_dump())
 ```
 
 ## Generic ModelUtil

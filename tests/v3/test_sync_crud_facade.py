@@ -5,10 +5,19 @@ from unittest import mock
 from django.core.exceptions import ImproperlyConfigured
 from django.db import models
 from django.test import TestCase
+from ninja import Schema
 from pydantic import ValidationError
 
 from ninja_aio.exceptions import NotFoundError
-from tests.test_app.models import TestModel, TestModelSerializer
+from tests.test_app.models import (
+    BookAsId,
+    TestModel,
+    TestModelForeignKey,
+    TestModelReverseForeignKey,
+    TestModelSerializer,
+    TestModelSerializerForeignKey,
+    TestModelSerializerReverseForeignKey,
+)
 from tests.test_app.serializers import (
     BookAsIdMetaSerializer,
     TestModelWithValidatorsMetaSerializer,
@@ -119,6 +128,120 @@ class ModelSerializerSyncCrudFacadeTests(SyncCrudFacadeContractMixin, TestCase):
     serializer_class = TestModelSerializer
     model_class = TestModelSerializer
 
+    def test_model_dump_serializes_without_queries(self) -> None:
+        instance = self.serializer_class.create(self.create_data("dump"))
+
+        with self.assertNumQueries(0):
+            result = self.serializer_class.model_dump(instance)
+
+        self.assertEqual(result["name"], instance.name)
+
+    def test_model_dump_uses_explicit_schema_with_custom_field(self) -> None:
+        class CustomSchema(Schema):
+            name: str
+            extra: int = 7
+
+        instance = self.serializer_class.create(self.create_data("custom"))
+
+        with self.assertNumQueries(0):
+            result = self.serializer_class.model_dump(instance, schema=CustomSchema)
+
+        self.assertEqual(result, {"name": instance.name, "extra": 7})
+
+    def test_model_dump_requires_a_schema(self) -> None:
+        instance = self.serializer_class.create(self.create_data("missing-schema"))
+
+        with mock.patch.object(self.serializer_class, "get_schema", return_value=None):
+            with self.assertRaisesRegex(ImproperlyConfigured, "detail schema"):
+                self.serializer_class.model_dump(instance)
+
+    def test_model_dump_rejects_schema_queries(self) -> None:
+        class QueryingSchema(self.serializer_class.read_schema):
+            def model_dump(self, **kwargs):
+                TestModelSerializer.objects.count()
+                return super().model_dump(**kwargs)
+
+        instance = self.serializer_class.create(self.create_data("querying"))
+
+        with self.assertRaisesRegex(ValueError, "preloaded fields and relations"):
+            self.serializer_class.model_dump(instance, schema=QueryingSchema)
+
+    def test_model_dumps_requires_evaluated_queryset(self) -> None:
+        instance = self.serializer_class.create(self.create_data("list"))
+
+        with self.assertRaisesRegex(ValueError, "evaluated queryset"):
+            self.serializer_class.model_dumps(self.model_class.objects.all())
+
+        queryset = self.model_class.objects.filter(pk=instance.pk)
+        list(queryset)
+        with self.assertNumQueries(0):
+            result = self.serializer_class.model_dumps(queryset)
+
+        self.assertEqual([item["name"] for item in result], [instance.name])
+
+    def test_model_dump_rejects_deferred_fields_without_querying(self) -> None:
+        instance = self.serializer_class.create(self.create_data("deferred"))
+        deferred = self.model_class.objects.only("id").get(pk=instance.pk)
+
+        with (
+            self.assertNumQueries(0),
+            self.assertRaisesRegex(ValueError, "preloaded fields and relations"),
+        ):
+            self.serializer_class.model_dump(deferred)
+
+    def test_model_dump_rejects_unloaded_relation_without_querying(self) -> None:
+        parent = TestModelSerializerReverseForeignKey.objects.create(
+            **self.create_data("parent")
+        )
+        TestModelSerializerForeignKey.objects.create(
+            **self.create_data("child"), test_model_serializer=parent
+        )
+        child = TestModelSerializerForeignKey.objects.get(name="name-child")
+
+        with (
+            self.assertNumQueries(0),
+            self.assertRaisesRegex(ValueError, "preloaded fields and relations"),
+        ):
+            TestModelSerializerForeignKey.model_dump(child)
+
+        loaded = TestModelSerializerForeignKey.objects.select_related(
+            "test_model_serializer"
+        ).get(pk=child.pk)
+        with self.assertNumQueries(0):
+            result = TestModelSerializerForeignKey.model_dump(loaded)
+
+        self.assertEqual(result["test_model_serializer"]["name"], parent.name)
+
+    def test_model_dump_requires_prefetched_reverse_relation(self) -> None:
+        parent = TestModelSerializerReverseForeignKey.objects.create(
+            **self.create_data("reverse")
+        )
+        TestModelSerializerForeignKey.objects.create(
+            **self.create_data("child"), test_model_serializer=parent
+        )
+
+        with (
+            self.assertNumQueries(0),
+            self.assertRaisesRegex(ValueError, "preloaded fields and relations"),
+        ):
+            TestModelSerializerReverseForeignKey.model_dump(parent)
+
+        loaded = TestModelSerializerReverseForeignKey.objects.prefetch_related(
+            "test_model_serializer_foreign_keys"
+        ).get(pk=parent.pk)
+        with self.assertNumQueries(0):
+            result = TestModelSerializerReverseForeignKey.model_dump(loaded)
+
+        self.assertEqual(len(result["test_model_serializer_foreign_keys"]), 1)
+
+    def test_model_dump_allows_null_relation_without_query(self) -> None:
+        instance = BookAsId.objects.create(**self.create_data("no-author"))
+
+        with self.assertNumQueries(0):
+            result = BookAsId.model_dump(instance)
+
+        self.assertIsNone(result["author_as_id"])
+
 
 class StandaloneSerializerSyncCrudFacadeTests(SyncCrudFacadeContractMixin, TestCase):
     serializer_class = TestModelWithValidatorsMetaSerializer
@@ -127,3 +250,34 @@ class StandaloneSerializerSyncCrudFacadeTests(SyncCrudFacadeContractMixin, TestC
     def test_create_requires_a_configured_schema(self) -> None:
         with self.assertRaisesRegex(ImproperlyConfigured, "create schema"):
             BookAsIdMetaSerializer.create({"name": "book"})
+
+    def test_model_dump_and_model_dumps_use_loaded_instances(self) -> None:
+        instance = self.serializer_class.create(self.create_data("dump"))
+
+        with self.assertNumQueries(0):
+            single = self.serializer_class.model_dump(instance)
+            many = self.serializer_class.model_dumps([instance])
+
+        self.assertEqual(single["name"], instance.name)
+        self.assertEqual(many, [single])
+
+    def test_relations_as_id_requires_loaded_fk(self) -> None:
+        parent = TestModelReverseForeignKey.objects.create(**self.create_data("parent"))
+        child = TestModelForeignKey.objects.create(
+            **self.create_data("child"), test_model=parent
+        )
+        unloaded = TestModelForeignKey.objects.get(pk=child.pk)
+
+        with (
+            self.assertNumQueries(0),
+            self.assertRaisesRegex(ValueError, "preloaded fields and relations"),
+        ):
+            BookAsIdMetaSerializer.model_dump(unloaded)
+
+        loaded = TestModelForeignKey.objects.select_related("test_model").get(
+            pk=child.pk
+        )
+        with self.assertNumQueries(0):
+            result = BookAsIdMetaSerializer.model_dump(loaded)
+
+        self.assertEqual(result["test_model"], parent.pk)
