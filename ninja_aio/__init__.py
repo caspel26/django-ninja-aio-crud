@@ -1,8 +1,24 @@
 """Django Ninja AIO CRUD - Rest Framework"""
 
+from importlib import import_module
+
 __version__ = "2.36.0"
 
-__all__ = ["NinjaAIO", "NinjaAIORouter", "register_admin", "Branding"]
+_EXPORTS = {
+    "NinjaAIO": ".api",
+    "NinjaAIORouter": ".router",
+    "register_admin": ".admin",
+    "Branding": ".docs",
+    "APIView": ".views",
+    "APIViewSet": ".views",
+    "ModelSerializer": ".models",
+    "Serializer": ".models.serializers",
+    "action": ".decorators",
+    "on": ".decorators",
+    "HttpMethod": ".types",
+}
+
+__all__ = list(_EXPORTS)
 
 # Public names are resolved lazily (PEP 562) instead of imported eagerly here.
 #
@@ -16,24 +32,11 @@ __all__ = ["NinjaAIO", "NinjaAIORouter", "register_admin", "Branding"]
 # resolution keeps `import ninja_aio` itself side-effect-free; Django's own
 # app-loading sequence then imports `ninja_aio.models` at the correct time.
 def __getattr__(name):
-    if name == "NinjaAIO":
-        from .api import NinjaAIO
-
-        return NinjaAIO
-    if name == "NinjaAIORouter":
-        from .router import NinjaAIORouter
-
-        return NinjaAIORouter
-    if name == "register_admin":
-        from .admin import register_admin
-
-        return register_admin
-    if name == "Branding":
-        from .docs import Branding
-
-        return Branding
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    module = _EXPORTS.get(name)
+    if module is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    return getattr(import_module(module, __name__), name)
 
 
 def __dir__():
-    return sorted(set(globals()) | set(__all__))
+    return sorted(globals().keys() | _EXPORTS.keys())

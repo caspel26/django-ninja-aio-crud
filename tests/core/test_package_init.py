@@ -22,6 +22,17 @@ class PackageLazyInitTests(SimpleTestCase):
         self.assertIs(ninja_aio.register_admin, register_admin_direct)
         self.assertIs(ninja_aio.Branding, BrandingDirect)
 
+    def test_v3_surface_resolves_to_defining_modules(self):
+        from ninja_aio.decorators.actions import action, on
+        from ninja_aio.models.serializers import ModelSerializer, Serializer
+        from ninja_aio.types import HttpMethod
+        from ninja_aio.views.api import APIView, APIViewSet
+
+        for exported in (
+            action, on, ModelSerializer, Serializer, HttpMethod, APIView, APIViewSet,
+        ):
+            self.assertIs(getattr(ninja_aio, exported.__name__), exported)
+
     def test_unknown_attribute_raises_attribute_error(self):
         with self.assertRaises(AttributeError):
             ninja_aio.DoesNotExist
