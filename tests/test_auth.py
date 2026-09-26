@@ -3,6 +3,9 @@ from django.http import HttpRequest
 from asgiref.sync import async_to_sync
 
 from joserfc import jwk, errors
+from ninja.testing import TestClient
+
+from ninja_aio import NinjaAIO
 from ninja_aio.auth import (
     validate_key,
     validate_mandatory_claims,
@@ -13,6 +16,8 @@ from ninja_aio.auth import (
     set_jwt_cookie,
     delete_jwt_cookie,
 )
+from ninja_aio.views import APIViewSet
+from tests.test_app import models
 
 
 class JwtTestBase(TestCase):
@@ -542,3 +547,42 @@ class MultiAuthChainTests(JwtTestBase):
 
         resp = self._async_get(client, "/whoami")
         self.assertEqual(resp.status_code, 401)
+
+
+class SyncEndpointAsyncAuthTests(JwtTestBase):
+    """Async JWT auth on sync endpoints must be awaited, never treated as a truthy coroutine."""
+
+    def setUp(self):
+        super().setUp()
+        pub = self.public_jwk
+
+        class TBearer(AsyncJwtBearer):
+            jwt_public = pub
+            claims = {
+                "iss": {"value": "test-issuer"},
+                "aud": {"value": "test-audience"},
+            }
+
+            async def auth_handler(self, request):
+                return self.dcd.claims.get("sub")
+
+        class SyncAPI(APIViewSet):
+            model = models.TestModelSerializer
+            execution_mode = "sync"
+            auth = [TBearer()]
+
+        api = NinjaAIO(urls_namespace=f"sync_auth_{id(self)}")
+        SyncAPI(api=api, prefix="sync-auth").add_views_to_route()
+        self.client = TestClient(api)
+
+    def test_valid_token_is_accepted(self):
+        token = encode_jwt({"sub": "42"}, duration=60)
+        resp = self.client.get("/sync-auth", headers={"Authorization": f"Bearer {token}"})
+        self.assertEqual(resp.status_code, 200)
+
+    def test_invalid_token_is_rejected(self):
+        resp = self.client.get("/sync-auth", headers={"Authorization": "Bearer not-a-jwt"})
+        self.assertEqual(resp.status_code, 401)
+
+    def test_missing_token_is_rejected(self):
+        self.assertEqual(self.client.get("/sync-auth").status_code, 401)
