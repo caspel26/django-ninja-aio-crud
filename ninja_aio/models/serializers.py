@@ -21,7 +21,7 @@ import weakref
 import sys
 import threading
 from collections import OrderedDict
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from contextlib import ExitStack
 from functools import lru_cache
 from asgiref.sync import sync_to_async
@@ -3213,13 +3213,7 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
                 if await self.ahas_changed(field, instance):
                     changed_fields.add(field)
 
-        if creation:
-            await sync_to_async(self.on_create_before_save)(instance)
-        await sync_to_async(self.before_save)(instance)
-        await instance.asave()
-        if creation:
-            await sync_to_async(self.on_create_after_save)(instance)
-        await sync_to_async(self.after_save)(instance)
+        await self._asave_instance(instance)
 
         # Fire reactive hooks
         if hooks:
@@ -3230,9 +3224,44 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
 
         return instance
 
+    def _overridden_hooks(self, *names: str) -> list[Callable]:
+        from ninja_aio.models.hooks import _is_overridden
+
+        return [getattr(self, name) for name in names if _is_overridden(self, name)]
+
+    def _save_instance(self, instance: ModelT) -> ModelT:
+        """Save with the before/after lifecycle hooks; reactive hooks are left to the caller."""
+        creation = instance._state.adding
+        before = ("on_create_before_save", "before_save") if creation else ("before_save",)
+        after = ("on_create_after_save", "after_save") if creation else ("after_save",)
+        for hook in self._overridden_hooks(*before):
+            hook(instance)
+        instance.save()
+        for hook in self._overridden_hooks(*after):
+            hook(instance)
+        return instance
+
+    async def _asave_instance(self, instance: ModelT) -> ModelT:
+        """Async counterpart of ``_save_instance``."""
+        creation = instance._state.adding
+        before = ("on_create_before_save", "before_save") if creation else ("before_save",)
+        after = ("on_create_after_save", "after_save") if creation else ("after_save",)
+        for hook in self._overridden_hooks(*before):
+            await sync_to_async(hook)(instance)
+        await instance.asave()
+        for hook in self._overridden_hooks(*after):
+            await sync_to_async(hook)(instance)
+        return instance
+
+    def _create_instance(self, payload: dict[str, Any] | Schema) -> ModelT:
+        """Build and save a new instance with lifecycle hooks (no reactive hooks)."""
+        return self._save_instance(self.model(**self._parse_payload(payload)))
+
     async def _acreate(self, payload: dict[str, Any] | Schema) -> ModelT:
         """
         Create a new model instance from the provided payload.
+
+        Runs the before/after save hooks; reactive hooks are fired by the caller.
 
         Parameters
         ----------
@@ -3244,8 +3273,7 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         ModelT
             Created model instance.
         """
-        instance: ModelT = self.model(**self._parse_payload(payload))
-        return await self.save(instance)
+        return await self._asave_instance(self.model(**self._parse_payload(payload)))
 
     def after_save(self, instance: models.Model):
         """

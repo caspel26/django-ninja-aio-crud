@@ -56,9 +56,8 @@ class InputPayloadPlan:
         ]
 
     def model_payload(self) -> Payload:
-        """Return the payload after applying the legacy exclusion rules."""
-        # Preserve the existing behavior: customs take precedence over optionals.
-        exclude: Iterable[str] = self.customs.keys() or self.optionals
+        """Return the payload without custom fields and omitted optionals."""
+        exclude = frozenset((*self.customs, *self.optionals))
         return {
             name: value for name, value in self.payload.items() if name not in exclude
         }
@@ -92,21 +91,39 @@ def plan_input_payload(
     *,
     model_fields: Sequence[str],
     field_policy: FieldPolicy | None,
+    set_fields: frozenset[str] | None = None,
 ) -> InputPayloadPlan:
-    """Classify custom, optional, and model fields without resolving values."""
+    """
+    Classify custom, optional, and model fields without resolving values.
+
+    With ``set_fields`` (partial updates), model fields the client did not send
+    are dropped and explicitly sent ``None`` values are kept.
+    """
+    model_field_names = frozenset(model_fields)
+
+    def is_custom(name: str) -> bool:
+        return (
+            field_policy is not None
+            and field_policy.is_custom(name)
+            and name not in model_field_names
+        )
+
+    if set_fields is not None:
+        payload = {
+            name: value
+            for name, value in payload.items()
+            if name in set_fields or is_custom(name)
+        }
     if field_policy is None:
         return InputPayloadPlan(payload, {}, (), frozenset())
 
-    model_field_names = frozenset(model_fields)
-    customs = {
-        name: value
-        for name, value in payload.items()
-        if field_policy.is_custom(name) and name not in model_field_names
-    }
+    customs = {name: value for name, value in payload.items() if is_custom(name)}
     optionals = tuple(
         name
         for name, value in payload.items()
-        if field_policy.is_optional(name) and value is None
+        if field_policy.is_optional(name)
+        and value is None
+        and (set_fields is None or name not in set_fields)
     )
     skip_keys = frozenset((*customs, *optionals))
     return InputPayloadPlan(payload, customs, optionals, skip_keys)

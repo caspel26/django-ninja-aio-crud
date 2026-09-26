@@ -1212,6 +1212,8 @@ class ModelUtil(Generic[ModelT]):
         request: HttpRequest | None,
         data: Schema,
         fk_cache: dict[tuple[type, Any], Any] | None = None,
+        *,
+        partial: bool = False,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         """
         Transform inbound schema data to a model-ready payload.
@@ -1243,14 +1245,14 @@ class ModelUtil(Generic[ModelT]):
         SerializeError
             On base64 decoding failure or invalid field names.
         """
-        payload, plan = self._prepare_input_payload(data)
+        payload, plan = self._prepare_input_payload(data, partial=partial)
         await self._process_payload_fields(
             request, payload, plan.fields_to_process, fk_cache
         )
         return plan.model_payload(), plan.customs
 
     def _prepare_input_payload(
-        self, data: Schema
+        self, data: Schema, *, partial: bool = False
     ) -> tuple[dict[str, Any], model_transformations.InputPayloadPlan]:
         """Dump and classify validated input before execution-mode-specific work."""
         payload = model_transformations.schema_to_payload(data, self.nested_fields)
@@ -1262,17 +1264,20 @@ class ModelUtil(Generic[ModelT]):
             payload,
             model_fields=self.model_fields,
             field_policy=serializer if is_serializer else None,
+            set_fields=frozenset(data.model_fields_set) if partial else None,
         )
-        return payload, plan
+        return plan.payload, plan
 
     def parse_input_data(
         self,
         request: HttpRequest | None,
         data: Schema,
         fk_cache: dict[tuple[type, Any], Any] | None = None,
+        *,
+        partial: bool = False,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Transform input data using only synchronous field resolution."""
-        payload, plan = self._prepare_input_payload(data)
+        payload, plan = self._prepare_input_payload(data, partial=partial)
         fields_to_process = plan.fields_to_process
         fields = model_transformations.resolve_model_fields(
             self.model, [name for name, _ in fields_to_process]
@@ -1337,15 +1342,47 @@ class ModelUtil(Generic[ModelT]):
         hooks = get_hooks(self.serializer_class or self.model)
         atomic = (
             transaction.atomic(using=using)
-            if hooks or self.nested_fields
+            if self._needs_atomic(hooks) or self.nested_fields
             else nullcontext()
         )
         with atomic:
             with suppress_signals():
-                obj = self.model._default_manager.create(**payload)
+                obj = (
+                    self.serializer._create_instance(payload)
+                    if self.with_serializer
+                    else self.model._default_manager.create(**payload)
+                )
             self._invoke_create_hooks(request, obj, payload, customs, hooks)
             self._create_nested_children(request, data, obj)
         return obj
+
+    @cached_property
+    def _has_lifecycle_hooks(self) -> bool:
+        """True when a hook runs after the row is written and may still fail."""
+        from ninja_aio.models.hooks import _is_overridden
+
+        target = self.serializer_class or self.model
+        return any(
+            _is_overridden(target, name)
+            for name in (
+                "post_create",
+                "apost_create",
+                "custom_actions",
+                "acustom_actions",
+                "after_save",
+                "on_create_after_save",
+                "on_delete",
+                "save",
+                "delete",
+            )
+        )
+
+    def _needs_atomic(self, hooks: dict | None) -> bool:
+        return bool(hooks) or self._has_lifecycle_hooks
+
+    def _reactive_target(self, obj: ModelT) -> tuple[Any, ModelT | None]:
+        """Return (hook owner, instance argument) for reactive hooks."""
+        return (self.serializer, obj) if self.with_serializer else (obj, None)
 
     def _invoke_create_hooks(
         self,
@@ -1411,7 +1448,9 @@ class ModelUtil(Generic[ModelT]):
         )
 
         obj = instance or self.get_object(request, pk, is_for="read")
-        payload, customs = self.parse_input_data(request, data, fk_cache)
+        payload, customs = self.parse_input_data(
+            request, data, fk_cache, partial=True
+        )
         hooks = get_hooks(self.serializer_class or self.model)
         changed = (
             detect_changed_fields(obj, payload, hooks["update_field"])
@@ -1423,26 +1462,24 @@ class ModelUtil(Generic[ModelT]):
         )
         atomic = (
             transaction.atomic(using=router.db_for_write(self.model))
-            if hooks
+            if self._needs_atomic(hooks)
             else nullcontext()
         )
         with atomic:
             for name, value in payload.items():
-                if value is not None:
-                    setattr(obj, name, value)
-            with suppress_signals():
-                obj.save()
+                setattr(obj, name, value)
             if self.with_serializer:
                 invoke_hook(context, "custom_actions", customs, obj)
             elif isinstance(self.model, ModelSerializerMeta):
                 invoke_hook(context, "custom_actions", customs)
+            with suppress_signals():
+                if self.with_serializer:
+                    self.serializer._save_instance(obj)
+                else:
+                    obj.save()
             if hooks:
-                fire_update_hooks(
-                    context.serializer,
-                    changed,
-                    hooks,
-                    obj if self.with_serializer else None,
-                )
+                target, hook_instance = self._reactive_target(obj)
+                fire_update_hooks(target, changed, hooks, hook_instance)
         return obj
 
     def destroy_instance(
@@ -1453,6 +1490,7 @@ class ModelUtil(Generic[ModelT]):
     ) -> None:
         """Destroy one model instance with Django's synchronous ORM."""
         from ninja_aio.models.hooks import (
+            _is_overridden,
             execute_reactive_hooks,
             get_hooks,
             suppress_signals,
@@ -1462,18 +1500,17 @@ class ModelUtil(Generic[ModelT]):
         hooks = get_hooks(self.serializer_class or self.model)
         atomic = (
             transaction.atomic(using=router.db_for_write(self.model))
-            if hooks
+            if self._needs_atomic(hooks)
             else nullcontext()
         )
         with atomic:
             with suppress_signals():
                 obj.delete()
+            if self.with_serializer and _is_overridden(self.serializer, "on_delete"):
+                self.serializer.on_delete(obj)
             if hooks:
-                execute_reactive_hooks(
-                    self.serializer or obj,
-                    hooks["delete"],
-                    obj if self.with_serializer else None,
-                )
+                target, hook_instance = self._reactive_target(obj)
+                execute_reactive_hooks(target, hooks["delete"], hook_instance)
 
     async def acreate_instance(
         self,
@@ -1489,7 +1526,7 @@ class ModelUtil(Generic[ModelT]):
             hooks = get_hooks(self.serializer_class or self.model)
             atomic = (
                 AsyncAtomicContextManager(using=router.db_for_write(self.model))
-                if hooks
+                if self._needs_atomic(hooks)
                 else nullcontext()
             )
             async with atomic:
@@ -1574,15 +1611,16 @@ class ModelUtil(Generic[ModelT]):
         context = OperationContext(
             request, "create", self.serializer or obj, obj, payload
         )
-        if isinstance(self.model, ModelSerializerMeta):
-            await ainvoke_hook(context, "custom_actions", customs)
-            await ainvoke_hook(context, "post_create")
-            hooks = get_hooks(self.model)
-            if hooks and hooks["create"]:
-                await aexecute_reactive_hooks(obj, hooks["create"])
         if self.with_serializer:
             await ainvoke_hook(context, "custom_actions", customs, obj)
             await ainvoke_hook(context, "post_create", obj)
+        elif isinstance(self.model, ModelSerializerMeta):
+            await ainvoke_hook(context, "custom_actions", customs)
+            await ainvoke_hook(context, "post_create")
+        hooks = get_hooks(self.serializer_class or self.model)
+        if hooks and hooks["create"]:
+            target, hook_instance = self._reactive_target(obj)
+            await aexecute_reactive_hooks(target, hooks["create"], hook_instance)
         return obj
 
     async def create_s(self, request: HttpRequest, data: Schema, obj_schema: Schema):
@@ -1816,7 +1854,9 @@ class ModelUtil(Generic[ModelT]):
             if instance is not None
             else await self.aget_object(request, pk, is_for="read")
         )
-        payload, customs = await self.aparse_input_data(request, data, fk_cache)
+        payload, customs = await self.aparse_input_data(
+            request, data, fk_cache, partial=True
+        )
         context = OperationContext(
             request, "update", self.serializer or obj, obj, payload
         )
@@ -1833,25 +1873,26 @@ class ModelUtil(Generic[ModelT]):
 
         atomic = (
             AsyncAtomicContextManager(using=router.db_for_write(self.model))
-            if hooks
+            if self._needs_atomic(hooks)
             else nullcontext()
         )
         async with atomic:
             for k, v in payload.items():
-                if v is not None:
-                    setattr(obj, k, v)
+                setattr(obj, k, v)
 
+            if self.with_serializer:
+                await ainvoke_hook(context, "custom_actions", customs, obj)
+            elif isinstance(self.model, ModelSerializerMeta):
+                await ainvoke_hook(context, "custom_actions", customs)
             async with asuppress_signals():
-                if isinstance(self.model, ModelSerializerMeta):
-                    await ainvoke_hook(context, "custom_actions", customs)
                 if self.with_serializer:
-                    await ainvoke_hook(context, "custom_actions", customs, obj)
-                    await self.serializer.save(obj)
+                    await self.serializer._asave_instance(obj)
                 else:
                     await obj.asave()
 
-            if isinstance(self.model, ModelSerializerMeta) and hooks:
-                await afire_update_hooks(obj, changed_fields, hooks)
+            if hooks:
+                target, hook_instance = self._reactive_target(obj)
+                await afire_update_hooks(target, changed_fields, hooks, hook_instance)
 
         logger.debug(f"Updated {self.model.__name__} (pk={pk})")
         return obj
@@ -1931,6 +1972,7 @@ class ModelUtil(Generic[ModelT]):
             asuppress_signals,
             get_hooks,
             aexecute_reactive_hooks,
+            _is_overridden,
         )
 
         logger.info(f"Deleting {self.model.__name__} (pk={pk})")
@@ -1938,20 +1980,19 @@ class ModelUtil(Generic[ModelT]):
         hooks = get_hooks(self.serializer_class or self.model)
         atomic = (
             AsyncAtomicContextManager(using=router.db_for_write(self.model))
-            if hooks
+            if self._needs_atomic(hooks)
             else nullcontext()
         )
         async with atomic:
             async with asuppress_signals():
                 await obj.adelete()
             logger.debug(f"Deleted {self.model.__name__} (pk={pk})")
+            if self.with_serializer and _is_overridden(self.serializer, "on_delete"):
+                await sync_to_async(self.serializer.on_delete)(obj)
 
             if hooks and hooks["delete"]:
-                await aexecute_reactive_hooks(
-                    self.serializer or obj,
-                    hooks["delete"],
-                    obj if self.with_serializer else None,
-                )
+                target, hook_instance = self._reactive_target(obj)
+                await aexecute_reactive_hooks(target, hooks["delete"], hook_instance)
 
     @staticmethod
     def _split_target(target: ModelT | PrimaryKey) -> tuple[PrimaryKey, ModelT | None]:

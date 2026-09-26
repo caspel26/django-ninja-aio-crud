@@ -1,7 +1,7 @@
 from django.db import models
 from django.test import TestCase, tag
 
-from ninja_aio import NinjaAIO
+from ninja_aio import NinjaAIO, SchemaConfig
 from ninja_aio.models import ModelSerializer, ModelUtil, on_create, on_update, on_delete
 from ninja_aio.models.serializers import Serializer, SchemaModelConfig
 from tests.generics.request import Request
@@ -810,3 +810,168 @@ class HookInternalCoverageTestCase(TestCase):
         # We're inside an async test, so there IS a running event loop
         _run_hook(my_async_hook)
         self.assertEqual(calls, [])
+
+
+# ─── Sync/async lifecycle consistency ───────────────────
+
+
+class NullableHookModel(ModelSerializer):
+    name = models.CharField(max_length=255)
+    note = models.CharField(max_length=255, null=True)
+
+    class Meta:
+        app_label = "test_app"
+
+    class Schemas:
+        create = SchemaConfig(fields=["name"], optionals=[("note", str)])
+        update = SchemaConfig(
+            optionals=[("name", str), ("note", str | None)],
+            customs=[("shout", bool, False)],
+        )
+        read = SchemaConfig(fields=["id", "name", "note"])
+
+    def custom_actions(self, payload):
+        if payload.get("shout"):
+            self.name = self.name.upper()
+
+    @on_update("note")
+    def note_changed(self):
+        _hook_calls.append(("note_changed", self.pk))
+
+
+class LifecycleSerializer(Serializer):
+    class Meta:
+        model = HookPlainModel
+
+    class Schemas:
+        create = SchemaConfig(fields=["name", "status"])
+        update = SchemaConfig(optionals=[("name", str), ("status", str)])
+        read = SchemaConfig(fields=["id", "name", "status"])
+
+    def on_create_before_save(self, instance):
+        _hook_calls.append(("on_create_before_save",))
+
+    def before_save(self, instance):
+        _hook_calls.append(("before_save",))
+
+    def on_create_after_save(self, instance):
+        _hook_calls.append(("on_create_after_save",))
+
+    def after_save(self, instance):
+        _hook_calls.append(("after_save",))
+
+    def custom_actions(self, payload, instance):
+        _hook_calls.append(("custom_actions",))
+
+    async def acustom_actions(self, payload, instance):
+        _hook_calls.append(("custom_actions",))
+
+    def post_create(self, instance):
+        if instance.name == "boom":
+            raise ValueError("post_create failed")
+        _hook_calls.append(("post_create",))
+
+    async def apost_create(self, instance):
+        self.post_create(instance)
+
+    @on_create
+    def created(self, instance):
+        _hook_calls.append(("reactive_create",))
+
+    @on_update
+    def updated(self, instance):
+        _hook_calls.append(("reactive_update",))
+
+    @on_delete
+    def deleted(self, instance):
+        _hook_calls.append(("reactive_delete",))
+
+    # Defined after @on_delete: in a class body this name shadows the decorator.
+    def on_delete(self, instance):
+        _hook_calls.append(("on_delete",))
+
+
+_LIFECYCLE_CREATE = [
+    "on_create_before_save",
+    "before_save",
+    "on_create_after_save",
+    "after_save",
+    "custom_actions",
+    "post_create",
+    "reactive_create",
+]
+_LIFECYCLE_UPDATE = ["custom_actions", "before_save", "after_save", "reactive_update"]
+_LIFECYCLE_DELETE = ["on_delete", "reactive_delete"]
+
+
+@tag("reactive_hooks")
+class LifecycleConsistencyTests(TestCase):
+    """Both execution modes and both serializer styles run the same lifecycle."""
+
+    def setUp(self):
+        _reset()
+
+    def _events(self):
+        events = [event for event, *_ in _hook_calls]
+        _reset()
+        return events
+
+    def test_sync_serializer_lifecycle(self):
+        obj = LifecycleSerializer.create({"name": "sync", "status": "draft"})
+        self.assertEqual(self._events(), _LIFECYCLE_CREATE)
+        LifecycleSerializer.update(obj, {"status": "published"})
+        self.assertEqual(self._events(), _LIFECYCLE_UPDATE)
+        LifecycleSerializer.destroy(obj)
+        self.assertEqual(self._events(), _LIFECYCLE_DELETE)
+
+    async def test_async_serializer_lifecycle(self):
+        obj = await LifecycleSerializer.acreate({"name": "async", "status": "draft"})
+        self.assertEqual(self._events(), _LIFECYCLE_CREATE)
+        await LifecycleSerializer.aupdate(obj, {"status": "published"})
+        self.assertEqual(self._events(), _LIFECYCLE_UPDATE)
+        await LifecycleSerializer.adestroy(obj)
+        self.assertEqual(self._events(), _LIFECYCLE_DELETE)
+
+    def test_sync_create_rolls_back_when_post_create_fails(self):
+        with self.assertRaisesRegex(ValueError, "post_create failed"):
+            LifecycleSerializer.create({"name": "boom", "status": "draft"})
+        self.assertFalse(HookPlainModel.objects.filter(name="boom").exists())
+
+    async def test_async_create_rolls_back_when_post_create_fails(self):
+        with self.assertRaisesRegex(ValueError, "post_create failed"):
+            await LifecycleSerializer.acreate({"name": "boom", "status": "draft"})
+        self.assertFalse(await HookPlainModel.objects.filter(name="boom").aexists())
+
+    def test_sync_update_sets_explicit_null_and_ignores_omitted_fields(self):
+        obj = NullableHookModel.create({"name": "a", "note": "n"})
+        NullableHookModel.update(obj, {"name": "b"})
+        obj.refresh_from_db()
+        self.assertEqual((obj.name, obj.note), ("b", "n"))
+        self.assertEqual(self._events(), [])
+        NullableHookModel.update(obj, {"note": None})
+        obj.refresh_from_db()
+        self.assertIsNone(obj.note)
+        self.assertEqual(self._events(), ["note_changed"])
+
+    async def test_async_update_sets_explicit_null_and_ignores_omitted_fields(self):
+        obj = await NullableHookModel.acreate({"name": "a", "note": "n"})
+        await NullableHookModel.aupdate(obj, {"name": "b"})
+        await obj.arefresh_from_db()
+        self.assertEqual((obj.name, obj.note), ("b", "n"))
+        self.assertEqual(self._events(), [])
+        await NullableHookModel.aupdate(obj, {"note": None})
+        await obj.arefresh_from_db()
+        self.assertIsNone(obj.note)
+        self.assertEqual(self._events(), ["note_changed"])
+
+    def test_sync_custom_actions_run_before_save(self):
+        obj = NullableHookModel.create({"name": "quiet"})
+        NullableHookModel.update(obj, {"shout": True})
+        obj.refresh_from_db()
+        self.assertEqual(obj.name, "QUIET")
+
+    async def test_async_custom_actions_run_before_save(self):
+        obj = await NullableHookModel.acreate({"name": "quiet"})
+        await NullableHookModel.aupdate(obj, {"shout": True})
+        await obj.arefresh_from_db()
+        self.assertEqual(obj.name, "QUIET")

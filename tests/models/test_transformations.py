@@ -47,8 +47,31 @@ class TransformationRuleTests(SimpleTestCase):
         self.assertEqual(plan.customs, {"custom": "value"})
         self.assertEqual(plan.optionals, ("optional",))
         self.assertEqual(plan.fields_to_process, [("name", "book")])
-        # Preserve the v2 rule: when customs exist, optional model values remain.
-        self.assertEqual(plan.model_payload(), {"name": "book", "optional": None})
+        # Omitted optionals are dropped even when customs are present.
+        self.assertEqual(plan.model_payload(), {"name": "book"})
+
+    def test_partial_plan_keeps_only_sent_fields_and_explicit_nulls(self) -> None:
+        payload = {"name": "book", "optional": None, "other": None, "custom": "x"}
+
+        plan = model_transformations.plan_input_payload(
+            payload,
+            model_fields=("name", "optional", "other"),
+            field_policy=_FieldPolicy(),
+            set_fields=frozenset({"optional"}),
+        )
+
+        self.assertEqual(plan.customs, {"custom": "x"})
+        self.assertEqual(plan.model_payload(), {"optional": None})
+
+    def test_partial_plan_without_field_policy_filters_unsent_fields(self) -> None:
+        plan = model_transformations.plan_input_payload(
+            {"name": "book", "other": None},
+            model_fields=("name", "other"),
+            field_policy=None,
+            set_fields=frozenset({"name"}),
+        )
+
+        self.assertEqual(plan.model_payload(), {"name": "book"})
 
     def test_plain_payload_plan_preserves_every_field(self) -> None:
         payload = {"name": "book", "optional": None}

@@ -214,10 +214,15 @@ class ModelSerializerUpdateHooksTestCase(TestCase):
 
             return _fn
 
-        app_models.TestModelSerializer.before_save = mk("before")
-        app_models.TestModelSerializer.after_save = mk("after")
-        app_models.TestModelSerializer.on_create_before_save = mk("on_create_before")
-        app_models.TestModelSerializer.on_create_after_save = mk("on_create_after")
+        model = app_models.TestModelSerializer
+        for attr, name in (
+            ("before_save", "before"),
+            ("after_save", "after"),
+            ("on_create_before_save", "on_create_before"),
+            ("on_create_after_save", "on_create_after"),
+        ):
+            setattr(model, attr, mk(name))
+            cls.addClassCleanup(delattr, model, attr)
         cls.obj = app_models.TestModelSerializer.objects.create(
             name="x", description="y"
         )
