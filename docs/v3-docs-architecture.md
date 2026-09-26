@@ -455,11 +455,11 @@ explicitly.
 
 | Generated-look default | Rule for this site |
 | --- | --- |
-| Purple-to-blue gradients, glows, glassmorphism | Flat colors only, with one exception: the brand gradient (logo purple to amber) on the wordmark. Depth comes from tonal surface layers and hairline borders, not shadows or blur |
+| Purple-to-blue gradients, glows, glassmorphism | Flat colors only, with one exception: the brand gradient (logo purple to amber) on the wordmark. Depth comes from tonal surface layers, hairline borders, and a restrained three-step elevation scale; no glows or blur |
 | Centered hero with gradient text and two pill buttons | Left-aligned, asymmetric hero: one plain statement, then the product demo carries the page |
 | 3×2 grid of icon + title + blurb cards | At most three strong sections; features are shown through code and output, not described in cards |
 | An icon or emoji on every heading (the current site puts `:material-*:` on almost every H1/H2) | No decorative heading icons; icons only where they carry meaning (e.g. HTTP method, deprecated, sync/async) |
-| Stock abstract illustrations and 3D blobs | Only real artifacts: code, terminal output, OpenAPI screenshots, query counts, benchmark numbers |
+| Stock abstract illustrations and 3D blobs | Only real artifacts: code, terminal output, OpenAPI screenshots, query counts, benchmark numbers, and the project's own mascot |
 | Marketing copy ("blazing fast", "seamless", "supercharge", "effortless") | Specific, checkable claims: names, numbers, and links to the benchmark that backs them |
 | Large radii and pill shapes everywhere | One small radius scale (4-6 px controls, 10-14 px surfaces); pills only for the version and HTTP methods |
 | Uniform spacing and card-in-card layouts | Editorial rhythm: a strict 4 px grid, clear density changes between hero, prose, and reference |
@@ -508,15 +508,19 @@ index, and is the direction Step 16 implements.
 | --- | --- |
 | Theme | Dark-first; light is a full variant, not an inversion |
 | Surfaces | `bg` plus three tonal layers (`surface-1..3`), hairline edges, a 1px inner top highlight instead of shadows |
-| Type | Schibsted Grotesk (UI and display, weights 400-900), IBM Plex Mono (code); tabular figures scoped to data, because Schibsted's `tnum` also spaces punctuation |
+| Type | Schibsted Grotesk (UI and display, weights 400-900), Source Serif 4 (guide titles, ledes and section headings, taken from direction A), IBM Plex Mono (code); tabular figures scoped to data, because Schibsted's `tnum` also spaces punctuation |
 | Color | Logo purple for brand and links, amber for attention and linked highlights; gradient on the wordmark only |
-| Homepage | Bold statement, primary button plus copyable install command, interactive operation demo (model, HTTP, OpenAPI with linked fields), capability list with real attribute names, Python usage, honest benchmarks, three learning paths |
-| Components | Segmented control with sliding thumb, code block with tabs and copy, command palette (⌘K and `/`), scroll-spy table of contents, pager, callout, diagram cards |
+| Depth | Tonal layers plus a three-step elevation scale (`shadow-1..3`): code blocks and cards at 1, the guide article sheet and key diagram step at 2, the homepage demo, menus and palette at 3 |
+| Guide pages | Direction A's article reading experience on a raised sheet: serif title and lede, ruled serif section headings with hover anchors, content blocks set back on the page tone |
+| Homepage | Bold statement beside the mascot, primary button plus copyable install command, verifiable facts (Python, Django Ninja, tests, coverage, license), interactive operation demo (model, HTTP, OpenAPI with linked fields), capability list with real attribute names, Python usage, honest benchmarks, three learning paths |
+| Versioning | Header version menu styled over the `mike` selector (latest, dev, 2.x releases, all versions); non-latest versions show a banner with links to the latest docs and the migration guide |
+| Logo | `design/step15/logo/build_logo.py` derives header marks from `docs/images/logo.png`: the drop shadow is removed, and the dark-theme mark gets a light outline so the black line work reads on dark surfaces |
+| Components | Segmented control with sliding thumb, code block with tabs and copy, command palette (⌘K and `/`), version menu, scroll-spy table of contents, pager, callout, diagram cards |
 
 Open items for Step 16:
 
-- A logo variant that reads on dark surfaces (the mockup uses a light plate
-  behind the current logo).
+- Replace the generated raster marks with a redrawn SVG mark when a designer
+  is available; the build script stays the fallback.
 - Self-hosted fonts instead of Google Fonts, within the performance budget.
 - Map every mockup component onto the Zensical/Material template blocks, and
   list what needs a template override rather than CSS.

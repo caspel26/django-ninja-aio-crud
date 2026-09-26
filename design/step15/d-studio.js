@@ -196,10 +196,70 @@
     });
   };
 
+  const VERSIONS = {
+    "3.0": null,
+    dev: "<strong>Development docs.</strong> <span>They describe the <code>main</code> branch and may cover unreleased features.</span> <a href=\"#\">Read the 3.0 docs</a>",
+    "2.36": "<strong>You are reading the 2.36 docs.</strong> <span>Version 3.0 is the latest release.</span> <a href=\"#\">Go to 3.0</a> <a href=\"#\">Migration guide</a>",
+    "2.35": "<strong>You are reading the 2.35 docs.</strong> <span>Version 3.0 is the latest release.</span> <a href=\"#\">Go to 3.0</a> <a href=\"#\">Migration guide</a>",
+    "2.34": "<strong>You are reading the 2.34 docs.</strong> <span>Version 3.0 is the latest release.</span> <a href=\"#\">Go to 3.0</a> <a href=\"#\">Migration guide</a>",
+  };
+
+  // Mirrors the mike version selector: switching version shows the banner for non-latest docs.
+  const setupVersions = () => {
+    const button = document.querySelector(".version-button");
+    const list = document.querySelector(".version-list");
+    const banner = document.querySelector(".version-banner");
+    if (!button || !list) return;
+    const items = [...list.querySelectorAll("[data-version]")];
+
+    const apply = (version) => {
+      items.forEach((item) => item.setAttribute("aria-checked", String(item.dataset.version === version)));
+      button.querySelector(".version-current").textContent = version === "dev" ? "dev" : `v${version}`;
+      if (banner) {
+        banner.innerHTML = VERSIONS[version] || "";
+        banner.hidden = !VERSIONS[version];
+      }
+      sessionStorage.setItem("nac-version", version);
+    };
+    const close = (focusButton) => {
+      list.hidden = true;
+      button.setAttribute("aria-expanded", "false");
+      if (focusButton) button.focus();
+    };
+    const open = () => {
+      list.hidden = false;
+      button.setAttribute("aria-expanded", "true");
+      (items.find((item) => item.getAttribute("aria-checked") === "true") || items[0]).focus();
+    };
+
+    button.addEventListener("click", () => (list.hidden ? open() : close(false)));
+    items.forEach((item) =>
+      item.addEventListener("click", () => {
+        apply(item.dataset.version);
+        close(true);
+      }),
+    );
+    list.addEventListener("keydown", (event) => {
+      const index = items.indexOf(document.activeElement);
+      if (event.key === "Escape") close(true);
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        const step = event.key === "ArrowDown" ? 1 : -1;
+        items[(index + step + items.length) % items.length].focus();
+      }
+    });
+    document.addEventListener("click", (event) => {
+      if (!list.hidden && !event.target.closest(".version-menu")) close(false);
+    });
+
+    apply(sessionStorage.getItem("nac-version") || "3.0");
+  };
+
   document.addEventListener("DOMContentLoaded", () => {
     setupPalette();
     setupDemo();
     setupScrollSpy();
+    setupVersions();
     updateThumbs();
     document.addEventListener("click", () => requestAnimationFrame(updateThumbs));
     document.addEventListener("keydown", () => requestAnimationFrame(updateThumbs));

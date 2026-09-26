@@ -83,6 +83,7 @@ th,
 
 .review-bar {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 1rem;
   padding: 0.35rem var(--gutter);
@@ -93,6 +94,7 @@ th,
 
 .review-bar nav {
   display: flex;
+  flex-wrap: wrap;
   gap: 1.25rem;
 }
 
@@ -930,7 +932,8 @@ th + th {
   }
 
   .site-nav,
-  .search {
+  .search,
+  .repo {
     display: none !important;
   }
 

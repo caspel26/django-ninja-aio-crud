@@ -63,9 +63,12 @@ pre {
   display: none !important;
 }
 
-/* Only directions that opt in show the theme icon and the palette trigger. */
+/* Only directions that opt in show these. */
 .theme-icon,
-.palette-trigger {
+.palette-trigger,
+.version-menu,
+.brand-mark-dark,
+.anchor {
   display: none;
 }
 

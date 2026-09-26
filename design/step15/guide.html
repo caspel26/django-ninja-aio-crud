@@ -30,7 +30,8 @@
           },
           d: {
             css: "d-studio.css",
-            fonts: "family=Schibsted+Grotesk:wght@400..900&family=IBM+Plex+Mono:wght@400;500;600",
+            fonts:
+              "family=Schibsted+Grotesk:wght@400..900&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&family=IBM+Plex+Mono:wght@400;500;600",
             script: "d-studio.js",
             theme: "dark",
           },
@@ -68,9 +69,12 @@
       </nav>
     </div>
 
+    <div class="version-banner" role="status" hidden></div>
+
     <header class="site-header">
       <a class="brand" href="#">
-        <img src="../../docs/images/logo.png" alt="" width="24" height="24" />
+        <img class="brand-mark-dark" src="logo/mark-dark-64.png" alt="" width="30" height="30" />
+        <img class="brand-mark-light" src="logo/mark-light-64.png" alt="" width="30" height="30" />
         <span class="brand-name">django-ninja-aio</span>
       </a>
       <nav class="site-nav" aria-label="Primary">
@@ -91,6 +95,21 @@
           <span>Search docs</span><kbd>⌘K</kbd>
         </button>
         <span class="version" title="Documentation version">3.0</span>
+        <div class="version-menu">
+          <button class="version-button" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="versions" aria-label="Documentation version">
+            <span class="version-current">v3.0</span>
+            <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2 3.5 5 6.5l3-3" /></svg>
+          </button>
+          <ul class="version-list" id="versions" role="menu" hidden>
+            <li role="none"><button role="menuitemradio" type="button" data-version="3.0"><b>3.0</b><small class="is-latest">latest</small></button></li>
+            <li role="none"><button role="menuitemradio" type="button" data-version="dev"><b>dev</b><small>main branch</small></button></li>
+            <li role="none"><button role="menuitemradio" type="button" data-version="2.36"><b>2.36</b><small>2.x</small></button></li>
+            <li role="none"><button role="menuitemradio" type="button" data-version="2.35"><b>2.35</b><small>2.x</small></button></li>
+            <li role="none"><button role="menuitemradio" type="button" data-version="2.34"><b>2.34</b><small>2.x</small></button></li>
+            <li role="none" class="version-divider"></li>
+            <li role="none"><a role="menuitem" href="#">All versions</a></li>
+          </ul>
+        </div>
         <button class="theme-toggle" type="button" data-theme-toggle>
           <svg class="theme-icon theme-icon-sun" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="8" cy="8" r="3" /><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1 1M11.6 11.6l1 1M3.4 12.6l1-1M11.6 4.4l1-1" /></svg>
           <svg class="theme-icon theme-icon-moon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7Z" /></svg>
@@ -162,7 +181,7 @@
             <a href="#">Quickstart</a>.</span>
         </aside>
 
-        <h2 id="kinds">The four schema kinds</h2>
+        <h2 id="kinds"><a class="anchor" href="#kinds" aria-label="Link to this section">#</a>The four schema kinds</h2>
         <p>Each kind maps to one part of the HTTP contract. Declare only the ones you need.</p>
         <div class="table-wrap">
           <table>
@@ -178,7 +197,7 @@
           </table>
         </div>
 
-        <h2 id="declare">Declare them</h2>
+        <h2 id="declare"><a class="anchor" href="#declare" aria-label="Link to this section">#</a>Declare them</h2>
         <p>
           Pick the tab for your serializer style. Everything after the <code>Schemas</code>
           class, including viewsets and OpenAPI, is identical for both.
@@ -237,7 +256,7 @@
         )</code></pre>
         </div>
 
-        <h2 id="options"><code>SchemaConfig</code> options</h2>
+        <h2 id="options"><a class="anchor" href="#options" aria-label="Link to this section">#</a><code>SchemaConfig</code> options</h2>
         <div class="table-wrap">
           <table class="options">
             <thead>
@@ -255,7 +274,7 @@
           </table>
         </div>
 
-        <h2 id="use">Use a generated schema</h2>
+        <h2 id="use"><a class="anchor" href="#use" aria-label="Link to this section">#</a>Use a generated schema</h2>
         <p>
           Schemas are class attributes. They are built on first access and cached, so reading
           one in a route signature costs nothing after startup.
@@ -274,7 +293,7 @@
 ArticleTree = Article.get_schema(<span class="tok-s">"read"</span>, depth=<span class="tok-u">2</span>)</code></pre>
         </div>
 
-        <h2 id="pipeline">How schemas are built</h2>
+        <h2 id="pipeline"><a class="anchor" href="#pipeline" aria-label="Link to this section">#</a>How schemas are built</h2>
         <figure class="diagram" aria-labelledby="pipeline-caption">
           <ol class="diagram-flow">
             <li>
@@ -304,7 +323,7 @@ ArticleTree = Article.get_schema(<span class="tok-s">"read"</span>, depth=<span 
           </figcaption>
         </figure>
 
-        <h2 id="checks">Startup checks</h2>
+        <h2 id="checks"><a class="anchor" href="#checks" aria-label="Link to this section">#</a>Startup checks</h2>
         <p>Mistakes in <code>Schemas</code> surface when Django starts, not on the first request.</p>
         <div class="table-wrap">
           <table class="checks">
@@ -319,7 +338,7 @@ ArticleTree = Article.get_schema(<span class="tok-s">"read"</span>, depth=<span 
           </table>
         </div>
 
-        <h2 id="v2">Coming from version 2</h2>
+        <h2 id="v2"><a class="anchor" href="#v2" aria-label="Link to this section">#</a>Coming from version 2</h2>
         <aside class="callout callout-deprecated" aria-label="Deprecated">
           <strong>Deprecated in 3.0, removed in 4.0</strong>
           <p>
