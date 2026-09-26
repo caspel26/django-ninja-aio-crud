@@ -1,5 +1,6 @@
 """Django Ninja AIO CRUD - Rest Framework"""
 
+import warnings
 from importlib import import_module
 
 __version__ = "2.36.0"
@@ -7,8 +8,6 @@ __version__ = "2.36.0"
 _EXPORTS = {
     "NinjaAIO": ".api",
     "NinjaAIORouter": ".router",
-    "register_admin": ".admin",
-    "Branding": ".docs",
     "APIView": ".views",
     "APIViewSet": ".views",
     "ModelSerializer": ".models",
@@ -17,6 +16,12 @@ _EXPORTS = {
     "action": ".decorators",
     "on": ".decorators",
     "HttpMethod": ".types",
+}
+
+# Still importable from the top level until version 4.
+_DEPRECATED_EXPORTS = {
+    "register_admin": "ninja_aio.admin",
+    "Branding": "ninja_aio.docs",
 }
 
 __all__ = list(_EXPORTS)
@@ -33,6 +38,14 @@ __all__ = list(_EXPORTS)
 # resolution keeps `import ninja_aio` itself side-effect-free; Django's own
 # app-loading sequence then imports `ninja_aio.models` at the correct time.
 def __getattr__(name):
+    if name in _DEPRECATED_EXPORTS:
+        module = _DEPRECATED_EXPORTS[name]
+        warnings.warn(
+            f"Importing {name} from ninja_aio is deprecated; import it from {module}.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return getattr(import_module(module), name)
     module = _EXPORTS.get(name)
     if module is None:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

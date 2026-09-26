@@ -7,7 +7,8 @@ Customize the Swagger UI appearance with your own logo, colors, favicon, and CSS
 ## Quick Start
 
 ```python
-from ninja_aio import NinjaAIO, Branding
+from ninja_aio import NinjaAIO
+from ninja_aio.docs import Branding
 
 api = NinjaAIO(
     title="My Company API",

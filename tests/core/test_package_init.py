@@ -19,8 +19,10 @@ class PackageLazyInitTests(SimpleTestCase):
 
         self.assertIs(ninja_aio.NinjaAIO, NinjaAIODirect)
         self.assertIs(ninja_aio.NinjaAIORouter, NinjaAIORouterDirect)
-        self.assertIs(ninja_aio.register_admin, register_admin_direct)
-        self.assertIs(ninja_aio.Branding, BrandingDirect)
+        with self.assertWarnsRegex(DeprecationWarning, "import it from ninja_aio.admin"):
+            self.assertIs(ninja_aio.register_admin, register_admin_direct)
+        with self.assertWarnsRegex(DeprecationWarning, "import it from ninja_aio.docs"):
+            self.assertIs(ninja_aio.Branding, BrandingDirect)
 
     def test_v3_surface_resolves_to_defining_modules(self):
         from ninja_aio.decorators.actions import action, on

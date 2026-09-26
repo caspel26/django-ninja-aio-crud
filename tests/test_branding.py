@@ -1,6 +1,7 @@
 from django.test import TestCase, tag
 
-from ninja_aio import NinjaAIO, Branding
+from ninja_aio import NinjaAIO
+from ninja_aio.docs import Branding
 from ninja_aio.docs import BrandedSwagger
 
 

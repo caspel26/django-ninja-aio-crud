@@ -403,7 +403,7 @@ Django app-registry side effects:
 
 ```python
 from ninja_aio import (
-    NinjaAIO, NinjaAIORouter, register_admin, Branding,
+    NinjaAIO, NinjaAIORouter,
     APIView, APIViewSet,
     ModelSerializer, Serializer, SchemaConfig,
     action, on, HttpMethod,
