@@ -6,6 +6,7 @@ from joserfc.errors import JoseError
 from ninja import NinjaAPI
 from django.http import HttpRequest, HttpResponse
 from pydantic import ValidationError
+from django.db import IntegrityError
 from django.db.models import Model
 from django.conf import settings
 
@@ -162,6 +163,15 @@ def _jose_error(
     return api.create_response(request, error.error, status=error.status_code)
 
 
+def _integrity_error(
+    request: HttpRequest, exc: IntegrityError, api: type[NinjaAPI]
+) -> HttpResponse:
+    """Translate a database constraint violation into a 409 without exposing SQL details."""
+    logger.warning(f"Integrity error: {exc}")
+    body = {"error": "conflict", "details": "The request violates a database constraint."}
+    return api.create_response(request, body, status=409)
+
+
 def set_api_exception_handlers(api: type[NinjaAPI]) -> None:
     """Register exception handlers for common error types on the NinjaAPI instance."""
     api.add_exception_handler(BaseException, partial(_default_error, api=api))
@@ -169,6 +179,7 @@ def set_api_exception_handlers(api: type[NinjaAPI]) -> None:
     api.add_exception_handler(
         ValidationError, partial(_pydantic_validation_error, api=api)
     )
+    api.add_exception_handler(IntegrityError, partial(_integrity_error, api=api))
 
 
 def parse_jose_error(jose_exc: JoseError) -> dict:

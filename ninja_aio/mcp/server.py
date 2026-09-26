@@ -51,8 +51,8 @@ class NinjaAIOMCPServer:
         request_factory: Optional[RequestFactory] = None,
     ) -> None:
         self.api = api
-        self.viewsets = list(viewsets) if viewsets is not None else list(api._viewsets)
-        self.views = list(views) if views is not None else list(api._views)
+        self.viewsets = list(viewsets) if viewsets is not None else api.registered_viewsets()
+        self.views = list(views) if views is not None else api.registered_views()
         self.request_factory = request_factory
         self.server = Server(name)
         self._tools: dict[str, ToolSpec] = {}

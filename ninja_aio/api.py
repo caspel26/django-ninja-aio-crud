@@ -48,6 +48,7 @@ class NinjaAIO(NinjaAPI):
         self.branding = branding or Branding()
         self._viewsets: list[APIViewSet] = []
         self._views: list[APIView] = []
+        self._aio_routers: list[NinjaAIORouter] = []
         if docs is None:
             docs = BrandedSwagger() if branding else Swagger()
         super().__init__(
@@ -72,6 +73,21 @@ class NinjaAIO(NinjaAPI):
         set_api_exception_handlers(self)
         super().set_default_exception_handlers()
 
+    def add_router(self, prefix: str, router: Router | str, *args: Any, **kwargs: Any) -> None:
+        super().add_router(prefix, router, *args, **kwargs)
+        if isinstance(router, NinjaAIORouter):
+            self._aio_routers.append(router)
+
+    def registered_viewsets(self) -> list[APIViewSet]:
+        """Viewsets registered on this API, including those on attached NinjaAIORouters."""
+        nested = [vs for router in self._aio_routers for vs in router.registered_viewsets()]
+        return [*self._viewsets, *nested]
+
+    def registered_views(self) -> list[APIView]:
+        """Views registered on this API, including those on attached NinjaAIORouters."""
+        nested = [view for router in self._aio_routers for view in router.registered_views()]
+        return [*self._views, *nested]
+
     def view(self, prefix: str, tags: list[str] = None) -> Any:
         def wrapper(view: type[APIView]):
             instance = view(api=self, prefix=prefix, tags=tags)
@@ -90,8 +106,8 @@ class NinjaAIO(NinjaAPI):
         """
         Decorator to register an APIViewSet with a specific model.
 
-        The decorator preserves the ViewSet's type, allowing type checkers
-        to infer that model_util is properly typed based on the model parameter.
+        The decorator preserves the ViewSet's type, so type checkers see the
+        concrete viewset class returned by the decorator.
 
         Usage:
             @api.viewset(MyModel)

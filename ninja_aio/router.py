@@ -28,10 +28,32 @@ class NinjaAIORouter(Router):
             pass
     """
 
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._viewsets: list[APIViewSet] = []
+        self._views: list[APIView] = []
+        self._aio_routers: list["NinjaAIORouter"] = []
+
+    def add_router(self, prefix: str, router: Router, *args: Any, **kwargs: Any) -> None:
+        super().add_router(prefix, router, *args, **kwargs)
+        if isinstance(router, NinjaAIORouter):
+            self._aio_routers.append(router)
+
+    def registered_viewsets(self) -> list[APIViewSet]:
+        """Viewsets registered on this router and its nested NinjaAIORouters."""
+        nested = [vs for child in self._aio_routers for vs in child.registered_viewsets()]
+        return [*self._viewsets, *nested]
+
+    def registered_views(self) -> list[APIView]:
+        """Views registered on this router and its nested NinjaAIORouters."""
+        nested = [view for child in self._aio_routers for view in child.registered_views()]
+        return [*self._views, *nested]
+
     def view(self, prefix: str, tags: list[str] = None) -> Any:
         def wrapper(view_cls: type[APIView]):
             instance = view_cls(api=self, prefix=prefix, tags=tags)
             instance.add_views_to_route()
+            self._views.append(instance)
             return instance
 
         return wrapper
@@ -45,6 +67,7 @@ class NinjaAIORouter(Router):
         def wrapper(viewset_cls: type[ViewSetT]) -> ViewSetT:
             instance: ViewSetT = viewset_cls(api=self, model=model, prefix=prefix, tags=tags)
             instance.add_views_to_route()
+            self._viewsets.append(instance)
             return instance
 
         return wrapper

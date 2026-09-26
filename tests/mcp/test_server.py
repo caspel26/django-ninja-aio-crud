@@ -3,9 +3,9 @@ from unittest.mock import AsyncMock, patch
 from django.test import TestCase, tag
 from mcp.shared.memory import create_connected_server_and_client_session
 
-from ninja_aio import NinjaAIO
+from ninja_aio import NinjaAIO, NinjaAIORouter
 from ninja_aio.mcp import NinjaAIOMCPServer, run_mcp_server
-from ninja_aio.views import APIViewSet
+from ninja_aio.views import APIView, APIViewSet
 from tests.test_app import models
 
 
@@ -22,6 +22,27 @@ class NinjaAIOMCPServerTests(TestCase):
 
         self.assertIn(AutoTestModelSerializerAPI, server.viewsets)
         self.assertIn("testmodelserializer_create", server._tools)
+        self.assertIn("testmodelserializer_list", server._tools)
+
+    def test_auto_discovers_viewsets_and_views_on_nested_routers(self):
+        api = NinjaAIO(urls_namespace="mcp_server_router")
+        parent = NinjaAIORouter()
+        child = NinjaAIORouter()
+
+        @child.viewset(models.TestModelSerializer, prefix="mcp-router-model")
+        class RouterModelAPI(APIViewSet):
+            pass
+
+        @parent.view(prefix="mcp-router-view")
+        class RouterView(APIView):
+            pass
+
+        parent.add_router("/child", child)
+        api.add_router("/v1", parent)
+        server = NinjaAIOMCPServer(api, name="test-server")
+
+        self.assertIn(RouterModelAPI, server.viewsets)
+        self.assertIn(RouterView, server.views)
         self.assertIn("testmodelserializer_list", server._tools)
 
     def test_explicit_viewsets_override_registry(self):

@@ -1,4 +1,5 @@
 from django.test import TestCase, tag
+from django.db import IntegrityError
 from django.http import HttpRequest
 from pydantic import BaseModel, Field, ValidationError
 from ninja_aio.api import NinjaAIO
@@ -164,6 +165,15 @@ class ExceptionHandlersTestCase(TestCase):
         response = api._exception_handlers[BaseException](request, exc)
         self.assertEqual(response.status_code, 499)
         self.assertIn(b"boom", response.content)
+
+    def test_integrity_error_returns_409_without_database_details(self):
+        api = NinjaAIO()
+        set_api_exception_handlers(api)
+        exc = IntegrityError("UNIQUE constraint failed: secret_table.secret_column")
+        response = api._exception_handlers[IntegrityError](HttpRequest(), exc)
+        self.assertEqual(response.status_code, 409)
+        self.assertIn(b"conflict", response.content)
+        self.assertNotIn(b"secret", response.content)
 
     def test_pydantic_error_handler(self):
         api = NinjaAIO()
