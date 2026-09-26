@@ -4,6 +4,10 @@ from ipaddress import IPv4Address, IPv6Address
 from django.http import HttpResponse, StreamingHttpResponse
 from django.test import TestCase, tag
 import orjson
+from ninja.parser import Parser
+from ninja.renderers import JSONRenderer
+
+from ninja_aio import NinjaAIO
 from ninja_aio.renders import ORJSONRenderer
 from ninja_aio.parsers import ORJSONParser
 
@@ -95,3 +99,17 @@ class ORJSONRendererParserTestCase(TestCase):
         rendered = self.renderer.render(DummyRequest(), response, response_status=200)
         self.assertIs(rendered, response)
         self.assertEqual(rendered["Content-Type"], "application/octet-stream")
+
+
+@tag("renderer_parser")
+class NinjaAIORendererParserTestCase(TestCase):
+    def test_orjson_is_the_default(self):
+        api = NinjaAIO(urls_namespace="renderer_default")
+        self.assertIsInstance(api.renderer, ORJSONRenderer)
+        self.assertIsInstance(api.parser, ORJSONParser)
+
+    def test_renderer_and_parser_can_be_overridden(self):
+        renderer, parser = JSONRenderer(), Parser()
+        api = NinjaAIO(urls_namespace="renderer_custom", renderer=renderer, parser=parser)
+        self.assertIs(api.renderer, renderer)
+        self.assertIs(api.parser, parser)

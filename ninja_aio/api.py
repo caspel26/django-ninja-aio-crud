@@ -1,10 +1,12 @@
 from typing import Any, Sequence, TypeVar
 
+from ninja import NinjaAPI
+from ninja.constants import NOT_SET, NOT_SET_TYPE
+from ninja.openapi.docs import DocsBase, Swagger
+from ninja.parser import Parser
+from ninja.renderers import BaseRenderer
 from ninja.router import Router
 from ninja.throttling import BaseThrottle
-from ninja import NinjaAPI
-from ninja.openapi.docs import DocsBase, Swagger
-from ninja.constants import NOT_SET, NOT_SET_TYPE
 from django.db import models
 
 from .parsers import ORJSONParser
@@ -23,7 +25,8 @@ RouterT = TypeVar("RouterT", bound=NinjaAIORouter)
 class NinjaAIO(NinjaAPI):
     branding: Branding
 
-    def __init__(
+    # Mirrors NinjaAPI's constructor on purpose, so the parameter count is inherited.
+    def __init__(  # NOSONAR
         self,
         title: str = "NinjaAPI",
         version: str = "1.0.0",
@@ -39,6 +42,8 @@ class NinjaAIO(NinjaAPI):
         default_router: Router | None = None,
         openapi_extra: dict[str, Any] | None = None,
         branding: Branding | None = None,
+        renderer: BaseRenderer | None = None,
+        parser: Parser | None = None,
     ):
         self.branding = branding or Branding()
         self._viewsets: list[APIViewSet] = []
@@ -59,8 +64,8 @@ class NinjaAIO(NinjaAPI):
             throttle=throttle,
             default_router=default_router,
             openapi_extra=openapi_extra,
-            renderer=ORJSONRenderer(),
-            parser=ORJSONParser(),
+            renderer=renderer or ORJSONRenderer(),
+            parser=parser or ORJSONParser(),
         )
 
     def set_default_exception_handlers(self):
