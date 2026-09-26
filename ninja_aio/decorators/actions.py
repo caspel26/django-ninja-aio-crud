@@ -1,11 +1,11 @@
 import logging
 from dataclasses import dataclass, field, replace
-from typing import TYPE_CHECKING, Any, Callable, TypedDict, get_args
+from typing import TYPE_CHECKING, Any, Callable, TypedDict
 
 from ninja.constants import NOT_SET, NOT_SET_TYPE
 from ninja.throttling import BaseThrottle
 
-from ninja_aio.types import HttpMethod
+from ninja_aio.types import HttpMethod, HttpMethodName
 
 if TYPE_CHECKING:
     from typing_extensions import Unpack
@@ -18,7 +18,9 @@ class ActionConfig:
     """Configuration for an @action-decorated viewset method."""
 
     detail: bool
-    methods: list[HttpMethod] = field(default_factory=lambda: ["get"])
+    methods: list[HttpMethod | HttpMethodName] = field(
+        default_factory=lambda: [HttpMethod.GET]
+    )
     url_path: str | None = None
     url_name: str | None = None
     auth: Any = NOT_SET
@@ -34,18 +36,20 @@ class ActionConfig:
     prefetch_object: bool = False
 
     def __post_init__(self) -> None:
-        unknown = set(self.methods) - set(get_args(HttpMethod))
+        valid = {member.value for member in HttpMethod}
+        unknown = {str(method) for method in self.methods} - valid
         if unknown:
             raise ValueError(
                 f"Unsupported action methods {sorted(unknown)}; "
-                f"expected any of {list(get_args(HttpMethod))}"
+                f"expected any of {sorted(valid)}"
             )
+        self.methods = [HttpMethod(method) for method in self.methods]
 
 
 class ActionOptions(TypedDict, total=False):
     """Keyword options accepted by ``@action`` and ``@on``; see ``ActionConfig``."""
 
-    methods: list[HttpMethod] | None
+    methods: list[HttpMethod | HttpMethodName] | None
     url_path: str | None
     url_name: str | None
     auth: Any

@@ -4,6 +4,7 @@ from typing import get_type_hints
 from django.test import SimpleTestCase, tag
 
 from ninja_aio.decorators.actions import ActionConfig, ActionOptions, action, on
+from ninja_aio.types import HttpMethod
 
 
 @tag("actions")
@@ -41,3 +42,12 @@ class ActionOptionsTestCase(SimpleTestCase):
         self.assertEqual(action(detail=True, methods=None)(lambda: None)._action_config.methods, ["get"])
         config = on("publish")(lambda: None)._action_config
         self.assertEqual((config.methods, config.url_path, config.prefetch_object), (["post"], "publish", True))
+
+    def test_methods_accept_enum_members_and_normalize_strings(self):
+        config = action(detail=False, methods=[HttpMethod.PATCH, "delete"])(
+            lambda: None
+        )._action_config
+        self.assertEqual(config.methods, [HttpMethod.PATCH, HttpMethod.DELETE])
+        self.assertTrue(all(isinstance(m, HttpMethod) for m in config.methods))
+        self.assertEqual(str(HttpMethod.PATCH), "patch")
+        self.assertEqual(f"{HttpMethod.PATCH}", "patch")

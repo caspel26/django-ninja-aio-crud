@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Any, Generic, Literal, TypeAlias, TypeVar
 from uuid import UUID
 
@@ -14,7 +15,22 @@ SchemaType: TypeAlias = type[Schema]
 InputData: TypeAlias = dict[str, Any] | Schema
 Payload: TypeAlias = dict[str, Any]
 PrimaryKey: TypeAlias = int | str | UUID
-HttpMethod: TypeAlias = Literal["get", "post", "put", "patch", "delete"]
+
+
+class HttpMethod(str, Enum):
+    """HTTP methods supported by generated routes and actions; members compare equal to their value."""
+
+    GET = "get"
+    POST = "post"
+    PUT = "put"
+    PATCH = "patch"
+    DELETE = "delete"
+
+    def __str__(self) -> str:
+        return self.value
+
+
+HttpMethodName: TypeAlias = Literal["get", "post", "put", "patch", "delete"]
 QueryPurpose: TypeAlias = Literal["read", "detail"]
 """Which read/detail relation optimizations a lookup applies."""
 BulkItemT = TypeVar("BulkItemT")
