@@ -113,6 +113,11 @@ body {
   opacity: 1;
 }
 
+.md-source__facts {
+  color: var(--nac-text-3);
+  opacity: 1;
+}
+
 .md-source__icon svg {
   fill: currentColor;
 }

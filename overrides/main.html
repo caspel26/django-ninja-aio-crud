@@ -1,5 +1,10 @@
 {% extends "base.html" %}
 
+{% block extrahead %}
+<meta name="theme-color" content="#0b0a10" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#fbfafc" media="(prefers-color-scheme: light)">
+{% endblock %}
+
 {% block outdated %}
 <strong>You are reading documentation for a version that is not the latest release.</strong>
 <a href="{{ '../' ~ base_url }}">Go to the latest docs</a>

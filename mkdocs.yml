@@ -184,3 +184,4 @@ extra_css:
 
 extra_javascript:
   - javascripts/a11y.js
+  - javascripts/home.js

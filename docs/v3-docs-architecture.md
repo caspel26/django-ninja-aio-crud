@@ -555,3 +555,23 @@ Deferred:
   `pymdown-extensions` 12, which conflicts with the pinned Material 9.6.
 - The ⌘K palette, homepage demo, and article sheet from the mockups belong to
   the homepage and page templates (Steps 17 and 18).
+
+### 11.7 Step 17 implementation
+
+- `docs/index.md` is now only front matter (`template: home.html`, title,
+  description); the 629-line markdown homepage is gone.
+- `overrides/home.html` renders the Studio homepage: hero with the mascot,
+  copyable install command, requirements, the interactive operation demo
+  (model, HTTP, OpenAPI with linked fields), capability list linking to the
+  current pages, sync/async Python example, benchmark bars, and three learning
+  paths. Links use the `url` filter, so they work under every `mike` version.
+- `docs/javascripts/home.js` drives the demo, tabs, and copy button, and
+  re-initializes on instant navigation through `document$`.
+- Homepage styles live in the final section of `pages.css`; the transitional
+  hero, badge, and call-to-action rules are removed.
+- `theme-color` metadata for both schemes in `overrides/main.html`.
+- Checks: all 15 homepage links resolve, no script errors, no horizontal
+  overflow at 390 px, and the `docs-tests` suite passes 44/44 with refreshed
+  homepage baselines. Fixed along the way: dimmed demo lines and `small`
+  labels (Material's 0.75 opacity) failed contrast, and the GitHub facts in the
+  header did too once the API responded.
