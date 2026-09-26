@@ -14,6 +14,9 @@ SchemaType: TypeAlias = type[Schema]
 InputData: TypeAlias = dict[str, Any] | Schema
 Payload: TypeAlias = dict[str, Any]
 PrimaryKey: TypeAlias = int | str | UUID
+HttpMethod: TypeAlias = Literal["get", "post", "put", "patch", "delete"]
+QueryPurpose: TypeAlias = Literal["read", "detail"]
+"""Which read/detail relation optimizations a lookup applies."""
 BulkItemT = TypeVar("BulkItemT")
 
 
@@ -24,6 +27,8 @@ class BulkFailure:
     message: str
     fields: dict[str, list[str]] = field(default_factory=dict)
     pk: PrimaryKey | None = None
+    error: dict[str, Any] = field(default_factory=dict)
+    """Legacy error payload, as returned in HTTP bulk responses."""
 
 
 @dataclass

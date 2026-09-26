@@ -5,7 +5,7 @@ from unittest import mock
 from ninja.errors import ConfigError
 from ninja_aio.models import ModelUtil
 from ninja_aio.schemas.helpers import ObjectQuerySchema, ObjectsQuerySchema
-from tests.test_app import models, schema
+from tests.test_app import models, schema, serializers
 from tests.generics.models import Tests
 
 
@@ -266,6 +266,185 @@ class ModelUtilDeleteSInstanceTestCase(TestCase):
         self.assertFalse(
             await models.TestModel.objects.filter(pk=obj.pk).aexists()
         )
+
+
+@tag("model_util_facade")
+class ModelUtilFacadeTestCase(TestCase):
+    """ModelUtil exposes the serializer CRUD facade for schema-only viewsets."""
+
+    def setUp(self):
+        self.util = ModelUtil(models.TestModel)
+        self.request = mock.Mock()
+
+    def test_sync_facade_round_trip(self):
+        obj = self.util.create(
+            schema.TestModelSchemaIn(name="sync", description="before"),
+            request=self.request,
+        )
+        self.util.update(
+            obj.pk, schema.TestModelSchemaPatch(description="after"), request=self.request
+        )
+        obj.refresh_from_db()
+        self.assertEqual(
+            self.util.model_dumps([obj], schema=schema.TestModelSchemaOut),
+            [{"id": obj.pk, "name": "sync", "description": "after"}],
+        )
+        self.util.destroy(obj, request=self.request)
+        self.assertFalse(models.TestModel.objects.filter(pk=obj.pk).exists())
+
+    async def test_async_facade_round_trip(self):
+        obj = await self.util.acreate(
+            schema.TestModelSchemaIn(name="async", description="before"),
+            request=self.request,
+        )
+        obj = await self.util.aupdate(
+            obj, schema.TestModelSchemaPatch(description="after"), request=self.request
+        )
+        self.assertEqual(
+            await self.util.amodel_dump(obj, schema=schema.TestModelSchemaOut),
+            {"id": obj.pk, "name": "async", "description": "after"},
+        )
+        await self.util.adestroy(obj.pk, request=self.request)
+        self.assertFalse(await models.TestModel.objects.filter(pk=obj.pk).aexists())
+
+    async def test_legacy_crud_methods_emit_deprecation_warnings(self):
+        obj = await models.TestModel.objects.acreate(name="legacy", description="d")
+        calls = {
+            "create_s": lambda: self.util.create_s(
+                self.request,
+                schema.TestModelSchemaIn(name="new", description="d"),
+                schema.TestModelSchemaOut,
+            ),
+            "read_s": lambda: self.util.read_s(
+                schema.TestModelSchemaOut, self.request, obj
+            ),
+            "list_read_s": lambda: self.util.list_read_s(
+                schema.TestModelSchemaOut, self.request, [obj]
+            ),
+            "update_s": lambda: self.util.update_s(
+                self.request,
+                schema.TestModelSchemaPatch(description="x"),
+                obj.pk,
+                schema.TestModelSchemaOut,
+            ),
+            "delete_s": lambda: self.util.delete_s(self.request, obj.pk),
+        }
+        for name, call in calls.items():
+            with self.subTest(method=name):
+                with self.assertWarnsRegex(DeprecationWarning, f"ModelUtil.{name}"):
+                    await call()
+
+    async def test_legacy_bulk_methods_warn_and_keep_tuple_format(self):
+        first = await models.TestModel.objects.acreate(name="a", description="d")
+        patch = schema.TestModelSchemaPatch(description="u")
+
+        with self.assertWarnsRegex(DeprecationWarning, "bulk_create_s"):
+            success, errors = await self.util.bulk_create_s(
+                self.request,
+                [schema.TestModelSchemaIn(name="b", description="d"), object()],
+            )
+        self.assertEqual((len(success), len(errors)), (1, 1))
+
+        with self.assertWarnsRegex(DeprecationWarning, "bulk_update_s"):
+            success, errors = await self.util.bulk_update_s(
+                self.request, [(first.pk, patch), (10**9, patch), (first.pk, object())]
+            )
+        self.assertEqual((success, len(errors)), ([first.pk], 2))
+
+        with self.assertWarnsRegex(DeprecationWarning, "bulk_delete_s"):
+            success, errors = await self.util.bulk_delete_s(
+                self.request, [first.pk, 10**9], ["name"]
+            )
+        self.assertEqual((success, len(errors)), (["a"], 1))
+
+        with self.assertWarns(DeprecationWarning):
+            self.assertEqual(await self.util.bulk_delete_s(self.request, []), ([], []))
+
+        other = await models.TestModel.objects.acreate(name="c", description="d")
+        with self.assertWarns(DeprecationWarning):
+            self.assertEqual(
+                await self.util.bulk_delete_s(self.request, [other.pk]), ([other.pk], [])
+            )
+
+        fk_util = ModelUtil(models.TestModelForeignKey)
+        with self.assertWarns(DeprecationWarning):
+            success, errors = await fk_util.bulk_create_s(
+                self.request,
+                [schema.TestModelForeignKeySchemaIn(name="x", description="d", test_model=10**9)],
+            )
+        self.assertEqual((success, len(errors)), ([], 1))
+
+
+@tag("model_util_facade", "facade_reads")
+class FacadeReadTestCase(TestCase):
+    """get/aget and get_queryset/aget_queryset honor optimize_for on every backend."""
+
+    @classmethod
+    def setUpTestData(cls):
+        parent = models.TestModelSerializerReverseForeignKey.objects.create(
+            name="parent", description="d"
+        )
+        cls.child = models.TestModelSerializerForeignKey.objects.create(
+            name="child", description="d", test_model_serializer=parent
+        )
+        cls.plain = models.TestModel.objects.create(name="plain", description="d")
+        cls.request = mock.Mock()
+
+    def _assert_joined(self, obj):
+        self.assertIn("test_model_serializer", obj._state.fields_cache)
+
+    def test_model_serializer_sync_reads(self):
+        serializer = models.TestModelSerializerForeignKey
+        obj = serializer.get(self.child.pk, request=self.request, optimize_for="read")
+        self._assert_joined(obj)
+        qs = serializer.get_queryset(request=self.request, optimize_for="read")
+        self.assertIn("test_model_serializer", qs.query.select_related)
+        self.assertEqual(list(qs), [self.child])
+
+    async def test_model_serializer_async_reads(self):
+        serializer = models.TestModelSerializerForeignKey
+        obj = await serializer.aget(
+            self.child.pk, request=self.request, optimize_for="read"
+        )
+        self._assert_joined(obj)
+        qs = await serializer.aget_queryset(request=self.request, optimize_for="read")
+        self.assertIn("test_model_serializer", qs.query.select_related)
+        self.assertEqual([o async for o in qs], [self.child])
+
+    def test_model_util_sync_reads(self):
+        util = ModelUtil(models.TestModel)
+        self.assertEqual(util.get(self.plain.pk, request=self.request), self.plain)
+        self.assertEqual(
+            list(util.get_queryset(request=self.request, optimize_for="read")),
+            [self.plain],
+        )
+
+    async def test_model_util_async_reads(self):
+        util = ModelUtil(models.TestModel)
+        self.assertEqual(
+            await util.aget(self.plain.pk, request=self.request, optimize_for="detail"),
+            self.plain,
+        )
+        qs = await util.aget_queryset(request=self.request)
+        self.assertEqual([o async for o in qs], [self.plain])
+
+    async def test_meta_serializer_forwards_optimize_for(self):
+        fk_serializer = serializers.TestModelForeignKeySerializer
+        with mock.patch.object(
+            fk_serializer.util, "aget_object", mock.AsyncMock(return_value="obj")
+        ) as aget_object:
+            self.assertEqual(
+                await fk_serializer.aget(1, request=self.request, optimize_for="detail"),
+                "obj",
+            )
+        self.assertEqual(aget_object.await_args.kwargs["is_for"], "detail")
+        with mock.patch.object(
+            fk_serializer.util, "get_object", return_value="obj"
+        ) as get_object:
+            self.assertEqual(
+                fk_serializer.get(1, request=self.request, optimize_for="read"), "obj"
+            )
+        self.assertEqual(get_object.call_args.kwargs["is_for"], "read")
 
 
 @tag("model_util_queryset_optimizations_preserved")

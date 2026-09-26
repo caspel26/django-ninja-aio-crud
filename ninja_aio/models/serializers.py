@@ -29,7 +29,7 @@ from django.conf import settings
 from ninja import Schema
 from django.core.exceptions import FieldDoesNotExist, ImproperlyConfigured
 from ninja.orm import create_schema
-from django.db import connections, models, router, transaction
+from django.db import connections, models
 from django.db.models import aprefetch_related_objects
 from django.http import HttpRequest
 from django.db.models.fields.related_descriptors import (
@@ -43,7 +43,6 @@ from pydantic import BeforeValidator, Field, ValidationError
 from pydantic._internal._decorators import PydanticDescriptorProxy
 
 from ninja_aio.types import (
-    BulkFailure,
     BulkResult,
     S_TYPES,
     F_TYPES,
@@ -51,6 +50,7 @@ from ninja_aio.types import (
     InputData,
     ModelSerializerMeta,
     PrimaryKey,
+    QueryPurpose,
     SchemaKind,
     SchemaType,
     SerializerMeta,
@@ -62,9 +62,8 @@ from ninja_aio.schemas.helpers import (
     ObjectQuerySchema,
 )
 from ninja_aio.models import transformations as model_transformations
-from ninja_aio.models.utils import ModelUtil
-from ninja_aio.exceptions import BaseException as OperationError, OperationValidationError
-from ninja_aio.decorators.views import AsyncAtomicContextManager
+from ninja_aio.models.utils import ModelUtil, arun_bulk, bulk_failure, run_bulk
+from ninja_aio.exceptions import OperationValidationError
 
 # TypeVar for generic model typing in Serializers
 ModelT = TypeVar("ModelT", bound=models.Model)
@@ -1612,7 +1611,7 @@ class BaseSerializer:
         return selected
 
     @classmethod
-    def _dump_models_sync(
+    def _dump_models(
         cls,
         instances: Iterable[models.Model],
         schema: SchemaType | None,
@@ -1663,16 +1662,7 @@ class BaseSerializer:
     def _dump_relation_plan(
         cls, schema: SchemaType
     ) -> model_transformations.RelationPlan:
-        model = cls._get_model()
-        relation_names = []
-        for name in schema.model_fields:
-            try:
-                field = model._meta.get_field(name)
-            except FieldDoesNotExist:
-                continue
-            if field.is_relation:
-                relation_names.append(name)
-        return model_transformations.discover_relation_plan(model, relation_names)
+        return model_transformations.schema_relation_plan(cls._get_model(), schema)
 
     @classmethod
     async def _amodel_dump_operation(
@@ -1739,7 +1729,7 @@ class BaseSerializer:
     ) -> models.Model:
         """Execute asynchronous creation for a concrete serializer class."""
         validated = cls._validate_operation_data("create", data)
-        return await cls.util._create_instance(request, validated)
+        return await cls.util.acreate_instance(request, validated)
 
     @classmethod
     async def _aget_operation(
@@ -1748,13 +1738,35 @@ class BaseSerializer:
         *,
         request: HttpRequest | None,
         lookups: dict[str, Any],
+        optimize_for: QueryPurpose | None = None,
     ) -> models.Model:
         """Execute one request-aware asynchronous lookup."""
         return await cls.util.aget_object(
             request,
             pk=pk,
             query_data=cls._operation_lookup_query(pk, lookups),
+            is_for=optimize_for,
         )
+
+    @classmethod
+    def get_queryset(
+        cls,
+        *,
+        request: HttpRequest | None = None,
+        optimize_for: QueryPurpose | None = None,
+    ) -> models.QuerySet:
+        """Return the request-scoped queryset, optionally optimized for read/detail dumps."""
+        return cls.util.get_objects(request, is_for=optimize_for)
+
+    @classmethod
+    async def aget_queryset(
+        cls,
+        *,
+        request: HttpRequest | None = None,
+        optimize_for: QueryPurpose | None = None,
+    ) -> models.QuerySet:
+        """Async counterpart of ``get_queryset`` (runs ``aqueryset_request``)."""
+        return await cls.util.aget_objects(request, is_for=optimize_for)
 
     @classmethod
     async def _aupdate_operation(
@@ -1768,7 +1780,7 @@ class BaseSerializer:
         """Execute asynchronous update without refetching loaded targets."""
         pk, instance = cls._resolve_operation_target(target)
         validated = cls._validate_operation_data("update", data)
-        return await cls.util._update_instance(
+        return await cls.util.aupdate_instance(
             request,
             validated,
             pk,
@@ -1785,7 +1797,7 @@ class BaseSerializer:
     ) -> None:
         """Execute asynchronous deletion without refetching loaded targets."""
         pk, instance = cls._resolve_operation_target(target)
-        await cls.util.delete_s(request, pk, instance=instance)
+        await cls.util.adestroy_instance(request, pk, instance=instance)
 
     @classmethod
     def _create_operation(
@@ -1808,39 +1820,27 @@ class BaseSerializer:
         request: HttpRequest | None,
     ) -> BulkResult[models.Model]:
         """Create each item independently, retaining successful model instances."""
-        result: BulkResult[models.Model] = BulkResult()
         fk_cache: dict[tuple[type, Any], Any] = {}
-        for index, data in enumerate(items):
-            try:
-                with transaction.atomic(using=router.db_for_write(cls._get_model())):
-                    result.succeeded.append(
-                        cls._create_operation(data, request=request, fk_cache=fk_cache)
-                    )
-            except Exception as exc:
-                result.failed.append(cls._bulk_failure(index, exc))
-        return result
+        return run_bulk(
+            cls._get_model(),
+            items,
+            lambda data: cls._create_operation(data, request=request, fk_cache=fk_cache),
+        )
+
+    _bulk_failure = staticmethod(bulk_failure)
 
     @staticmethod
-    def _bulk_failure(
-        index: int, exc: Exception, pk: PrimaryKey | None = None
-    ) -> BulkFailure:
-        if isinstance(exc, OperationError):
-            return BulkFailure(index, exc.code, exc.message, exc.field_errors, pk)
-        if isinstance(exc, ValidationError):
-            return BulkFailure(
-                index,
-                "validation_error",
-                str(exc),
-                OperationValidationError(exc).field_errors,
-                pk,
-            )
-        if isinstance(exc, ValueError):
-            code = "invalid_value"
-        elif isinstance(exc, TypeError):
-            code = "invalid_type"
-        else:
-            code = "operation_error"
-        return BulkFailure(index, code, str(exc), pk=pk)
+    def _bulk_target(
+        target: models.Model | PrimaryKey,
+    ) -> tuple[PrimaryKey, models.Model | PrimaryKey]:
+        return (target.pk if isinstance(target, models.Model) else target), target
+
+    @classmethod
+    def _bulk_update_prepare(
+        cls, item: InputData | tuple[models.Model | PrimaryKey, InputData]
+    ) -> tuple[PrimaryKey, tuple[models.Model | PrimaryKey, InputData]]:
+        target, data = cls._bulk_update_item(item)
+        return cls._bulk_target(target)[0], (target, data)
 
     @classmethod
     def _bulk_update_item(
@@ -1863,20 +1863,14 @@ class BaseSerializer:
         *,
         request: HttpRequest | None = None,
     ) -> BulkResult[models.Model]:
-        result: BulkResult[models.Model] = BulkResult()
         fk_cache: dict[tuple[type, Any], Any] = {}
-        for index, data in enumerate(items):
-            try:
-                async with AsyncAtomicContextManager(
-                    using=router.db_for_write(cls._get_model())
-                ):
-                    validated = cls._validate_operation_data("create", data)
-                    result.succeeded.append(
-                        await cls.util._create_instance(request, validated, fk_cache)
-                    )
-            except Exception as exc:
-                result.failed.append(cls._bulk_failure(index, exc))
-        return result
+        return await arun_bulk(
+            cls._get_model(),
+            items,
+            lambda data: cls.util.acreate_instance(
+                request, cls._validate_operation_data("create", data), fk_cache
+            ),
+        )
 
     @classmethod
     def bulk_update(
@@ -1885,22 +1879,13 @@ class BaseSerializer:
         *,
         request: HttpRequest | None = None,
     ) -> BulkResult[models.Model]:
-        result: BulkResult[models.Model] = BulkResult()
         fk_cache: dict[tuple[type, Any], Any] = {}
-        for index, item in enumerate(items):
-            pk = None
-            try:
-                target, data = cls._bulk_update_item(item)
-                pk = target.pk if isinstance(target, models.Model) else target
-                with transaction.atomic(using=router.db_for_write(cls._get_model())):
-                    result.succeeded.append(
-                        cls._update_operation(
-                            target, data, request=request, fk_cache=fk_cache
-                        )
-                    )
-            except Exception as exc:
-                result.failed.append(cls._bulk_failure(index, exc, pk))
-        return result
+        return run_bulk(
+            cls._get_model(),
+            items,
+            lambda pair: cls._update_operation(*pair, request=request, fk_cache=fk_cache),
+            cls._bulk_update_prepare,
+        )
 
     @classmethod
     async def abulk_update(
@@ -1909,24 +1894,13 @@ class BaseSerializer:
         *,
         request: HttpRequest | None = None,
     ) -> BulkResult[models.Model]:
-        result: BulkResult[models.Model] = BulkResult()
         fk_cache: dict[tuple[type, Any], Any] = {}
-        for index, item in enumerate(items):
-            pk = None
-            try:
-                target, data = cls._bulk_update_item(item)
-                pk = target.pk if isinstance(target, models.Model) else target
-                async with AsyncAtomicContextManager(
-                    using=router.db_for_write(cls._get_model())
-                ):
-                    result.succeeded.append(
-                        await cls._aupdate_operation(
-                            target, data, request=request, fk_cache=fk_cache
-                        )
-                    )
-            except Exception as exc:
-                result.failed.append(cls._bulk_failure(index, exc, pk))
-        return result
+        return await arun_bulk(
+            cls._get_model(),
+            items,
+            lambda pair: cls._aupdate_operation(*pair, request=request, fk_cache=fk_cache),
+            cls._bulk_update_prepare,
+        )
 
     @classmethod
     def bulk_destroy(
@@ -1935,17 +1909,12 @@ class BaseSerializer:
         *,
         request: HttpRequest | None = None,
     ) -> BulkResult[PrimaryKey]:
-        result: BulkResult[PrimaryKey] = BulkResult()
-        for index, target in enumerate(targets):
-            pk = target.pk if isinstance(target, models.Model) else target
-            try:
-                with transaction.atomic(using=router.db_for_write(cls._get_model())):
-                    pk, _ = cls._resolve_operation_target(target)
-                    cls._destroy_operation(target, request=request)
-                    result.succeeded.append(pk)
-            except Exception as exc:
-                result.failed.append(cls._bulk_failure(index, exc, pk))
-        return result
+        def destroy(target: models.Model | PrimaryKey) -> PrimaryKey:
+            pk, _ = cls._resolve_operation_target(target)
+            cls._destroy_operation(target, request=request)
+            return pk
+
+        return run_bulk(cls._get_model(), targets, destroy, cls._bulk_target)
 
     @classmethod
     async def abulk_destroy(
@@ -1954,19 +1923,12 @@ class BaseSerializer:
         *,
         request: HttpRequest | None = None,
     ) -> BulkResult[PrimaryKey]:
-        result: BulkResult[PrimaryKey] = BulkResult()
-        for index, target in enumerate(targets):
-            pk = target.pk if isinstance(target, models.Model) else target
-            try:
-                async with AsyncAtomicContextManager(
-                    using=router.db_for_write(cls._get_model())
-                ):
-                    pk, _ = cls._resolve_operation_target(target)
-                    await cls._adestroy_operation(target, request=request)
-                    result.succeeded.append(pk)
-            except Exception as exc:
-                result.failed.append(cls._bulk_failure(index, exc, pk))
-        return result
+        async def destroy(target: models.Model | PrimaryKey) -> PrimaryKey:
+            pk, _ = cls._resolve_operation_target(target)
+            await cls._adestroy_operation(target, request=request)
+            return pk
+
+        return await arun_bulk(cls._get_model(), targets, destroy, cls._bulk_target)
 
     @classmethod
     def _get_operation(
@@ -1975,12 +1937,14 @@ class BaseSerializer:
         *,
         request: HttpRequest | None,
         lookups: dict[str, Any],
+        optimize_for: QueryPurpose | None = None,
     ) -> models.Model:
         """Execute one request-aware synchronous lookup."""
         return cls.util.get_object(
             request,
             pk=pk,
             query_data=cls._operation_lookup_query(pk, lookups),
+            is_for=optimize_for,
         )
 
     @classmethod
@@ -2014,7 +1978,14 @@ class BaseSerializer:
         cls.util.destroy_instance(request, pk, instance=instance)
 
     @classmethod
-    async def queryset_request(
+    def queryset_request(
+        cls, request: HttpRequest | None
+    ) -> models.QuerySet[models.Model]:
+        """Override to return a request-scoped filtered queryset."""
+        raise NotImplementedError
+
+    @classmethod
+    async def aqueryset_request(
         cls, request: HttpRequest | None
     ) -> models.QuerySet[models.Model]:
         """
@@ -2044,8 +2015,13 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
         super().__init_subclass__(**kwargs)
         from ninja_aio.models.utils import ModelUtil, register_serializer_for_model
         from ninja_aio.helpers.query import QueryUtil
-        from ninja_aio.models.hooks import collect_reactive_hooks, register_signals
+        from ninja_aio.models.hooks import (
+            collect_reactive_hooks,
+            register_signals,
+            validate_serializer_hooks,
+        )
 
+        validate_serializer_hooks(cls)
         cls.util = ModelUtil(cls)
         cls.query_util = QueryUtil(cls)
         cls._reactive_hooks = collect_reactive_hooks(cls)
@@ -2094,12 +2070,15 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
         pk: PrimaryKey | None = None,
         *,
         request: HttpRequest | None = None,
+        optimize_for: QueryPurpose | None = None,
         **lookups: Any,
     ) -> ModelSerializerT:
         """Retrieve and return one model instance synchronously."""
         return cast(
             ModelSerializerT,
-            cls._get_operation(pk, request=request, lookups=lookups),
+            cls._get_operation(
+                pk, request=request, lookups=lookups, optimize_for=optimize_for
+            ),
         )
 
     @classmethod
@@ -2134,7 +2113,7 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
         schema: SchemaType | None = None,
     ) -> dict[str, Any]:
         """Serialize an already-loaded model instance without fetching relations."""
-        return cls._dump_models_sync((instance,), schema, "detail")[0]
+        return cls._dump_models((instance,), schema, "detail")[0]
 
     @classmethod
     def model_dumps(
@@ -2144,7 +2123,7 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
         schema: SchemaType | None = None,
     ) -> list[dict[str, Any]]:
         """Serialize an already-evaluated collection with the read schema."""
-        return cls._dump_models_sync(instances, schema)
+        return cls._dump_models(instances, schema)
 
     @classmethod
     async def amodel_dump(
@@ -2184,12 +2163,15 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
         pk: PrimaryKey | None = None,
         *,
         request: HttpRequest | None = None,
+        optimize_for: QueryPurpose | None = None,
         **lookups: Any,
     ) -> ModelSerializerT:
         """Retrieve and return one model instance asynchronously."""
         return cast(
             ModelSerializerT,
-            await cls._aget_operation(pk, request=request, lookups=lookups),
+            await cls._aget_operation(
+                pk, request=request, lookups=lookups, optimize_for=optimize_for
+            ),
         )
 
     @classmethod
@@ -2656,7 +2638,7 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
         return await sync_to_async(self.has_changed)(field)
 
     @classmethod
-    async def queryset_request(
+    async def aqueryset_request(
         cls, request: HttpRequest | None
     ) -> models.QuerySet["ModelSerializer"]:
         return cls.query_util.apply_queryset_optimizations(
@@ -2665,7 +2647,7 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
         )
 
     @classmethod
-    def queryset_request_sync(
+    def queryset_request(
         cls, request: HttpRequest | None
     ) -> models.QuerySet["ModelSerializer"]:
         """Synchronous counterpart for request-scoped query construction."""
@@ -2674,13 +2656,13 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
             scope=cls.query_util.SCOPES.QUERYSET_REQUEST,
         )
 
-    async def post_create(self) -> None:
+    async def apost_create(self) -> None:
         """
         Async hook executed after first persistence (create path).
         """
         pass
 
-    async def custom_actions(self, payload: dict[str, Any]):
+    async def acustom_actions(self, payload: dict[str, Any]):
         """
         Async hook for reacting to provided custom (synthetic) fields.
 
@@ -2691,11 +2673,11 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
         """
         pass
 
-    def post_create_sync(self) -> None:
+    def post_create(self) -> None:
         """Synchronous counterpart for post-create lifecycle work."""
         pass
 
-    def custom_actions_sync(self, payload: dict[str, Any]) -> None:
+    def custom_actions(self, payload: dict[str, Any]) -> None:
         """Synchronous counterpart for custom field handling."""
         pass
 
@@ -2848,8 +2830,9 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         super().__init_subclass__(**kwargs)
         from ninja_aio.models.utils import ModelUtil, register_serializer_for_model
         from ninja_aio.helpers.query import QueryUtil
-        from ninja_aio.models.hooks import collect_reactive_hooks
+        from ninja_aio.models.hooks import collect_reactive_hooks, validate_serializer_hooks
 
+        validate_serializer_hooks(cls)
         cls.model = cls._get_model()
         cls.util = ModelUtil(cls.model, serializer_class=cls)
         cls.query_util = QueryUtil(cls)
@@ -2915,10 +2898,16 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         pk: PrimaryKey | None = None,
         *,
         request: HttpRequest | None = None,
+        optimize_for: QueryPurpose | None = None,
         **lookups: Any,
     ) -> ModelT:
         """Retrieve and return one model instance synchronously."""
-        return cast(ModelT, cls._get_operation(pk, request=request, lookups=lookups))
+        return cast(
+            ModelT,
+            cls._get_operation(
+                pk, request=request, lookups=lookups, optimize_for=optimize_for
+            ),
+        )
 
     @classmethod
     def update(
@@ -2949,7 +2938,7 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         schema: SchemaType | None = None,
     ) -> dict[str, Any]:
         """Serialize an already-loaded model instance without querying."""
-        return cls._dump_models_sync((instance,), schema, "detail")[0]
+        return cls._dump_models((instance,), schema, "detail")[0]
 
     @classmethod
     def model_dumps(
@@ -2959,7 +2948,7 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         schema: SchemaType | None = None,
     ) -> list[dict[str, Any]]:
         """Serialize an already-evaluated collection with the read schema."""
-        return cls._dump_models_sync(instances, schema)
+        return cls._dump_models(instances, schema)
 
     @classmethod
     async def amodel_dump(
@@ -2997,11 +2986,15 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         pk: PrimaryKey | None = None,
         *,
         request: HttpRequest | None = None,
+        optimize_for: QueryPurpose | None = None,
         **lookups: Any,
     ) -> ModelT:
         """Retrieve and return one model instance asynchronously."""
         return cast(
-            ModelT, await cls._aget_operation(pk, request=request, lookups=lookups)
+            ModelT,
+            await cls._aget_operation(
+                pk, request=request, lookups=lookups, optimize_for=optimize_for
+            ),
         )
 
     @classmethod
@@ -3283,7 +3276,7 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         return getattr(schema, f_type, []) or []
 
     @classmethod
-    async def queryset_request(
+    async def aqueryset_request(
         cls, request: HttpRequest | None
     ) -> models.QuerySet[ModelT]:
         return cls.query_util.apply_queryset_optimizations(
@@ -3292,7 +3285,7 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         )
 
     @classmethod
-    def queryset_request_sync(
+    def queryset_request(
         cls, request: HttpRequest | None
     ) -> models.QuerySet[ModelT]:
         """Synchronous counterpart for request-scoped query construction."""
@@ -3354,13 +3347,13 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         """
         return await sync_to_async(self.has_changed)(field, instance)
 
-    async def post_create(self, instance: models.Model) -> None:
+    async def apost_create(self, instance: models.Model) -> None:
         """
         Async hook executed after first persistence (create path).
         """
         pass
 
-    async def custom_actions(self, payload: dict[str, Any], instance: models.Model):
+    async def acustom_actions(self, payload: dict[str, Any], instance: models.Model):
         """
         Async hook for reacting to provided custom (synthetic) fields.
 
@@ -3371,11 +3364,11 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         """
         pass
 
-    def post_create_sync(self, instance: models.Model) -> None:
+    def post_create(self, instance: models.Model) -> None:
         """Synchronous counterpart for post-create lifecycle work."""
         pass
 
-    def custom_actions_sync(
+    def custom_actions(
         self, payload: dict[str, Any], instance: models.Model
     ) -> None:
         """Synchronous counterpart for custom field handling."""
@@ -3399,7 +3392,7 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         ModelT
             The saved model instance.
         """
-        from ninja_aio.models.hooks import execute_reactive_hooks, fire_update_hooks
+        from ninja_aio.models.hooks import aexecute_reactive_hooks, afire_update_hooks
 
         instance = self._resolve_instance(instance)
         creation = instance._state.adding
@@ -3423,9 +3416,9 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         # Fire reactive hooks
         if hooks:
             if creation:
-                await execute_reactive_hooks(self, hooks.get("create", []), instance)
+                await aexecute_reactive_hooks(self, hooks.get("create", []), instance)
             else:
-                await fire_update_hooks(self, changed_fields, hooks, instance)
+                await afire_update_hooks(self, changed_fields, hooks, instance)
 
         return instance
 

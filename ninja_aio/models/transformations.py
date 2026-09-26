@@ -9,6 +9,7 @@ import base64
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping, Protocol, Sequence, TypeVar
 
+from django.core.exceptions import FieldDoesNotExist
 from django.db import models
 from django.db.models.fields.related_descriptors import (
     ForwardManyToOneDescriptor,
@@ -191,6 +192,21 @@ def discover_relation_plan(
             prefetch_related.append(descriptor.related.name)
 
     return RelationPlan(tuple(select_related), tuple(prefetch_related))
+
+
+def schema_relation_plan(
+    model: type[models.Model], schema: SchemaType
+) -> RelationPlan:
+    """Discover the relations an output schema needs loaded before dumping."""
+    relation_names = []
+    for name in schema.model_fields:
+        try:
+            field = model._meta.get_field(name)
+        except FieldDoesNotExist:
+            continue
+        if field.is_relation:
+            relation_names.append(name)
+    return discover_relation_plan(model, relation_names)
 
 
 def combine_relation_plans(

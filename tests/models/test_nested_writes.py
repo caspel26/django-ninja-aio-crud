@@ -139,7 +139,7 @@ class NestedWritesTestCase(TestCase):
         return self.schema_in(name=name, description="d", **kwargs)
 
     async def test_parsing_preserves_public_two_tuple_contract(self):
-        payload, customs = await self.util.parse_input_data(
+        payload, customs = await self.util.aparse_input_data(
             self.request.post(), self.payload(items=[{"name": "i", "description": "d"}])
         )
         self.assertNotIn("items", payload)
@@ -165,10 +165,10 @@ class NestedWritesTestCase(TestCase):
 
     async def test_nested_children_run_lifecycle_hooks(self):
         with patch.object(
-            app_models.NestedOrderItem, "custom_actions", new_callable=AsyncMock
+            app_models.NestedOrderItem, "acustom_actions", new_callable=AsyncMock
         ) as custom:
             with patch.object(
-                app_models.NestedOrderItem, "post_create", new_callable=AsyncMock
+                app_models.NestedOrderItem, "apost_create", new_callable=AsyncMock
             ) as post:
                 await self.util.create_s(
                     self.request.post(),
@@ -212,7 +212,7 @@ class NestedWritesTestCase(TestCase):
             name="outside-scope", description="d"
         )
         scoped = AsyncMock(return_value=app_models.NestedLinkedObject.objects.none())
-        with patch.object(app_models.NestedLinkedObject, "queryset_request", scoped):
+        with patch.object(app_models.NestedLinkedObject, "aqueryset_request", scoped):
             with self.assertRaises(NotFoundError):
                 await self.util.create_s(
                     self.request.post(),
@@ -252,8 +252,8 @@ class NestedWritesTestCase(TestCase):
         parsed = AsyncMock(
             return_value=({"name": "i", "description": "d", "order_id": other.pk}, {})
         )
-        with patch.object(child_util, "parse_input_data", parsed):
-            item = await child_util._create_instance(
+        with patch.object(child_util, "aparse_input_data", parsed):
+            item = await child_util.acreate_instance(
                 self.request.post(),
                 schema(name="i", description="d"),
                 extra_fields={"order": owner},
@@ -278,7 +278,7 @@ class NestedWritesTestCase(TestCase):
     async def test_child_hook_failure_rolls_back_whole_graph(self):
         with patch.object(
             app_models.NestedOrderItem,
-            "post_create",
+            "apost_create",
             new=AsyncMock(side_effect=RuntimeError("hook failed")),
         ):
             with self.assertRaisesRegex(RuntimeError, "hook failed"):
@@ -344,11 +344,11 @@ class NestedWritesTestCase(TestCase):
     async def test_failing_nested_hook_does_not_schedule_later_hook(self):
         with patch.object(
             app_models.NestedOrderItem,
-            "custom_actions",
+            "acustom_actions",
             new=AsyncMock(side_effect=RuntimeError("custom failed")),
         ):
             with patch.object(
-                app_models.NestedOrderItem, "post_create", new_callable=AsyncMock
+                app_models.NestedOrderItem, "apost_create", new_callable=AsyncMock
             ) as post:
                 with self.assertRaisesRegex(RuntimeError, "custom failed"):
                     await self.util.create_s(

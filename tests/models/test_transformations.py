@@ -129,6 +129,19 @@ class TransformationRuleTests(SimpleTestCase):
         self.assertEqual(plan.select_related, ("configured_fk",))
         self.assertEqual(plan.prefetch_related, ())
 
+    def test_schema_relation_plan_skips_non_model_fields(self) -> None:
+        class _RelatedOutput(Schema):
+            name: str
+            test_model: dict
+            computed: str
+
+        plan = model_transformations.schema_relation_plan(
+            TestModelForeignKey, _RelatedOutput
+        )
+
+        self.assertEqual(plan.select_related, ("test_model",))
+        self.assertEqual(plan.prefetch_related, ())
+
     def test_relation_plans_compose_without_evaluating_queryset(self) -> None:
         plan = model_transformations.combine_relation_plans(
             model_transformations.RelationPlan(select_related=("test_model",)),

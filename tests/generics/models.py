@@ -121,7 +121,7 @@ class Tests:
             self.assertEqual(exc.exception.status_code, 404)
 
         @mock.patch(
-            "ninja_aio.models.ModelSerializer.queryset_request",
+            "ninja_aio.models.ModelSerializer.aqueryset_request",
             new_callable=mock.AsyncMock,
         )
         async def test_get_object(self, mock_queryset_request: mock.AsyncMock):
@@ -134,7 +134,7 @@ class Tests:
                 mock_queryset_request.assert_not_awaited()
 
         @mock.patch(
-            "ninja_aio.models.ModelSerializer.queryset_request",
+            "ninja_aio.models.ModelSerializer.aqueryset_request",
             new_callable=mock.AsyncMock,
         )
         async def test_get_object_with_additional_data(
@@ -166,18 +166,18 @@ class Tests:
             )
 
         async def test_parse_input_data(self):
-            payload, customs = await self.model_util.parse_input_data(
+            payload, customs = await self.model_util.aparse_input_data(
                 self.request.post(), self.data_in
             )
             self.assertEqual(payload, self.parsed_input_data.get("payload", {}))
             self.assertEqual(customs, self.parsed_input_data.get("customs", {}))
 
         @mock.patch(
-            "ninja_aio.models.ModelSerializer.custom_actions",
+            "ninja_aio.models.ModelSerializer.acustom_actions",
             new_callable=mock.AsyncMock,
         )
         @mock.patch(
-            "ninja_aio.models.ModelSerializer.post_create",
+            "ninja_aio.models.ModelSerializer.apost_create",
             new_callable=mock.AsyncMock,
         )
         async def test_create_s(
@@ -252,7 +252,7 @@ class Tests:
             if not isinstance(self.model, ModelSerializerMeta):
                 return
             with mock.patch(
-                "ninja_aio.models.ModelSerializer.queryset_request",
+                "ninja_aio.models.ModelSerializer.aqueryset_request",
                 new_callable=mock.AsyncMock,
             ) as m_qs:
                 await self.model_util.aget_object(

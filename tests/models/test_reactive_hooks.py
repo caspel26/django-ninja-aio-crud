@@ -209,7 +209,7 @@ class ModelSerializerReactiveHooksTestCase(TestCase):
     async def test_on_create_fires(self):
         """@on_create fires after creation."""
         await self.model.objects.all().adelete()
-        view = self.viewset.create_view()
+        view = self.viewset.acreate_view()
         data = self.viewset.schema_in(name="test", description="d", status="draft")
         await view(self.request.post(), data)
 
@@ -223,7 +223,7 @@ class ModelSerializerReactiveHooksTestCase(TestCase):
         obj = await self.model.objects.acreate(name="test", description="d")
         _reset()
 
-        view = self.viewset.update_view()
+        view = self.viewset.aupdate_view()
         data = self.viewset.schema_update(description="updated")
         pk_schema = self.viewset.path_schema(id=obj.pk)
         await view(self.request.patch(), data, pk_schema)
@@ -237,7 +237,7 @@ class ModelSerializerReactiveHooksTestCase(TestCase):
         obj = await self.model.objects.acreate(name="test", status="draft")
         _reset()
 
-        view = self.viewset.update_view()
+        view = self.viewset.aupdate_view()
         data = self.viewset.schema_update(status="published")
         pk_schema = self.viewset.path_schema(id=obj.pk)
         await view(self.request.patch(), data, pk_schema)
@@ -253,7 +253,7 @@ class ModelSerializerReactiveHooksTestCase(TestCase):
         obj = await self.model.objects.acreate(name="test", status="draft")
         _reset()
 
-        view = self.viewset.update_view()
+        view = self.viewset.aupdate_view()
         data = self.viewset.schema_update(description="only desc changed")
         pk_schema = self.viewset.path_schema(id=obj.pk)
         await view(self.request.patch(), data, pk_schema)
@@ -268,7 +268,7 @@ class ModelSerializerReactiveHooksTestCase(TestCase):
         obj = await self.model.objects.acreate(name="test")
         _reset()
 
-        view = self.viewset.update_view()
+        view = self.viewset.aupdate_view()
         data = self.viewset.schema_update(description="updated")
         pk_schema = self.viewset.path_schema(id=obj.pk)
         await view(self.request.patch(), data, pk_schema)
@@ -279,7 +279,7 @@ class ModelSerializerReactiveHooksTestCase(TestCase):
     async def test_on_update_does_not_fire_on_create(self):
         """@on_update does NOT fire on create."""
         await self.model.objects.all().adelete()
-        view = self.viewset.create_view()
+        view = self.viewset.acreate_view()
         data = self.viewset.schema_in(name="test", description="d", status="draft")
         await view(self.request.post(), data)
 
@@ -293,13 +293,34 @@ class ModelSerializerReactiveHooksTestCase(TestCase):
         obj = await self.model.objects.acreate(name="del_me")
         _reset()
 
-        view = self.viewset.delete_view()
+        view = self.viewset.adelete_view()
         pk_schema = self.viewset.path_schema(id=obj.pk)
         await view(self.request.delete(), pk_schema)
 
         self.assertEqual(len(_hook_calls), 1)
         self.assertEqual(_hook_calls[0][0], "delete")
         self.assertEqual(_hook_calls[0][2], "del_me")
+
+    async def test_on_delete_fires_for_each_bulk_deleted_object(self):
+        """Bulk delete goes through the per-object destroy, so @on_delete fires."""
+        await self.model.objects.all().adelete()
+        first = await self.model.objects.acreate(name="bulk_1")
+        second = await self.model.objects.acreate(name="bulk_2")
+        _reset()
+
+        class BulkHookAPI(HookTestAPI):
+            bulk_operations = ["delete"]
+
+        viewset = BulkHookAPI()
+        result = await viewset.abulk_delete_view()(
+            self.request.delete(), viewset.bulk_delete_schema(ids=[first.pk, second.pk])
+        )
+
+        self.assertEqual(result.value["success"]["details"], [first.pk, second.pk])
+        self.assertEqual(
+            [(event, name) for event, _, name in _hook_calls],
+            [("delete", "bulk_1"), ("delete", "bulk_2")],
+        )
 
 
 @tag("reactive_hooks")
@@ -321,7 +342,7 @@ class SyncHookTestCase(TestCase):
     async def test_sync_hook_fires(self):
         """Sync @on_create hook is properly wrapped and fires."""
         await self.model.objects.all().adelete()
-        view = self.viewset.create_view()
+        view = self.viewset.acreate_view()
         data = self.viewset.schema_in(name="sync_test")
         await view(self.request.post(), data)
 
@@ -432,7 +453,7 @@ class SerializerReactiveHooksTestCase(TestCase):
     async def test_serializer_on_create_fires(self):
         """@on_create on Serializer fires with instance parameter."""
         await self.model.objects.all().adelete()
-        view = self.viewset.create_view()
+        view = self.viewset.acreate_view()
         data = self.viewset.schema_in(name="ser_test", status="draft")
         await view(self.request.post(), data)
 
@@ -446,7 +467,7 @@ class SerializerReactiveHooksTestCase(TestCase):
         obj = await self.model.objects.acreate(name="test", status="draft")
         _reset()
 
-        view = self.viewset.update_view()
+        view = self.viewset.aupdate_view()
         data = self.viewset.schema_update(status="published")
         pk_schema = self.viewset.path_schema(id=obj.pk)
         await view(self.request.patch(), data, pk_schema)
@@ -460,7 +481,7 @@ class SerializerReactiveHooksTestCase(TestCase):
         obj = await self.model.objects.acreate(name="del_me")
         _reset()
 
-        view = self.viewset.delete_view()
+        view = self.viewset.adelete_view()
         pk_schema = self.viewset.path_schema(id=obj.pk)
         await view(self.request.delete(), pk_schema)
 
@@ -601,7 +622,7 @@ class SyncSerializerHookTestCase(TestCase):
     async def test_sync_serializer_hook_fires(self):
         """Sync @on_create on Serializer is wrapped and fires with instance."""
         await self.model.objects.all().adelete()
-        view = self.viewset.create_view()
+        view = self.viewset.acreate_view()
         data = self.viewset.schema_in(name="sync_ser", status="draft")
         await view(self.request.post(), data)
 
@@ -721,27 +742,27 @@ class HookInternalCoverageTestCase(TestCase):
     """Unit tests for internal hook functions to cover edge case branches."""
 
     def test_run_hook_sync_with_sync_method_and_instance(self):
-        """_run_hook_sync calls sync method with instance when provided."""
-        from ninja_aio.models.hooks import _run_hook_sync
+        """_run_hook calls sync method with instance when provided."""
+        from ninja_aio.models.hooks import _run_hook
 
         calls = []
 
         def my_hook(inst):
             calls.append(("sync_with_instance", inst))
 
-        _run_hook_sync(my_hook, instance="fake_instance")
+        _run_hook(my_hook, instance="fake_instance")
         self.assertEqual(calls, [("sync_with_instance", "fake_instance")])
 
     def test_run_hook_sync_with_async_method_and_instance(self):
-        """_run_hook_sync wraps async method with async_to_sync when instance provided."""
-        from ninja_aio.models.hooks import _run_hook_sync
+        """_run_hook wraps async method with async_to_sync when instance provided."""
+        from ninja_aio.models.hooks import _run_hook
 
         calls = []
 
         async def my_async_hook(inst):
             calls.append(("async_with_instance", inst))
 
-        _run_hook_sync(my_async_hook, instance="fake_instance")
+        _run_hook(my_async_hook, instance="fake_instance")
         self.assertEqual(calls, [("async_with_instance", "fake_instance")])
 
     def test_on_post_save_noop_for_model_without_hooks(self):
@@ -778,8 +799,8 @@ class HookInternalCoverageTestCase(TestCase):
         register_signals(NoAttrModel)  # should not raise
 
     async def test_run_hook_sync_skips_async_when_loop_running(self):
-        """_run_hook_sync skips async hooks when an event loop is already running."""
-        from ninja_aio.models.hooks import _run_hook_sync
+        """_run_hook skips async hooks when an event loop is already running."""
+        from ninja_aio.models.hooks import _run_hook
 
         calls = []
 
@@ -787,5 +808,5 @@ class HookInternalCoverageTestCase(TestCase):
             calls.append("should_not_fire")
 
         # We're inside an async test, so there IS a running event loop
-        _run_hook_sync(my_async_hook)
+        _run_hook(my_async_hook)
         self.assertEqual(calls, [])
