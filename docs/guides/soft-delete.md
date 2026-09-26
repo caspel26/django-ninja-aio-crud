@@ -60,7 +60,7 @@ If the model has no `is_deleted` field, the app fails at startup with
 | Attribute | Default | What it does |
 | --- | --- | --- |
 | `soft_delete_field` | `"is_deleted"` | The name of the boolean field on the model |
-| `include_deleted` | `False` | Show deleted rows in list, retrieve and update |
+| `include_deleted` | `False` | Show deleted rows in list, retrieve, update and `@on` actions |
 
 ## What changes
 
@@ -76,8 +76,7 @@ If the model has no `is_deleted` field, the app fails at startup with
 Deleting an article that is already deleted returns `204` again. When you set
 `schema_delete_out`, delete returns `200` with the article instead.
 
-Custom actions like `@on("publish")` still run on deleted articles. Check
-`obj.is_deleted` in the action if that matters.
+Custom actions like `@on("publish")` return `404` for a deleted article too.
 
 ## Restore an article
 
@@ -124,9 +123,9 @@ DELETE /api/articles/bulk/
 }
 ```
 
-Every existing article in `ids` gets `is_deleted` set to `True`, in one
-query. Ids that don't exist go to `errors`. Articles that were already
-deleted count as a success. See [Bulk operations](bulk-operations.md).
+Every active article in `ids` gets `is_deleted` set to `True`, in one
+query. Ids that don't exist, and articles that were already deleted, go to
+`errors`. See [Bulk operations](bulk-operations.md).
 
 ## Show deleted articles
 
@@ -138,8 +137,8 @@ class ArticleAdminViewSet(SoftDeleteViewSetMixin, APIViewSet):
     include_deleted = True
 ```
 
-This viewset lists, retrieves and updates deleted articles too. Delete still
-only sets the flag.
+This viewset lists, retrieves and updates deleted articles too, and runs
+`@on` actions on them. Delete still only sets the flag.
 
 ## Use another field name
 
@@ -196,10 +195,9 @@ Restore and hard delete run the operation hook with the operation names
 A denied request returns `403`. The soft delete itself uses the `delete`
 operation, and bulk delete uses `bulk_delete`.
 
-!!! note
-
-    Restore and hard delete don't call `has_object_permission`. Put the checks
-    for these two endpoints in `has_permission`.
+Restore and hard delete also run `has_object_permission` /
+`ahas_object_permission` on the loaded article, with the same operation names.
+The mixins work in any order, as long as they come before `APIViewSet`.
 
 ## Hooks
 

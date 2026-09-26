@@ -82,11 +82,15 @@ class ArticleSerializer(Serializer[Article]):
 | `nested` | Create related objects in the same request, like `{"comments": Comment}`. `create` on `ModelSerializer` only |
 | `model_config` | A Pydantic `ConfigDict` for the generated schema |
 
-An optional field that the client leaves out or sends as `null` is skipped.
-On create the model default is used, on update the current value is kept.
+An optional field that the client leaves out is skipped. On create the model
+default is used, and `null` is treated the same. On update the current value
+is kept: an update only touches the fields the client sent. An explicit `null`
+is saved when the type allows it, like `optionals=[("note", str | None)]` on a
+nullable field.
 
 A foreign key in `create` fields becomes `<name>_id` in the request body, like
-`"category_id": 1`. In `update`, declare it as `optionals=[("category", int)]`.
+`"category_id": 1`. In `update`, declare it as `optionals=[("category", int)]`,
+or `("category", int | None)` for a nullable foreign key the client may clear.
 See [Relations](relations.md) and [Nested writes](nested-writes.md).
 
 ## Accept extra input values
@@ -125,16 +129,15 @@ class Article(ModelSerializer):
 
 When the object has no such attribute, the default is returned.
 
-In `read` and `detail` you can also put the tuple straight into `fields`:
+You can also put the tuple straight into `fields`:
 
 ```python
 read = SchemaConfig(fields=["id", "title", ("summary", str, "")])
 ```
 
-!!! warning
-
-    Inline tuples in `fields` only work in `read` and `detail`. For `create`
-    and `update`, use `customs`.
+This works in `create` and `update` too, like
+`fields=["title", ("source", str, "web")]`. There the value is not saved on the
+model: read it in `custom_actions`, like any value in `customs`.
 
 ## Change the schema settings
 

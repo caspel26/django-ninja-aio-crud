@@ -108,8 +108,10 @@ accepts `optimize_for="read"` or `optimize_for="detail"`.
 
 The target is a primary key or an instance you already loaded. A primary key
 is looked up first, an instance is used as it is. The data is validated with
-the `update` schema. Fields you leave out, or send as `None`, keep their
-value. You get the updated instance back.
+the `update` schema. Only the fields you send are changed, the others keep
+their value. An explicit `None` is saved when the schema allows it, like
+`optionals=[("note", str | None)]` on a nullable field. You get the updated
+instance back.
 
 ## Delete an object
 
@@ -199,10 +201,11 @@ ArticleSerializer.destroy(article)
 
 ## Use transactions
 
-A call runs in a transaction when the serializer has `@on_create`,
-`@on_update` or `@on_delete` hooks, or nested writes. Otherwise the row is
-saved before your `post_create` and `custom_actions` hooks run, and it stays
-saved if a hook raises.
+A call runs in a transaction when the serializer has a hook that runs after
+the write, like `post_create`, `custom_actions`, `after_save`,
+`on_create_after_save` or `on_delete`, `@on_create`, `@on_update` or
+`@on_delete` hooks, or nested writes. If one of these hooks raises, the write
+is rolled back.
 
 Wrap the calls in `transaction.atomic()` when several steps must succeed or
 fail together:

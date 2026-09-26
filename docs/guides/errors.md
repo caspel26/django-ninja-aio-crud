@@ -17,6 +17,7 @@ how to raise and handle your own errors.
 | `401` | Authentication fails | `{"detail": "Unauthorized"}` |
 | `403` | A permission check returns `False` | `{"error": "forbidden", "details": "..."}` |
 | `404` | The object or a related object does not exist | `{"article": "not found"}` |
+| `409` | A database constraint fails, like a duplicate unique value | `{"error": "conflict", "details": "..."}` |
 | `422` | The body, path or query does not match the schema | `{"detail": [...]}` |
 | `500` | Your code raises an exception nobody handles | Django's error response |
 
@@ -36,6 +37,16 @@ entry per problem:
 
 A wrong path value, like `GET /api/articles/abc`, returns `422` with
 `"loc": ["path", "id"]`.
+
+Validation errors raised inside your own code, for example `Article.create()`
+with invalid data in a custom action, return `400` with the details:
+
+```json
+{
+  "error": "Validation Error",
+  "details": [{"type": "missing", "loc": ["body"], "msg": "Field required"}]
+}
+```
 
 ### Not found
 
@@ -68,8 +79,14 @@ An empty body then returns `400`:
 
 ### Database errors
 
-Database errors, like a duplicate value in a unique field, are not converted.
-They return `500`. Add a handler to turn them into a clean response, see
+A database constraint error, like a duplicate value in a unique field, returns
+`409`:
+
+```json
+{"error": "conflict", "details": "The request violates a database constraint."}
+```
+
+To change this response, see
 [Handle your own exceptions](#handle-your-own-exceptions).
 
 ## Raise an error from your code
@@ -109,7 +126,7 @@ The second returns `403` with
 | `SerializeError` | `error`, `status_code=None`, `details=None` | `400` |
 | `NotFoundError` | `model`, `details=None` | `404` |
 | `ForbiddenError` | `error=None`, `details=None` | `403` |
-| `AuthError` | `error`, `status_code=None`, `details=None` | `400` |
+| `AuthError` | `error`, `status_code=None`, `details=None` | `401` |
 | `BaseException` | `error`, `status_code=None`, `details=None` | `400` |
 
 All of them live in `ninja_aio.exceptions`. The body depends on `error`:
@@ -149,6 +166,17 @@ raise PaymentRequired("Upgrade your plan")
 
 The response is `402` with `{"error": "Upgrade your plan"}`. Every instance has
 `error` (the body), `status_code` and `code`.
+
+Set `error` on the class to give it a default message:
+
+```python
+class PaymentRequired(BaseException):
+    status_code = 402
+    error = "payment required"
+```
+
+`raise PaymentRequired()` then returns `402` with
+`{"error": "payment required"}`.
 
 ## Change the not found key
 
@@ -203,11 +231,11 @@ api = NinjaAIO(title="Blog API")
 
 @api.exception_handler(IntegrityError)
 def integrity_error(request, exc):
-    return api.create_response(request, {"error": "conflict"}, status=409)
+    return api.create_response(request, {"error": "already exists"}, status=409)
 ```
 
-A duplicate category name now returns `409` with `{"error": "conflict"}`
-instead of `500`.
+A duplicate category name now returns `409` with `{"error": "already exists"}`
+instead of the default conflict body.
 
 ## Unhandled errors
 

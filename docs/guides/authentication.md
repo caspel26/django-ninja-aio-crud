@@ -215,8 +215,10 @@ when the whole API needs a token.
 
 !!! note
 
-    Many-to-many endpoints don't use the viewset `auth`. Set `m2m_auth` on the
-    viewset, or `auth` on each `M2MRelationSchema`.
+    Many-to-many endpoints use the `auth` of the `M2MRelationSchema` first,
+    then the viewset `m2m_auth`, then `get_auth` for the list or `patch_auth`
+    for add and remove, falling back to `auth`. `M2MRelationSchema(auth=None)`
+    makes one relation public.
 
 The same auth classes work in sync viewsets (`execution_mode = "sync"`). You
 keep `auth_handler` as `async def`.

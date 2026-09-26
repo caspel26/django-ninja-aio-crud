@@ -37,7 +37,8 @@ you call them on:
 | `create()`, `acreate()` | `Article` |
 | `get()`, `aget()` | `Article` |
 | `update()`, `aupdate()` | `Article` |
-| `bulk_create()` | `BulkResult[Article]`, so `result.succeeded` is `list[Article]` |
+| `bulk_create()`, `abulk_create()`, `bulk_update()`, `abulk_update()` | `BulkResult[Article]`, so `result.succeeded` is `list[Article]` |
+| `get_queryset()`, `aget_queryset()` | `QuerySet[Article]` |
 | `model_dump()`, `amodel_dump()` | `dict[str, Any]` |
 | `model_dumps()`, `amodel_dumps()` | `list[dict[str, Any]]` |
 
@@ -69,6 +70,7 @@ Now the same methods return `Article`:
 ```python
 article = ArticleSerializer.create({"title": "Hello", "body": "...", "category_id": 1})
 result = ArticleSerializer.bulk_create([...])  # BulkResult[Article]
+queryset = ArticleSerializer.get_queryset()  # QuerySet[Article]
 ```
 
 Without `[Article]`, the type checker cannot tell which model you get back.

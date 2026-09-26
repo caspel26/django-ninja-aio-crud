@@ -98,7 +98,8 @@ author of an article can change or delete it:
         return True
     ```
 
-The object check runs for `retrieve`, `update`, `delete` and `@on` actions.
+The object check runs for `retrieve`, `update`, `delete` and `@on` actions,
+and for `restore` and `hard_delete` with the soft delete mixin.
 It does not run for `create`, `list`, bulk endpoints or `@action` endpoints:
 those only call `has_permission`.
 
@@ -182,8 +183,8 @@ you can add object and row checks on top.
 
 ## Combine with other mixins
 
-Put every mixin before `APIViewSet`. Filter mixins work in any order with the
-permission mixin:
+Put every mixin before `APIViewSet`. Filter mixins and `SoftDeleteViewSetMixin`
+work in any order with the permission mixin:
 
 ```python
 from ninja_aio.views.mixins import IcontainsFilterViewSetMixin, PermissionViewSetMixin
@@ -192,13 +193,6 @@ from ninja_aio.views.mixins import IcontainsFilterViewSetMixin, PermissionViewSe
 @api.viewset(model=Article)
 class ArticleViewSet(PermissionViewSetMixin, IcontainsFilterViewSetMixin, APIViewSet):
     query_params = {"title": (str, None)}
-```
-
-With `SoftDeleteViewSetMixin`, put the soft delete mixin first:
-
-```python
-class ArticleViewSet(SoftDeleteViewSetMixin, PermissionViewSetMixin, APIViewSet):
-    ...
 ```
 
 The list applies `get_permission_queryset` first, then the filters, then

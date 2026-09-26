@@ -67,8 +67,9 @@ Without the path and without the setting, the command stops with an error.
 
 ## Know which tools you get
 
-Every viewset registered with `@api.viewset` becomes a set of tools. Tool
-names are the model class name in lower case, plus the operation:
+Every viewset registered with `@api.viewset`, or on a `NinjaAIORouter` added
+with `api.add_router(...)`, becomes a set of tools. Nested routers count too.
+Tool names are the model class name in lower case, plus the operation:
 
 | Tool | Input |
 | --- | --- |
@@ -108,11 +109,8 @@ See [Custom actions](custom-actions.md).
 Endpoints of an `APIView` become tools too. Endpoints with
 `include_in_schema=False` are skipped.
 
-!!! note
-
-    Viewsets registered on a `NinjaAIORouter` are not found by the server.
-    Register them with `@api.viewset` to expose them as tools, or pass them
-    yourself as shown below.
+`api.registered_viewsets()` and `api.registered_views()` return everything the
+server exposes, including what is registered on routers.
 
 ## Choose what to expose
 
@@ -141,8 +139,8 @@ python mcp_server.py
 
 | Argument | What it does |
 | --- | --- |
-| `viewsets` | The viewsets to expose. Defaults to all `@api.viewset` viewsets |
-| `views` | The views to expose. Defaults to all `@api.view` views |
+| `viewsets` | The viewsets to expose. Defaults to `api.registered_viewsets()` |
+| `views` | The views to expose. Defaults to `api.registered_views()` |
 | `name` | The server name shown to clients |
 | `request_factory` | A function that builds the request passed to each tool call |
 

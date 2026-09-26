@@ -61,11 +61,8 @@ The framework logs at two levels:
 Errors are not logged as `WARNING` or `ERROR`. The client gets them as error
 responses, and `ninja_aio.exceptions` logs them at `DEBUG`.
 
-!!! note
-
-    Create, update and delete messages come from async code: async viewsets
-    and `acreate()`, `aupdate()`, `adestroy()`. Sync viewsets and the sync
-    methods do not log them.
+Create, update and delete messages are logged in sync and async code: in
+viewsets and in `create()`, `update()`, `destroy()` and their async versions.
 
 With `DEBUG` on, one async create looks like this:
 

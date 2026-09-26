@@ -130,6 +130,9 @@ An id that doesn't exist returns `404` and nothing is saved:
 {"category": "not found"}
 ```
 
+For a nullable foreign key, use `("category", int | None)`. Sending
+`{"category": null}` then clears it.
+
 To create related objects in the same request, see
 [Nested writes](nested-writes.md).
 
@@ -197,7 +200,7 @@ that is already linked, or removing one that isn't, is an error.
 | `add` | `True` | Accept `add` in the `POST` body |
 | `remove` | `True` | Accept `remove` in the `POST` body |
 | `path` | plural verbose name | The URL segment after `{id}/` |
-| `auth` | viewset `m2m_auth` | Authentication for these endpoints |
+| `auth` | viewset `m2m_auth` | Authentication for these endpoints. `None` makes this relation public |
 | `filters` | `None` | Query parameters for the `GET` endpoint, as `{"name": (type, default)}` |
 | `related_schema` | related `read` fields | The schema of each listed object. Required for a plain Django model without `serializer_class` |
 | `serializer_class` | `None` | The `Serializer` of a plain Django model, used to build `related_schema` |
@@ -208,10 +211,11 @@ that is already linked, or removing one that isn't, is an error.
 With `add=False` or `remove=False`, the body only accepts the other key. With
 both set to `False` there is no `POST` endpoint.
 
-!!! warning
+!!! note
 
-    Many-to-many endpoints don't use the viewset `auth`. Set `m2m_auth` on the
-    viewset or `auth` on the relation. Without either, the API auth is used.
+    Many-to-many endpoints use the `auth` of the relation first, then the
+    viewset `m2m_auth`, then the viewset auth for the method: `get_auth` for
+    the list, `patch_auth` for add and remove, both falling back to `auth`.
 
 ### Filter the related list
 

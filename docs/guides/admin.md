@@ -55,7 +55,7 @@ The article now shows up in the admin. You need `django.contrib.admin` in
 | `list_display` | The `read` fields and customs. Many-to-many and reverse relations are left out |
 | `search_fields` | Text fields in `read`: `CharField`, `TextField`, `SlugField`, `EmailField`, `URLField` |
 | `list_filter` | Fields in `read` that are boolean, date, datetime, foreign key, one-to-one, many-to-many or have `choices` |
-| `readonly_fields` | Fields in `read` that are not in the `fields` of `update`, and all customs. The primary key is never read-only |
+| `readonly_fields` | Fields in `read` that are not in the generated `update` schema (its `fields`, `optionals`, and fields allowed through `excludes`), and all customs. The primary key is never read-only |
 | `inlines` | Every model with a foreign key to this one. One-to-one relations use a stacked inline, the others a tabular inline |
 | `filter_horizontal` | Many-to-many fields declared on this model |
 
@@ -66,10 +66,9 @@ The `detail` schema is not used. For the `Article` above you get:
 | `list_display` | `id`, `title`, `is_published`, `views`, `created_at`, `category` |
 | `search_fields` | `title` |
 | `list_filter` | `is_published`, `created_at`, `category` |
-| `readonly_fields` | `title`, `is_published`, `views`, `created_at`, `category` |
+| `readonly_fields` | `views`, `created_at`, `category` |
 
-Fields declared in `update` `optionals` are read-only in the admin. Pass
-`readonly_fields` to make them editable, see below.
+`title` and `is_published` are editable because they are in `update`.
 
 ### Inlines
 
@@ -157,8 +156,9 @@ class ArticleAdmin(Article.as_admin()):
 
 ## Use the admin with a Serializer
 
-`register_admin` and `as_admin()` work only with `ModelSerializer`. For a
-model described by a `Serializer`, write a regular `ModelAdmin`:
+`register_admin` and `as_admin()` work only with `ModelSerializer`.
+`register_admin` raises `TypeError` for any other class. For a model described
+by a `Serializer`, register the model with Django's admin yourself:
 
 ```python title="blog/admin.py"
 from django.contrib import admin

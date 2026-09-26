@@ -204,8 +204,8 @@ class Article(ModelSerializer):
 | --- | --- |
 | `@on_create` | After an object is created |
 | `@on_update` | After every update |
-| `@on_update("status")` | After an update that changes `status` |
-| `@on_update("status", "views")` | After an update that changes any of the fields |
+| `@on_update("status")` | After an update that sends and changes `status` |
+| `@on_update("status", "views")` | After an update that sends and changes any of the fields |
 | `@on_delete` | After an object is deleted |
 
 The decorated methods can be `def` or `async def`. Both run in sync and async
@@ -214,29 +214,35 @@ define them.
 
 When you call `save()` or `delete()` yourself, `@on_create`, `@on_update` and
 `@on_delete` still run. `@on_update("field")` only runs through the framework
-update, like `PATCH` or `Article.update()`.
+update, like `PATCH` or `Article.update()`. An update only touches the fields
+the client sent, so `@on_update("status")` runs only when `status` was sent
+and its value changed.
 
 !!! note
 
-    The `on_delete` method and the `@on_delete` decorator share a name. If your
-    class defines both, import the module instead:
+    On a `ModelSerializer` or `Serializer`, a method named `on_delete` hides the
+    `@on_delete` decorator for the lines after it in the class body. Define the
+    `on_delete` method after the decorated methods, or import the module:
     `from ninja_aio.models import hooks`, then use `@hooks.on_delete`.
 
 ## Know the order
 
-For a `ModelSerializer`, hooks run in this order:
+Hooks run in this order, in sync and async, for a `ModelSerializer` and a
+`Serializer`:
 
 | Operation | Order |
 | --- | --- |
-| Create | `on_create_before_save`, `before_save`, save, `on_create_after_save`, `after_save`, `custom_actions`, `post_create`, `@on_create` |
-| Update | `before_save`, save, `after_save`, `custom_actions`, `@on_update("field")`, `@on_update` |
+| Create | `on_create_before_save`, `before_save`, save, `on_create_after_save`, `after_save`, `custom_actions`, `post_create`, `@on_create`, nested children |
+| Update | set the sent fields, `custom_actions`, `before_save`, save, `after_save`, `@on_update("field")`, `@on_update` |
 | Delete | delete, `on_delete`, `@on_delete` |
 
-In async viewsets, `custom_actions` runs before `before_save` on update.
-
-On the generated endpoints, the write and its hooks run in one database
-transaction. If a hook raises, the change is rolled back. To run code only
-after the commit, use Django's `transaction.on_commit()` inside the hook.
+When the class has a hook that runs after the write, the write and its hooks
+run in one database transaction. This covers `post_create`, `custom_actions`,
+`after_save`, `on_create_after_save`, `on_delete`, the `@on_create`,
+`@on_update` and `@on_delete` hooks, and nested writes. If a hook raises, the
+change is rolled back, on the endpoints and when you call the serializer from
+Python. To run code only after the commit, use Django's
+`transaction.on_commit()` inside the hook.
 
 ## Use hooks on a Serializer
 
@@ -270,9 +276,13 @@ class ArticleSerializer(Serializer):
 | Hook | Arguments |
 | --- | --- |
 | `post_create` / `apost_create` | `instance` |
+| `before_save`, `after_save`, `on_create_before_save`, `on_create_after_save`, `on_delete` | `instance` |
 | `custom_actions` / `acustom_actions` | `payload`, `instance` |
 | `queryset_request` / `aqueryset_request` | `request` (classmethod) |
 | `@on_create`, `@on_update`, `@on_delete` methods | `instance` |
+
+They run in sync and async viewsets, and when you call the serializer from
+Python.
 
 ## Hooks on the viewset
 
