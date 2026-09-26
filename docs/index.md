@@ -624,6 +624,6 @@ If you find Django Ninja AIO useful, consider supporting the project:
 
 ---
 
-<div style="text-align: center; opacity: 0.7;" markdown>
+<div style="text-align: center;" markdown>
 Built with :material-heart: using [Django Ninja](https://django-ninja.dev/)
 </div>

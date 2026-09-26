@@ -373,7 +373,7 @@ Description of what changed and why.
 
 ### Documentation
 
-Brief summary of documentation changes. Do NOT list every CSS class or inline style change. Keep `main.py`, `extra.css`, and `mkdocs.yml` changes to one-line summaries unless they introduce user-facing functionality.
+Brief summary of documentation changes. Do NOT list every CSS class or inline style change. Keep `main.py`, `docs/stylesheets/*.css`, and `mkdocs.yml` changes to one-line summaries unless they introduce user-facing functionality.
 
 ---
 

@@ -1,0 +1,13 @@
+{
+  "name": "django-ninja-aio-docs-tests",
+  "private": true,
+  "description": "Visual-regression and accessibility checks for the built documentation site.",
+  "scripts": {
+    "test": "playwright test",
+    "update": "playwright test --update-snapshots"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.10.0",
+    "@playwright/test": "^1.50.0"
+  }
+}

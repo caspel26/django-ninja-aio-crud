@@ -294,6 +294,12 @@ that must be approved (see section 9).
 Every page has front matter with `title` and `description` (used for search
 and social previews) and exactly one H1.
 
+**Voice rule for all public pages:** keep the documentation as friendly and
+simple as it is today. Pages show what to write and what you get, with short
+examples. They never explain design rationale, implementation choices, or why
+an alternative was rejected; that material stays in these internal `v3-*.md`
+artifacts.
+
 | Template | Used by | Required structure | Rules |
 | --- | --- | --- | --- |
 | **Landing** | `/` | Value proposition → runnable example → sync/async story → learning paths → project links | No feature-card walls; single primary call to action |
@@ -444,7 +450,7 @@ Mechanical mapping to this site:
 | Custom homepage | `overrides/home.html`, used only by `index.md` |
 | Product demo | Model with `Schemas` → `APIViewSet` → real request and JSON response, with a sync/async switch |
 | Diagrams | `main.py` macros (a `diagram("lifecycle")` call in the page) rendering HTML figures: request lifecycle, sync vs async execution, auth precedence, schema generation |
-| Version banner | `overrides/partials/announce.html`, driven by the `mike` version (latest / old / dev) |
+| Version banner | `{% raw %}{% block outdated %}{% endraw %}` in `overrides/main.html`, shown by the `mike` version selector on every non-default version |
 | Benchmark results | A results component for `comparison.md` and `performance.md` showing the real numbers |
 
 ### 11.3 Avoiding the generated look
@@ -527,3 +533,25 @@ Open items for Step 16:
 - Found while building: `docs/api/pagination.md` documents
   `count/next/previous/results`, but the list endpoint returns
   `{"items": [...], "count": N}`. Fixed with the content in Step 19.
+
+### 11.6 Step 16 implementation
+
+| Area | Result |
+| --- | --- |
+| Build engine | Zensical 0.0.65 builds the unchanged `mkdocs.yml` (macros, search, autorefs, section-index) in about 2 s with no warnings, using `theme.variant: classic`. The same config still builds on MkDocs + Material 9.6 with no warnings, so CI keeps working until the engine switch |
+| Stylesheets | `docs/extra.css` (1,218 lines) removed. `docs/stylesheets/tokens.css` (tokens, `@font-face`, Material/Zensical variable mapping, search-dialog variables), `shell.css` (header, search, version selector, banners, tabs, sidebars, TOC, footer), `components.css` (typography, code, tabs, callouts, tables, buttons, cards), `pages.css` (transitional restyle of classes the current content still uses; removed in Steps 17-19) |
+| Fonts | Self-hosted WOFF2 in `docs/assets/fonts/` (about 220 KB, OFL texts alongside); `theme.font: false`, so no Google Fonts requests |
+| Palette | Dark (`slate`) first, light second, both `primary/accent: custom` |
+| Templates | `partials/logo.html` renders the dark and light marks; `main.html` replaces the GitHub announcement with the outdated-version banner; `partials/javascripts/outdated.html` fixes an upstream `new URL()` call that threw on every page; `partials/announce.html` removed (unused) |
+| Site name | `django-ninja-aio-crud`, rendered as the gradient wordmark |
+| Versioning | Checked against a simulated `mike` layout (3.0 latest, dev, 2.36): selector lists all versions, non-latest versions show the banner |
+| Baselines | `docs-tests/` Playwright suite (`npx playwright test` after `zensical build`): visual regression for home, installation, tutorial, reference, and release notes in dark and light at desktop and mobile, axe WCAG 2 AA checks, labelled header controls, and keyboard-reachable scrollable code (`docs/javascripts/a11y.js`). 44 checks pass |
+
+Deferred:
+
+- CI and `docs/requirements.txt` still use MkDocs + Material. Switching them to
+  Zensical and the `mike` fork changes the publishing workflow, so it happens
+  with release validation (Step 20). Zensical currently requires
+  `pymdown-extensions` 12, which conflicts with the pinned Material 9.6.
+- The ⌘K palette, homepage demo, and article sheet from the mockups belong to
+  the homepage and page templates (Steps 17 and 18).

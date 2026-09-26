@@ -1,0 +1,426 @@
+/* Transitional page styles: the classes current content still uses, restyled
+   with Studio tokens. Removed as Steps 17-19 replace the homepage, page
+   templates, and content. */
+
+/* ---------- Current homepage (index.md) ---------- */
+
+.md-typeset .hero {
+  padding: 1.5rem 0 1rem;
+  text-align: center;
+}
+
+.md-typeset .hero h1 {
+  margin-bottom: 0.5rem;
+  font-family: var(--nac-font-sans);
+  font-size: 2.6rem;
+  font-weight: 800;
+  letter-spacing: -0.045em;
+}
+
+.md-typeset .hero img.hero-logo {
+  display: block;
+  width: 100%;
+  max-width: 600px;
+  height: auto;
+  margin: -3rem auto 0;
+  object-fit: contain;
+}
+
+[data-md-color-scheme="slate"] .md-typeset .hero img.hero-logo {
+  filter: drop-shadow(0 0 1px rgb(240 235 248 / 0.9)) drop-shadow(0 0 1px rgb(240 235 248 / 0.9));
+}
+
+.md-typeset .hero p.subtitle {
+  margin-bottom: 1.5rem;
+  color: var(--nac-text-2);
+  font-size: 1.05rem;
+}
+
+/* The hero replaces the generated page title on the homepage only. */
+.md-content > .md-typeset:has(.hero) > h1:first-child {
+  display: none;
+}
+
+.md-typeset .badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  margin-bottom: 2rem;
+}
+
+.md-typeset .badges a {
+  display: inline-flex;
+  margin: 0;
+}
+
+.md-typeset .cta-buttons {
+  margin: 1.5rem 0 2.5rem;
+  text-align: center;
+}
+
+.md-typeset .cta-buttons a.md-button {
+  margin: 0.3rem;
+}
+
+/* ---------- Tutorial pages ---------- */
+
+.md-typeset .tutorial-hero {
+  margin-bottom: 1rem;
+  padding: 1.5rem 0 1.25rem;
+  border-bottom: 1px solid var(--nac-edge);
+}
+
+.md-typeset .tutorial-hero h1 {
+  margin-bottom: 0.4rem;
+}
+
+.md-typeset .tutorial-hero .tutorial-subtitle {
+  margin-bottom: 0;
+  color: var(--nac-text-2);
+  font-family: var(--nac-font-serif);
+  font-size: 1.05rem;
+}
+
+.md-typeset .step-indicator {
+  display: inline-block;
+  margin-bottom: 0.8rem;
+  color: var(--nac-brand);
+  font-family: var(--nac-font-mono);
+  font-size: 0.6rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.md-typeset .learning-objectives,
+.md-typeset .prerequisites,
+.md-typeset .next-step,
+.md-typeset .summary-checklist {
+  margin: 1.5rem 0;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--nac-edge);
+  border-radius: var(--nac-radius-m);
+  background: var(--nac-surface-1);
+  box-shadow: inset 0 1px 0 var(--nac-edge-light), var(--nac-shadow-1);
+}
+
+.md-typeset .learning-objectives h3,
+.md-typeset .summary-checklist h3 {
+  margin-top: 0;
+  color: var(--nac-text-3);
+  font-family: var(--nac-font-mono);
+  font-size: 0.6rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.md-typeset .learning-objectives ul,
+.md-typeset .summary-checklist ul {
+  margin-bottom: 0;
+}
+
+.md-typeset .prerequisites p {
+  margin: 0.25rem 0;
+}
+
+.md-typeset .next-step {
+  text-align: center;
+}
+
+.md-typeset .next-step a.md-button {
+  margin-top: 0.8rem;
+}
+
+.md-typeset .summary-checklist {
+  border-color: color-mix(in srgb, var(--nac-green) 40%, var(--nac-edge));
+}
+
+/* ---------- Release notes (main.py macros) ---------- */
+
+.release-selector {
+  margin-bottom: 1.5rem;
+}
+
+.release-selector-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: var(--nac-text-3);
+  font-family: var(--nac-font-mono);
+  font-size: 0.6rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.release-dropdown {
+  position: relative;
+  width: 100%;
+}
+
+.release-dropdown-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.65rem 0.9rem;
+  border: 1px solid var(--nac-edge);
+  border-radius: var(--nac-radius-m);
+  background: var(--nac-surface-1);
+  color: var(--nac-text);
+  font-family: var(--nac-font-mono);
+  font-size: 0.75rem;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s var(--nac-ease);
+}
+
+.release-dropdown-toggle:hover,
+.release-dropdown--open .release-dropdown-toggle {
+  border-color: var(--nac-edge-strong);
+}
+
+.release-dropdown-toggle-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.release-dropdown-chevron {
+  flex-shrink: 0;
+  margin-left: 0.5rem;
+  opacity: 0.6;
+  transition: transform 0.2s var(--nac-ease);
+}
+
+.release-dropdown--open .release-dropdown-chevron {
+  transform: rotate(180deg);
+}
+
+.release-dropdown-menu {
+  position: absolute;
+  z-index: 100;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 0;
+  overflow: hidden;
+  padding: 0 0.2rem;
+  border: 1px solid transparent;
+  border-radius: var(--nac-radius-m);
+  background: var(--nac-surface-2);
+  opacity: 0;
+  pointer-events: none;
+  transition: max-height 0.25s var(--nac-ease), opacity 0.15s var(--nac-ease);
+}
+
+.release-dropdown--open .release-dropdown-menu {
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 0.2rem;
+  border-color: var(--nac-edge-strong);
+  box-shadow: inset 0 1px 0 var(--nac-edge-light), var(--nac-shadow-3);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.release-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.5rem 0.7rem;
+  border: 0;
+  border-radius: var(--nac-radius-s);
+  background: none;
+  color: var(--nac-text);
+  font-family: var(--nac-font-mono);
+  font-size: 0.7rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.release-dropdown-item:hover {
+  background: var(--nac-surface-3);
+}
+
+.release-dropdown-item--active {
+  background: var(--nac-brand-tint);
+  font-weight: 600;
+}
+
+.release-dropdown-item-tag {
+  flex-shrink: 0;
+  font-weight: 600;
+}
+
+.release-dropdown-item-date {
+  flex: 1;
+  color: var(--nac-text-3);
+  font-size: 0.62rem;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.release-dropdown-latest,
+.release-badge--latest {
+  display: inline-block;
+  flex-shrink: 0;
+  padding: 0.05rem 0.45rem;
+  border: 1px solid color-mix(in srgb, var(--nac-green) 50%, transparent);
+  border-radius: 999px;
+  color: var(--nac-green);
+  font-family: var(--nac-font-mono);
+  font-size: 0.55rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.release-display {
+  min-height: 6rem;
+}
+
+.release-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+}
+
+.release-card {
+  padding: 1.1rem 1.25rem;
+  border: 1px solid var(--nac-edge);
+  border-radius: var(--nac-radius-l);
+  background: var(--nac-surface-1);
+  box-shadow: inset 0 1px 0 var(--nac-edge-light), var(--nac-shadow-2);
+}
+
+.release-card--latest {
+  border-color: color-mix(in srgb, var(--nac-brand) 45%, var(--nac-edge));
+}
+
+.release-card-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.release-card-header h4 {
+  margin: 0;
+  font-family: var(--nac-font-mono);
+  font-size: 0.95rem;
+}
+
+.release-card-header h4 a {
+  color: var(--nac-text);
+  text-decoration: none;
+}
+
+.release-card-date {
+  color: var(--nac-text-3);
+  font-size: 0.65rem;
+  white-space: nowrap;
+}
+
+.release-card-body {
+  font-size: 0.72rem;
+  line-height: 1.6;
+}
+
+.release-card-body h1,
+.release-card-body h2,
+.release-card-body h3,
+.release-card-body h4,
+.release-card-body h5 {
+  margin: 1rem 0 0.4rem;
+  padding: 0;
+  border: 0;
+  font-family: var(--nac-font-sans);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.release-card-body pre {
+  padding: 0.7rem 1rem;
+  overflow-x: auto;
+  border: 1px solid var(--nac-edge);
+  border-radius: var(--nac-radius-s);
+  background: var(--nac-bg);
+  font-size: 0.68rem;
+}
+
+.release-card-body table {
+  width: 100%;
+  margin: 0.6rem 0;
+  border-collapse: collapse;
+  font-size: 0.68rem;
+}
+
+.release-card-body th,
+.release-card-body td {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--nac-edge);
+  text-align: left;
+}
+
+.release-card-body th {
+  background: var(--nac-surface-2);
+}
+
+.release-card-body blockquote {
+  margin: 0.4rem 0;
+  padding: 0.2rem 0.8rem;
+  border-left: 2px solid var(--nac-brand);
+  color: var(--nac-text-2);
+}
+
+.release-card-body hr {
+  margin: 0.8rem 0;
+  border: 0;
+  border-top: 1px solid var(--nac-edge);
+}
+
+.release-card-body img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--nac-radius-s);
+}
+
+.release-card-footer {
+  margin-top: 0.75rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--nac-edge);
+  font-size: 0.65rem;
+}
+
+.release-notes-empty {
+  color: var(--nac-text-3);
+  font-size: 0.7rem;
+  font-style: italic;
+}
+
+/* ---------- FAQ question callouts ---------- */
+
+:root {
+  --md-admonition-icon--question: url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M15.07 11.25l-.9.92C13.45 12.89 13 13.5 13 15h-2v-.5c0-1.11.45-2.11 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41a2 2 0 0 0-2-2 2 2 0 0 0-2 2H8a4 4 0 0 1 4-4 4 4 0 0 1 4 4 3.2 3.2 0 0 1-.93 2.25M13 19h-2v-2h2M12 2A10 10 0 0 0 2 12a10 10 0 0 0 10 10 10 10 0 0 0 10-10A10 10 0 0 0 12 2z"/></svg>');
+}
+
+.md-typeset .question > .admonition-title::before,
+.md-typeset .question > summary::before {
+  -webkit-mask-image: var(--md-admonition-icon--question);
+  mask-image: var(--md-admonition-icon--question);
+}
+
+@media screen and (max-width: 768px) {
+  .md-typeset .hero h1 {
+    font-size: 1.9rem;
+  }
+
+  .md-typeset .hero img.hero-logo {
+    margin-top: -1.5rem;
+  }
+}

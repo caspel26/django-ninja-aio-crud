@@ -1,4 +1,4 @@
-site_name: Django Ninja Aio CRUD
+site_name: django-ninja-aio-crud
 site_description: Async CRUD utilities for Django Ninja with auth, filtering, pagination.
 site_url: https://django-ninja-aio.com/
 repo_name: caspel26/django-ninja-aio-crud
@@ -56,34 +56,25 @@ nav:
 
 theme:
   custom_dir: overrides
-  font:
-    text: Roboto
-    code: Roboto Mono
+  font: false
   name: material
+  variant: classic
   language: en
-  logo: images/logo.png
+  logo: images/brand/mark-light-256.png
   favicon: images/favicon.ico
   palette:
-    - media: "(prefers-color-scheme)"
-      toggle:
-        icon: material/brightness-auto
-        name: Auto
-      primary: deep-purple
-      accent: deep-purple
-    - media: "(prefers-color-scheme: light)"
-      scheme: default
-      toggle:
-        icon: material/weather-night
-        name: Dark
-      primary: deep-purple
-      accent: deep-purple
-    - media: "(prefers-color-scheme: dark)"
-      scheme: slate
+    - scheme: slate
       toggle:
         icon: material/weather-sunny
-        name: Light
-      primary: deep-purple
-      accent: deep-purple
+        name: Switch to light theme
+      primary: custom
+      accent: custom
+    - scheme: default
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark theme
+      primary: custom
+      accent: custom
   features:
     - navigation.instant
     - navigation.tracking
@@ -94,8 +85,6 @@ theme:
     - navigation.indexes
     - navigation.expand
     - navigation.path
-    - header.autohide
-    - announce.dismiss
     - toc.follow
     - toc.integrate
     - content.code.copy
@@ -123,6 +112,7 @@ extra:
     provider: google
   version:
     provider: mike
+    alias: true
     repo: caspel26/django-ninja-aio-crud
     default: latest
 
@@ -159,7 +149,6 @@ markdown_extensions:
   - toc:
       permalink: true
   - pymdownx.highlight:
-      anchor_linenums: true
       line_spans: __span
       pygments_lang_class: true
       auto_title: true
@@ -188,4 +177,10 @@ markdown_extensions:
   - md_in_html
 
 extra_css:
-  - extra.css
+  - stylesheets/tokens.css
+  - stylesheets/shell.css
+  - stylesheets/components.css
+  - stylesheets/pages.css
+
+extra_javascript:
+  - javascripts/a11y.js
