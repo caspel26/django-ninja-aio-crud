@@ -24,12 +24,13 @@ class PackageLazyInitTests(SimpleTestCase):
 
     def test_v3_surface_resolves_to_defining_modules(self):
         from ninja_aio.decorators.actions import action, on
+        from ninja_aio.models.config import SchemaConfig
         from ninja_aio.models.serializers import ModelSerializer, Serializer
         from ninja_aio.types import HttpMethod
         from ninja_aio.views.api import APIView, APIViewSet
 
         for exported in (
-            action, on, ModelSerializer, Serializer, HttpMethod, APIView, APIViewSet,
+            action, on, ModelSerializer, Serializer, SchemaConfig, HttpMethod, APIView, APIViewSet,
         ):
             self.assertIs(getattr(ninja_aio, exported.__name__), exported)
 

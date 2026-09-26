@@ -17,6 +17,7 @@ from typing import (
 )
 import types
 import warnings
+import weakref
 import sys
 import threading
 from collections import OrderedDict
@@ -62,6 +63,12 @@ from ninja_aio.schemas.helpers import (
     ObjectQuerySchema,
 )
 from ninja_aio.models import transformations as model_transformations
+from ninja_aio.models.config import (
+    CONFIG_KINDS,
+    EMPTY_SCHEMA_CONFIG,
+    ConfigKind,
+    SchemaConfig,
+)
 from ninja_aio.models.utils import ModelUtil, arun_bulk, bulk_failure, run_bulk
 from ninja_aio.exceptions import OperationValidationError
 
@@ -84,6 +91,26 @@ _SCHEMA_TYPE_BY_KIND: dict[SchemaKind, SCHEMA_TYPES] = {
 }
 _schema_cache: OrderedDict[SchemaCacheKey, SchemaType | None] = OrderedDict()
 _schema_cache_lock = threading.RLock()
+
+SERIALIZER_CLASSES: "weakref.WeakSet[type[BaseSerializer]]" = weakref.WeakSet()
+"""Every concrete serializer class, inspected by the ``ninja_aio`` system checks."""
+
+
+def _register_serializer_config(cls: type, legacy: list[str]) -> None:
+    SERIALIZER_CLASSES.add(cls)
+    if not legacy:
+        return
+    names = ", ".join(legacy)
+    if "Schemas" in cls.__dict__:
+        raise ImproperlyConfigured(
+            f"{cls.__name__} declares both Schemas and legacy {names}; keep only Schemas."
+        )
+    warnings.warn(
+        f"{cls.__name__}: {names} is deprecated; declare a Schemas class with "
+        "SchemaConfig entries instead.",
+        DeprecationWarning,
+        stacklevel=3,
+    )
 
 
 class _LazySchemaAttribute:
@@ -389,89 +416,90 @@ class BaseSerializer:
                 setattr(subclass, attr_name, rebound)
         return subclass
 
-    @classmethod
-    def _get_validators(cls, schema_type: SCHEMA_TYPES) -> dict:
-        """
-        Return collected validators for the given schema type.
-
-        Subclasses must implement this to map schema types to the appropriate
-        validator source class.
-
-        Parameters
-        ----------
-        schema_type : SCHEMA_TYPES
-            One of ``"In"``, ``"Patch"``, ``"Out"``, ``"Detail"``, or ``"Related"``.
-
-        Returns
-        -------
-        dict
-            Mapping of validator names to ``PydanticDescriptorProxy`` instances.
-        """
-        return {}
+    _KIND_BY_SCHEMA_TYPE: ClassVar[dict[str, ConfigKind]] = {
+        "In": "create",
+        "Patch": "update",
+        "Out": "read",
+        "Detail": "detail",
+        "Related": "read",
+    }
+    _VALIDATORS_CLASS_BY_KIND: ClassVar[dict[ConfigKind, str]] = {
+        "create": "CreateValidators",
+        "update": "UpdateValidators",
+        "read": "ReadValidators",
+        "detail": "DetailValidators",
+    }
 
     @classmethod
-    def _get_model_config(cls, schema_type: SCHEMA_TYPES) -> dict | None:
-        """
-        Return Pydantic ``ConfigDict`` for the given schema type.
+    def _schema_config(cls, kind: str) -> SchemaConfig:
+        """Return the ``SchemaConfig`` for a kind, from ``Schemas`` or legacy configuration."""
+        if kind not in CONFIG_KINDS:
+            return EMPTY_SCHEMA_CONFIG
+        schemas = getattr(cls, "Schemas", None)
+        if schemas is None:
+            return cls._legacy_schema_config(kind)
+        config = getattr(schemas, kind, None)
+        if config is None and kind == "detail":
+            config = getattr(schemas, "read", None)
+        return EMPTY_SCHEMA_CONFIG if config is None else config
 
-        Subclasses may override this to source ``model_config`` from their
-        configuration classes.
+    @classmethod
+    def _legacy_schema_config(cls, kind: ConfigKind) -> SchemaConfig:
+        """Convert version 2 configuration into a ``SchemaConfig``."""
+        return EMPTY_SCHEMA_CONFIG
 
-        Parameters
-        ----------
-        schema_type : SCHEMA_TYPES
-            One of ``"In"``, ``"Patch"``, ``"Out"``, ``"Detail"``, or ``"Related"``.
+    @classmethod
+    def _legacy_fields(cls, kind: ConfigKind, f_type: F_TYPES) -> list:
+        """Read one version 2 field category without building a ``SchemaConfig``."""
+        return []
 
-        Returns
-        -------
-        dict | None
-            A ``ConfigDict`` instance, or ``None`` if not configured.
-        """
+    @classmethod
+    def _legacy_config_class(cls, kind: ConfigKind) -> type | None:
+        """Version 2 class that may also declare validators and schema overrides."""
         return None
 
     @classmethod
+    def _config_sources(cls, schema_type: SCHEMA_TYPES) -> list[type]:
+        kind = cls._KIND_BY_SCHEMA_TYPE.get(schema_type)
+        if kind is None:
+            return []
+        sources = (
+            cls._legacy_config_class(kind),
+            getattr(cls, cls._VALIDATORS_CLASS_BY_KIND[kind], None),
+        )
+        return [source for source in sources if source is not None]
+
+    @classmethod
+    def _get_validators(cls, schema_type: SCHEMA_TYPES) -> dict:
+        """Collect Pydantic validators declared for the schema type."""
+        validators: dict = {}
+        for source in cls._config_sources(schema_type):
+            validators.update(cls._collect_validators(source))
+        return validators
+
+    @classmethod
+    def _get_model_config(cls, schema_type: SCHEMA_TYPES) -> dict | None:
+        """Return the Pydantic ``ConfigDict`` configured for the schema type."""
+        kind = cls._KIND_BY_SCHEMA_TYPE.get(schema_type)
+        return None if kind is None else cls._schema_config(kind).model_config
+
+    @classmethod
     def _get_schema_overrides(cls, schema_type: SCHEMA_TYPES) -> dict:
-        """
-        Return collected schema method overrides for the given schema type.
-
-        Subclasses must implement this to map schema types to the appropriate
-        source class for method overrides.
-
-        Parameters
-        ----------
-        schema_type : SCHEMA_TYPES
-            One of ``"In"``, ``"Patch"``, ``"Out"``, ``"Detail"``, or ``"Related"``.
-
-        Returns
-        -------
-        dict
-            Mapping of method names to callables.
-        """
-        return {}
+        """Collect schema method overrides declared for the schema type."""
+        overrides: dict = {}
+        for source in cls._config_sources(schema_type):
+            overrides.update(cls._collect_schema_overrides(source))
+        return overrides
 
     @classmethod
     def _get_fields(cls, s_type: S_TYPES, f_type: F_TYPES):
-        """
-        Return raw configuration list for the given serializer/field category.
-
-        Parameters
-        ----------
-        s_type : S_TYPES
-            Serializer type (``"create"`` | ``"update"`` | ``"read"`` | ``"detail"``).
-        f_type : F_TYPES
-            Field category (``"fields"`` | ``"optionals"`` | ``"customs"`` | ``"excludes"``).
-
-        Returns
-        -------
-        list
-            Raw configuration list for the requested category.
-
-        Raises
-        ------
-        NotImplementedError
-            Subclasses must provide an implementation.
-        """
-        raise NotImplementedError
+        """Return the raw configuration list for a serializer type and field category."""
+        if s_type not in CONFIG_KINDS:
+            return []
+        if getattr(cls, "Schemas", None) is None:
+            # Hot path during schema generation: skip building a SchemaConfig.
+            return cls._legacy_fields(s_type, f_type)
+        return getattr(cls._schema_config(s_type), f_type, None) or []
 
     @classmethod
     def _get_model(cls) -> type[models.Model]:
@@ -636,21 +664,6 @@ class BaseSerializer:
             Mapping of field name to serializer class. Empty by default.
         """
         return {}
-
-    @classmethod
-    def _get_relations_as_id(cls) -> list[str]:
-        """
-        Return relation field names that should be serialized as IDs.
-
-        Subclasses may override to specify which relation fields should be
-        represented as primary key values instead of nested objects.
-
-        Returns
-        -------
-        list[str]
-            Field names to serialize as IDs. Empty by default.
-        """
-        return []
 
     @classmethod
     def _generate_union_schema(cls, resolved_union: Any) -> Any:
@@ -1190,7 +1203,7 @@ class BaseSerializer:
         model = cls._get_model()
         relations_serializers = cls._get_relations_serializers() or {}
         # Fetch once to avoid repeated method calls during field processing
-        relations_as_id = cls._get_relations_as_id()
+        relations_as_id = cls._schema_config(fields_type).relations_as_id
 
         fields: list[str] = []
         reverse_rels: list[tuple] = []
@@ -2022,6 +2035,9 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
         )
 
         validate_serializer_hooks(cls)
+        _register_serializer_config(
+            cls, [name for name in cls._LEGACY_CONFIG_CLASSES.values() if name in cls.__dict__]
+        )
         cls.util = ModelUtil(cls)
         cls.query_util = QueryUtil(cls)
         cls._reactive_hooks = collect_reactive_hooks(cls)
@@ -2296,112 +2312,56 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
         optionals: list[tuple[str, Any]] = []
         excludes: list[str] = []
 
-    # Serializer type to configuration class mapping
-    _SERIALIZER_CONFIG_MAP = {
+    # Legacy (version 2) inner configuration classes, converted by _legacy_schema_config
+    _LEGACY_CONFIG_CLASSES: ClassVar[dict[ConfigKind, str]] = {
         "create": "CreateSerializer",
         "update": "UpdateSerializer",
         "read": "ReadSerializer",
         "detail": "DetailSerializer",
     }
 
-    # Schema type to serializer type mapping for validator resolution
-    _SCHEMA_TO_S_TYPE = {
-        "In": "create",
-        "Patch": "update",
-        "Out": "read",
-        "Detail": "detail",
-        "Related": "read",
-    }
+    @classmethod
+    def _legacy_config_class(cls, kind: ConfigKind) -> type | None:
+        return getattr(cls, cls._LEGACY_CONFIG_CLASSES[kind], None)
 
     @classmethod
-    def _get_validators(cls, schema_type: SCHEMA_TYPES) -> dict:
-        """
-        Collect validators from the inner serializer class for the given schema type.
-
-        Parameters
-        ----------
-        schema_type : SCHEMA_TYPES
-            One of ``"In"``, ``"Patch"``, ``"Out"``, ``"Detail"``, or ``"Related"``.
-
-        Returns
-        -------
-        dict
-            Mapping of validator names to ``PydanticDescriptorProxy`` instances.
-        """
-        s_type = cls._SCHEMA_TO_S_TYPE.get(schema_type)
-        config_name = cls._SERIALIZER_CONFIG_MAP.get(s_type)
-        config_class = getattr(cls, config_name, None) if config_name else None
-        return cls._collect_validators(config_class)
+    def _legacy_fields(cls, kind: ConfigKind, f_type: F_TYPES) -> list:
+        values = getattr(cls._legacy_config_class(kind), f_type, None) or []
+        if not values and kind == "detail":
+            # Each empty detail category falls back to the read category.
+            values = getattr(cls.ReadSerializer, f_type, None) or []
+        return values
 
     @classmethod
-    def _get_model_config(cls, schema_type: SCHEMA_TYPES) -> dict | None:
-        """
-        Return Pydantic ``ConfigDict`` from the inner serializer class.
-
-        Parameters
-        ----------
-        schema_type : SCHEMA_TYPES
-            One of ``"In"``, ``"Patch"``, ``"Out"``, ``"Detail"``, or ``"Related"``.
-
-        Returns
-        -------
-        dict | None
-            A ``ConfigDict`` instance, or ``None`` if not configured.
-        """
-        s_type = cls._SCHEMA_TO_S_TYPE.get(schema_type)
-        config_name = cls._SERIALIZER_CONFIG_MAP.get(s_type)
-        config_class = getattr(cls, config_name, None) if config_name else None
-        if config_class is None:
-            return None
-        return getattr(config_class, "model_config", None)
-
-    @classmethod
-    def _get_schema_overrides(cls, schema_type: SCHEMA_TYPES) -> dict:
-        """
-        Collect schema method overrides from the inner serializer class.
-
-        Parameters
-        ----------
-        schema_type : SCHEMA_TYPES
-            One of ``"In"``, ``"Patch"``, ``"Out"``, ``"Detail"``, or ``"Related"``.
-
-        Returns
-        -------
-        dict
-            Mapping of method names to callables.
-        """
-        s_type = cls._SCHEMA_TO_S_TYPE.get(schema_type)
-        config_name = cls._SERIALIZER_CONFIG_MAP.get(s_type)
-        config_class = getattr(cls, config_name, None) if config_name else None
-        return cls._collect_schema_overrides(config_class)
-
-    @classmethod
-    def _get_relations_as_id(cls) -> list[str]:
-        """
-        Return relation fields to serialize as primary key values.
-
-        Reads the ``relations_as_id`` attribute from ``ReadSerializer``.
-
-        Returns
-        -------
-        list[str]
-            Field names whose related objects should be serialized as IDs.
-        """
-        return getattr(cls.ReadSerializer, "relations_as_id", [])
+    def _legacy_schema_config(cls, kind: ConfigKind) -> SchemaConfig:
+        source = cls._legacy_config_class(kind)
+        return SchemaConfig(
+            **{
+                name: list(cls._legacy_fields(kind, name))
+                for name in ("fields", "optionals", "customs", "excludes")
+            },
+            relations_as_id=(
+                list(getattr(cls.ReadSerializer, "relations_as_id", None) or [])
+                if kind in ("read", "detail")
+                else []
+            ),
+            nested=(getattr(source, "nested", None) or {}) if kind == "create" else {},
+            model_config=getattr(source, "model_config", None),
+        )
 
     @classmethod
     def get_nested_fields(cls) -> dict[str, type["ModelSerializer"]]:
         """
         Return the reverse-FK relations declared for nested creation.
 
-        Reads the ``nested`` attribute from ``CreateSerializer``.
+        Reads ``nested`` from the create ``SchemaConfig``.
 
         Returns
         -------
         dict[str, type[ModelSerializer]]
             Mapping of reverse accessor name -> child ``ModelSerializer`` class.
         """
-        nested = getattr(cls.CreateSerializer, "nested", {}) or {}
+        nested = cls._schema_config("create").nested
         if not isinstance(nested, dict):
             raise ImproperlyConfigured("CreateSerializer.nested must be a dict")
         return nested
@@ -2538,32 +2498,6 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
             return customs
         finally:
             _nested_schema_state.path = path
-
-    @classmethod
-    def _get_fields(cls, s_type: S_TYPES, f_type: F_TYPES):
-        """
-        Internal accessor for raw configuration lists.
-
-        Parameters
-        ----------
-        s_type : str
-            Serializer type ("create" | "update" | "read").
-        f_type : str
-            Field category ("fields" | "optionals" | "customs" | "excludes").
-
-        Returns
-        -------
-        list
-            Raw configuration list or empty list.
-        """
-        config_class_name = cls._SERIALIZER_CONFIG_MAP.get(s_type)
-        if not config_class_name:
-            return []
-        config_class = getattr(cls, config_class_name)
-        fields = getattr(config_class, f_type, [])
-        if not fields and s_type == "detail":
-            fields = getattr(cls.ReadSerializer, f_type, [])
-        return fields
 
     @classmethod
     def _get_model(cls) -> type["ModelSerializer"]:
@@ -2807,21 +2741,12 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
     SchemaModelConfig : Configuration object for defining field sets per operation
     """
 
-    # Serializer type to Meta schema attribute mapping
-    _SCHEMA_META_MAP = {
-        "create": "in",
-        "update": "update",
-        "read": "out",
-        "detail": "detail",
-    }
-
-    # Schema type to validators inner class mapping
-    _VALIDATORS_CLASS_MAP = {
-        "In": "CreateValidators",
-        "Patch": "UpdateValidators",
-        "Out": "ReadValidators",
-        "Detail": "DetailValidators",
-        "Related": "ReadValidators",
+    # Legacy (version 2) Meta schema attributes, converted by _legacy_schema_config
+    _LEGACY_META_ATTRS: ClassVar[dict[ConfigKind, str]] = {
+        "create": "schema_in",
+        "update": "schema_update",
+        "read": "schema_out",
+        "detail": "schema_detail",
     }
 
     model: type[ModelT]
@@ -2833,6 +2758,12 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         from ninja_aio.models.hooks import collect_reactive_hooks, validate_serializer_hooks
 
         validate_serializer_hooks(cls)
+        legacy = [
+            f"Meta.{name}"
+            for name in (*cls._LEGACY_META_ATTRS.values(), "relations_as_id")
+            if getattr(cls.Meta, name, None)
+        ]
+        _register_serializer_config(cls, legacy)
         cls.model = cls._get_model()
         cls.util = ModelUtil(cls.model, serializer_class=cls)
         cls.query_util = QueryUtil(cls)
@@ -3069,90 +3000,36 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         return model_transformations.serializer_payload(payload)
 
     @classmethod
-    def _get_validators(cls, schema_type: SCHEMA_TYPES) -> dict:
-        """
-        Collect validators from the inner validators class for the given schema type.
-
-        Looks for inner classes named ``CreateValidators``, ``ReadValidators``,
-        ``UpdateValidators``, or ``DetailValidators`` on the serializer.
-
-        Parameters
-        ----------
-        schema_type : SCHEMA_TYPES
-            One of ``"In"``, ``"Patch"``, ``"Out"``, ``"Detail"``, or ``"Related"``.
-
-        Returns
-        -------
-        dict
-            Mapping of validator names to ``PydanticDescriptorProxy`` instances.
-        """
-        class_name = cls._VALIDATORS_CLASS_MAP.get(schema_type)
-        validators_class = getattr(cls, class_name, None) if class_name else None
-        return cls._collect_validators(validators_class)
+    def _legacy_meta_config(cls, kind: ConfigKind) -> "SchemaModelConfig | None":
+        meta_config = getattr(cls.Meta, cls._LEGACY_META_ATTRS[kind], None)
+        if meta_config is None and kind == "detail":
+            meta_config = getattr(cls.Meta, "schema_out", None)
+        return meta_config
 
     @classmethod
-    def _get_model_config(cls, schema_type: SCHEMA_TYPES) -> dict | None:
-        """
-        Return Pydantic ``ConfigDict`` from the ``SchemaModelConfig`` for the given schema type.
-
-        Parameters
-        ----------
-        schema_type : SCHEMA_TYPES
-            One of ``"In"``, ``"Patch"``, ``"Out"``, ``"Detail"``, or ``"Related"``.
-
-        Returns
-        -------
-        dict | None
-            A ``ConfigDict`` instance, or ``None`` if not configured.
-        """
-        schema_type_to_key = {
-            "In": "in",
-            "Patch": "update",
-            "Out": "out",
-            "Detail": "detail",
-            "Related": "out",
-        }
-        schema_key = schema_type_to_key.get(schema_type)
-        if not schema_key:
-            return None
-        schema_meta = cls._get_schema_meta(schema_key)
-        if schema_meta is None:
-            return None
-        return getattr(schema_meta, "model_config_override", None)
+    def _legacy_fields(cls, kind: ConfigKind, f_type: F_TYPES) -> list:
+        meta_config = cls._legacy_meta_config(kind)
+        # Version 2 looked up `excludes`, so SchemaModelConfig.exclude never applied.
+        if meta_config is None or f_type == "excludes":
+            return []
+        return getattr(meta_config, f_type, None) or []
 
     @classmethod
-    def _get_schema_overrides(cls, schema_type: SCHEMA_TYPES) -> dict:
-        """
-        Collect schema method overrides from the validator inner class.
-
-        Parameters
-        ----------
-        schema_type : SCHEMA_TYPES
-            One of ``"In"``, ``"Patch"``, ``"Out"``, ``"Detail"``, or ``"Related"``.
-
-        Returns
-        -------
-        dict
-            Mapping of method names to callables.
-        """
-        class_name = cls._VALIDATORS_CLASS_MAP.get(schema_type)
-        validators_class = getattr(cls, class_name, None) if class_name else None
-        return cls._collect_schema_overrides(validators_class)
-
-    @classmethod
-    def _get_relations_as_id(cls) -> list[str]:
-        """
-        Return relation fields to serialize as primary key values.
-
-        Reads the ``relations_as_id`` attribute from ``Meta``.
-
-        Returns
-        -------
-        list[str]
-            Field names whose related objects should be serialized as IDs.
-        """
-        relations_as_id = cls._get_meta_data("relations_as_id")
-        return relations_as_id or []
+    def _legacy_schema_config(cls, kind: ConfigKind) -> SchemaConfig:
+        meta_config = cls._legacy_meta_config(kind)
+        if meta_config is None:
+            return EMPTY_SCHEMA_CONFIG
+        return SchemaConfig(
+            fields=list(cls._legacy_fields(kind, "fields")),
+            optionals=list(cls._legacy_fields(kind, "optionals")),
+            customs=list(cls._legacy_fields(kind, "customs")),
+            relations_as_id=(
+                list(cls._get_meta_data("relations_as_id") or [])
+                if kind in ("read", "detail")
+                else []
+            ),
+            model_config=meta_config.model_config_override,
+        )
 
     @classmethod
     def _get_meta_data(cls, attr_name: str) -> Any:
@@ -3197,33 +3074,6 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         return relations_serializers or {}
 
     @classmethod
-    def _get_schema_meta(cls, schema_type: str) -> SchemaModelConfig | None:
-        """
-        Retrieve the ``SchemaModelConfig`` for the given schema type.
-
-        Parameters
-        ----------
-        schema_type : str
-            One of ``"in"``, ``"out"``, ``"update"``, or ``"detail"``.
-
-        Returns
-        -------
-        SchemaModelConfig | None
-            The configuration object, or ``None`` if not defined.
-        """
-        match schema_type:
-            case "in":
-                return cls._get_meta_data("schema_in")
-            case "out":
-                return cls._get_meta_data("schema_out")
-            case "update":
-                return cls._get_meta_data("schema_update")
-            case "detail":
-                return cls._get_meta_data("schema_detail")
-            case _:
-                return None
-
-    @classmethod
     def _validate_model(cls):
         """
         Validate and return the model defined in ``Meta.model``.
@@ -3244,36 +3094,6 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         if not issubclass(model, models.Model):
             raise ValueError("Meta.model must be a Django model")
         return model
-
-    @classmethod
-    def _get_fields(cls, s_type: S_TYPES, f_type: F_TYPES):
-        """
-        Return raw configuration list from the Meta schema for the given categories.
-
-        Falls back to the ``out`` schema when ``detail`` is requested but not defined.
-
-        Parameters
-        ----------
-        s_type : S_TYPES
-            Serializer type (``"create"`` | ``"update"`` | ``"read"`` | ``"detail"``).
-        f_type : F_TYPES
-            Field category (``"fields"`` | ``"optionals"`` | ``"customs"`` | ``"excludes"``).
-
-        Returns
-        -------
-        list
-            Raw configuration list, or empty list if not configured.
-        """
-        schema_key = cls._SCHEMA_META_MAP.get(s_type)
-        if not schema_key:
-            return []
-        schema = cls._get_schema_meta(schema_key)
-        if not schema:
-            if s_type == "detail":
-                schema = cls._get_schema_meta("out")
-            else:
-                return []
-        return getattr(schema, f_type, []) or []
 
     @classmethod
     async def aqueryset_request(

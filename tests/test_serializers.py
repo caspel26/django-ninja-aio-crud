@@ -2054,10 +2054,9 @@ class ModelValidationTestCase(TestCase):
 @tag("serializers", "base_serializer")
 class BaseSerializerAbstractMethodsTestCase(TestCase):
 
-    def test_get_fields_raises_not_implemented(self):
-        """Test _get_fields raises NotImplementedError (covers line 108)."""
-        with self.assertRaises(NotImplementedError):
-            serializers.BaseSerializer._get_fields("read", "fields")
+    def test_base_get_fields_returns_empty_list(self):
+        """BaseSerializer has no configuration, so every category is empty."""
+        self.assertEqual(serializers.BaseSerializer._get_fields("read", "fields"), [])
 
     def test_get_model_raises_not_implemented(self):
         """Test _get_model raises NotImplementedError (covers line 113)."""
@@ -2258,17 +2257,15 @@ class ReverseRelNonModelSerializerSerializer(serializers.Serializer):
 
 @tag("serializers", "coverage")
 class BaseSerializerDefaultMethodsTestCase(TestCase):
-    """Cover BaseSerializer._get_validators and _get_relations_as_id defaults."""
+    """Cover BaseSerializer._get_validators and _schema_config defaults."""
 
     def test_base_get_validators_returns_empty_dict(self):
         """Line 175: BaseSerializer._get_validators returns {}."""
         result = serializers.BaseSerializer._get_validators("In")
         self.assertEqual(result, {})
 
-    def test_base_get_relations_as_id_returns_empty_list(self):
-        """Line 378: BaseSerializer._get_relations_as_id returns []."""
-        result = serializers.BaseSerializer._get_relations_as_id()
-        self.assertEqual(result, [])
+    def test_base_schema_config_is_empty(self):
+        self.assertEqual(serializers.BaseSerializer._schema_config("read").relations_as_id, [])
 
 
 @tag("serializers", "coverage")
@@ -2381,14 +2378,10 @@ class ModelSerializerGetFieldsEdgeCasesTestCase(TestCase):
 
 @tag("serializers", "coverage")
 class SerializerGetSchemaMetaEdgeCasesTestCase(TestCase):
-    """Cover Serializer._get_schema_meta default case and _get_fields unknown s_type."""
+    """Cover Serializer._get_fields with an unknown s_type."""
 
     def setUp(self):
         warnings.simplefilter("ignore", UserWarning)
-
-    def test_get_schema_meta_unknown_type_returns_none(self):
-        result = SerializerForCRUD._get_schema_meta("nonexistent")
-        self.assertIsNone(result)
 
     def test_get_fields_unknown_s_type_returns_empty_list(self):
         result = SerializerForCRUD._get_fields("nonexistent", "fields")

@@ -13,6 +13,7 @@ _EXPORTS = {
     "APIViewSet": ".views",
     "ModelSerializer": ".models",
     "Serializer": ".models.serializers",
+    "SchemaConfig": ".models.config",
     "action": ".decorators",
     "on": ".decorators",
     "HttpMethod": ".types",

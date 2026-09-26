@@ -2,6 +2,7 @@ import uuid
 
 from pydantic import ConfigDict, field_validator
 
+from ninja_aio import SchemaConfig
 from ninja_aio.models import ModelSerializer
 from ninja_aio.admin import register_admin
 from ninja_aio.models.hooks import on_create
@@ -817,3 +818,48 @@ class NestedNode(BaseTestModelSerializer):
 
 
 NestedNode.CreateSerializer.nested = {"children": NestedNode}
+
+
+# ==========================================================
+#                  SCHEMAS CONFIGURATION MODELS
+# ==========================================================
+
+
+class SchemasChild(ModelSerializer):
+    name = models.CharField(max_length=255)
+    parent = models.ForeignKey(
+        "SchemasParent", on_delete=models.CASCADE, related_name="children"
+    )
+
+    class Schemas:
+        create = SchemaConfig(fields=["name", "parent"])
+        read = SchemaConfig(fields=["id", "name"])
+
+
+class SchemasParent(ModelSerializer):
+    name = models.CharField(max_length=255)
+    description = models.TextField(default="")
+    owner = models.ForeignKey(
+        TestModel, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+
+    class Schemas:
+        create = SchemaConfig(
+            fields=["name", "owner"],
+            optionals=[("description", str)],
+            nested={"children": SchemasChild},
+            model_config=ConfigDict(str_strip_whitespace=True),
+        )
+        update = SchemaConfig(optionals=[("name", str), ("description", str)])
+        read = SchemaConfig(
+            fields=["id", "name", "owner", "children"], relations_as_id=["owner"]
+        )
+        detail = SchemaConfig(fields=["id", "name", "description"], customs=[("label", str, "")])
+
+    class CreateValidators:
+        @field_validator("name")
+        @classmethod
+        def reject_blank(cls, value):
+            if not value:
+                raise ValueError("name is required")
+            return value
