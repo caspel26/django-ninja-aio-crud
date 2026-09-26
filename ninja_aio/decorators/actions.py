@@ -1,9 +1,14 @@
 import logging
-from dataclasses import dataclass, field
-from typing import Any, Callable, Optional
+from dataclasses import dataclass, field, replace
+from typing import TYPE_CHECKING, Any, Callable, TypedDict, get_args
 
 from ninja.constants import NOT_SET, NOT_SET_TYPE
 from ninja.throttling import BaseThrottle
+
+from ninja_aio.types import HttpMethod
+
+if TYPE_CHECKING:
+    from typing_extensions import Unpack
 
 logger = logging.getLogger("ninja_aio.decorators")
 
@@ -13,7 +18,7 @@ class ActionConfig:
     """Configuration for an @action-decorated viewset method."""
 
     detail: bool
-    methods: list[str] = field(default_factory=lambda: ["get"])
+    methods: list[HttpMethod] = field(default_factory=lambda: ["get"])
     url_path: str | None = None
     url_name: str | None = None
     auth: Any = NOT_SET
@@ -28,24 +33,42 @@ class ActionConfig:
     openapi_extra: dict[str, Any] | None = None
     prefetch_object: bool = False
 
+    def __post_init__(self) -> None:
+        unknown = set(self.methods) - set(get_args(HttpMethod))
+        if unknown:
+            raise ValueError(
+                f"Unsupported action methods {sorted(unknown)}; "
+                f"expected any of {list(get_args(HttpMethod))}"
+            )
 
-def action(
-    detail: bool,
-    *,
-    methods: list[str] | None = None,
-    url_path: str | None = None,
-    url_name: str | None = None,
-    auth: Any = NOT_SET,
-    response: Any = NOT_SET,
-    summary: str | None = None,
-    description: str | None = None,
-    tags: list[str] | None = None,
-    deprecated: bool | None = None,
-    decorators: list[Callable] | None = None,
-    throttle: BaseThrottle | list[BaseThrottle] | NOT_SET_TYPE = NOT_SET,
-    include_in_schema: bool = True,
-    openapi_extra: Optional[dict[str, Any]] = None,
-):
+
+class ActionOptions(TypedDict, total=False):
+    """Keyword options accepted by ``@action`` and ``@on``; see ``ActionConfig``."""
+
+    methods: list[HttpMethod] | None
+    url_path: str | None
+    url_name: str | None
+    auth: Any
+    response: Any
+    summary: str | None
+    description: str | None
+    tags: list[str] | None
+    deprecated: bool | None
+    decorators: list[Callable] | None
+    throttle: BaseThrottle | list[BaseThrottle] | NOT_SET_TYPE
+    include_in_schema: bool
+    openapi_extra: dict[str, Any] | None
+
+
+def _config_decorator(config: ActionConfig) -> Callable:
+    def decorator(func):
+        func._action_config = replace(config)
+        return func
+
+    return decorator
+
+
+def action(detail: bool, **options: "Unpack[ActionOptions]"):
     """
     Decorator that marks a viewset method as a custom action endpoint.
 
@@ -87,52 +110,17 @@ def action(
     openapi_extra : dict, optional
         Additional OpenAPI metadata.
     """
-
-    def decorator(func):
-        func._action_config = ActionConfig(
-            detail=detail,
-            methods=methods or ["get"],
-            url_path=url_path,
-            url_name=url_name,
-            auth=auth,
-            response=response,
-            summary=summary,
-            description=description,
-            tags=tags,
-            deprecated=deprecated,
-            decorators=decorators,
-            throttle=throttle,
-            include_in_schema=include_in_schema,
-            openapi_extra=openapi_extra,
-        )
-        return func
-
-    return decorator
+    options["methods"] = options.get("methods") or ["get"]
+    return _config_decorator(ActionConfig(detail=detail, **options))
 
 
-def on(
-    action_name: str,
-    *,
-    methods: list[str] | None = None,
-    url_path: str | None = None,
-    url_name: str | None = None,
-    auth: Any = NOT_SET,
-    response: Any = NOT_SET,
-    summary: str | None = None,
-    description: str | None = None,
-    tags: list[str] | None = None,
-    deprecated: bool | None = None,
-    decorators: list[Callable] | None = None,
-    throttle: BaseThrottle | list[BaseThrottle] | NOT_SET_TYPE = NOT_SET,
-    include_in_schema: bool = True,
-    openapi_extra: Optional[dict[str, Any]] = None,
-):
+def on(action_name: str, **options: "Unpack[ActionOptions]"):
     """
     Shorthand decorator for detail actions that pre-fetches the model instance.
 
     The decorated method receives ``(self, request, obj)`` instead of
-    ``(self, request, pk)``. ``on_before_operation`` and
-    ``on_before_object_operation`` are called automatically before the
+    ``(self, request, pk)``. ``aon_before_operation`` and
+    ``aon_before_object_operation`` are called automatically before the
     handler runs, eliminating the common boilerplate found in ``@action``
     detail handlers.
 
@@ -161,30 +149,15 @@ def on(
             async def publish(self, request, obj):
                 obj.status = "published"
                 await obj.asave(update_fields=["status"])
-                return Status(200, await self.model_util.read_s(self.schema_out, request, obj))
+                return Status(200, await self.model_util.amodel_dump(obj, schema=self.schema_out))
 
     .. note::
-        The handler **must** be ``async``.
+        The handler may be ``def`` or ``async def``; hooks and the object
+        lookup run in the same mode as the handler.
     """
-
-    def decorator(func):
-        func._action_config = ActionConfig(
-            detail=True,
-            methods=methods or ["post"],
-            url_path=url_path if url_path is not None else action_name,
-            url_name=url_name,
-            auth=auth,
-            response=response,
-            summary=summary,
-            description=description,
-            tags=tags,
-            deprecated=deprecated,
-            decorators=decorators,
-            throttle=throttle,
-            include_in_schema=include_in_schema,
-            openapi_extra=openapi_extra,
-            prefetch_object=True,
-        )
-        return func
-
-    return decorator
+    options["methods"] = options.get("methods") or ["post"]
+    if options.get("url_path") is None:
+        options["url_path"] = action_name
+    return _config_decorator(
+        ActionConfig(detail=True, prefetch_object=True, **options)
+    )
