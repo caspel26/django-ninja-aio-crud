@@ -1,0 +1,211 @@
+/* Structure shared by every Step 15 direction. Directions only set tokens and
+   their own visual language; this file never sets colors or fonts. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: var(--size-body);
+  line-height: var(--leading-body);
+  font-variant-numeric: tabular-nums;
+}
+
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+a {
+  color: var(--link);
+  text-underline-offset: 0.18em;
+  text-decoration-thickness: 1px;
+}
+
+a:hover {
+  text-decoration-thickness: 2px;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+code,
+pre,
+kbd {
+  font-family: var(--font-mono);
+  font-variant-ligatures: none;
+  font-feature-settings: "zero" 1;
+}
+
+pre {
+  margin: 0;
+  overflow-x: auto;
+  tab-size: 4;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+/* Only directions that opt in show the theme icon and the palette trigger. */
+.theme-icon,
+.palette-trigger {
+  display: none;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.skip-link {
+  position: absolute;
+  left: 1rem;
+  top: -3rem;
+  z-index: 10;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.skip-link:focus {
+  top: 1rem;
+}
+
+/* Tabs: markup is role="tablist" > button[data-tab] + [data-panel]. */
+[role="tablist"] {
+  display: flex;
+  gap: 0;
+}
+
+[role="tab"] {
+  appearance: none;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+/* A shared block followed by per-mode continuation lines reads as one listing. */
+.code pre:not([data-panel]):has(+ pre[data-panel]) {
+  padding-bottom: 0 !important;
+}
+
+.code pre + pre[data-panel] {
+  padding-top: 0 !important;
+}
+
+/* Syntax roles; each direction maps them to its palette. */
+.tok-k { color: var(--syn-keyword); }
+.tok-s { color: var(--syn-string); }
+.tok-c { color: var(--syn-comment); font-style: var(--syn-comment-style, normal); }
+.tok-n { color: var(--syn-name); font-weight: var(--syn-name-weight, 600); }
+.tok-d { color: var(--syn-decorator); }
+.tok-u { color: var(--syn-number); }
+.tok-p { color: var(--syn-punct, inherit); }
+
+/* Guide page skeleton, shared so the directions compare styling, not markup. */
+.doc {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr) var(--toc-width);
+  gap: var(--doc-gap);
+  max-width: var(--page-width);
+  margin: 0 auto;
+  padding: 0 var(--gutter);
+}
+
+.doc-sidebar,
+.doc-toc {
+  position: sticky;
+  top: var(--sticky-top);
+  align-self: start;
+  max-height: calc(100vh - var(--sticky-top));
+  overflow-y: auto;
+}
+
+.doc-sidebar ul,
+.doc-toc ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.doc-main {
+  min-width: 0;
+  max-width: var(--measure);
+}
+
+[id] {
+  scroll-margin-top: calc(var(--sticky-top) + 1rem);
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th {
+  text-align: left;
+}
+
+.pager {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.pager a:last-child {
+  text-align: right;
+}
+
+@media (max-width: 1100px) {
+  .doc {
+    grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  }
+
+  .doc-toc {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .doc {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .doc-sidebar {
+    position: static;
+    max-height: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

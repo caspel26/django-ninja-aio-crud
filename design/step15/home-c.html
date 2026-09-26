@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>django-ninja-aio-crud documentation</title>
+    <meta
+      name="description"
+      content="Documentation for django-ninja-aio-crud: CRUD endpoints for Django Ninja from a Schemas class, sync or async."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@500;700&family=Red+Hat+Text:wght@400;500;600&family=Red+Hat+Mono:wght@400;500&display=swap"
+    />
+    <link rel="stylesheet" href="base.css" />
+    <link rel="stylesheet" href="c-index.css" />
+    <script src="shared.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#content">Skip to content</a>
+
+    <div class="review-bar" role="note">
+      <span>Step 15 mockup · Direction C · Index</span>
+      <nav aria-label="Mockup pages">
+        <a href="guide.html?d=c">Guide page</a>
+        <a href="index.html">Overview</a>
+      </nav>
+    </div>
+
+    <header class="site-header">
+      <a class="brand" href="#">
+        <img src="../../docs/images/logo.png" alt="" width="24" height="24" />
+        <span class="brand-name">django-ninja-aio</span>
+      </a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="#">Get started</a>
+        <a href="#">Tutorial</a>
+        <a href="guide.html?d=c">Guides</a>
+        <a href="#">Concepts</a>
+        <a href="#">Reference</a>
+        <a href="#">Migration</a>
+      </nav>
+      <div class="header-tools">
+        <span class="version">v3.0</span>
+        <button class="theme-toggle" type="button" data-theme-toggle>Dark</button>
+        <a class="repo" href="https://github.com/caspel26/django-ninja-aio-crud">GitHub</a>
+      </div>
+    </header>
+
+    <main id="content" class="home">
+      <section class="home-top">
+        <div>
+          <h1>django-ninja-aio-crud</h1>
+          <p>
+            CRUD endpoints for Django Ninja, generated from a <code>Schemas</code> class on your
+            model. Sync or async per viewset, with the same paths and OpenAPI schema.
+          </p>
+        </div>
+        <div class="home-search">
+          <label>
+            <span class="visually-hidden">Search the documentation</span>
+            <input type="search" placeholder="Search guides, reference and migration notes" />
+            <kbd>/</kbd>
+          </label>
+          <div class="suggest">
+            <span>Common:</span>
+            <a href="#">relations_as_id</a>
+            <a href="#">SynchronousOnlyOperation</a>
+            <a href="#">execution_mode</a>
+            <a href="#">bulk_operations</a>
+          </div>
+          <div class="home-install">
+            <span aria-hidden="true">$</span>
+            <code>pip install django-ninja-aio-crud</code>
+            <button class="code-copy" type="button" data-copy="pip install django-ninja-aio-crud">Copy</button>
+          </div>
+        </div>
+      </section>
+
+      <aside class="notice" aria-label="Version notice">
+        <strong>Upgrading from 2.x?</strong>
+        <span>Version 2 configuration and <code>*_s()</code> methods still run with a
+          <code>DeprecationWarning</code> until 4.0.</span>
+        <a href="#">Migration guide</a>
+      </aside>
+
+      <section class="index" aria-label="Documentation index">
+        <div>
+          <h2>Get started</h2>
+          <p class="index-hint">Ten minutes, one model</p>
+          <ul>
+            <li><a href="#">Installation</a></li>
+            <li><a href="#">Quickstart</a></li>
+            <li><a href="#">Choosing a serializer</a></li>
+          </ul>
+        </div>
+        <div>
+          <h2>Tutorial</h2>
+          <p class="index-hint">A blog API, step by step</p>
+          <ol>
+            <li><a href="#">Models and schemas</a></li>
+            <li><a href="#">CRUD API</a></li>
+            <li><a href="#">Relations</a></li>
+            <li><a href="#">Authentication</a></li>
+            <li><a href="#">Permissions</a></li>
+            <li><a href="#">Filtering and pagination</a></li>
+            <li><a href="#">Ready for production</a></li>
+          </ol>
+        </div>
+        <div>
+          <h2>Guides</h2>
+          <p class="index-hint">One task per page</p>
+          <ul>
+            <li><a href="guide.html?d=c">Declare schemas</a></li>
+            <li><a href="#">Using serializers in Python</a></li>
+            <li><a href="#">Relations</a></li>
+            <li><a href="#">Nested writes</a></li>
+            <li><a href="#">Bulk operations</a></li>
+            <li><a href="#">Custom actions</a></li>
+            <li><a href="#">JWT authentication</a></li>
+            <li><a href="#">All 25 guides</a></li>
+          </ul>
+        </div>
+        <div>
+          <h2>Reference</h2>
+          <p class="index-hint">Generated from docstrings</p>
+          <ul>
+            <li><a href="#">ModelSerializer</a></li>
+            <li><a href="#">Serializer</a></li>
+            <li><a href="#">SchemaConfig</a></li>
+            <li><a href="#">APIViewSet</a></li>
+            <li><a href="#">Decorators</a></li>
+            <li><a href="#">Settings</a></li>
+            <li><a href="#">Exceptions</a></li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="sample" aria-labelledby="sample-title">
+        <div>
+          <h2 id="sample-title">The whole API for one model</h2>
+          <p>
+            A <code>Schemas</code> class and a viewset register list, create, retrieve, update
+            and delete under <code>/api/articles/</code>.
+          </p>
+          <p>
+            The same class is the CRUD API in plain Python: <code>Article.create()</code> or
+            <code>await Article.acreate()</code>.
+          </p>
+          <p><a href="#">Quickstart</a> · <a href="#">Sync and async</a></p>
+        </div>
+        <div class="code" data-tabs="mode">
+          <div class="code-head">
+            <div role="tablist" aria-label="Execution mode">
+              <button role="tab" type="button" data-tab="sync">Sync</button>
+              <button role="tab" type="button" data-tab="async">Async</button>
+            </div>
+            <span class="code-file">blog/api.py</span>
+            <button class="code-copy" type="button" data-copy="@api.viewset(model=Article)">Copy</button>
+          </div>
+<pre><code><span class="tok-k">class</span> <span class="tok-n">Article</span>(ModelSerializer):
+    title = models.CharField(max_length=<span class="tok-u">200</span>)
+    is_published = models.BooleanField(default=<span class="tok-k">False</span>)
+
+    <span class="tok-k">class</span> <span class="tok-n">Schemas</span>:
+        create = SchemaConfig(fields=[<span class="tok-s">"title"</span>])
+        update = SchemaConfig(optionals=[(<span class="tok-s">"is_published"</span>, bool)])
+        read = SchemaConfig(fields=[<span class="tok-s">"id"</span>, <span class="tok-s">"title"</span>, <span class="tok-s">"is_published"</span>])
+
+
+<span class="tok-d">@api.viewset</span>(model=Article)
+<span class="tok-k">class</span> <span class="tok-n">ArticleViewSet</span>(APIViewSet):</code></pre>
+<pre data-panel="sync" role="tabpanel"><code>    execution_mode = <span class="tok-s">"sync"</span></code></pre>
+<pre data-panel="async" role="tabpanel" hidden><code>    execution_mode = <span class="tok-s">"async"</span>  <span class="tok-c"># the default</span></code></pre>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <span>django-ninja-aio-crud · MIT License</span>
+      <a href="#">Release notes</a>
+      <a href="#">Benchmarks</a>
+      <a href="#">Contributing</a>
+    </footer>
+  </body>
+</html>

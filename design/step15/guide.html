@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Declare schemas · django-ninja-aio-crud</title>
+    <meta
+      name="description"
+      content="Declare which fields each operation reads and writes with a Schemas class, on a ModelSerializer or a Serializer."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="base.css" />
+    <script>
+      (() => {
+        const directions = {
+          a: {
+            css: "a-manuscript.css",
+            fonts:
+              "family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Source+Sans+3:wght@400;500;600&family=Source+Code+Pro:wght@400;500",
+          },
+          b: {
+            css: "b-console.css",
+            fonts: "family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600",
+          },
+          c: {
+            css: "c-index.css",
+            fonts:
+              "family=Red+Hat+Display:wght@500;700&family=Red+Hat+Text:wght@400;500;600&family=Red+Hat+Mono:wght@400;500",
+          },
+          d: {
+            css: "d-studio.css",
+            fonts: "family=Schibsted+Grotesk:wght@400..900&family=IBM+Plex+Mono:wght@400;500;600",
+            script: "d-studio.js",
+            theme: "dark",
+          },
+        };
+        const requested = new URLSearchParams(location.search).get("d");
+        const key = requested in directions ? requested : "a";
+        const direction = directions[key];
+        document.documentElement.dataset.direction = key;
+        if (direction.theme) document.documentElement.dataset.defaultTheme = direction.theme;
+        for (const href of [
+          `https://fonts.googleapis.com/css2?${direction.fonts}&display=swap`,
+          direction.css,
+        ]) {
+          const link = document.createElement("link");
+          link.rel = "stylesheet";
+          link.href = href;
+          document.head.append(link);
+        }
+        if (direction.script) document.write(`<script src="${direction.script}"><\/script>`);
+      })();
+    </script>
+    <script src="shared.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#content">Skip to content</a>
+
+    <div class="review-bar" role="note">
+      <span>Step 15 mockup, guide page</span>
+      <nav aria-label="Design directions">
+        <a href="guide.html?d=a">A · Manuscript</a>
+        <a href="guide.html?d=b">B · Console</a>
+        <a href="guide.html?d=c">C · Index</a>
+        <a href="guide.html?d=d">D · Studio</a>
+        <a href="index.html">Overview</a>
+      </nav>
+    </div>
+
+    <header class="site-header">
+      <a class="brand" href="#">
+        <img src="../../docs/images/logo.png" alt="" width="24" height="24" />
+        <span class="brand-name">django-ninja-aio</span>
+      </a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="#">Get started</a>
+        <a href="#">Tutorial</a>
+        <a href="#" aria-current="true">Guides</a>
+        <a href="#">Concepts</a>
+        <a href="#">Reference</a>
+        <a href="#">Migration</a>
+      </nav>
+      <div class="header-tools">
+        <label class="search">
+          <span class="visually-hidden">Search the documentation</span>
+          <input type="search" placeholder="Search" />
+          <kbd>/</kbd>
+        </label>
+        <button class="palette-trigger" type="button" data-palette-open>
+          <span>Search docs</span><kbd>⌘K</kbd>
+        </button>
+        <span class="version" title="Documentation version">3.0</span>
+        <button class="theme-toggle" type="button" data-theme-toggle>
+          <svg class="theme-icon theme-icon-sun" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="8" cy="8" r="3" /><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1 1M11.6 11.6l1 1M3.4 12.6l1-1M11.6 4.4l1-1" /></svg>
+          <svg class="theme-icon theme-icon-moon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7Z" /></svg>
+          <span class="theme-label">Dark</span>
+        </button>
+        <a class="repo" href="https://github.com/caspel26/django-ninja-aio-crud">GitHub</a>
+      </div>
+    </header>
+
+    <div class="doc">
+      <nav class="doc-sidebar" aria-label="Guides">
+        <div class="nav-group">
+          <h2>Data</h2>
+          <ul>
+            <li><a href="#" aria-current="page">Declare schemas</a></li>
+            <li><a href="#">Validation</a></li>
+            <li><a href="#">Using serializers in Python</a></li>
+            <li><a href="#">Dumping objects</a></li>
+            <li><a href="#">Relations</a></li>
+            <li><a href="#">Nested writes</a></li>
+            <li><a href="#">Bulk operations</a></li>
+            <li><a href="#">Query optimization</a></li>
+          </ul>
+        </div>
+        <div class="nav-group">
+          <h2>Endpoints</h2>
+          <ul>
+            <li><a href="#">ViewSets</a></li>
+            <li><a href="#">Custom actions</a></li>
+            <li><a href="#">Routers and versioning</a></li>
+            <li><a href="#">Filtering and search</a></li>
+            <li><a href="#">Pagination</a></li>
+            <li><a href="#">Field selection</a></li>
+            <li><a href="#">Soft delete</a></li>
+          </ul>
+        </div>
+        <div class="nav-group">
+          <h2>Security</h2>
+          <ul>
+            <li><a href="#">JWT authentication</a></li>
+            <li><a href="#">Cookie authentication</a></li>
+            <li><a href="#">Permissions</a></li>
+          </ul>
+        </div>
+        <div class="nav-group">
+          <h2>Behavior</h2>
+          <ul>
+            <li><a href="#">Hooks</a></li>
+            <li><a href="#">Errors</a></li>
+          </ul>
+        </div>
+      </nav>
+
+      <main id="content" class="doc-main">
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="#">Guides</a><span aria-hidden="true">/</span><a href="#">Data</a>
+        </nav>
+
+        <h1>Declare schemas</h1>
+        <p class="lede">
+          A <code>Schemas</code> class tells the framework which fields each operation reads
+          and writes. It is the same on a <code>ModelSerializer</code> and on a
+          <code>Serializer</code> for a model you already have.
+        </p>
+
+        <aside class="prereq" aria-label="Before you start">
+          <strong>Before you start</strong>
+          <span>You have a model and an <code>APIViewSet</code> from the
+            <a href="#">Quickstart</a>.</span>
+        </aside>
+
+        <h2 id="kinds">The four schema kinds</h2>
+        <p>Each kind maps to one part of the HTTP contract. Declare only the ones you need.</p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th scope="col">Kind</th><th scope="col">Used for</th><th scope="col">If omitted</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>create</code></td><td><span class="method">POST</span> request body</td><td>Create endpoint is not generated</td></tr>
+              <tr><td><code>update</code></td><td><span class="method">PATCH</span> request body</td><td>Update endpoint is not generated</td></tr>
+              <tr><td><code>read</code></td><td>List items and write responses</td><td>Read endpoints are not generated</td></tr>
+              <tr><td><code>detail</code></td><td><span class="method">GET</span> <code>/{id}</code> response</td><td>Reuses <code>read</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h2 id="declare">Declare them</h2>
+        <p>
+          Pick the tab for your serializer style. Everything after the <code>Schemas</code>
+          class, including viewsets and OpenAPI, is identical for both.
+        </p>
+
+        <div class="code" data-tabs="style">
+          <div class="code-head">
+            <div role="tablist" aria-label="Serializer style">
+              <button role="tab" type="button" data-tab="model">ModelSerializer</button>
+              <button role="tab" type="button" data-tab="serializer">Serializer</button>
+            </div>
+            <span class="code-file">blog/models.py</span>
+            <button class="code-copy" type="button" data-copy="class Schemas: ...">Copy</button>
+          </div>
+<pre data-panel="model" role="tabpanel"><code><span class="tok-k">from</span> django.db <span class="tok-k">import</span> models
+<span class="tok-k">from</span> ninja_aio <span class="tok-k">import</span> ModelSerializer, SchemaConfig
+
+
+<span class="tok-k">class</span> <span class="tok-n">Article</span>(ModelSerializer):
+    title = models.CharField(max_length=<span class="tok-u">200</span>)
+    body = models.TextField()
+    is_published = models.BooleanField(default=<span class="tok-k">False</span>)
+    created_at = models.DateTimeField(auto_now_add=<span class="tok-k">True</span>)
+
+    <span class="tok-k">class</span> <span class="tok-n">Schemas</span>:
+        create = SchemaConfig(
+            fields=[<span class="tok-s">"title"</span>, <span class="tok-s">"body"</span>],
+            optionals=[(<span class="tok-s">"is_published"</span>, bool)],
+        )
+        update = SchemaConfig(
+            optionals=[(<span class="tok-s">"title"</span>, str), (<span class="tok-s">"body"</span>, str), (<span class="tok-s">"is_published"</span>, bool)],
+        )
+        read = SchemaConfig(
+            fields=[<span class="tok-s">"id"</span>, <span class="tok-s">"title"</span>, <span class="tok-s">"is_published"</span>, <span class="tok-s">"created_at"</span>],
+        )
+        <span class="tok-c"># detail omitted: retrieve reuses read</span></code></pre>
+<pre data-panel="serializer" role="tabpanel" hidden><code><span class="tok-k">from</span> ninja_aio <span class="tok-k">import</span> Serializer, SchemaConfig
+
+<span class="tok-k">from</span> blog.models <span class="tok-k">import</span> Article  <span class="tok-c"># an existing models.Model</span>
+
+
+<span class="tok-k">class</span> <span class="tok-n">ArticleSerializer</span>(Serializer[Article]):
+    <span class="tok-k">class</span> <span class="tok-n">Meta</span>:
+        model = Article
+
+    <span class="tok-k">class</span> <span class="tok-n">Schemas</span>:
+        create = SchemaConfig(
+            fields=[<span class="tok-s">"title"</span>, <span class="tok-s">"body"</span>],
+            optionals=[(<span class="tok-s">"is_published"</span>, bool)],
+        )
+        update = SchemaConfig(
+            optionals=[(<span class="tok-s">"title"</span>, str), (<span class="tok-s">"body"</span>, str), (<span class="tok-s">"is_published"</span>, bool)],
+        )
+        read = SchemaConfig(
+            fields=[<span class="tok-s">"id"</span>, <span class="tok-s">"title"</span>, <span class="tok-s">"is_published"</span>, <span class="tok-s">"created_at"</span>],
+        )</code></pre>
+        </div>
+
+        <h2 id="options"><code>SchemaConfig</code> options</h2>
+        <div class="table-wrap">
+          <table class="options">
+            <thead>
+              <tr><th scope="col">Option</th><th scope="col">Kinds</th><th scope="col">What it does</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>fields</code></td><td>all</td><td>Model fields to include. Required on <code>create</code>.</td></tr>
+              <tr><td><code>optionals</code></td><td>all</td><td><code>(name, type)</code> pairs accepted but not required.</td></tr>
+              <tr><td><code>customs</code></td><td>all</td><td>Fields that are not model columns: <code>(name, type)</code> or <code>(name, type, default)</code>.</td></tr>
+              <tr><td><code>excludes</code></td><td>all</td><td>Fields removed from the generated schema.</td></tr>
+              <tr><td><code>relations_as_id</code></td><td>read, detail</td><td>Serialize these relations as their primary key.</td></tr>
+              <tr><td><code>nested</code></td><td>create</td><td>Reverse-FK children created with the parent. <code>ModelSerializer</code> only.</td></tr>
+              <tr><td><code>model_config</code></td><td>all</td><td>Pydantic <code>ConfigDict</code> for the generated schema.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h2 id="use">Use a generated schema</h2>
+        <p>
+          Schemas are class attributes. They are built on first access and cached, so reading
+          one in a route signature costs nothing after startup.
+        </p>
+        <div class="code">
+          <div class="code-head">
+            <span class="code-file">blog/api.py</span>
+            <button class="code-copy" type="button" data-copy="Article.read_schema">Copy</button>
+          </div>
+<pre><code><span class="tok-d">@api.get</span>(<span class="tok-s">"/featured-articles"</span>, response=list[Article.read_schema])
+<span class="tok-k">def</span> <span class="tok-n">featured</span>(request):
+    articles = Article.get_queryset(request=request).filter(is_published=<span class="tok-k">True</span>)[:<span class="tok-u">3</span>]
+    <span class="tok-k">return</span> Article.model_dumps(articles)
+
+<span class="tok-c"># Deeper nesting for one route only</span>
+ArticleTree = Article.get_schema(<span class="tok-s">"read"</span>, depth=<span class="tok-u">2</span>)</code></pre>
+        </div>
+
+        <h2 id="pipeline">How schemas are built</h2>
+        <figure class="diagram" aria-labelledby="pipeline-caption">
+          <ol class="diagram-flow">
+            <li>
+              <span class="diagram-when">You write</span>
+              <strong>class Schemas</strong>
+              <span>one <code>SchemaConfig</code> per kind</span>
+            </li>
+            <li>
+              <span class="diagram-when">Startup</span>
+              <strong>System checks</strong>
+              <span>unknown fields fail <code>manage.py check</code></span>
+            </li>
+            <li class="is-key">
+              <span class="diagram-when">First access</span>
+              <strong>Pydantic model</strong>
+              <span>generated once, then cached</span>
+            </li>
+            <li>
+              <span class="diagram-when">Every request</span>
+              <strong>Validate and dump</strong>
+              <span>same class for input, output and OpenAPI</span>
+            </li>
+          </ol>
+          <figcaption id="pipeline-caption">
+            Generated schema names stay stable across releases, so OpenAPI clients do not change
+            when you upgrade.
+          </figcaption>
+        </figure>
+
+        <h2 id="checks">Startup checks</h2>
+        <p>Mistakes in <code>Schemas</code> surface when Django starts, not on the first request.</p>
+        <div class="table-wrap">
+          <table class="checks">
+            <tbody>
+              <tr><td><code>ninja_aio.E001</code></td><td>Unknown schema kind</td></tr>
+              <tr><td><code>ninja_aio.E002</code></td><td>Value is not a <code>SchemaConfig</code></td></tr>
+              <tr><td><code>ninja_aio.E003</code></td><td>Unknown field name</td></tr>
+              <tr><td><code>ninja_aio.E004</code></td><td>Field in both <code>fields</code> and <code>optionals</code></td></tr>
+              <tr><td><code>ninja_aio.E005</code></td><td><code>relations_as_id</code> or <code>nested</code> on an unsupported kind</td></tr>
+              <tr><td><code>ninja_aio.E006</code></td><td><code>relations_as_id</code> entry is not a relation</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h2 id="v2">Coming from version 2</h2>
+        <aside class="callout callout-deprecated" aria-label="Deprecated">
+          <strong>Deprecated in 3.0, removed in 4.0</strong>
+          <p>
+            <code>CreateSerializer</code>, <code>ReadSerializer</code>,
+            <code>UpdateSerializer</code>, <code>DetailSerializer</code> and
+            <code>Meta.schema_in</code>/<code>schema_out</code> still work and emit a
+            <code>DeprecationWarning</code>. Declaring them next to <code>Schemas</code> raises
+            <code>ImproperlyConfigured</code>.
+            <a href="#">Migration: deprecations</a>
+          </p>
+        </aside>
+
+        <nav class="pager" aria-label="Previous and next">
+          <a href="#"><span>Previous</span>Quickstart</a>
+          <a href="#"><span>Next</span>Validation</a>
+        </nav>
+      </main>
+
+      <nav class="doc-toc" aria-label="On this page">
+        <h2>On this page</h2>
+        <ul>
+          <li><a href="#kinds">The four schema kinds</a></li>
+          <li><a href="#declare">Declare them</a></li>
+          <li><a href="#options">SchemaConfig options</a></li>
+          <li><a href="#use">Use a generated schema</a></li>
+          <li><a href="#pipeline">How schemas are built</a></li>
+          <li><a href="#checks">Startup checks</a></li>
+          <li><a href="#v2">Coming from version 2</a></li>
+        </ul>
+        <a class="edit-link" href="#">Edit this page</a>
+      </nav>
+    </div>
+
+    <footer class="site-footer">
+      <span>django-ninja-aio-crud · MIT License</span>
+      <a href="#">Release notes</a>
+      <a href="#">Contributing</a>
+    </footer>
+
+    <dialog class="palette" aria-label="Search the documentation">
+      <label>
+        <span class="visually-hidden">Search</span>
+        <input type="search" placeholder="Search pages" autocomplete="off" />
+        <kbd>esc</kbd>
+      </label>
+      <ul role="listbox" aria-label="Results"></ul>
+      <div class="palette-foot"><span><kbd>↑</kbd><kbd>↓</kbd>navigate</span><span><kbd>↵</kbd>open</span></div>
+    </dialog>
+  </body>
+</html>

@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Step 15 · Visual directions</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: system-ui, sans-serif;
+        line-height: 1.55;
+      }
+      body {
+        max-width: 60rem;
+        margin: 0 auto;
+        padding: 3rem 1.5rem;
+      }
+      h1 {
+        margin: 0 0 0.5rem;
+        font-size: 1.75rem;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 1rem 0 2rem;
+        font-size: 0.9375rem;
+      }
+      th,
+      td {
+        padding: 0.5rem 0.75rem;
+        border-bottom: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+        text-align: left;
+        vertical-align: top;
+      }
+      th {
+        font-weight: 600;
+      }
+      code {
+        font-size: 0.9em;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Step 15 · Visual directions</h1>
+    <p>
+      Three directions for the version 3 docsite, each shown as a homepage and the
+      <em>Declare schemas</em> guide. All code, paths, responses and benchmark numbers match
+      the version 3 API and <code>comparison_results.json</code>. Every page has a light and
+      a dark theme (toggle in the header) and linked sync/async tabs.
+    </p>
+
+    <table>
+      <thead>
+        <tr><th>Direction</th><th>Character</th><th>Type</th><th>Pages</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>A · Manuscript</strong></td>
+          <td>Editorial. Serif display on warm paper, book-like measure, rules instead of boxes. Amber marks the one thing that matters on a screen.</td>
+          <td>Source Serif 4, Source Sans 3, Source Code Pro</td>
+          <td><a href="home-a.html">Home</a> · <a href="guide.html?d=a">Guide</a></td>
+        </tr>
+        <tr>
+          <td><strong>B · Console</strong></td>
+          <td>Technical. Visible 1px grid like a spec sheet, monospace indexes, no radii or shadows. Amber is the cursor: active tab, current page, this project's row.</td>
+          <td>IBM Plex Sans, IBM Plex Mono</td>
+          <td><a href="home-b.html">Home</a> · <a href="guide.html?d=b">Guide</a></td>
+        </tr>
+        <tr>
+          <td><strong>C · Index</strong></td>
+          <td>Reference-first. The homepage is an index built around search; dense, neutral, calm. Amber is reserved for attention: deprecations and version notices.</td>
+          <td>Red Hat Display, Red Hat Text, Red Hat Mono</td>
+          <td><a href="home-c.html">Home</a> · <a href="guide.html?d=c">Guide</a></td>
+        </tr>
+        <tr>
+          <td><strong>D · Studio</strong><br /><small>iteration after review</small></td>
+          <td>Modern synthesis: B's precision, A's hierarchy, C's search-first index. Dark-first, layered tonal surfaces, bold display scale, functional motion, ⌘K palette, interactive operation demo with linked fields. Brand gradient on the wordmark only.</td>
+          <td>Schibsted Grotesk, IBM Plex Mono</td>
+          <td><a href="home-d.html">Home</a> · <a href="guide.html?d=d">Guide</a></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Review against the architecture rules (section 11.3)</h2>
+    <table>
+      <thead>
+        <tr><th>Rule</th><th>A</th><th>B</th><th>C</th><th>D</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Flat color only: no gradients, glows or blur</td><td>Yes</td><td>Yes (one hatched pattern marks a clipped bar)</td><td>Yes</td><td>One brand gradient, wordmark only (requested)</td></tr>
+        <tr><td>Left-aligned hero, product carries the page</td><td>Yes, code beside the statement</td><td>Yes, three-pane session</td><td>Yes, index and search</td><td>Yes, interactive demo</td></tr>
+        <tr><td>No 3×2 icon feature grid</td><td>Yes</td><td>Yes</td><td>Yes</td><td>Yes, capability list with real attribute names</td></tr>
+        <tr><td>No decorative heading icons</td><td>Yes</td><td>Yes (numbers are structural)</td><td>Yes</td><td>Yes</td></tr>
+        <tr><td>Only real artifacts</td><td>Code, JSON, benchmark table</td><td>Code, terminal, benchmark bars</td><td>Code, real search terms</td><td>Real schema names, JSON, OpenAPI, benchmarks</td></tr>
+        <tr><td>Specific, checkable copy</td><td>Yes, includes where others are faster</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+        <tr><td>Small radius scale</td><td>2–3 px</td><td>0 px</td><td>4–6 px</td><td>4–14 px</td></tr>
+        <tr><td>Non-default font pairing, tabular figures</td><td>Yes</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+        <tr><td>No decorative motion; reduced motion honored</td><td>Yes</td><td>Yes</td><td>Yes</td><td>Motion only on state changes; honored</td></tr>
+        <tr><td>Visible keyboard focus, labelled tabs</td><td>Yes</td><td>Yes</td><td>Yes</td><td>Yes, plus keyboard palette</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Notes</h2>
+    <ul>
+      <li>
+        The guide page uses identical markup for all three directions; only the stylesheet
+        changes (<code>guide.html?d=a|b|c</code>). This mirrors the real constraint: the
+        theme's HTML is largely fixed, so a direction must be achievable mostly in CSS.
+      </li>
+      <li>
+        Mockups load fonts from Google Fonts for convenience. Production would self-host them
+        (privacy, performance budget).
+      </li>
+      <li>
+        Found while building: the list endpoint returns <code>{"items": [...], "count": N}</code>,
+        but <code>docs/api/pagination.md</code> documents <code>count/next/previous/results</code>.
+        To be corrected in Step 19.
+      </li>
+    </ul>
+  </body>
+</html>

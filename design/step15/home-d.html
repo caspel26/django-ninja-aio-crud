@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en" data-default-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>django-ninja-aio-crud · The Django model is the API</title>
+    <meta
+      name="description"
+      content="Declare which fields each operation reads and writes; get typed Django Ninja endpoints, validation and OpenAPI, served sync or async."
+    />
+    <meta name="theme-color" content="#0b0a10" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#fbfafc" media="(prefers-color-scheme: light)" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400..900&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+    />
+    <link rel="stylesheet" href="base.css" />
+    <link rel="stylesheet" href="d-studio.css" />
+    <script src="shared.js"></script>
+    <script src="d-studio.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#content">Skip to content</a>
+
+    <div class="review-bar" role="note">
+      <span>Step 15 mockup · Direction D · Studio</span>
+      <nav aria-label="Mockup pages">
+        <a href="guide.html?d=d">Guide page</a>
+        <a href="index.html">Overview</a>
+      </nav>
+    </div>
+
+    <header class="site-header">
+      <a class="brand" href="#">
+        <img src="../../docs/images/logo.png" alt="" width="26" height="26" />
+        <span class="brand-name">django-ninja-aio</span>
+      </a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="#">Get started</a>
+        <a href="#">Tutorial</a>
+        <a href="guide.html?d=d">Guides</a>
+        <a href="#">Concepts</a>
+        <a href="#">Reference</a>
+        <a href="#">Migration</a>
+      </nav>
+      <div class="header-tools">
+        <button class="palette-trigger" type="button" data-palette-open>
+          <span>Search docs</span><kbd>⌘K</kbd>
+        </button>
+        <span class="version">v3.0</span>
+        <button class="theme-toggle" type="button" data-theme-toggle>
+          <svg class="theme-icon theme-icon-sun" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="8" cy="8" r="3" /><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1 1M11.6 11.6l1 1M3.4 12.6l1-1M11.6 4.4l1-1" /></svg>
+          <svg class="theme-icon theme-icon-moon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7Z" /></svg>
+          <span class="theme-label">Light</span>
+        </button>
+        <a class="repo" href="https://github.com/caspel26/django-ninja-aio-crud">GitHub</a>
+      </div>
+    </header>
+
+    <main id="content" class="home">
+      <section class="hero">
+        <a class="hero-release" href="#"><b>3.0</b> Sync and async, one API <span aria-hidden="true">→</span></a>
+        <h1>The Django model is the API.</h1>
+        <p class="hero-sub">
+          Declare which fields each operation reads and writes. django-ninja-aio-crud
+          registers typed Django Ninja endpoints, validates every request and publishes the
+          OpenAPI schema, served sync or async.
+        </p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="#">Get started</a>
+          <button class="btn btn-command" type="button" data-copy="pip install django-ninja-aio-crud">
+            <span class="prompt" aria-hidden="true">$</span> pip install django-ninja-aio-crud
+            <span class="copy-state">Copy</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="demo" data-active-op="list" aria-label="Interactive example">
+        <div class="demo-bar">
+          <div class="seg" role="tablist" aria-label="Operation">
+            <button role="tab" type="button" data-op="list" data-kind="read">List</button>
+            <button role="tab" type="button" data-op="create" data-kind="create">Create</button>
+            <button role="tab" type="button" data-op="retrieve" data-kind="read">Retrieve</button>
+            <button role="tab" type="button" data-op="update" data-kind="update">Update</button>
+            <button role="tab" type="button" data-op="delete" data-kind="none">Delete</button>
+          </div>
+          <span class="demo-hint">Hover a field to trace it through the request</span>
+        </div>
+
+        <div class="demo-grid">
+          <div class="demo-pane">
+            <div class="pane-label"><span>blog/models.py</span><span>you write</span></div>
+<pre><code><span class="tok-k">class</span> <span class="tok-n">Article</span>(ModelSerializer):
+    <span data-field="title">title</span> = models.CharField(max_length=<span class="tok-u">200</span>)
+    <span data-field="body">body</span> = models.TextField()
+    <span data-field="is_published">is_published</span> = models.BooleanField(default=<span class="tok-k">False</span>)
+
+    <span class="tok-k">class</span> <span class="tok-n">Schemas</span>:
+<span class="cfg-line" data-kind-line="create">        create = SchemaConfig(fields=[<span class="tok-s" data-field="title">"title"</span>, <span class="tok-s" data-field="body">"body"</span>])</span><span class="cfg-line" data-kind-line="update">        update = SchemaConfig(optionals=[(<span class="tok-s" data-field="is_published">"is_published"</span>, bool)])</span><span class="cfg-line" data-kind-line="read">        read = SchemaConfig(fields=[<span class="tok-s" data-field="id">"id"</span>, <span class="tok-s" data-field="title">"title"</span>, <span class="tok-s" data-field="is_published">"is_published"</span>])</span></code></pre>
+          </div>
+
+          <div class="demo-pane">
+            <div class="pane-label"><span>HTTP</span><span>you get</span></div>
+            <div data-op-panel="list">
+              <div class="http-line"><span><span class="method">GET</span>/api/articles/</span><span class="http-status"><b>200</b> OK</span></div>
+<pre><code>{
+  <span class="tok-s">"items"</span>: [
+    {
+      <span class="tok-s" data-field="id">"id"</span>: <span class="tok-u">1</span>,
+      <span class="tok-s" data-field="title">"title"</span>: <span class="tok-s">"Sync or async?"</span>,
+      <span class="tok-s" data-field="is_published">"is_published"</span>: <span class="tok-k">true</span>
+    }
+  ],
+  <span class="tok-s">"count"</span>: <span class="tok-u">1</span>
+}</code></pre>
+            </div>
+            <div data-op-panel="create" hidden>
+              <div class="http-line"><span><span class="method">POST</span>/api/articles/</span><span class="http-status"><b>201</b> Created</span></div>
+<pre><code><span class="tok-c">// request</span>
+{<span class="tok-s" data-field="title">"title"</span>: <span class="tok-s">"Draft"</span>, <span class="tok-s" data-field="body">"body"</span>: <span class="tok-s">"..."</span>}
+
+<span class="tok-c">// response, read schema</span>
+{
+  <span class="tok-s" data-field="id">"id"</span>: <span class="tok-u">2</span>,
+  <span class="tok-s" data-field="title">"title"</span>: <span class="tok-s">"Draft"</span>,
+  <span class="tok-s" data-field="is_published">"is_published"</span>: <span class="tok-k">false</span>
+}</code></pre>
+            </div>
+            <div data-op-panel="retrieve" hidden>
+              <div class="http-line"><span><span class="method">GET</span>/api/articles/1</span><span class="http-status"><b>200</b> OK</span></div>
+<pre><code>{
+  <span class="tok-s" data-field="id">"id"</span>: <span class="tok-u">1</span>,
+  <span class="tok-s" data-field="title">"title"</span>: <span class="tok-s">"Sync or async?"</span>,
+  <span class="tok-s" data-field="is_published">"is_published"</span>: <span class="tok-k">true</span>
+}</code></pre>
+            </div>
+            <div data-op-panel="update" hidden>
+              <div class="http-line"><span><span class="method">PATCH</span>/api/articles/1/</span><span class="http-status"><b>200</b> OK</span></div>
+<pre><code><span class="tok-c">// request, every field optional</span>
+{<span class="tok-s" data-field="is_published">"is_published"</span>: <span class="tok-k">false</span>}
+
+<span class="tok-c">// response, read schema</span>
+{
+  <span class="tok-s" data-field="id">"id"</span>: <span class="tok-u">1</span>,
+  <span class="tok-s" data-field="title">"title"</span>: <span class="tok-s">"Sync or async?"</span>,
+  <span class="tok-s" data-field="is_published">"is_published"</span>: <span class="tok-k">false</span>
+}</code></pre>
+            </div>
+            <div data-op-panel="delete" hidden>
+              <div class="http-line"><span><span class="method">DELETE</span>/api/articles/1/</span><span class="http-status"><b>204</b> No Content</span></div>
+<pre><code><span class="tok-c">// no response body</span></code></pre>
+            </div>
+          </div>
+
+          <div class="demo-pane">
+            <div class="pane-label"><span>OpenAPI</span><span>generated</span></div>
+            <div data-op-panel="list">
+              <div class="oa-name">PaginatedarticleSchemaOut</div>
+              <ul class="oa-list">
+                <li><span>items</span><span class="oa-type">articleSchemaOut[]</span></li>
+                <li><span>count</span><span class="oa-type">integer</span></li>
+              </ul>
+              <div class="oa-name">articleSchemaOut</div>
+              <ul class="oa-list">
+                <li><span data-field="id">id</span><span class="oa-type">integer</span></li>
+                <li><span data-field="title">title</span><span class="oa-type">string ≤ 200</span></li>
+                <li><span data-field="is_published">is_published</span><span class="oa-type">boolean</span></li>
+              </ul>
+            </div>
+            <div data-op-panel="create" hidden>
+              <div class="oa-name">articleSchemaIn</div>
+              <ul class="oa-list">
+                <li><span data-field="title">title</span><span class="oa-type">string ≤ 200 · required</span></li>
+                <li><span data-field="body">body</span><span class="oa-type">string · required</span></li>
+              </ul>
+            </div>
+            <div data-op-panel="retrieve" hidden>
+              <div class="oa-name">articleSchemaOut</div>
+              <ul class="oa-list">
+                <li><span data-field="id">id</span><span class="oa-type">integer</span></li>
+                <li><span data-field="title">title</span><span class="oa-type">string ≤ 200</span></li>
+                <li><span data-field="is_published">is_published</span><span class="oa-type">boolean</span></li>
+              </ul>
+            </div>
+            <div data-op-panel="update" hidden>
+              <div class="oa-name">articleSchemaPatch</div>
+              <ul class="oa-list">
+                <li><span data-field="is_published">is_published</span><span class="oa-type">boolean · optional</span></li>
+              </ul>
+            </div>
+            <div data-op-panel="delete" hidden>
+              <div class="oa-name">204 response</div>
+              <ul class="oa-list">
+                <li><span>body</span><span class="oa-type">none</span></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="caps-title">
+        <div class="section-head">
+          <h2 id="caps-title">Everything around the endpoint.</h2>
+          <p>
+            Each capability is one attribute or mixin on the viewset, and each one works the
+            same in sync and async mode.
+          </p>
+        </div>
+        <dl class="capabilities">
+          <div><dt>Filtering and search <code>query_params</code></dt><dd>Typed query parameters, checked against real model fields before they reach the ORM.</dd></div>
+          <div><dt>Pagination <code>pagination_class</code></dt><dd>Page-number pagination by default. Swap in your own class per viewset.</dd></div>
+          <div><dt>Authentication <code>AsyncJwtBearer</code></dt><dd>JWT bearer or HttpOnly cookie auth, set per verb with <code>get_auth</code>, <code>post_auth</code> and friends.</dd></div>
+          <div><dt>Permissions <code>PermissionViewSetMixin</code></dt><dd>Object-level <code>has_permission</code> hooks, or role-based rules per operation.</dd></div>
+          <div><dt>Bulk operations <code>bulk_operations</code></dt><dd>Create, update and delete many rows; each item succeeds or fails on its own.</dd></div>
+          <div><dt>Nested writes <code>SchemaConfig(nested=…)</code></dt><dd>Create a parent and its reverse-FK children in a single transaction.</dd></div>
+          <div><dt>Soft delete <code>SoftDeleteViewSetMixin</code></dt><dd>Mark rows deleted, restore them, or purge them for good.</dd></div>
+          <div><dt>AI agents <code>manage.py mcp_server</code></dt><dd>Expose the same viewsets as MCP tools, with the same permissions.</dd></div>
+        </dl>
+      </section>
+
+      <section class="section" aria-labelledby="python-title">
+        <div class="split">
+          <div>
+            <h2 id="python-title">Call it from Python, too.</h2>
+            <p style="margin-top: 1.25rem">
+              The serializer is also the CRUD API for scripts, Celery tasks and tests. Sync and
+              async are separate methods, never a flag, so type checkers see real return types.
+            </p>
+            <a class="arrow" href="#">Using serializers in Python</a>
+          </div>
+          <div class="code" data-tabs="mode">
+            <div class="code-head">
+              <div role="tablist" aria-label="Execution mode">
+                <button role="tab" type="button" data-tab="sync">Sync</button>
+                <button role="tab" type="button" data-tab="async">Async</button>
+              </div>
+              <span class="code-file">blog/tasks.py</span>
+              <button class="code-copy" type="button" data-copy="Article.create({...})">Copy</button>
+            </div>
+<pre data-panel="sync" role="tabpanel"><code>article = Article.create({<span class="tok-s">"title"</span>: <span class="tok-s">"Draft"</span>, <span class="tok-s">"body"</span>: <span class="tok-s">"..."</span>})
+article = Article.update(article, {<span class="tok-s">"is_published"</span>: <span class="tok-k">True</span>})
+data = Article.model_dump(article)
+Article.destroy(article)</code></pre>
+<pre data-panel="async" role="tabpanel" hidden><code>article = <span class="tok-k">await</span> Article.acreate({<span class="tok-s">"title"</span>: <span class="tok-s">"Draft"</span>, <span class="tok-s">"body"</span>: <span class="tok-s">"..."</span>})
+article = <span class="tok-k">await</span> Article.aupdate(article, {<span class="tok-s">"is_published"</span>: <span class="tok-k">True</span>})
+data = <span class="tok-k">await</span> Article.amodel_dump(article)
+<span class="tok-k">await</span> Article.adestroy(article)</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="bench-title">
+        <div class="split">
+          <div>
+            <h2 id="bench-title">Measured, not claimed.</h2>
+            <p style="margin-top: 1.25rem">
+              Hand-written Django Ninja and FastAPI endpoints are faster; they also do less.
+              The hatched bar is cut off to keep the scale readable.
+            </p>
+            <a class="arrow" href="#">Full comparison</a>
+          </div>
+          <div>
+            <div class="bars" role="table" aria-label="List endpoint, median milliseconds">
+              <div class="bar is-self" role="row"><span class="bar-name" role="cell">django-ninja-aio-crud</span><span class="bar-track" aria-hidden="true"><span class="bar-fill" style="--w: 83%"></span></span><span class="bar-value" role="cell">0.25 ms</span></div>
+              <div class="bar" role="row"><span class="bar-name" role="cell">FastAPI</span><span class="bar-track" aria-hidden="true"><span class="bar-fill" style="--w: 72%"></span></span><span class="bar-value" role="cell">0.22 ms</span></div>
+              <div class="bar" role="row"><span class="bar-name" role="cell">Django Ninja</span><span class="bar-track" aria-hidden="true"><span class="bar-fill" style="--w: 64%"></span></span><span class="bar-value" role="cell">0.19 ms</span></div>
+              <div class="bar is-clipped" role="row"><span class="bar-name" role="cell">ADRF</span><span class="bar-track" aria-hidden="true"><span class="bar-fill" style="--w: 100%"></span></span><span class="bar-value" role="cell">13.94 ms</span></div>
+            </div>
+            <p class="bench-note">
+              Median of 100 requests listing 20 rows. Python 3.14, SQLite in memory,
+              26 September 2026. Reproduce with <code>./run-comparison.sh</code>.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" aria-label="Where to start">
+        <div class="paths">
+          <a class="path" href="#"><small>5 minutes</small><strong>Quickstart</strong><span>One model, five endpoints and Swagger UI.</span></a>
+          <a class="path" href="#"><small>7 steps</small><strong>Tutorial</strong><span>A blog API, from models to production.</span></a>
+          <a class="path" href="#"><small>From 2.x</small><strong>Migration</strong><span>Every renamed method and its replacement.</span></a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <span>django-ninja-aio-crud · MIT License</span>
+      <a href="#">Release notes</a>
+      <a href="#">Benchmarks</a>
+      <a href="#">Contributing</a>
+      <a href="https://github.com/caspel26/django-ninja-aio-crud">GitHub</a>
+    </footer>
+
+    <dialog class="palette" aria-label="Search the documentation">
+      <label>
+        <span class="visually-hidden">Search</span>
+        <input type="search" placeholder="Search pages" autocomplete="off" />
+        <kbd>esc</kbd>
+      </label>
+      <ul role="listbox" aria-label="Results"></ul>
+      <div class="palette-foot"><span><kbd>↑</kbd><kbd>↓</kbd>navigate</span><span><kbd>↵</kbd>open</span></div>
+    </dialog>
+  </body>
+</html>

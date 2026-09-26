@@ -443,7 +443,7 @@ Mechanical mapping to this site:
 | Palette from the logo | Colors sampled from `images/logo-full.png` (ninja purple, amber "CRUD" lettering), used as flat colors, with amber reserved for a single job |
 | Custom homepage | `overrides/home.html`, used only by `index.md` |
 | Product demo | Model with `Schemas` → `APIViewSet` → real request and JSON response, with a sync/async switch |
-| Diagrams | `main.py` macros (`{{ diagram("lifecycle") }}`) rendering HTML figures: request lifecycle, sync vs async execution, auth precedence, schema generation |
+| Diagrams | `main.py` macros (a `diagram("lifecycle")` call in the page) rendering HTML figures: request lifecycle, sync vs async execution, auth precedence, schema generation |
 | Version banner | `overrides/partials/announce.html`, driven by the `mike` version (latest / old / dev) |
 | Benchmark results | A results component for `comparison.md` and `performance.md` showing the real numbers |
 
@@ -455,16 +455,16 @@ explicitly.
 
 | Generated-look default | Rule for this site |
 | --- | --- |
-| Purple-to-blue gradients, glows, glassmorphism | Flat colors only; depth comes from hairline borders and surface tone, not shadows or blur |
+| Purple-to-blue gradients, glows, glassmorphism | Flat colors only, with one exception: the brand gradient (logo purple to amber) on the wordmark. Depth comes from tonal surface layers and hairline borders, not shadows or blur |
 | Centered hero with gradient text and two pill buttons | Left-aligned, asymmetric hero: one plain statement, then the product demo carries the page |
 | 3×2 grid of icon + title + blurb cards | At most three strong sections; features are shown through code and output, not described in cards |
 | An icon or emoji on every heading (the current site puts `:material-*:` on almost every H1/H2) | No decorative heading icons; icons only where they carry meaning (e.g. HTTP method, deprecated, sync/async) |
 | Stock abstract illustrations and 3D blobs | Only real artifacts: code, terminal output, OpenAPI screenshots, query counts, benchmark numbers |
 | Marketing copy ("blazing fast", "seamless", "supercharge", "effortless") | Specific, checkable claims: names, numbers, and links to the benchmark that backs them |
-| Large radii and pill shapes everywhere | One small radius scale (2-6 px); pills only for tags and HTTP methods |
+| Large radii and pill shapes everywhere | One small radius scale (4-6 px controls, 10-14 px surfaces); pills only for the version and HTTP methods |
 | Uniform spacing and card-in-card layouts | Editorial rhythm: a strict 4 px grid, clear density changes between hero, prose, and reference |
 | Default font pairings (Inter, Roboto, Poppins) | A deliberate pairing chosen in Step 15 from shortlisted families with real character (for example IBM Plex, Source Serif + Source Code, or a grotesk with a matching mono), with tabular figures for numbers |
-| Decorative motion | No motion beyond functional feedback (focus, copy confirmation, tab switch); honors `prefers-reduced-motion` |
+| Decorative motion | Motion only on state changes (tab thumb, panel swap, linked fields, copy confirmation, palette); honors `prefers-reduced-motion` |
 
 Signals of craft that each direction must show: consistent optical sizes for
 headings, proper code typography (ligatures off, clear `0`/`O` and `1`/`l`),
@@ -496,3 +496,30 @@ weight across diagrams and icons.
 - Hugo + Hextra, as in goninja, stays rejected. It would give up mkdocstrings,
   the published `mike` history, and the macros for no gain in visual
   quality.
+
+### 11.5 Selected direction: D · Studio
+
+Mockups live in `design/step15/` (overview: `index.html`). Directions A
+(Manuscript), B (Console), and C (Index) were reviewed as professional but not
+modern enough; D combines B's precision, A's hierarchy, and C's search-first
+index, and is the direction Step 16 implements.
+
+| Element | Decision |
+| --- | --- |
+| Theme | Dark-first; light is a full variant, not an inversion |
+| Surfaces | `bg` plus three tonal layers (`surface-1..3`), hairline edges, a 1px inner top highlight instead of shadows |
+| Type | Schibsted Grotesk (UI and display, weights 400-900), IBM Plex Mono (code); tabular figures scoped to data, because Schibsted's `tnum` also spaces punctuation |
+| Color | Logo purple for brand and links, amber for attention and linked highlights; gradient on the wordmark only |
+| Homepage | Bold statement, primary button plus copyable install command, interactive operation demo (model, HTTP, OpenAPI with linked fields), capability list with real attribute names, Python usage, honest benchmarks, three learning paths |
+| Components | Segmented control with sliding thumb, code block with tabs and copy, command palette (⌘K and `/`), scroll-spy table of contents, pager, callout, diagram cards |
+
+Open items for Step 16:
+
+- A logo variant that reads on dark surfaces (the mockup uses a light plate
+  behind the current logo).
+- Self-hosted fonts instead of Google Fonts, within the performance budget.
+- Map every mockup component onto the Zensical/Material template blocks, and
+  list what needs a template override rather than CSS.
+- Found while building: `docs/api/pagination.md` documents
+  `count/next/previous/results`, but the list endpoint returns
+  `{"items": [...], "count": N}`. Fixed with the content in Step 19.

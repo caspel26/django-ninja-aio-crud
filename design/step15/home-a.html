@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>django-ninja-aio-crud · CRUD APIs for Django</title>
+    <meta
+      name="description"
+      content="Declare which fields each operation reads and writes; get Django Ninja endpoints, validation and OpenAPI, served sync or async."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=Source+Sans+3:wght@400;500;600&family=Source+Code+Pro:wght@400;500&display=swap"
+    />
+    <link rel="stylesheet" href="base.css" />
+    <link rel="stylesheet" href="a-manuscript.css" />
+    <script src="shared.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#content">Skip to content</a>
+
+    <div class="review-bar" role="note">
+      <span>Step 15 mockup · Direction A · Manuscript</span>
+      <nav aria-label="Mockup pages">
+        <a href="guide.html?d=a">Guide page</a>
+        <a href="index.html">Overview</a>
+      </nav>
+    </div>
+
+    <header class="site-header">
+      <a class="brand" href="#">
+        <img src="../../docs/images/logo.png" alt="" width="24" height="24" />
+        <span class="brand-name">django-ninja-aio</span>
+      </a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="#">Get started</a>
+        <a href="#">Tutorial</a>
+        <a href="guide.html?d=a">Guides</a>
+        <a href="#">Concepts</a>
+        <a href="#">Reference</a>
+        <a href="#">Migration</a>
+      </nav>
+      <div class="header-tools">
+        <label class="search">
+          <span class="visually-hidden">Search the documentation</span>
+          <input type="search" placeholder="Search" />
+          <kbd>/</kbd>
+        </label>
+        <span class="version">3.0</span>
+        <button class="theme-toggle" type="button" data-theme-toggle>Dark</button>
+        <a class="repo" href="https://github.com/caspel26/django-ninja-aio-crud">GitHub</a>
+      </div>
+    </header>
+
+    <main id="content">
+      <section class="home-hero">
+        <div>
+          <p class="home-kicker">Built on Django Ninja · Python 3.10–3.14</p>
+          <h1>CRUD APIs for Django, <em>from the models you already have.</em></h1>
+          <p>
+            Declare which fields each operation reads and writes. You get Django Ninja
+            endpoints, request validation and an OpenAPI schema, served sync or async from
+            the same class.
+          </p>
+          <div class="install">
+            <span aria-hidden="true">$</span>
+            <code>pip install django-ninja-aio-crud</code>
+            <button class="code-copy" type="button" data-copy="pip install django-ninja-aio-crud">Copy</button>
+          </div>
+          <div class="home-links">
+            <a href="#">Start the tutorial</a>
+            <a href="#">Five-minute quickstart</a>
+          </div>
+        </div>
+
+        <div class="code" data-tabs="mode">
+          <div class="code-head">
+            <div role="tablist" aria-label="Execution mode">
+              <button role="tab" type="button" data-tab="sync">Sync</button>
+              <button role="tab" type="button" data-tab="async">Async</button>
+            </div>
+            <span class="code-file">blog/models.py · blog/api.py</span>
+          </div>
+<pre><code><span class="tok-k">class</span> <span class="tok-n">Article</span>(ModelSerializer):
+    title = models.CharField(max_length=<span class="tok-u">200</span>)
+    body = models.TextField()
+    is_published = models.BooleanField(default=<span class="tok-k">False</span>)
+
+    <span class="tok-k">class</span> <span class="tok-n">Schemas</span>:
+        create = SchemaConfig(fields=[<span class="tok-s">"title"</span>, <span class="tok-s">"body"</span>])
+        update = SchemaConfig(optionals=[(<span class="tok-s">"is_published"</span>, bool)])
+        read = SchemaConfig(fields=[<span class="tok-s">"id"</span>, <span class="tok-s">"title"</span>, <span class="tok-s">"is_published"</span>])
+
+
+api = NinjaAIO(title=<span class="tok-s">"Blog API"</span>)
+
+<span class="tok-d">@api.viewset</span>(model=Article)
+<span class="tok-k">class</span> <span class="tok-n">ArticleViewSet</span>(APIViewSet):</code></pre>
+<pre data-panel="sync" role="tabpanel"><code>    execution_mode = <span class="tok-s">"sync"</span></code></pre>
+<pre data-panel="async" role="tabpanel" hidden><code>    execution_mode = <span class="tok-s">"async"</span>  <span class="tok-c"># the default</span></code></pre>
+        </div>
+      </section>
+
+      <section class="home-section">
+        <div class="home-section-grid">
+          <div>
+            <h2>One class, five endpoints</h2>
+            <p>
+              Paths come from the model's plural name. Omit a schema kind and its endpoint is
+              not generated. Switching sync and async changes nothing on the wire.
+            </p>
+            <p><a href="guide.html?d=a">Declare schemas</a></p>
+          </div>
+          <div>
+            <div class="table-wrap">
+              <table class="endpoints">
+                <tbody>
+                  <tr><td><span class="method">GET</span></td><td>/api/articles/</td><td>Paginated list</td></tr>
+                  <tr><td><span class="method">POST</span></td><td>/api/articles/</td><td>Create</td></tr>
+                  <tr><td><span class="method">GET</span></td><td>/api/articles/{id}</td><td>Retrieve</td></tr>
+                  <tr><td><span class="method">PATCH</span></td><td>/api/articles/{id}/</td><td>Partial update</td></tr>
+                  <tr><td><span class="method">DELETE</span></td><td>/api/articles/{id}/</td><td>Delete, 204</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="response">
+              <div class="response-head"><span>GET /api/articles/?page=1</span><span>200 OK</span></div>
+<pre><code>{
+  <span class="tok-s">"items"</span>: [
+    {<span class="tok-s">"id"</span>: <span class="tok-u">1</span>, <span class="tok-s">"title"</span>: <span class="tok-s">"Sync or async?"</span>, <span class="tok-s">"is_published"</span>: <span class="tok-k">true</span>},
+    {<span class="tok-s">"id"</span>: <span class="tok-u">2</span>, <span class="tok-s">"title"</span>: <span class="tok-s">"Schemas, not serializers"</span>, <span class="tok-s">"is_published"</span>: <span class="tok-k">false</span>}
+  ],
+  <span class="tok-s">"count"</span>: <span class="tok-u">2</span>
+}</code></pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="home-section">
+        <div class="home-section-grid">
+          <div>
+            <h2>Call it from Python, too</h2>
+            <p>
+              The serializer is also the CRUD API for scripts, Celery tasks and tests. Sync and
+              async are separate methods, never a flag, so type checkers see real return types.
+            </p>
+          </div>
+          <div class="code" data-tabs="mode">
+            <div class="code-head">
+              <div role="tablist" aria-label="Execution mode">
+                <button role="tab" type="button" data-tab="sync">Sync</button>
+                <button role="tab" type="button" data-tab="async">Async</button>
+              </div>
+              <span class="code-file">blog/tasks.py</span>
+            </div>
+<pre data-panel="sync" role="tabpanel"><code>article = Article.create({<span class="tok-s">"title"</span>: <span class="tok-s">"Draft"</span>, <span class="tok-s">"body"</span>: <span class="tok-s">"..."</span>})
+article = Article.update(article, {<span class="tok-s">"is_published"</span>: <span class="tok-k">True</span>})
+data = Article.model_dump(article)
+Article.destroy(article)</code></pre>
+<pre data-panel="async" role="tabpanel" hidden><code>article = <span class="tok-k">await</span> Article.acreate({<span class="tok-s">"title"</span>: <span class="tok-s">"Draft"</span>, <span class="tok-s">"body"</span>: <span class="tok-s">"..."</span>})
+article = <span class="tok-k">await</span> Article.aupdate(article, {<span class="tok-s">"is_published"</span>: <span class="tok-k">True</span>})
+data = <span class="tok-k">await</span> Article.amodel_dump(article)
+<span class="tok-k">await</span> Article.adestroy(article)</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <section class="home-section">
+        <div class="home-section-grid">
+          <div>
+            <h2>Measured, not claimed</h2>
+            <p>
+              Hand-written Django Ninja and FastAPI endpoints are faster on single objects;
+              they also do less. ADRF is the slowest on every operation we measure.
+            </p>
+            <p class="bench-note">
+              Median milliseconds, 20–100 iterations each. Python 3.14, SQLite in memory,
+              26 September 2026. Reproduce with <code>./run-comparison.sh</code>.
+            </p>
+            <p><a href="#">Full comparison</a></p>
+          </div>
+          <div class="table-wrap">
+            <table class="bench">
+              <thead>
+                <tr><th scope="col">Framework</th><th scope="col">List</th><th scope="col">Create</th><th scope="col">Retrieve</th><th scope="col">Dump 500 rows</th></tr>
+              </thead>
+              <tbody>
+                <tr class="is-self"><td>django-ninja-aio-crud</td><td>0.25</td><td>0.27</td><td>0.26</td><td>2.51</td></tr>
+                <tr><td>Django Ninja</td><td>0.19</td><td>0.14</td><td>0.16</td><td>1.40</td></tr>
+                <tr><td>FastAPI</td><td>0.22</td><td>0.14</td><td>0.17</td><td>1.99</td></tr>
+                <tr><td>ADRF</td><td>13.94</td><td>0.98</td><td>0.91</td><td>334.77</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="home-section">
+        <div class="paths">
+          <div>
+            <h3>Learn</h3>
+            <ol>
+              <li><a href="#">Models and schemas</a></li>
+              <li><a href="#">CRUD API</a></li>
+              <li><a href="#">Relations</a></li>
+              <li><a href="#">Authentication</a></li>
+              <li><a href="#">Permissions</a></li>
+              <li><a href="#">Filtering and pagination</a></li>
+              <li><a href="#">Ready for production</a></li>
+            </ol>
+          </div>
+          <div>
+            <h3>Do</h3>
+            <ul>
+              <li><a href="guide.html?d=a">Declare schemas</a></li>
+              <li><a href="#">Nested writes</a></li>
+              <li><a href="#">Bulk operations</a></li>
+              <li><a href="#">Custom actions</a></li>
+              <li><a href="#">JWT authentication</a></li>
+              <li><a href="#">All guides</a></li>
+            </ul>
+          </div>
+          <div>
+            <h3>Look up</h3>
+            <ul>
+              <li><a href="#">ModelSerializer</a></li>
+              <li><a href="#">APIViewSet</a></li>
+              <li><a href="#">SchemaConfig</a></li>
+              <li><a href="#">Settings</a></li>
+              <li><a href="#">Upgrading from 2.x</a></li>
+            </ul>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <span>django-ninja-aio-crud · MIT License</span>
+      <a href="#">Release notes</a>
+      <a href="#">Contributing</a>
+    </footer>
+  </body>
+</html>
