@@ -330,6 +330,7 @@ sync) break in version 3, and the migration guide lists each of them.
 | `Serializer.model_dump()` (async) | Replace with sync `model_dump()` and async `amodel_dump()` |
 | `Serializer.models_dump()` | Replace with `model_dumps()`/`amodel_dumps()` |
 | bound `Serializer(instance=...)` CRUD | Remove; pass target explicitly |
+| `ModelSerializer.util` / `Serializer.util` | Make internal as `_util`; use the serializer CRUD facade |
 | `ModelUtil.get_object()` | Replace with `get()`/`aget()` |
 | `ModelUtil.get_objects()` | Replace with `get_queryset()`/`aget_queryset()`; query planning becomes internal |
 | `ModelUtil.create_s()` | Replace with `create()`/`acreate()` |

@@ -148,6 +148,25 @@ class _LazySchemaAttribute:
         return serializer_class.get_schema(self.kind)
 
 
+class _DeprecatedUtilAttribute:
+    """Version 2 ``.util`` access, kept as a warning alias of ``_util`` until v4."""
+
+    def __get__(
+        self,
+        instance: Optional["BaseSerializer"],
+        owner: Optional[type["BaseSerializer"]] = None,
+    ) -> "ModelUtil[models.Model]":
+        owner = owner or type(instance)
+        warnings.warn(
+            f"{owner.__name__}.util is deprecated; use the serializer methods "
+            "(create/acreate, get/aget, update/aupdate, destroy/adestroy, "
+            "model_dump/amodel_dump, ...) instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return owner._util
+
+
 def _extract_pk(v: Any) -> Any:
     """Extract primary key from a model instance or return value as-is."""
     if hasattr(v, "pk"):
@@ -201,7 +220,8 @@ class BaseSerializer:
     related_schema: ClassVar[SchemaType | None] = cast(
         Any, _LazySchemaAttribute("related")
     )
-    util: ClassVar["ModelUtil[models.Model]"]
+    _util: ClassVar["ModelUtil[models.Model]"]
+    util: ClassVar["ModelUtil[models.Model]"] = cast(Any, _DeprecatedUtilAttribute())
 
     class QuerySet:
         """
@@ -1695,7 +1715,7 @@ class BaseSerializer:
     ) -> models.Model:
         """Execute asynchronous creation for a concrete serializer class."""
         validated = cls._validate_operation_data("create", data)
-        return await cls.util.acreate_instance(request, validated)
+        return await cls._util.acreate_instance(request, validated)
 
     @classmethod
     async def _aget_operation(
@@ -1707,7 +1727,7 @@ class BaseSerializer:
         optimize_for: QueryPurpose | None = None,
     ) -> models.Model:
         """Execute one request-aware asynchronous lookup."""
-        return await cls.util.aget_object(
+        return await cls._util.aget_object(
             request,
             pk=pk,
             query_data=cls._operation_lookup_query(pk, lookups),
@@ -1722,7 +1742,7 @@ class BaseSerializer:
         optimize_for: QueryPurpose | None = None,
     ) -> models.QuerySet:
         """Return the request-scoped queryset, optionally optimized for read/detail dumps."""
-        return cls.util.get_objects(request, is_for=optimize_for)
+        return cls._util.get_objects(request, is_for=optimize_for)
 
     @classmethod
     async def aget_queryset(
@@ -1732,7 +1752,7 @@ class BaseSerializer:
         optimize_for: QueryPurpose | None = None,
     ) -> models.QuerySet:
         """Async counterpart of ``get_queryset`` (runs ``aqueryset_request``)."""
-        return await cls.util.aget_objects(request, is_for=optimize_for)
+        return await cls._util.aget_objects(request, is_for=optimize_for)
 
     @classmethod
     async def _aupdate_operation(
@@ -1746,7 +1766,7 @@ class BaseSerializer:
         """Execute asynchronous update without refetching loaded targets."""
         pk, instance = cls._resolve_operation_target(target)
         validated = cls._validate_operation_data("update", data)
-        return await cls.util.aupdate_instance(
+        return await cls._util.aupdate_instance(
             request,
             validated,
             pk,
@@ -1763,7 +1783,7 @@ class BaseSerializer:
     ) -> None:
         """Execute asynchronous deletion without refetching loaded targets."""
         pk, instance = cls._resolve_operation_target(target)
-        await cls.util.adestroy_instance(request, pk, instance=instance)
+        await cls._util.adestroy_instance(request, pk, instance=instance)
 
     @classmethod
     def _create_operation(
@@ -1774,7 +1794,7 @@ class BaseSerializer:
         fk_cache: dict[tuple[type, Any], Any] | None = None,
     ) -> models.Model:
         """Execute synchronous creation for a concrete serializer class."""
-        return cls.util.create_instance(
+        return cls._util.create_instance(
             request, cls._validate_operation_data("create", data), fk_cache=fk_cache
         )
 
@@ -1835,7 +1855,7 @@ class BaseSerializer:
         return await arun_bulk(
             cls._get_model(),
             items,
-            lambda data: cls.util.acreate_instance(
+            lambda data: cls._util.acreate_instance(
                 request, cls._validate_operation_data("create", data), fk_cache
             ),
         )
@@ -1912,7 +1932,7 @@ class BaseSerializer:
         optimize_for: QueryPurpose | None = None,
     ) -> models.Model:
         """Execute one request-aware synchronous lookup."""
-        return cls.util.get_object(
+        return cls._util.get_object(
             request,
             pk=pk,
             query_data=cls._operation_lookup_query(pk, lookups),
@@ -1930,7 +1950,7 @@ class BaseSerializer:
     ) -> models.Model:
         """Execute synchronous update without refetching loaded targets."""
         pk, instance = cls._resolve_operation_target(target)
-        return cls.util.update_instance(
+        return cls._util.update_instance(
             request,
             cls._validate_operation_data("update", data),
             pk,
@@ -1947,7 +1967,7 @@ class BaseSerializer:
     ) -> None:
         """Execute synchronous deletion without refetching loaded targets."""
         pk, instance = cls._resolve_operation_target(target)
-        cls.util.destroy_instance(request, pk, instance=instance)
+        cls._util.destroy_instance(request, pk, instance=instance)
 
     @classmethod
     def queryset_request(
@@ -2002,7 +2022,7 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
                 if name in cls.__dict__
             ],
         )
-        cls.util = ModelUtil(cls)
+        cls._util = ModelUtil(cls)
         cls.query_util = QueryUtil(cls)
         cls._reactive_hooks = collect_reactive_hooks(cls)
         register_signals(cls)
@@ -2735,7 +2755,7 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         ]
         _register_serializer_config(cls, legacy)
         cls.model = cls._get_model()
-        cls.util = ModelUtil(cls.model, serializer_class=cls)
+        cls._util = ModelUtil(cls.model, serializer_class=cls)
         cls.query_util = QueryUtil(cls)
         cls._meta = cls.Meta
         cls._reactive_hooks = collect_reactive_hooks(cls)

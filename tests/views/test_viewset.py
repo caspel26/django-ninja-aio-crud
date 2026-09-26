@@ -974,7 +974,7 @@ class ViewSetDecoratorModelSerializerTestCase(TestCase):
             pass
 
         # base path inferred from verbose_name plural
-        cls.base = f"{models.TestModelSerializer.util.verbose_name_path_resolver()}"
+        cls.base = f"{models.TestModelSerializer._util.verbose_name_path_resolver()}"
 
     def test_crud_routes_mounted(self):
         # default router + our viewset router

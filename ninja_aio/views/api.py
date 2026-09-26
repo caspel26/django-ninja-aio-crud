@@ -466,7 +466,7 @@ class APIViewSet(API, Generic[ModelT]):
         self.model_util: ModelUtil[ModelT] = (
             ModelUtil(self.model, serializer_class=self.serializer_class)
             if not isinstance(self.model, ModelSerializerMeta)
-            else self.model.util
+            else self.model._util
         )
         self._operations: dict[str, Callable] = {}
         (

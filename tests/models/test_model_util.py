@@ -75,7 +75,6 @@ class ModelUtilModelBaseTestCase(BaseTests.ModelUtilModelBaseTestCase):
 
 @tag("model_util_config_error")
 class ModelUtilConfigErrorTestCase(TestCase):
-
     def test_model_util_raises_config_error_for_model_serializer_with_serializer_class(
         self,
     ):
@@ -95,7 +94,6 @@ class ModelUtilConfigErrorTestCase(TestCase):
 
 @tag("model_util_pk_field_type")
 class ModelUtilPkFieldTypeTestCase(TestCase):
-
     def test_pk_field_type_raises_config_error_for_unknown_type(self):
         """Test that pk_field_type raises ConfigError for unknown field types."""
         from ninja.orm import fields
@@ -251,9 +249,7 @@ class ModelUtilDeleteSInstanceTestCase(TestCase):
         ):
             await util.delete_s(request, obj.pk, instance=obj)
 
-        self.assertFalse(
-            await models.TestModel.objects.filter(pk=obj.pk).aexists()
-        )
+        self.assertFalse(await models.TestModel.objects.filter(pk=obj.pk).aexists())
 
     async def test_delete_s_without_instance_still_looks_up(self):
         """Backward-compatible default: no instance -> falls back to get_object."""
@@ -263,9 +259,7 @@ class ModelUtilDeleteSInstanceTestCase(TestCase):
 
         await util.delete_s(request, obj.pk)
 
-        self.assertFalse(
-            await models.TestModel.objects.filter(pk=obj.pk).aexists()
-        )
+        self.assertFalse(await models.TestModel.objects.filter(pk=obj.pk).aexists())
 
 
 @tag("model_util_facade")
@@ -282,7 +276,9 @@ class ModelUtilFacadeTestCase(TestCase):
             request=self.request,
         )
         self.util.update(
-            obj.pk, schema.TestModelSchemaPatch(description="after"), request=self.request
+            obj.pk,
+            schema.TestModelSchemaPatch(description="after"),
+            request=self.request,
         )
         obj.refresh_from_db()
         self.assertEqual(
@@ -363,16 +359,40 @@ class ModelUtilFacadeTestCase(TestCase):
         other = await models.TestModel.objects.acreate(name="c", description="d")
         with self.assertWarns(DeprecationWarning):
             self.assertEqual(
-                await self.util.bulk_delete_s(self.request, [other.pk]), ([other.pk], [])
+                await self.util.bulk_delete_s(self.request, [other.pk]),
+                ([other.pk], []),
             )
 
         fk_util = ModelUtil(models.TestModelForeignKey)
         with self.assertWarns(DeprecationWarning):
             success, errors = await fk_util.bulk_create_s(
                 self.request,
-                [schema.TestModelForeignKeySchemaIn(name="x", description="d", test_model=10**9)],
+                [
+                    schema.TestModelForeignKeySchemaIn(
+                        name="x", description="d", test_model=10**9
+                    )
+                ],
             )
         self.assertEqual((success, len(errors)), ([], 1))
+
+    def test_serializer_util_attribute_is_deprecated_alias(self):
+        for serializer_class in (
+            models.TestModelSerializer,
+            serializers.TestModelForeignKeySerializer,
+        ):
+            with self.subTest(serializer=serializer_class.__name__):
+                with self.assertWarnsMessage(
+                    DeprecationWarning,
+                    f"{serializer_class.__name__}.util is deprecated",
+                ):
+                    self.assertIs(serializer_class.util, serializer_class._util)
+
+    def test_model_serializer_instance_util_is_deprecated_alias(self):
+        instance = models.TestModelSerializer(name="n", description="d")
+        with self.assertWarnsMessage(
+            DeprecationWarning, "TestModelSerializer.util is deprecated"
+        ):
+            self.assertIs(instance.util, models.TestModelSerializer._util)
 
 
 @tag("model_util_facade", "facade_reads")
@@ -431,15 +451,17 @@ class FacadeReadTestCase(TestCase):
     async def test_meta_serializer_forwards_optimize_for(self):
         fk_serializer = serializers.TestModelForeignKeySerializer
         with mock.patch.object(
-            fk_serializer.util, "aget_object", mock.AsyncMock(return_value="obj")
+            fk_serializer._util, "aget_object", mock.AsyncMock(return_value="obj")
         ) as aget_object:
             self.assertEqual(
-                await fk_serializer.aget(1, request=self.request, optimize_for="detail"),
+                await fk_serializer.aget(
+                    1, request=self.request, optimize_for="detail"
+                ),
                 "obj",
             )
         self.assertEqual(aget_object.await_args.kwargs["is_for"], "detail")
         with mock.patch.object(
-            fk_serializer.util, "get_object", return_value="obj"
+            fk_serializer._util, "get_object", return_value="obj"
         ) as get_object:
             self.assertEqual(
                 fk_serializer.get(1, request=self.request, optimize_for="read"), "obj"
@@ -478,7 +500,7 @@ class ModelUtilQuerysetOptimizationsPreservedTestCase(TestCase):
         """select_related declared in QuerySet.read must be applied to the queryset
         returned by get_objects, even though the default queryset_request hook runs
         (with_qs_request defaults to True for list/retrieve)."""
-        util = models.TestModelSerializerForeignKey.util
+        util = models.TestModelSerializerForeignKey._util
         request = mock.Mock()
 
         qs = await util.aget_objects(request, is_for="read")
@@ -489,7 +511,7 @@ class ModelUtilQuerysetOptimizationsPreservedTestCase(TestCase):
         """Rows from get_objects() must come back with the FK relation already
         cached by the JOIN (select_related), so accessing it needs no extra query
         (N+1) now that the optimization survives the queryset_request hook."""
-        util = models.TestModelSerializerForeignKey.util
+        util = models.TestModelSerializerForeignKey._util
         request = mock.Mock()
 
         qs = await util.aget_objects(request, is_for="read")
@@ -532,18 +554,17 @@ class PrefetchWithForwardRelsTestCase(TestCase):
         from tests.test_app.models import TestModelSerializerForeignKey
 
         util = ModelUtil(TestModelSerializerForeignKey)
-        obj = await TestModelSerializerForeignKey.objects.aget(
-            pk=self.fk_obj.pk
-        )
+        obj = await TestModelSerializerForeignKey.objects.aget(pk=self.fk_obj.pk)
         # Mock reverse rels to be non-empty (triggers the prefetch path)
         # and forward rels to be non-empty (triggers line 791: select_related)
         # Use "test_model_serializer" which is a valid FK on this model
-        with mock.patch.object(
-            util, "get_reverse_relations",
-            return_value=["test_model_serializer"]
-        ), mock.patch.object(
-            util, "get_select_relateds",
-            return_value=["test_model_serializer"]
+        with (
+            mock.patch.object(
+                util, "get_reverse_relations", return_value=["test_model_serializer"]
+            ),
+            mock.patch.object(
+                util, "get_select_relateds", return_value=["test_model_serializer"]
+            ),
         ):
             result = await util._prefetch_reverse_relations_on_instance(obj, "read")
         self.assertEqual(result.pk, self.fk_obj.pk)
