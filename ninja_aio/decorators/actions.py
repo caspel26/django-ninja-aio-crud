@@ -149,11 +149,11 @@ def on(action_name: str, **options: "Unpack[ActionOptions]"):
         class ArticleAPI(APIViewSet):
             model = Article
 
-            @on("publish", methods=["post"], response={200: ArticleReadSchema})
+            @on("publish", methods=["post"])
             async def publish(self, request, obj):
                 obj.status = "published"
                 await obj.asave(update_fields=["status"])
-                return Status(200, await self.model_util.amodel_dump(obj, schema=self.schema_out))
+                return await Article.amodel_dump(obj)
 
     .. note::
         The handler may be ``def`` or ``async def``; hooks and the object

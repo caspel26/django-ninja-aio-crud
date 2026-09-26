@@ -363,7 +363,7 @@ class RelationFilterViewSetMixin(APIViewSet[ModelT]):
         # GET /books?category_slug=fiction -> queryset.filter(category__slug="fiction")
 
     Notes:
-        - Filter values that are None or falsy are skipped.
+        - Filter values that are None are skipped.
         - This mixin automatically registers query_params from relations_filters.
     """
 

@@ -1,331 +1,125 @@
-# :material-decagram: View Decorators
-
-Django Ninja AIO provides decorator utilities for composing view behavior and attaching decorators to CRUD operations declaratively.
-
-<div class="grid cards" markdown>
-
--   :material-flash:{ .lg .middle } **`@action`**
-
-    ---
-
-    Custom actions for ViewSets
-
--   :material-lightning-bolt:{ .lg .middle } **`@on`**
-
-    ---
-
-    Detail actions with automatic object pre-fetch
-
--   :material-layers:{ .lg .middle } **`decorate_view`**
-
-    ---
-
-    Compose multiple decorators on sync/async views
-
--   :material-cog:{ .lg .middle } **`extra_decorators`**
-
-    ---
-
-    Declarative per-operation decorators on ViewSets
-
--   :material-link-variant:{ .lg .middle } **M2M Decorators**
-
-    ---
-
-    Custom decorators for relation endpoints
-
--   :material-factory:{ .lg .middle } **`api_get` / `api_post`**
-
-    ---
-
-    Endpoint decorators with built-in decorator support
-
-</div>
-
+---
+type: reference
+title: Decorators
+description: Lookup page for the @action and @on decorators, HttpMethod and the view decorators.
 ---
 
-## :material-flash: `@action` (custom actions)
+# Decorators
 
-Decorator for adding custom endpoints to ViewSets. Supports detail/list actions, multiple HTTP methods, auth inheritance, and full OpenAPI metadata.
+`@action` and `@on` add custom endpoints to a view or viewset. For how to use
+them, see [Custom actions](../../guides/custom-actions.md).
 
 ```python
-from ninja_aio.decorators import action
+from ninja_aio import action, on, HttpMethod
+from ninja_aio.decorators import aatomic, decorate_view
 ```
 
-=== "Detail action"
-
-    ```python
-    @action(detail=True, methods=["post"], url_path="activate")
-    async def activate(self, request, pk):
-        obj = await self.model_util.get_object(request, pk)
-        obj.is_active = True
-        await obj.asave()
-        return Status(200, {"message": "activated"})
-    ```
-
-=== "List action"
-
-    ```python
-    @action(detail=False, methods=["get"], url_path="count", response=CountSchema)
-    async def count(self, request):
-        total = await self.model.objects.acount()
-        return {"count": total}
-    ```
-
-=== "With decorators"
-
-    ```python
-    @action(detail=False, methods=["post"], url_path="batch", decorators=[aatomic])
-    async def batch(self, request):
-        ...
-    ```
-
-=== "Public override"
-
-    ```python
-    @action(detail=False, methods=["get"], url_path="public", auth=None)
-    async def public_endpoint(self, request):
-        return {"message": "no auth required"}
-    ```
-
-**Key features:**
-
-- `detail=True` auto-adds `{pk}` to URL, renamed to match model PK field
-- `url_path` defaults to method name with `_` → `-`
-- `auth=NOT_SET` inherits from viewset per-verb auth
-- Actions survive `disable=["all"]` — always registered
-- Multiple methods create separate routes: `methods=["get", "post"]`
-
-See [APIViewSet @action](api_view_set.md#recommended-action-decorator) for full parameter reference.
-
----
-
-## :material-lightning-bolt: `@on` (detail action shorthand)
-
-Shorthand over `@action` for detail endpoints that operate on a pre-fetched model instance. Instead of manually fetching the object and running permission hooks, `@on` does it automatically — your handler receives `obj` ready to use.
+## `@action`
 
 ```python
-from ninja_aio.decorators import on
+@action(detail=False, url_path="stats")
+async def stats(self, request):
+    ...
 ```
 
-**Comparison with `@action`:**
+`detail` is required. `detail=True` adds the primary key to the path and works
+only on `APIViewSet`. On `APIView` it raises `ImproperlyConfigured`.
 
-=== "`@on` (zero boilerplate)"
-
-    ```python
-    @on("publish", methods=["post"], response={200: ArticleSchema})
-    async def publish(self, request, obj):
-        obj.status = "published"
-        await obj.asave(update_fields=["status"])
-        return Status(200, await self.model_util.read_s(self.schema_out, request, obj))
-    ```
-
-=== "`@action` (manual)"
-
-    ```python
-    @action(detail=True, methods=["post"], url_path="publish", response={200: ArticleSchema})
-    async def publish(self, request, pk):
-        await self.a(request, "publish")
-        obj = await self.model_util.get_object(request, pk)
-        await self.on_before_object_permission(request, "publish", obj)
-        obj.status = "published"
-        await obj.asave(update_fields=["status"])
-        return Status(200, await self.model_util.read_s(self.schema_out, request, obj))
-    ```
-
-**What `@on` does automatically:**
-
-1. Calls `on_before_operation(request, action_name)` — view-level hooks/permissions
-2. Fetches `obj = await model_util.get_object(request, pk)` — raises 404 if not found
-3. Calls `on_before_object_operation(request, action_name, obj)` — object-level hooks/permissions
-4. Passes `obj` to your handler
-
-**Parameters:**
-
-| Parameter | Default | Description |
-|---|---|---|
-| `action_name` | required | URL path segment and operation name |
-| `methods` | `["post"]` | HTTP methods |
-| `url_path` | `action_name` | Override the URL segment |
-| `auth` | `NOT_SET` | Inherits from viewset per-verb auth |
-| `response` | `NOT_SET` | Response schema |
-| `summary`, `description`, `tags`, `deprecated`, `decorators`, `throttle`, `include_in_schema`, `openapi_extra` | — | Standard Ninja endpoint metadata |
-
-!!! note
-    `@on` always sets `detail=True`. The handler **must** be `async` since object fetching is async.
-
-!!! tip
-    Works seamlessly with `PermissionViewSetMixin` — `on_before_object_operation` is always called regardless of `_has_object_hooks`.
-
----
-
-## :material-layers: `decorate_view`
-
-Compose multiple decorators into a single view wrapper.
+## `@on`
 
 ```python
-from ninja_aio.decorators import decorate_view
+@on("publish")
+async def publish(self, request, obj):
+    ...
 ```
 
-**Behavior:**
+`@on(action_name)` is a detail action that loads the object for you. It works
+only on `APIViewSet`. `action_name` is the path segment unless you pass
+`url_path`.
 
-- Order matches normal stacking: `@d1` over `@d2` ≡ `d1(d2(view))`
-- Works with both sync and async views
-- `None` values are ignored — useful for conditional decoration
+## Options
 
-=== "Basic usage"
+`@action` and `@on` accept the same keyword options.
 
-    ```python
-    from ninja_aio.decorators import decorate_view
-    from ninja_aio.views import APIViewSet
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `methods` | `list[HttpMethod \| str]` | `["get"]` for `@action`, `["post"]` for `@on` | HTTP methods. One route per method |
+| `url_path` | `str \| None` | `None` | Path segment, used as written. `None` uses the method name with `_` as `-` (`@on`: `action_name`) |
+| `url_name` | `str \| None` | `None` | Django URL name |
+| `auth` | auth or `None` | `NOT_SET` | Auth for the route. `NOT_SET` uses the viewset auth for the HTTP method |
+| `response` | schema or dict | `NOT_SET` | Response schema. `NOT_SET` lets Django Ninja infer it |
+| `summary` | `str \| None` | `None` | OpenAPI summary. `None` builds one from the method and the name |
+| `description` | `str \| None` | `None` | OpenAPI description |
+| `tags` | `list[str] \| None` | `None` | OpenAPI tags. `None` uses the viewset tags |
+| `deprecated` | `bool \| None` | `None` | Mark the route as deprecated in OpenAPI |
+| `decorators` | `list[Callable] \| None` | `None` | Decorators applied to the handler, first one outermost |
+| `throttle` | throttle or list | `NOT_SET` | Throttling. `NOT_SET` uses the API throttling |
+| `include_in_schema` | `bool` | `True` | Show the route in OpenAPI |
+| `openapi_extra` | `dict \| None` | `None` | Extra OpenAPI data for the operation |
 
-    class MyViewSet(APIViewSet):
-        api = api
-        model = MyModel
+An unknown value in `methods` raises `ValueError`.
 
-        def views(self):
-            @self.router.get("health/")
-            @decorate_view(authenticate, log_request)
-            async def health(request):
-                return {"ok": True}
-    ```
+## Handler signatures
 
-=== "Conditional decoration"
+The handler may be `def` or `async def`.
 
-    ```python
-    cache_dec = cache_page(60) if settings.ENABLE_CACHE else None
+| Decorator | Signature |
+| --- | --- |
+| `@action(detail=False)` | `(self, request, ...)` |
+| `@action(detail=True)` | `(self, request, pk, ...)` |
+| `@on(...)` | `(self, request, obj)` |
 
-    @self.router.get("data/")
-    @decorate_view(cache_dec, authenticate)
-    async def data(request):
-        ...
-    ```
+Extra arguments are parsed by Django Ninja as query, path or body parameters.
+In a detail action, name the key argument `pk` or after the model primary key,
+like `id`. Every action runs `on_before_operation` first. `@on` also loads the
+object and runs `on_before_object_operation`. Async handlers get the `a`
+versions of the hooks.
 
-!!! note
-    `decorate_view` does not add an extra wrapper layer. Each decorator should preserve metadata itself (e.g., via `functools.wraps`).
+## Resulting paths
 
----
+For `prefix="articles"`:
 
-## :material-cog: `APIViewSet.extra_decorators`
+| Decorator | Path |
+| --- | --- |
+| `@action(detail=False, url_path="stats")` | `GET /api/articles/stats` |
+| `@action(detail=True)` on `mark_read` | `GET /api/articles/{id}/mark-read` |
+| `@on("publish")` | `POST /api/articles/{id}/publish` |
 
-Attach decorators to auto-generated CRUD operations without redefining views:
+No trailing slash is added to action paths.
+
+## `HttpMethod`
+
+A string enum. Plain strings like `"post"` are accepted too.
+
+| Member | Value |
+| --- | --- |
+| `HttpMethod.GET` | `"get"` |
+| `HttpMethod.POST` | `"post"` |
+| `HttpMethod.PUT` | `"put"` |
+| `HttpMethod.PATCH` | `"patch"` |
+| `HttpMethod.DELETE` | `"delete"` |
+| `HttpMethod.HEAD` | `"head"` |
+| `HttpMethod.OPTIONS` | `"options"` |
+
+## View decorators
+
+| Decorator | Description |
+| --- | --- |
+| `aatomic` | Runs an async function inside a database transaction. Rolls back when it raises. Async functions only |
+| `decorate_view(*decorators)` | Applies several decorators in stacking order. `None` entries are skipped |
 
 ```python
-from ninja_aio.schemas.helpers import DecoratorsSchema
-
-@api.viewset(MyModel)
-class MyViewSet(APIViewSet):
-    extra_decorators = DecoratorsSchema(
-        list=[require_auth, cache_page(30)],
-        retrieve=[require_auth],
-        create=[require_auth],
-        update=[require_auth],
-        delete=[require_auth],
-    )
+@action(detail=False, methods=["post"], decorators=[aatomic])
+async def import_articles(self, request):
+    ...
 ```
 
-### Available operations
+!!! deprecated "Deprecated in 3.0"
 
-| Field | Applies to |
-|---|---|
-| `list` | `GET /` — List all items |
-| `retrieve` | `GET /{pk}` — Get single item |
-| `create` | `POST /` — Create item |
-| `update` | `PATCH /{pk}` — Update item |
-| `delete` | `DELETE /{pk}` — Delete item |
+    `@api_get`, `@api_post`, `@api_put`, `@api_patch`, `@api_delete`, `@api_options` and `@api_head` are replaced by `@action`. See [Route decorators](../../migration/deprecations.md#route-decorators).
 
-!!! tip
-    These decorators are applied in combination with built-in decorators (`unique_view`, `paginate`) using `decorate_view` internally.
+## See also
 
----
-
-## :material-link-variant: M2M Relation Decorators
-
-Apply custom decorators to Many-to-Many relation endpoints via `get_decorators` and `post_decorators`:
-
-```python
-from ninja_aio.schemas import M2MRelationSchema
-
-M2MRelationSchema(
-    model=Tag,
-    related_name="tags",
-    get_decorators=[cache_decorator, log_decorator],   # GET (list related)
-    post_decorators=[rate_limit_decorator],             # POST (add/remove)
-)
-```
-
-| Parameter | Applies to |
-|---|---|
-| `get_decorators` | `GET /{pk}/tag` — List related items |
-| `post_decorators` | `POST /{pk}/tag` — Add/remove relations |
-
-See [APIViewSet M2M Relations](api_view_set.md#many-to-many-relations) for more details.
-
----
-
-## :material-factory: `api_get` / `api_post` with Decorators
-
-Endpoint decorators accept a `decorators` parameter for inline decorator composition:
-
-```python
-from ninja.pagination import PageNumberPagination
-from ninja_aio.decorators.operations import api_get
-from ninja_aio.decorators import unique_view
-from ninja.pagination import paginate
-
-@api.viewset(models.Book)
-class BookAPI(APIViewSet):
-    @api_get(
-        "/custom-get",
-        response={200: list[GenericMessageSchema]},
-        decorators=[paginate(PageNumberPagination), unique_view("test-unique-view")],
-    )
-    async def get_test(self, request):
-        return [{"message": "This is a custom GET method in BookAPI"}]
-```
-
-!!! info "How decorators are applied"
-    - Provide decorators as a list — they are applied in reverse order internally
-    - `paginate(PageNumberPagination)` enables async pagination on the handler
-    - `unique_view(name)` marks the route as unique to avoid duplicate registration
-    - Works with `@api.viewset(Model)` classes extending `APIViewSet`
-
----
-
-## :material-arrow-right-circle: See Also
-
-<div class="grid cards" markdown>
-
--   :material-view-grid:{ .lg .middle } **APIViewSet**
-
-    ---
-
-    Complete CRUD view generation with decorator support
-
-    [:octicons-arrow-right-24: Learn more](api_view_set.md)
-
--   :material-eye:{ .lg .middle } **APIView**
-
-    ---
-
-    Base view class for custom endpoints
-
-    [:octicons-arrow-right-24: Learn more](api_view.md)
-
--   :material-puzzle:{ .lg .middle } **Mixins**
-
-    ---
-
-    Reusable filtering and query behaviors
-
-    [:octicons-arrow-right-24: Learn more](mixins.md)
-
--   :material-page-next:{ .lg .middle } **Pagination**
-
-    ---
-
-    Async pagination support for list endpoints
-
-    [:octicons-arrow-right-24: Learn more](../pagination.md)
-
-</div>
+- [Custom actions](../../guides/custom-actions.md)
+- [APIViewSet](api_view_set.md)
+- [APIView](api_view.md)

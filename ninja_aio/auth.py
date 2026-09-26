@@ -166,7 +166,7 @@ def validate_key(key: Optional[JwtKeys], setting_name: str) -> JwtKeys:
         raise ValueError(f"{setting_name} is required")
     if not isinstance(key, (jwk.RSAKey, jwk.ECKey, jwk.OctKey)):
         raise ValueError(
-            f"{setting_name} must be an instance of jwk.RSAKey or jwk.ECKey"
+            f"{setting_name} must be an instance of jwk.RSAKey, jwk.ECKey or jwk.OctKey"
         )
     return key
 
@@ -197,14 +197,14 @@ def encode_jwt(
     Parameters:
       - claims (dict): additional claims to merge into the payload (can override defaults)
       - duration (int): token lifetime in seconds
-      - private_key (jwk.RSAKey): RSA/EC JWK for signing; defaults to settings.JWT_PRIVATE_KEY
+      - private_key (jwk.RSAKey | jwk.ECKey | jwk.OctKey): signing key; defaults to settings.JWT_PRIVATE_KEY
       - algorithm (str): JWS algorithm (default "RS256")
 
     Returns:
       - str: JWT compact string
 
     Raises:
-      - ValueError: if private_key is missing or not jwk.RSAKey/jwk.ECKey
+      - ValueError: if private_key is missing or not an RSA, EC or oct JWK
       - ValueError: if mandatory claims (iss, aud) are missing and not in settings
 
     Notes:
@@ -241,15 +241,15 @@ def decode_jwt(
     This function decodes the JWT, verifies its signature, and returns the decoded token object.
     Parameters:
     - token (str): The JWT string to decode.
-    - public_key (jwk.RSAKey, optional): RSA public key used to verify the token's signature.
-        If not provided, settings.JWT_PUBLIC_KEY will be used. Must be an instance of jwk.RSAKey.
+    - public_key (jwk.RSAKey | jwk.ECKey | jwk.OctKey, optional): key used to verify the token's signature.
+        If not provided, settings.JWT_PUBLIC_KEY will be used.
     - algorithms (list[str], optional): List of permitted algorithms for signature verification.
         Defaults to ["RS256"] if not provided.
     Returns:
     - jwt.Token: The decoded JWT token object containing header and claims.
     Raises:
-    - ValueError: If no public key is provided or if the provided key is not an instance of jwk.RSAKey.
-    - jose.errors.JoseError: If the token is invalid or fails verification.
+    - ValueError: If no public key is provided or the key is not an RSA, EC or oct JWK.
+    - joserfc.errors.JoseError: If the token is invalid or fails verification.
     Notes:
     - The function uses the specified algorithms to restrict acceptable signing methods.
     Example:

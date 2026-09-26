@@ -161,16 +161,20 @@ plugins:
       handlers:
         python:
           paths:
-            - ./ninja_aio
+            - .
           options:
-            show_source: true
+            show_source: false
             docstring_style: google
             separate_signature: true
-            show_if_no_docstring: true
+            show_signature_annotations: true
+            show_if_no_docstring: false
+            show_root_heading: false
+            show_root_toc_entry: false
+            heading_level: 3
             merge_init_into_class: true
             members_order: source
             filters:
-              - "!^__"
+              - "!^_"
             inherited_members: true
             signature_crossrefs: true
 

@@ -1,1618 +1,210 @@
-# :material-file-document-edit: Model Serializer
-
-`ModelSerializer` is a powerful abstract mixin for Django models that centralizes schema generation and serialization configuration directly on the model class.
-
-## :material-format-list-bulleted: Overview
-
-**Goals:**
-
-- :material-content-copy: Eliminate duplication between Model and separate serializer classes
-- :material-hook: Provide clear extension points (sync + async hooks, custom synthetic fields)
-- :material-auto-fix: Auto-generate Ninja schemas from model metadata
-- :material-link-variant: Support nested serialization for relationships
-
-**Key Features:**
-
-- :material-playlist-plus: Declarative schema configuration via inner classes
-- :material-sync: Automatic CRUD schema generation
-- :material-file-tree: Nested relationship handling
-- :material-hook: Sync and async lifecycle hooks
-- :material-pencil-plus: Custom field support (computed/synthetic fields)
-
+---
+type: reference
+title: ModelSerializer
+description: Lookup page for ModelSerializer schemas, Python methods, hooks and options.
 ---
 
-## :material-rocket-launch: Quick Start
+# ModelSerializer
+
+`ModelSerializer` is a Django model base class that carries its own schemas,
+Python CRUD methods and hooks. For how to use it, see
+[Schemas](../../guides/schemas.md) and [Python CRUD](../../guides/python-crud.md).
 
 ```python
-from django.db import models
-from ninja_aio.models import ModelSerializer
-
-class User(ModelSerializer):
-    username = models.CharField(max_length=150, unique=True)
-    email = models.EmailField(unique=True)
-
-    class CreateSerializer:
-        fields = ["username", "email"]
-
-    class ReadSerializer:
-        fields = ["id", "username", "email"]
-
-    def __str__(self):
-        return self.username
+from ninja_aio import ModelSerializer, SchemaConfig
 ```
 
----
+## Schemas
 
-## :material-playlist-plus: Inner Configuration Classes
+Declare each kind with a `SchemaConfig` inside `class Schemas:`. The generated
+names below are for a model named `Article`.
 
-### CreateSerializer
-
-Describes how to build a create (input) schema for a model.
-
-**Attributes:**
-
-| Attribute   | Type                     | Description                                                                                                                       |
-| ----------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
-| `fields`    | `list[str \| tuple]`     | REQUIRED model field names for creation. Can also include inline custom tuples (see below)                                        |
-| `optionals` | `list[tuple[str, type]]` | Optional model fields: `(field_name, python_type)`                                                                                |
-| `customs`   | `list[tuple]`            | Synthetic inputs. Tuple forms: `(name, type)` = required (no default); `(name, type, default)` = optional (literal or callable)   |
-| `excludes`  | `list[str]`              | Field names rejected on create                                                                                                    |
-| `nested`    | `dict[str, type[ModelSerializer]]` | Reverse-FK child relations created atomically with the parent. See [Nested Writes](#nested-writes) below.                |
-
-**Example:**
-
-```python
-class User(ModelSerializer):
-    username = models.CharField(max_length=150)
-    email = models.EmailField()
-    password = models.CharField(max_length=128)
-    bio = models.TextField(blank=True)
-
-    class CreateSerializer:
-        fields = ["username", "email", "password"]
-        optionals = [
-            ("bio", str),
-        ]
-        customs = [
-            ("password_confirm", str),          # required (no default) equivalent of ("password_confirm", str, ...)
-            ("send_welcome_email", bool, True), # optional with default
-        ]
-        excludes = ["id", "created_at"]
-```
-
-**Inline Custom Fields:**
-
-You can also define custom fields directly in the `fields` list as tuples:
-
-```python
-class User(ModelSerializer):
-    class CreateSerializer:
-        fields = [
-            "username",
-            "email",
-            ("password_confirm", str),          # 2-tuple: required
-            ("send_welcome", bool, True),       # 3-tuple: optional with default
-        ]
-```
-
-This is equivalent to using the separate `customs` list but keeps field definitions together.
-
-**Resolution Order for `customs`:**
-
-1. Payload value (if provided)
-2. If default present and callable → invoked
-3. Literal default (if provided)
-4. If tuple was only (name, type) and no value supplied → validation error (required)
-
-**Conceptual Equivalent (django-ninja):**
-
-```python
-# Without ModelSerializer
-from ninja import ModelSchema
-
-class UserIn(ModelSchema):
-    class Meta:
-        model = User
-        fields = ["username", "email"]
-```
-
-### Nested Writes
-
-`CreateSerializer.nested` lets a parent create endpoint accept and persist its
-reverse-FK children in the same request, atomically. This is distinct from
-M2M relations (`ManyToManyAPI`, see [Views: Mixins](../views/mixins.md)),
-which link *existing* objects — nested writes *create new owned children*
-that don't exist yet.
-
-```python
-class OrderItem(ModelSerializer):
-    order = models.ForeignKey(
-        "Order", on_delete=models.CASCADE, related_name="items"
-    )
-    product = models.ForeignKey(Product, on_delete=models.PROTECT)
-    quantity = models.PositiveIntegerField(default=1)
-
-    class CreateSerializer:
-        # Standalone creation needs order; nesting removes and injects it.
-        fields = ["order", "product", "quantity"]
-
-    class ReadSerializer:
-        fields = ["id", "product", "quantity"]
-        relations_as_id = ["product"]
-
-
-class Order(ModelSerializer):
-    customer = models.ForeignKey(Customer, on_delete=models.PROTECT)
-
-    class ReadSerializer:
-        fields = ["id", "customer", "items"]
-        relations_as_id = ["customer"]
-
-    class CreateSerializer:
-        fields = ["customer"]
-        nested = {"items": OrderItem}
-```
-
-A single request now creates the order and all of its items in one atomic
-transaction:
-
-```http
-POST /orders/
-Content-Type: application/json
-
-{
-  "customer_id": 5,
-  "items": [
-    {"product_id": 1, "quantity": 2},
-    {"product_id": 3, "quantity": 1}
-  ]
-}
-```
-
-```json
-{
-  "id": 42,
-  "customer": 5,
-  "items": [
-    {"id": 101, "product": 1, "quantity": 2},
-    {"id": 102, "product": 3, "quantity": 1}
-  ]
-}
-```
-
-**Key `dict` is the reverse accessor / `related_name`** on the parent model
-(`"items"` above matches `related_name="items"` on `OrderItem.order`). The
-value is the child's `ModelSerializer` class.
-
-**Rules:**
-
-- The child's FK back to the parent (`order` above) is always excluded from
-  the nested input schema and injected before persistence. It may remain in
-  the child's `CreateSerializer.fields` for standalone creation. The nested
-  payload cannot override this FK; use `model_config = ConfigDict(extra="forbid")`
-  on the child's create config if unknown input fields should be rejected
-  rather than ignored.
-- Each child payload is validated against the *child's own* create schema
-  (minus the injected FK), so the child's own custom fields, optionals,
-  validators, `custom_actions`, `post_create`, and reactive hooks (`@on_create`,
-  etc.) all run normally for every nested item.
-- Each parent and its owned children are persisted inside one atomic
-  transaction, including direct `ModelUtil.create_s()` and bulk calls. Child
-  validation, persistence, or lifecycle-hook failures roll back that graph.
-  Bulk creation still commits successful parent graphs independently.
-  Parent and children must route to the same database; cross-database owned
-  graphs are rejected before persistence rather than claiming a distributed
-  transaction.
-- Omitting the nested key from the payload defaults to an empty list (no
-  children created); it is never required.
-- **Create-only.** There is no update/patch equivalent — updating a
-  collection of children (replace vs. merge vs. diff-by-pk) has ambiguous
-  semantics, so it's intentionally out of scope. Manage children via their
-  own CRUD endpoints after creation.
-- Only reverse-FK relations are supported. M2M relations should continue to
-  use `ManyToManyAPI` (`m2m_relations` on `APIViewSet`), since linking
-  existing rows is a different operation from creating owned children.
-- A child may declare its own nested relations, allowing multiple levels.
-  Cyclic configurations and mismatched relation/model mappings raise
-  `ImproperlyConfigured` during schema generation.
-- Nested writes currently require the `ModelSerializer` pattern; Meta-driven
-  `Serializer` classes are unchanged. `parse_input_data()` still returns
-  `(payload, customs)` and excludes nested values from the model payload.
-- Parent lifecycle hooks run before child creation. Database writes roll back
-  on failure, but external effects (emails, webhooks) do not; schedule those
-  with Django's `transaction.on_commit()` when they must follow a commit.
-- Child ViewSet authentication/permission hooks are not called: the parent's
-  create endpoint authorizes the owned graph. Other FK lookups still use the
-  child's normal request-scoped `ModelUtil` resolution.
-
-### ReadSerializer
-
-Describes how to build a read (output) schema for a model.
-
-**Attributes**
-
-| Attribute        | Type                 | Description |
-|------------------|----------------------|-------------|
-| `fields`         | `list[str \| tuple]` | **REQUIRED.** Model fields / related names explicitly included in the read (output) schema. Can also include inline custom tuples. |
-| `excludes`       | `list[str]`          | Fields / related names to always omit (takes precedence over `fields` and `optionals`). Use for sensitive or noisy data (e.g., passwords, internal flags). |
-| `customs`        | `list[tuple]`        | Computed / synthetic output values. Tuple formats:<br>• `(name, type)` = required resolvable attribute (object attribute or property). Serialization error if not resolvable.<br>• `(name, type, default)` = optional; default may be a callable (`lambda obj: ...`) or a literal value. |
-| `relations_as_id`| `list[str]`          | Relation fields to serialize as IDs instead of nested objects. Works with forward FK, forward O2O, reverse FK, reverse O2O, and M2M relations. |
-
-**Example:**
-
-```python
-class User(ModelSerializer):
-    first_name = models.CharField(max_length=150)
-    last_name = models.CharField(max_length=150)
-    email = models.EmailField()
-    password = models.CharField(max_length=128)
-
-    class ReadSerializer:
-        fields = ["id", "first_name", "last_name", "email", "created_at"]
-        excludes = ["password"]
-        customs = [
-            ("full_name", str, lambda obj: f"{obj.first_name} {obj.last_name}".strip()),
-            ("is_premium", bool, lambda obj: obj.subscription.is_active if hasattr(obj, 'subscription') else False),
-        ]
-```
-
-**Resolution Order for `customs`:**
-
-1. Attribute / property on instance
-2. Callable default (if provided)
-3. Literal default
-4. If required (2‑tuple) and still unresolved → error
-
-**Generated Output:**
-
-```json
-{
-  "id": 1,
-  "first_name": "John",
-  "last_name": "Doe",
-  "email": "john@example.com",
-  "created_at": "2024-01-15T10:30:00Z",
-  "full_name": "John Doe",
-  "is_premium": true
-}
-```
-
-### DetailSerializer
-
-Describes how to build a detail (single object) output schema. Use this when you want the retrieve endpoint to return more fields than the list endpoint.
-
-**Fallback Behavior:** `DetailSerializer` supports **per-field-type fallback** to `ReadSerializer`. Each attribute (`fields`, `customs`, `optionals`, `excludes`) is checked independently:
-
-- If `DetailSerializer.fields` is empty → uses `ReadSerializer.fields`
-- If `DetailSerializer.customs` is empty → uses `ReadSerializer.customs`
-- If `DetailSerializer.optionals` is empty → uses `ReadSerializer.optionals`
-- If `DetailSerializer.excludes` is empty → uses `ReadSerializer.excludes`
-
-This allows partial overrides: define only `DetailSerializer.fields` while inheriting `customs` from `ReadSerializer`.
-
-**Attributes:**
-
-| Attribute   | Type                     | Description                                                                   |
-| ----------- | ------------------------ | ----------------------------------------------------------------------------- |
-| `fields`    | `list[str \| tuple]`     | Model fields to include in detail view. Can include inline custom tuples. Falls back to ReadSerializer.fields if empty |
-| `excludes`  | `list[str]`              | Fields to exclude from detail view (falls back to ReadSerializer.excludes if empty) |
-| `customs`   | `list[tuple]`            | Computed fields: `(name, type)` required; `(name, type, default)` optional (falls back to ReadSerializer.customs if empty) |
-| `optionals` | `list[tuple[str, type]]` | Optional output fields (falls back to ReadSerializer.optionals if empty) |
-
-**Example:**
+| Kind | Schema attribute | Generated name | Used for |
+| --- | --- | --- | --- |
+| `create` | `create_schema` | `articleSchemaIn` | Create request body |
+| `update` | `update_schema` | `articleSchemaPatch` | Update request body |
+| `read` | `read_schema` | `articleSchemaOut` | List, create and update responses |
+| `detail` | `detail_schema` | `articleDetailSchemaOut` | Retrieve response. Falls back to `read` |
+| (automatic) | `related_schema` | `articleSchemaRelated` | This model nested inside another model |
 
 ```python
 class Article(ModelSerializer):
-    title = models.CharField(max_length=200)
-    summary = models.TextField()
-    content = models.TextField()
-    author = models.ForeignKey(User, on_delete=models.CASCADE)
-    tags = models.ManyToManyField(Tag)
-    view_count = models.IntegerField(default=0)
+    ...
 
-    class ReadSerializer:
-        # List view: minimal fields for performance
-        fields = ["id", "title", "summary", "author"]
-        customs = [
-            ("word_count", int, lambda obj: len(obj.content.split())),
-        ]
-
-    class DetailSerializer:
-        # Detail view: all fields including expensive relations
-        # customs inherited from ReadSerializer (word_count)
-        fields = ["id", "title", "summary", "content", "author", "tags", "view_count"]
+    class Schemas:
+        create = SchemaConfig(fields=["title", "body", "category"])
+        update = SchemaConfig(optionals=[("title", str), ("body", str)])
+        read = SchemaConfig(fields=["id", "title", "category"])
 ```
 
-**Generated Output (List):**
+A kind you leave out has no schema (`None`), and its endpoint is not generated.
+See [Schema generation](../../concepts/schema-generation.md) for how fields become
+schemas.
 
-```json
-[
-  {"id": 1, "title": "Getting Started", "summary": "...", "author": {...}, "word_count": 500},
-  {"id": 2, "title": "Advanced Topics", "summary": "...", "author": {...}, "word_count": 1200}
-]
-```
+## Validators
 
-**Generated Output (Detail):**
+Put Pydantic `@field_validator` and `@model_validator` methods on these inner
+classes:
 
-```json
-{
-  "id": 1,
-  "title": "Getting Started",
-  "summary": "...",
-  "content": "Full article content here...",
-  "author": {...},
-  "tags": [{"id": 1, "name": "python"}, {"id": 2, "name": "django"}],
-  "view_count": 1234,
-  "word_count": 500
-}
-```
+| Inner class | Applies to |
+| --- | --- |
+| `CreateValidators` | `create` schema |
+| `UpdateValidators` | `update` schema |
+| `ReadValidators` | `read` schema |
+| `DetailValidators` | `detail` schema |
 
-**Example with Custom Override:**
+## Schema attributes
+
+| Attribute | Description |
+| --- | --- |
+| `create_schema`, `update_schema`, `read_schema`, `detail_schema`, `related_schema` | The generated schema class, or `None` if the kind is not declared. Built on first access and cached |
+| `get_schema(kind, *, depth=1)` | Returns the schema for `"create"`, `"update"`, `"read"`, `"detail"` or `"related"`. `depth` (relation nesting) only applies to `read` and `detail` |
+| `clear_schema_cache()` | Drops the cached schemas of this class |
+
+Assign your own `Schema` subclass to an attribute, for example
+`read_schema = ArticleOut`, to replace the generated one.
+
+## Python methods
+
+All methods are classmethods. `request` is keyword-only and optional in every
+method.
+
+| Sync | Async | Returns |
+| --- | --- | --- |
+| `create(data, *, request=None)` | `acreate(...)` | `Article` |
+| `get(pk=None, *, request=None, optimize_for=None, **lookups)` | `aget(...)` | `Article` |
+| `get_queryset(*, request=None, optimize_for=None)` | `aget_queryset(...)` | `QuerySet[Article]` |
+| `update(target, data, *, request=None)` | `aupdate(...)` | `Article` |
+| `destroy(target, *, request=None)` | `adestroy(...)` | `None` |
+| `model_dump(instance, *, schema=None)` | `amodel_dump(...)` | `dict` (default: detail schema) |
+| `model_dumps(instances, *, schema=None)` | `amodel_dumps(...)` | `list[dict]` (default: read schema) |
+| `bulk_create(items, *, request=None)` | `abulk_create(...)` | `BulkResult[Article]` |
+| `bulk_update(items, *, request=None)` | `abulk_update(...)` | `BulkResult[Article]` |
+| `bulk_destroy(targets, *, request=None)` | `abulk_destroy(...)` | `BulkResult` of primary keys |
+
+`target` is an instance or a primary key. `optimize_for` is `"read"` or
+`"detail"`. Sync `model_dump()` and `model_dumps()` never query the database:
+load relations first, or use the async versions.
+
+::: ninja_aio.models.serializers.ModelSerializer.create
+    options:
+      show_root_heading: true
+      show_root_full_path: false
+
+::: ninja_aio.models.serializers.ModelSerializer.acreate
+    options:
+      show_root_heading: true
+      show_root_full_path: false
+
+::: ninja_aio.models.serializers.ModelSerializer.get
+    options:
+      show_root_heading: true
+      show_root_full_path: false
+
+::: ninja_aio.models.serializers.ModelSerializer.aget
+    options:
+      show_root_heading: true
+      show_root_full_path: false
+
+::: ninja_aio.models.serializers.ModelSerializer.update
+    options:
+      show_root_heading: true
+      show_root_full_path: false
+
+::: ninja_aio.models.serializers.ModelSerializer.aupdate
+    options:
+      show_root_heading: true
+      show_root_full_path: false
+
+::: ninja_aio.models.serializers.ModelSerializer.destroy
+    options:
+      show_root_heading: true
+      show_root_full_path: false
+
+::: ninja_aio.models.serializers.ModelSerializer.adestroy
+    options:
+      show_root_heading: true
+      show_root_full_path: false
+
+::: ninja_aio.models.serializers.ModelSerializer.model_dump
+    options:
+      show_root_heading: true
+      show_root_full_path: false
+
+::: ninja_aio.models.serializers.ModelSerializer.amodel_dump
+    options:
+      show_root_heading: true
+      show_root_full_path: false
+
+::: ninja_aio.models.serializers.ModelSerializer.model_dumps
+    options:
+      show_root_heading: true
+      show_root_full_path: false
+
+::: ninja_aio.models.serializers.ModelSerializer.amodel_dumps
+    options:
+      show_root_heading: true
+      show_root_full_path: false
+
+## Hooks
+
+Sync viewsets call the plain names, async viewsets the `a` names. Override one
+of the pair. See [Hooks](../../guides/hooks.md).
+
+| Hook | Signature | Runs |
+| --- | --- | --- |
+| `queryset_request` / `aqueryset_request` | `(cls, request)` classmethod | Builds the base queryset for lookups, lists, updates and deletes |
+| `post_create` / `apost_create` | `(self)` | Once, after the object is created |
+| `custom_actions` / `acustom_actions` | `(self, payload)` | On create and update, with the `customs` fields as a dict |
+| `on_create_before_save` | `(self)` | Before the first save only |
+| `before_save` | `(self)` | Before every save |
+| `on_create_after_save` | `(self)` | After the first save only |
+| `after_save` | `(self)` | After every save |
+| `on_delete` | `(self)` | After the object is deleted |
+| `has_changed` / `ahas_changed` | `(self, field) -> bool` | Helper: `True` if the value differs from the database |
+| `as_admin` | `(cls, **overrides) -> type` | Helper: returns a Django `ModelAdmin` class built from the schemas |
+
+## Query optimization
+
+Declare `class QuerySet:` on the model to add `select_related` and
+`prefetch_related` to generated queries.
+
+| Attribute | Type | Description |
+| --- | --- | --- |
+| `read`, `detail`, `queryset_request`, `extras` | `ModelQuerySetSchema` (`extras`: list of `ModelQuerySetExtraSchema`) | Relations to load for list, retrieve and the base queryset. `detail` falls back to `read`. `extras` adds named scopes |
 
 ```python
-class Article(ModelSerializer):
-    # ... fields ...
+from ninja_aio.schemas import ModelQuerySetSchema
 
-    class ReadSerializer:
-        fields = ["id", "title", "summary"]
-        customs = [("word_count", int, lambda obj: len(obj.content.split()))]
-
-    class DetailSerializer:
-        fields = ["id", "title", "summary", "content"]
-        # Override customs - reading_time instead of word_count
-        customs = [("reading_time", int, lambda obj: len(obj.content.split()) // 200)]
-```
-
-### UpdateSerializer
-
-Describes how to build an update (partial/full) input schema.
-
-**Attributes:**
-
-| Attribute   | Type                     | Description                                                                   |
-| ----------- | ------------------------ | ----------------------------------------------------------------------------- |
-| `fields`    | `list[str \| tuple]`     | REQUIRED fields for update (rarely used). Can include inline custom tuples    |
-| `optionals` | `list[tuple[str, type]]` | Updatable optional fields (typical for PATCH)                                 |
-| `customs`   | `list[tuple]`            | Instruction fields: `(name, type)` required; `(name, type, default)` optional |
-| `excludes`  | `list[str]`              | Immutable fields that cannot be updated                                       |
-
-**Example:**
-
-```python
-class User(ModelSerializer):
-    username = models.CharField(max_length=150, unique=True)
-    email = models.EmailField()
-    bio = models.TextField(blank=True)
-    is_active = models.BooleanField(default=True)
-
-    class UpdateSerializer:
-        optionals = [
-            ("email", str),
-            ("bio", str),
-            ("is_active", bool),
-        ]
-        customs = [
-            ("reset_password", bool, False),  # optional flag
-            ("rotate_token", bool),          # required instruction
-        ]
-        excludes = ["username", "created_at", "id"]
-```
-
-**Usage (PATCH request):**
-
-```json
-{
-  "email": "newemail@example.com",
-  "bio": "Updated bio",
-  "reset_password": true
-}
-```
-
----
-
-## :material-cog: Pydantic Configuration & Schema Overrides
-
-### `model_config` — Pydantic ConfigDict
-
-You can set `model_config` on any inner serializer class to apply a Pydantic
-[`ConfigDict`](https://docs.pydantic.dev/latest/api/config/#pydantic.config.ConfigDict)
-to the generated schema. This lets you customize validation and serialization behavior
-without writing validators.
-
-```python
-from pydantic import ConfigDict
-from ninja_aio.models import ModelSerializer
-from django.db import models
-
-class Article(models.Model, ModelSerializer):
-    title = models.CharField(max_length=255)
-    body = models.TextField()
-
-    class CreateSerializer:
-        fields = ["title", "body"]
-        model_config = ConfigDict(str_strip_whitespace=True)
-
-    class ReadSerializer:
-        fields = ["id", "title", "body"]
-        model_config = ConfigDict(str_strip_whitespace=True)
-
-    class UpdateSerializer:
-        optionals = [("title", str), ("body", str)]
-        model_config = ConfigDict(str_strip_whitespace=True)
-```
-
-!!! info "Common ConfigDict options"
-    - `str_strip_whitespace=True` — strip leading/trailing whitespace from strings
-    - `str_to_lower=True` — convert strings to lowercase
-    - `str_to_upper=True` — convert strings to uppercase
-    - `use_enum_values=True` — store enum values instead of enum members
-    - `validate_default=True` — validate default values
-
-    See the full list of options in the [Pydantic ConfigDict reference](https://docs.pydantic.dev/latest/api/config/#pydantic.config.ConfigDict).
-
-### Schema Method Overrides
-
-You can define Pydantic schema method overrides directly on inner serializer classes.
-These methods are applied to the generated schema subclass, allowing you to customize
-methods like `model_dump`, `model_validate`, or add computed properties.
-
-```python
-from __future__ import annotations
-
-from typing import TYPE_CHECKING, Any
-
-if TYPE_CHECKING:
-    from ninja import Schema
-
-class Article(models.Model, ModelSerializer):
-    title = models.CharField(max_length=255)
-    body = models.TextField()
-
-    class ReadSerializer:
-        fields = ["id", "title", "body"]
-
-        def model_dump(
-            self: Schema,
-            *,
-            mode: str = "python",
-            include: Any = None,
-            exclude: Any = None,
-            context: Any = None,
-            by_alias: bool = False,
-            exclude_unset: bool = False,
-            exclude_defaults: bool = False,
-            exclude_none: bool = False,
-            round_trip: bool = False,
-            warnings: bool | str = True,
-            serialize_as_any: bool = False,
-        ) -> dict[str, Any]:
-            data = super().model_dump(
-                mode=mode,
-                include=include,
-                exclude=exclude,
-                context=context,
-                by_alias=by_alias,
-                exclude_unset=exclude_unset,
-                exclude_defaults=exclude_defaults,
-                exclude_none=exclude_none,
-                round_trip=round_trip,
-                warnings=warnings,
-                serialize_as_any=serialize_as_any,
-            )
-            data["title"] = data["title"].title()
-            return data
-```
-
-!!! tip "IDE autocomplete for overridden methods"
-    By annotating `self: Schema` (with `Schema` imported under `TYPE_CHECKING`), your
-    IDE will provide full autocomplete and type checking for all Pydantic `BaseModel`
-    attributes and methods inside the override. The `TYPE_CHECKING` guard ensures
-    `Schema` is never imported at runtime — inner serializer classes are plain Python
-    classes, not Pydantic models.
-
-!!! warning "No automatic argument hinting"
-    Inner serializer classes are plain Python classes — not Pydantic models — so IDEs
-    cannot automatically infer parameter names or types for overridden methods like
-    `model_dump`. You must write out the full signature manually. Consult the
-    [Pydantic `BaseModel` API reference](https://docs.pydantic.dev/latest/api/base_model/)
-    for the correct parameter signatures.
-
-!!! info "How it works"
-    Methods defined on inner classes are collected and injected into the generated
-    Pydantic schema subclass. Bare `super()` calls work correctly — the framework
-    rebinds the method's class reference to the generated schema.
-
-You can combine `model_config`, validators, and method overrides on the same inner class:
-
-```python
-from __future__ import annotations
-
-from typing import TYPE_CHECKING, Any
-
-if TYPE_CHECKING:
-    from ninja import Schema
-
-class Article(models.Model, ModelSerializer):
-    title = models.CharField(max_length=255)
-    body = models.TextField()
-
-    class CreateSerializer:
-        from pydantic import field_validator
-
-        fields = ["title", "body"]
-        model_config = ConfigDict(str_strip_whitespace=True)
-
-        @field_validator("title")
-        @classmethod
-        def validate_title(cls, v):
-            if len(v) < 3:
-                raise ValueError("Title too short")
-            return v
-
-        def model_dump(
-            self: Schema,
-            *,
-            mode: str = "python",
-            include: Any = None,
-            exclude: Any = None,
-            context: Any = None,
-            by_alias: bool = False,
-            exclude_unset: bool = False,
-            exclude_defaults: bool = False,
-            exclude_none: bool = False,
-            round_trip: bool = False,
-            warnings: bool | str = True,
-            serialize_as_any: bool = False,
-        ) -> dict[str, Any]:
-            data = super().model_dump(
-                mode=mode,
-                include=include,
-                exclude=exclude,
-                context=context,
-                by_alias=by_alias,
-                exclude_unset=exclude_unset,
-                exclude_defaults=exclude_defaults,
-                exclude_none=exclude_none,
-                round_trip=round_trip,
-                warnings=warnings,
-                serialize_as_any=serialize_as_any,
-            )
-            data["title"] = data["title"].title()
-            return data
-```
-
----
-
-## :material-auto-fix: Schema Generation
-
-### Auto-Generated Schemas
-
-ModelSerializer automatically generates five schema types:
-
-| Attribute        | Schema Type        | Purpose                              |
-| ---------------- | ------------------ | ------------------------------------ |
-| `create_schema`  | Input ("In")       | POST endpoint payload                |
-| `update_schema`  | Input ("Patch")    | PATCH/PUT endpoint payload           |
-| `read_schema`    | Output ("Out")     | List response with nested relations  |
-| `detail_schema`  | Output ("Detail")  | Single object response (retrieve)    |
-| `related_schema` | Output ("Related") | Compact nested representation        |
-
-Schemas are generated lazily and cached. Use `get_schema("read", depth=2)` or `get_schema("detail", depth=2)` for a custom nesting depth.
-
-!!! warning "Deprecated"
-    The version 2 factories `generate_create_s()`, `generate_update_s()`, `generate_read_s()`, `generate_detail_s()` and `generate_related_s()` still work but emit a `DeprecationWarning`. They will be removed in version 4.
-
-**Example:**
-
-```python
-class User(ModelSerializer):
-    username = models.CharField(max_length=150)
-    email = models.EmailField()
-
-    class CreateSerializer:
-        fields = ["username", "email"]
-
-    class ReadSerializer:
-        fields = ["id", "username", "email"]
-
-# Auto-generate schemas
-UserCreateSchema = User.create_schema
-UserReadSchema = User.read_schema
-UserDetailSchema = User.detail_schema  # Falls back to read schema if DetailSerializer not defined
-UserUpdateSchema = User.update_schema
-UserRelatedSchema = User.related_schema
-```
-
-### Nested Relationship Handling
-
-ModelSerializer automatically serializes relationships if the related model is also a ModelSerializer.
-
-#### ForeignKey (Forward)
-
-```python
-class Profile(ModelSerializer):
-    bio = models.TextField()
-
-    class ReadSerializer:
-        fields = ["id", "bio"]
-
-class User(ModelSerializer):
-    username = models.CharField(max_length=150)
-    profile = models.ForeignKey(Profile, on_delete=models.CASCADE)
-
-    class ReadSerializer:
-        fields = ["id", "username", "profile"]
-```
-
-**Output:**
-
-```json
-{
-  "id": 1,
-  "username": "john_doe",
-  "profile": {
-    "id": 10,
-    "bio": "Software developer"
-  }
-}
-```
-
-#### ManyToMany
-
-```python
-class Tag(ModelSerializer):
-    name = models.CharField(max_length=50)
-
-    class ReadSerializer:
-        fields = ["id", "name"]
 
 class Article(ModelSerializer):
-    title = models.CharField(max_length=200)
-    tags = models.ManyToManyField(Tag, related_name="articles")
-
-    class ReadSerializer:
-        fields = ["id", "title", "tags"]
-```
-
-**Output:**
-
-```json
-{
-  "id": 1,
-  "title": "Getting Started",
-  "tags": [
-    { "id": 1, "name": "python" },
-    { "id": 2, "name": "django" }
-  ]
-}
-```
-
-#### Reverse Relationships
-
-```python
-class Author(ModelSerializer):
-    name = models.CharField(max_length=200)
-
-    class ReadSerializer:
-        fields = ["id", "name", "books"]  # Reverse FK
-
-class Book(ModelSerializer):
-    title = models.CharField(max_length=200)
-    author = models.ForeignKey(Author, on_delete=models.CASCADE, related_name="books")
-
-    class ReadSerializer:
-        fields = ["id", "title"]
-```
-
-**Output:**
-
-```json
-{
-  "id": 1,
-  "name": "J.K. Rowling",
-  "books": [
-    { "id": 1, "title": "Harry Potter" },
-    { "id": 2, "title": "Fantastic Beasts" }
-  ]
-}
-```
-
-#### Relations as ID
-
-Use `relations_as_id` to serialize relation fields as IDs instead of nested objects. This is useful for:
-
-- Reducing response payload size
-- Avoiding circular serialization
-- Performance optimization when nested data isn't needed
-- API designs where clients fetch related data separately
-
-**Supported Relations:**
-
-| Relation Type      | Output Type       | Example Value        |
-|--------------------|-------------------|----------------------|
-| Forward FK         | `PK_TYPE \| None` | `5` or `null`        |
-| Forward O2O        | `PK_TYPE \| None` | `3` or `null`        |
-| Reverse FK         | `list[PK_TYPE]`   | `[1, 2, 3]`          |
-| Reverse O2O        | `PK_TYPE \| None` | `7` or `null`        |
-| M2M (forward)      | `list[PK_TYPE]`   | `[1, 2]`             |
-| M2M (reverse)      | `list[PK_TYPE]`   | `[4, 5, 6]`          |
-
-**Note:** `PK_TYPE` is automatically detected from the related model's primary key field. Supported types include `int` (default), `UUID`, `str`, and any other Django primary key type.
-
-**Example:**
-
-```python
-class Author(ModelSerializer):
-    name = models.CharField(max_length=200)
-
-    class ReadSerializer:
-        fields = ["id", "name", "books"]
-        relations_as_id = ["books"]  # Serialize as list of IDs
-
-class Book(ModelSerializer):
-    title = models.CharField(max_length=200)
-    author = models.ForeignKey(Author, on_delete=models.CASCADE, related_name="books")
-
-    class ReadSerializer:
-        fields = ["id", "title", "author"]
-        relations_as_id = ["author"]  # Serialize as ID
-```
-
-**Output (Author):**
-
-```json
-{
-  "id": 1,
-  "name": "J.K. Rowling",
-  "books": [1, 2, 3]
-}
-```
-
-**Output (Book):**
-
-```json
-{
-  "id": 1,
-  "title": "Harry Potter",
-  "author": 1
-}
-```
-
-**M2M Example:**
-
-```python
-class Tag(ModelSerializer):
-    name = models.CharField(max_length=50)
-
-    class ReadSerializer:
-        fields = ["id", "name", "articles"]
-        relations_as_id = ["articles"]  # Reverse M2M as IDs
-
-class Article(ModelSerializer):
-    title = models.CharField(max_length=200)
-    tags = models.ManyToManyField(Tag, related_name="articles")
-
-    class ReadSerializer:
-        fields = ["id", "title", "tags"]
-        relations_as_id = ["tags"]  # Forward M2M as IDs
-```
-
-**Output (Article):**
-
-```json
-{
-  "id": 1,
-  "title": "Getting Started with Django",
-  "tags": [1, 2, 5]
-}
-```
-
-**UUID Primary Key Example:**
-
-When models use UUID primary keys, the output type is automatically `UUID`:
-
-```python
-import uuid
-from django.db import models
-from ninja_aio.models import ModelSerializer
-
-class Author(ModelSerializer):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    name = models.CharField(max_length=200)
-
-    class ReadSerializer:
-        fields = ["id", "name", "books"]
-        relations_as_id = ["books"]
-
-class Book(ModelSerializer):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    title = models.CharField(max_length=200)
-    author = models.ForeignKey(Author, on_delete=models.CASCADE, related_name="books")
-
-    class ReadSerializer:
-        fields = ["id", "title", "author"]
-        relations_as_id = ["author"]
-```
-
-**Output (Author with UUID):**
-
-```json
-{
-  "id": "550e8400-e29b-41d4-a716-446655440000",
-  "name": "J.K. Rowling",
-  "books": [
-    "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
-    "6ba7b811-9dad-11d1-80b4-00c04fd430c8"
-  ]
-}
-```
-
-**Output (Book with UUID):**
-
-```json
-{
-  "id": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
-  "title": "Harry Potter",
-  "author": "550e8400-e29b-41d4-a716-446655440000"
-}
-```
-
-**Query Optimization Note:** When using `relations_as_id`, you should still use `select_related()` for forward relations and `prefetch_related()` for reverse/M2M relations to avoid N+1 queries:
-
-```python
-class Article(ModelSerializer):
-    # ...
+    ...
 
     class QuerySet:
-        read = ModelQuerySetSchema(
-            select_related=["author"],       # For forward FK
-            prefetch_related=["tags"],        # For M2M
-        )
+        read = ModelQuerySetSchema(select_related=["category"])
 ```
 
----
+## NinjaAIOMeta
 
-## :material-lightning-bolt: Async Extension Points
+Optional inner class with names the framework uses instead of Django's `Meta`.
 
-### `queryset_request(request)`
-
-Filter queryset based on request context (user, permissions, tenant, etc.).
+| Key | Default | Description |
+| --- | --- | --- |
+| `verbose_name` | `Meta.verbose_name` | Singular name, used in the OpenAPI tag |
+| `verbose_name_plural` | `Meta.verbose_name_plural` | Plural name. Spaces become hyphens in the default URL path |
+| `not_found_name` | Model name | Error text of `404` responses: `{"error": "<not_found_name>"}` |
 
 ```python
 class Article(ModelSerializer):
-    title = models.CharField(max_length=200)
-    author = models.ForeignKey(User, on_delete=models.CASCADE)
-    is_published = models.BooleanField(default=False)
+    ...
 
-    @classmethod
-    async def a(cls, request):
-        qs = cls.objects.select_related('author').all()
-
-        # Non-authenticated users see only published
-        if not request.auth:
-            return qs.filter(is_published=True)
-
-        # Authors see their own + published
-        return qs.filter(
-            models.Q(author=request.auth) | models.Q(is_published=True)
-        )
-```
-
-### `post_create()`
-
-Execute async logic after object creation.
-
-```python
-class User(ModelSerializer):
-    email = models.EmailField()
-
-    async def a(self):
-        # Send welcome email
-        from myapp.tasks import send_welcome_email
-        await send_welcome_email(self.email)
-
-        # Create related objects
-        await Profile.objects.acreate(user=self)
-
-        # Log creation
-        await AuditLog.objects.acreate(
-            action="user_created",
-            user_id=self.id
-        )
-```
-
-### `custom_actions(payload)`
-
-React to synthetic/custom fields from the payload.
-
-```python
-class User(ModelSerializer):
-    password = models.CharField(max_length=128)
-
-    class CreateSerializer:
-        fields = ["username", "email", "password"]
-        customs = [
-            ("password_confirm", str, None),
-            ("send_welcome_email", bool, True),
-        ]
-
-    async def a(self, payload: dict):
-        # Validate password confirmation
-        if "password_confirm" in payload:
-            if payload["password_confirm"] != self.password:
-                raise ValueError("Passwords do not match")
-
-        # Send welcome email if requested
-        if payload.get("send_welcome_email", True):
-            await send_email(self.email, "Welcome!")
-```
-
----
-
-## :material-hook: Sync Lifecycle Hooks
-
-### Save Hooks
-
-```python
-class User(ModelSerializer):
-    username = models.CharField(max_length=150)
-    slug = models.SlugField(unique=True, blank=True)
-
-    def before_save(self):
-        """Executed before every save (create + update)"""
-        if not self.slug:
-            self.slug = slugify(self.username)
-
-    def on_create_before_save(self):
-        """Executed only on creation, before save"""
-        self.set_password(self.password)  # Hash password
-
-    def after_save(self):
-        """Executed after every save"""
-        cache.delete(f"user:{self.id}")
-
-    def on_create_after_save(self):
-        """Executed only after creation"""
-        send_welcome_email_sync(self.email)
-```
-
-**Execution Order:**
-
-```
-CREATE:
-1. on_create_before_save()
-2. before_save()
-3. super().save()
-4. on_create_after_save()
-5. after_save()
-
-UPDATE:
-1. before_save()
-2. super().save()
-3. after_save()
-```
-
-### Delete Hook
-
-```python
-class User(ModelSerializer):
-
-    def on_delete(self):
-        """Executed after object deletion"""
-        # Clean up related data
-        logger.info(f"User {self.username} deleted")
-
-        # Remove from cache
-        cache.delete(f"user:{self.id}")
-
-        # Archive data
-        ArchivedUser.objects.create(
-            username=self.username,
-            deleted_at=timezone.now()
-        )
-```
-
----
-
-## :material-lightning-bolt: Reactive Hooks
-
-Declarative async hooks that fire automatically during CRUD operations. Unlike sync lifecycle hooks (which run inside `save()`), reactive hooks run in the async context after the operation completes.
-
-### `@on_create`
-
-Fires after a new instance is created via the API.
-
-```python
-from ninja_aio.models import ModelSerializer, on_create
-
-class Article(ModelSerializer):
-    title = models.CharField(max_length=255)
-
-    @on_create
-    async def notify_author(self):
-        await send_email(self.author.email, f"Article '{self.title}' created")
-```
-
-### `@on_update` and `@on_update("field")`
-
-Fires after an instance is updated. The field-level variant only fires when the specified field **actually changes**.
-
-```python
-from ninja_aio.models import on_update
-
-class Article(ModelSerializer):
-    status = models.CharField(max_length=20, default="draft")
-
-    @on_update("status")  # fires ONLY when status changes
-    async def handle_publish(self):
-        if self.status == "published":
-            await invalidate_cache(f"article:{self.pk}")
-
-    @on_update  # fires on ANY update
-    async def log_change(self):
-        logger.info(f"Article {self.pk} updated")
-```
-
-Multiple fields can be watched:
-
-```python
-    @on_update("status", "priority")  # fires when either changes
-    async def handle_status_or_priority(self):
-        ...
-```
-
-!!! info "Field change detection"
-    Field changes are detected by comparing the attribute value on the loaded object with the new value from the request payload — **zero extra DB queries**.
-
-### `@on_delete`
-
-Fires after an instance is deleted via the API.
-
-```python
-from ninja_aio.models import on_delete
-
-class Article(ModelSerializer):
-    @on_delete
-    async def cleanup(self):
-        await delete_s3_images(self.pk)
-```
-
-### Execution Order
-
-Reactive hooks fire **after** sync lifecycle hooks:
-
-```
-CREATE:
-1. on_create_before_save()   ← sync hook
-2. before_save()             ← sync hook
-3. super().save()
-4. on_create_after_save()    ← sync hook
-5. after_save()              ← sync hook
-6. custom_actions()
-7. post_create()
-8. @on_create                ← reactive hook (async)
-
-UPDATE:
-1. before_save()             ← sync hook
-2. super().save()
-3. after_save()              ← sync hook
-4. @on_update("field")       ← reactive hook (async, field-specific)
-5. @on_update                ← reactive hook (async, generic)
-
-DELETE:
-1. on_delete()               ← sync hook
-2. adelete()
-3. @on_delete                ← reactive hook (async)
-```
-
-### Sync and Async Support
-
-Both sync and async functions are supported. Sync hooks are automatically wrapped in `sync_to_async`:
-
-```python
-class Article(ModelSerializer):
-    @on_create
-    def sync_hook(self):  # sync — wrapped automatically
-        logger.info(f"Created {self.pk}")
-
-    @on_create
-    async def async_hook(self):  # async — called directly
-        await notify(self.pk)
-```
-
-### Works Everywhere — API, Admin, Shell
-
-Reactive hooks fire via **two paths** to ensure they work everywhere:
-
-| Path | When | Field-level `@on_update("field")` |
-|---|---|---|
-| **API** (async) | `_create_instance`, `_update_instance`, `delete_s` | Full support — compares old vs new values |
-| **Django signals** (sync) | `obj.save()`, `obj.delete()` from admin/shell | Only `@on_update` (generic) — signals don't provide old values |
-
-A `ContextVar` prevents double-firing: when the API path is active, Django signals are skipped.
-
-!!! note "Field-level detection limitation"
-    `@on_update("status")` only fires via the API path, because Django's `post_save` signal doesn't provide the previous field values. From shell/admin, only `@on_update` (generic, no field specified) will fire.
-
-```
-# Via API:
-PATCH /articles/1 {"status": "published"}
-→ @on_update("status") fires ✅
-→ @on_update fires ✅
-
-# Via shell:
-obj.status = "published"
-obj.save()
-→ @on_update("status") does NOT fire ❌ (no old value available)
-→ @on_update fires ✅
-```
-
----
-
-## :material-wrench: Utility Methods
-
-### `has_changed(field)`
-
-Check if a field value has changed compared to the database (sync).
-
-```python
-class Article(ModelSerializer):
-    title = models.CharField(max_length=200)
-    status = models.CharField(max_length=20)
-
-    def before_save(self):
-        if self.has_changed('status'):
-            if self.status == 'published':
-                self.published_at = timezone.now()
-                notify_subscribers(self)
-```
-
-### `ahas_changed(field)`
-
-Async version of `has_changed`. Use this inside async hooks or async views.
-
-```python
-class Article(ModelSerializer):
-    title = models.CharField(max_length=200)
-    status = models.CharField(max_length=20)
-
-    async def before_save(self):
-        if await self.ahas_changed('status'):
-            await notify_subscribers_async(self)
-```
-
-Returns `False` for unsaved instances (no primary key).
-
-### `verbose_name_path_resolver()`
-
-Get slugified plural verbose name for URL routing. If the model defines a `NinjaAIOMeta` inner class with `verbose_name_plural`, that value takes priority over Django's `Meta.verbose_name_plural`.
-
-```python
-class BlogPost(ModelSerializer):
-    class Meta:
-        verbose_name_plural = "blog posts"
-
-# Returns: "blog-posts"
-path = BlogPost.verbose_name_path_resolver()
-```
-
-With `NinjaAIOMeta` override:
-
-```python
-class BlogPost(ModelSerializer):
     class NinjaAIOMeta:
-        verbose_name_plural = "Blog Articles"
-
-# Returns: "Blog-Articles"
-path = BlogPost.verbose_name_path_resolver()
+        verbose_name_plural = "blog posts"  # -> /api/blog-posts
 ```
 
----
-
-## :material-cog-sync: ModelUtil
-
-Helper class for async CRUD operations with ModelSerializer.
-
-### Overview
-
-```python
-from ninja_aio.models import ModelUtil
-
-util = ModelUtil(User)
-```
-
-**Key Responsibilities:**
-
-- Introspect model metadata
-- Normalize inbound/outbound payloads
-- Handle FK resolution and base64 decoding
-- Prefetch reverse relations
-- Invoke serializer hooks
-
-### Key Methods
-
-#### `get_object(request, pk=None, filters=None, getters=None)`
-
-Fetch single object or queryset with optimized queries.
-
-```python
-# Get single object
-user = await util.get_object(request, pk=1)
-
-# Get with filters
-active_users = await util.get_object(
-    request,
-    filters={"is_active": True}
-)
-
-# Get with custom lookup
-user = await util.get_object(
-    request,
-    getters={"email": "john@example.com"}
-)
-```
-
-**Features:**
-
-- Automatic `select_related()` and `prefetch_related()`
-- Respects `queryset_request()` filtering
-- Raises `SerializeError` (404) if not found
-
-#### `parse_input_data(request, data)`
-
-Convert incoming schema to model-ready dict.
-
-**Transformations:**
-
-1. Strips custom fields (stored separately)
-2. Removes optional fields with `None` value
-3. Decodes BinaryField (base64 → bytes)
-4. Resolves FK IDs to model instances
-
-```python
-from ninja import Schema
-
-class UserCreateSchema(Schema):
-    username: str
-    email: str
-    profile_id: int
-    avatar: str  # base64 for BinaryField
-    send_welcome: bool  # custom field
-
-data = UserCreateSchema(
-    username="john",
-    email="john@example.com",
-    profile_id=5,
-    avatar="iVBORw0KG...",  # base64
-    send_welcome=True
-)
-
-payload, customs = await util.parse_input_data(request, data)
-
-# payload = {
-#     "username": "john",
-#     "email": "john@example.com",
-#     "profile": <Profile instance>,
-#     "avatar": b'\x89PNG\r\n...'
-# }
-# customs = {"send_welcome": True}
-```
-
-#### `parse_output_data(request, data)`
-
-Post-process serialized output for consistency.
-
-**Transformations:**
-
-1. Replaces nested FK dicts with actual instances
-2. Rewrites nested FK keys to `<field>_id` format
-
-```python
-# Before
-{
-    "id": 1,
-    "author": {"id": 10, "profile": {"id": 5}}
-}
-
-# After parse_output_data
-{
-    "id": 1,
-    "author": <Author instance>,
-    "author_id": 10,
-    "profile_id": 5
-}
-```
-
-#### CRUD Operations
-
-##### `create_s(request, data, obj_schema)`
-
-```python
-user_data = UserCreateSchema(username="john", email="john@example.com")
-result = await util.create_s(request, user_data, UserReadSchema)
-
-# Executes:
-# 1. parse_input_data (normalize)
-# 2. Model.objects.acreate()
-# 3. custom_actions(customs)
-# 4. post_create()
-# 5. read_s (serialize response)
-```
-
-##### `read_s(request, obj, obj_schema)`
-
-```python
-user = await User.objects.aget(id=1)
-result = await util.read_s(request, user, UserReadSchema)
-# Returns parsed dict ready for API response
-```
-
-##### `update_s(request, data, pk, obj_schema)`
-
-```python
-update_data = UserUpdateSchema(email="newemail@example.com")
-result = await util.update_s(request, update_data, 1, UserReadSchema)
-
-# Executes:
-# 1. get_object(pk)
-# 2. parse_input_data
-# 3. Update changed fields
-# 4. custom_actions(customs)
-# 5. obj.asave()
-# 6. read_s (serialize updated object)
-```
-
-##### `delete_s(request, pk)`
-
-```python
-await util.delete_s(request, 1)
-# Returns None
-```
-
-### Error Handling
-
-```python
-from ninja_aio.exceptions import SerializeError
-
-try:
-    user = await util.get_object(request, pk=999)
-except SerializeError as e:
-    # e.details = {"user": "not found"}
-    # e.status_code = 404
-    pass
-
-try:
-    await util.create_s(request, bad_data, UserReadSchema)
-except SerializeError as e:
-    # e.details = {"avatar": "Invalid base64"}
-    # e.status_code = 400
-    pass
-```
-
----
-
-## :material-code-braces: Complete Example
-
-```python
-from django.db import models
-from ninja_aio.models import ModelSerializer
-from django.utils.text import slugify
-
-class Category(ModelSerializer):
-    name = models.CharField(max_length=100)
-    slug = models.SlugField(unique=True, blank=True)
-
-    class CreateSerializer:
-        fields = ["name"]
-
-    class ReadSerializer:
-        fields = ["id", "name", "slug"]
-
-    class UpdateSerializer:
-        optionals = [("name", str)]
-
-    def before_save(self):
-        if not self.slug:
-            self.slug = slugify(self.name)
-
-class Author(ModelSerializer):
-    name = models.CharField(max_length=200)
-    email = models.EmailField(unique=True)
-    bio = models.TextField(blank=True)
-
-    class CreateSerializer:
-        fields = ["name", "email"]
-        optionals = [("bio", str)]
-
-    class ReadSerializer:
-        fields = ["id", "name", "email", "bio"]
-        customs = [
-            ("post_count", int, lambda obj: obj.articles.count()),
-        ]
-
-    class UpdateSerializer:
-        optionals = [
-            ("name", str),
-            ("email", str),
-            ("bio", str),
-        ]
-
-class Article(ModelSerializer):
-    title = models.CharField(max_length=200)
-    slug = models.SlugField(unique=True)
-    content = models.TextField()
-    author = models.ForeignKey(Author, on_delete=models.CASCADE, related_name="articles")
-    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True)
-    tags = models.ManyToManyField('Tag', related_name="articles")
-    is_published = models.BooleanField(default=False)
-    views = models.IntegerField(default=0)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class CreateSerializer:
-        fields = ["title", "slug", "content", "author", "category"]
-        customs = [
-            ("notify_subscribers", bool, True),
-        ]
-
-    class ReadSerializer:
-        fields = [
-            "id", "title", "slug", "content",
-            "author", "category", "tags",
-            "is_published", "views", "created_at"
-        ]
-
-    class UpdateSerializer:
-        optionals = [
-            ("title", str),
-            ("content", str),
-            ("category", int),
-            ("is_published", bool),
-        ]
-        excludes = ["slug", "author", "created_at"]
-
-    @classmethod
-    async def a(cls, request):
-        qs = cls.objects.select_related('author', 'category').prefetch_related('tags')
-
-        if not request.auth:
-            return qs.filter(is_published=True)
-
-        return qs.filter(
-            models.Q(author=request.auth) | models.Q(is_published=True)
-        )
-
-    async def a(self):
-        await AuditLog.objects.acreate(
-            action="article_created",
-            article_id=self.id,
-            author_id=self.author_id
-        )
-
-    async def a(self, payload: dict):
-        if payload.get("notify_subscribers"):
-            await notify_new_article(self)
-
-    def before_save(self):
-        if self.has_changed('is_published') and self.is_published:
-            self.published_at = timezone.now()
-
-class Tag(ModelSerializer):
-    name = models.CharField(max_length=50, unique=True)
-
-    class ReadSerializer:
-        fields = ["id", "name"]
-```
-
----
-
-## :material-pencil-plus: Custom Fields Normalization
-
-Custom tuples are normalized by `ModelSerializer.get_custom_fields()` to `(name, python_type, default)`.
-
-Accepted forms:
-
-- `(name, type)` -> stored with `default = Ellipsis` (treated as required)
-- `(name, type, default)` -> default kept (callable or literal)
-
-Invalid lengths raise `ValueError`.
-
-Example mix:
-
-```python
-class CreateSerializer:
-    customs = [
-        ("password_confirm", str),           # required
-        ("send_welcome", bool, True),        # optional
-        ("initial_quota", int, lambda: 100)  # optional callable
-    ]
-```
-
-At runtime:
-
-```python
-# Normalized
-[
-  ("password_confirm", str, Ellipsis),
-  ("send_welcome", bool, True),
-  ("initial_quota", int, <function ...>)
-]
-```
-
-Required customs (Ellipsis) must be provided in input (create/update) or resolvable (read) or an error is raised.
-
-## :material-alert-circle: Error Cases
-
-| Situation                                    | Result              |
-| -------------------------------------------- | ------------------- |
-| 1‑item or 4‑item tuple                       | ValueError          |
-| Missing required custom (2‑tuple) in payload | Validation error    |
-| Unresolvable required read custom            | Serialization error |
-
-## :material-shield-star: Best Practices
-
-1. **Always exclude sensitive fields:**
-
-   ```python
-   class ReadSerializer:
-       excludes = ["password", "secret_key", "internal_id"]
-   ```
-
-2. **Use optionals for PATCH operations:**
-
-   ```python
-   class UpdateSerializer:
-       optionals = [("email", str), ("bio", str)]  # Partial updates
-   ```
-
-3. **Leverage customs for computed data:**
-
-   ```python
-   customs = [
-       ("full_name", str, lambda obj: f"{obj.first_name} {obj.last_name}"),
-   ]
-   ```
-
-4. **Optimize queries in queryset_request:**
-
-   ```python
-   @classmethod
-   async def a(cls, request):
-       return cls.objects.select_related('author').prefetch_related('tags')
-   ```
-
-5. **Keep hooks focused:**
-   ```python
-   async def a(self):
-       # Do ONE thing well
-       await send_welcome_email(self.email)
-   ```
-
-## :material-bookshelf: See Also
-
-<div class="grid cards" markdown>
-
--   :material-cog-sync:{ .lg .middle } **ModelUtil**
-
-    ---
-
-    [:octicons-arrow-right-24: Deep dive](model_util.md)
-
--   :material-check-decagram:{ .lg .middle } **Validators**
-
-    ---
-
-    [:octicons-arrow-right-24: Field & model validators](validators.md)
-
--   :material-view-grid:{ .lg .middle } **APIViewSet**
-
-    ---
-
-    [:octicons-arrow-right-24: Using with ViewSets](../views/api_view_set.md)
-
--   :material-shield-lock:{ .lg .middle } **Authentication**
-
-    ---
-
-    [:octicons-arrow-right-24: Securing endpoints](../authentication.md)
-
-</div>
+## See also
+
+- [Schemas](../../guides/schemas.md)
+- [Python CRUD](../../guides/python-crud.md)
+- [Hooks](../../guides/hooks.md)
+- [Serializer](serializers.md)
