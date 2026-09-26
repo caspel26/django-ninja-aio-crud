@@ -551,7 +551,7 @@ Deferred:
 
 - CI and `docs/requirements.txt` still use MkDocs + Material. Switching them to
   Zensical and the `mike` fork changes the publishing workflow, so it happens
-  with release validation (Step 20). Zensical currently requires
+  with release validation (Step 21). Zensical currently requires
   `pymdown-extensions` 12, which conflicts with the pinned Material 9.6.
 - The ⌘K palette, homepage demo, and article sheet from the mockups belong to
   the homepage and page templates (Steps 17 and 18).

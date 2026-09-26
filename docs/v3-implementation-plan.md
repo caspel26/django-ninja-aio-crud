@@ -700,11 +700,41 @@ Each step must leave the branch in a coherent, testable state.
 - Publish the complete 2.x migration guide.
 - Preserve version 2 documentation and add redirects/version notices.
 
-### Step 20: Release-candidate validation
+### Step 20: Build the version 3 sample application
+
+Build a small but realistic Django project (much simpler than a production
+system) that exercises every version 3 feature end to end, in both execution
+modes. It proves the release works for real applications, not only in unit
+tests.
+
+- Domain: a compact library app (users, authors, books, tags, loans) with at
+  least one plain Django model served through a `Serializer` and the rest as
+  `ModelSerializer`s, all configured with `Schemas`/`SchemaConfig`.
+- Mount the same viewsets twice, under `/api/sync/` (`execution_mode =
+  "sync"`) and `/api/async/` (`execution_mode = "async"`), with matching sync
+  (`name`) and async (`aname`) hooks.
+- Cover: CRUD, relations (FK, reverse FK, M2M, `relations_as_id`), nested
+  writes, bulk operations and `BulkResult`, filtering, search, ordering,
+  pagination, field selection, soft delete, permissions and role rules, JWT
+  and cookie authentication, custom actions (`@action`, `@on`, `APIView`),
+  lifecycle and reactive hooks, errors, Admin integration, and the MCP server.
+- Use the serializer facade from plain Python too: a management command with
+  the sync methods and an async task with the `a`-prefixed methods.
+- Add an end-to-end suite that runs every HTTP scenario against both mounts
+  and asserts identical status codes, bodies, database state, and query
+  counts.
+- Run the app and its suite with `-W error::DeprecationWarning` so no version
+  2 API is used anywhere.
+- Check every code example in the documentation against the app; fix the docs
+  or the framework when they disagree.
+
+### Step 21: Release-candidate validation
 
 - Run the complete functional, parity, typing, packaging, documentation,
   accessibility, visual, performance, and supported-version matrices.
-- Migrate the sample application.
+- Run the version 3 sample application suite from Step 20.
+- Migrate an existing 2.x project (`ninja-aio-blog-example`) to 3.0 using
+  only the migration guide.
 - Remove the internal version 3 implementation plan, contract, and baseline
   documents before release; retain only user-facing documentation, the
   migration guide, and executable regression tests.
