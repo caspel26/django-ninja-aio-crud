@@ -53,6 +53,13 @@ nav:
       - Swagger UI: guides/swagger-ui.md
       - Logging: guides/logging.md
       - Type hints: guides/type-hints.md
+  - Concepts:
+    - concepts/index.md
+    - Serializer first: concepts/serializer-first.md
+    - Sync and async: concepts/sync-and-async.md
+    - Request lifecycle: concepts/lifecycle.md
+    - Transactions: concepts/transactions.md
+    - Schema generation: concepts/schema-generation.md
   - API Reference:
     - Views:
       - APIView: api/views/api_view.md
@@ -67,6 +74,11 @@ nav:
     - Exceptions: api/exceptions.md
     - Pagination: api/pagination.md
     - Renderers: api/renderers/orjson_renderer.md
+  - Migration:
+    - migration/index.md
+    - Breaking changes: migration/breaking-changes.md
+    - Deprecations: migration/deprecations.md
+    - Recipes: migration/recipes.md
   - Benchmarks:
       - Framework Comparison: comparison.md
       - Performance: performance.md
