@@ -1,6 +1,7 @@
-from typing import Callable, List, Optional, Type
+from typing import Any, Callable, List, Optional, Type
 
 from ninja import Schema
+from ninja.constants import NOT_SET
 from ninja_aio.types import ModelSerializerMeta, SerializerMeta
 from django.db.models import Model, Q
 from pydantic import BaseModel, ConfigDict, model_validator
@@ -70,7 +71,7 @@ class M2MRelationSchema(BaseModel):
     remove: bool = True
     get: bool = True
     path: Optional[str] = ""
-    auth: Optional[list] = None
+    auth: Any = NOT_SET
     filters: Optional[dict[str, tuple]] = None
     related_schema: Optional[Type[Schema]] = None
     serializer_class: Optional[SerializerMeta] = None

@@ -6,6 +6,7 @@ from typing import Any, Coroutine, List
 from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.http import HttpRequest
 from ninja import Path, Query, Schema, Status
+from ninja.constants import NOT_SET
 from pydantic import create_model
 from ninja_aio.decorators import unique_view, decorate_view
 from ninja_aio.models import ModelSerializer, ModelUtil
@@ -716,10 +717,19 @@ class ManyToManyAPI:
             await asyncio.gather(*tasks)
         return self._manage_response(related_name, added, removed)
 
+    def _relation_auth(self, relation: M2MRelationSchema, verb: str):
+        """Relation auth, then viewset ``m2m_auth``, then the viewset auth for the verb."""
+        if relation.auth is not NOT_SET:
+            return relation.auth
+        if self.default_auth is not NOT_SET:
+            return self.default_auth
+        if verb == "get":
+            return self.view_set.get_view_auth()
+        return self.view_set.patch_view_auth()
+
     def _build_views(self, relation: M2MRelationSchema):
         model = relation.model
         related_name = relation.related_name
-        m2m_auth = relation.auth or self.default_auth
         rel_util = ModelUtil(model, serializer_class=relation.serializer_class)
         rel_path = relation.path or rel_util.verbose_name_path_resolver()
         related_schema = relation.related_schema
@@ -736,7 +746,7 @@ class ManyToManyAPI:
         if m2m_get:
             self._register_get_relation_view(
                 related_name=related_name,
-                m2m_auth=m2m_auth,
+                m2m_auth=self._relation_auth(relation, "get"),
                 rel_util=rel_util,
                 rel_path=rel_path,
                 related_schema=related_schema,
@@ -750,7 +760,7 @@ class ManyToManyAPI:
             self._register_manage_relation_view(
                 related_model=model,
                 related_name=related_name,
-                m2m_auth=m2m_auth,
+                m2m_auth=self._relation_auth(relation, "post"),
                 rel_path=rel_path,
                 m2m_add=m2m_add,
                 m2m_remove=m2m_remove,
