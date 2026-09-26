@@ -355,6 +355,8 @@ entries marked "remove" before the final release.
 | `@action`/`@on` handlers (async only) | Accept `def` or `async def`; hooks follow the handler |
 | `@api_get`/`@api_post`/`@api_put`/`@api_patch`/`@api_delete`/`@api_options`/`@api_head` | Deprecate in favor of `@action`, which also works on `APIView` (non-detail only); remove in version 4 |
 | `register_admin`, `Branding` top-level imports | Deprecate at top level; import from `ninja_aio.admin`/`ninja_aio.docs` |
+| `CreateSerializer`/`ReadSerializer`/`UpdateSerializer`/`DetailSerializer` inner classes | Deprecate in favor of `Schemas` + `SchemaConfig`; remove in version 4 |
+| `Serializer.Meta.schema_in/out/update/detail`, `Meta.relations_as_id`, `SchemaModelConfig` | Deprecate in favor of `Schemas` + `SchemaConfig`; remove in version 4 |
 | HTTP bulk delete (single queryset delete) | Destroy per object with delete hooks; wire format unchanged |
 | `has_changed()`/`ahas_changed()` | Keep |
 | `ModelSerializer.as_admin()` | Keep |
@@ -398,12 +400,69 @@ Django app-registry side effects:
 from ninja_aio import (
     NinjaAIO, NinjaAIORouter, register_admin, Branding,
     APIView, APIViewSet,
-    ModelSerializer, Serializer,
+    ModelSerializer, Serializer, SchemaConfig,
     action, on, HttpMethod,
 )
 ```
 
-`SchemaConfig` joins this list with the unified serializer configuration.
+## Serializer configuration
+
+Both serializer styles declare schemas with the same `Schemas` class:
+
+```python
+class Book(ModelSerializer):
+    class Schemas:
+        create = SchemaConfig(fields=["title", "author"], nested={"chapters": Chapter})
+        update = SchemaConfig(optionals=[("title", str)])
+        read = SchemaConfig(fields=["id", "title", "author"], relations_as_id=["author"])
+        # detail omitted: reuses read
+
+    class CreateValidators:
+        @field_validator("title")
+        @classmethod
+        def strip(cls, value): ...
+
+class BookSerializer(Serializer[BookModel]):
+    class Meta:
+        model = BookModel
+        relations_serializers = {"author": AuthorSerializer}
+
+    class Schemas:
+        ...
+```
+
+```python
+@dataclass(frozen=True)
+class SchemaConfig:
+    fields: list[str | tuple[str, Any] | tuple[str, Any, Any]] = []
+    optionals: list[tuple[str, Any]] = []
+    customs: list[tuple[str, Any] | tuple[str, Any, Any]] = []
+    excludes: list[str] = []
+    relations_as_id: list[str] = []   # read/detail only
+    nested: dict[str, type[ModelSerializer]] = {}  # ModelSerializer create only
+    model_config: dict | None = None
+```
+
+- `Schemas` accepts `create`, `update`, `read`, and `detail`; an omitted
+  `detail` reuses `read` entirely.
+- Pydantic validators and schema method overrides live on
+  `CreateValidators`, `UpdateValidators`, `ReadValidators`, and
+  `DetailValidators` for both styles.
+- `Meta.model` and `Meta.relations_serializers` remain on `Serializer`;
+  `QuerySet` query optimizations are unchanged.
+- Django system checks validate `Schemas` at startup: unknown kinds
+  (`ninja_aio.E001`), non-`SchemaConfig` values (`E002`), unknown field names
+  (`E003`), a name in both `fields` and `optionals` (`E004`),
+  `relations_as_id`/`nested` on unsupported kinds or styles (`E005`), and
+  `relations_as_id` entries that are not relations (`E006`).
+- Version 2 configuration (`CreateSerializer`/`ReadSerializer`/
+  `UpdateSerializer`/`DetailSerializer` inner classes, `Meta.schema_*`, and
+  `Meta.relations_as_id`) is converted to `SchemaConfig` with a
+  `DeprecationWarning` at class creation and is removed in version 4. It keeps
+  its version 2 behavior, including the per-category detail fallback and the
+  ignored `SchemaModelConfig.exclude`. Declaring both `Schemas` and legacy
+  configuration on the same class raises `ImproperlyConfigured`. Legacy
+  configuration is not covered by the system checks.
 
 ## Stability rules
 
