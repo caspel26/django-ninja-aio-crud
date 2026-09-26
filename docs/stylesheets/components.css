@@ -524,6 +524,202 @@
   box-shadow: var(--nac-shadow-2);
 }
 
+/* ---------- Page patterns (front matter `type:`) ---------- */
+
+.md-typeset .nac-kicker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.8rem;
+  margin: 0 0 0.9rem;
+  font-family: var(--nac-font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.md-typeset .nac-kicker__type {
+  color: var(--nac-brand);
+}
+
+.md-typeset .nac-kicker__step {
+  color: var(--nac-text-2);
+}
+
+.md-typeset .nac-kicker__status {
+  padding: 0.05rem 0.45rem;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  letter-spacing: 0.04em;
+}
+
+.md-typeset .nac-kicker__status--new {
+  color: var(--nac-green);
+}
+
+.md-typeset .nac-kicker__status--changed {
+  color: var(--nac-brand);
+}
+
+.md-typeset .nac-kicker__status--deprecated {
+  color: var(--nac-amber);
+}
+
+/* Reading pages sit on a raised article sheet. */
+.md-content__inner:has(> .nac-kicker:is([data-type="guide"], [data-type="tutorial"], [data-type="concept"])) {
+  margin-top: 0.4rem;
+  padding: 1.6rem clamp(1rem, 3vw, 2.4rem) 1.4rem;
+  border: 1px solid var(--nac-edge);
+  border-radius: var(--nac-radius-l);
+  background: var(--nac-surface-1);
+  box-shadow: inset 0 1px 0 var(--nac-edge-light), var(--nac-shadow-2);
+}
+
+.md-content__inner:has(> .nac-kicker:is([data-type="guide"], [data-type="tutorial"], [data-type="concept"])) :is(.highlight, .tabbed-set, .admonition, details, table:not([class]), .nac-signature) {
+  background: var(--nac-bg);
+}
+
+.md-content__inner:has(> .nac-kicker:is([data-type="guide"], [data-type="tutorial"], [data-type="concept"])) > h1 + p {
+  color: var(--nac-text-2);
+  font-family: var(--nac-font-serif);
+  font-size: 1.02rem;
+  line-height: 1.5;
+}
+
+/* Reference pages are denser and use sans headings. */
+.md-content__inner:has(> .nac-kicker[data-type="reference"]) :is(h2, h3) {
+  font-family: var(--nac-font-sans);
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+
+.md-content__inner:has(> .nac-kicker[data-type="reference"]) h2 {
+  font-size: 1.1rem;
+}
+
+/* Numbered steps: <div class="nac-steps" markdown> with one ### per step. */
+.md-typeset .nac-steps {
+  margin: 1.4rem 0;
+  counter-reset: nac-step;
+}
+
+.md-typeset .nac-steps > h3 {
+  position: relative;
+  margin: 1.8rem 0 0.6rem;
+  padding-left: 2.2rem;
+  counter-increment: nac-step;
+}
+
+.md-typeset .nac-steps > h3::before {
+  content: counter(nac-step);
+  position: absolute;
+  left: 0;
+  top: -0.1rem;
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 1px solid var(--nac-edge-strong);
+  border-radius: 50%;
+  background: var(--nac-surface-2);
+  color: var(--nac-text);
+  font-family: var(--nac-font-mono);
+  font-size: 0.62rem;
+  font-weight: 600;
+}
+
+.md-typeset .nac-steps > :not(h3) {
+  margin-left: 2.2rem;
+}
+
+.md-typeset .nac-steps > h3:first-child {
+  margin-top: 0.6rem;
+}
+
+/* API signature: <div class="nac-signature" markdown> around one code block. */
+.md-typeset .nac-signature {
+  margin: 1rem 0 1.4rem;
+  border: 1px solid var(--nac-edge);
+  border-left: 2px solid var(--nac-brand);
+  border-radius: var(--nac-radius-m);
+  background: var(--nac-surface-1);
+  overflow: hidden;
+}
+
+.md-typeset .nac-signature .highlight {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.md-typeset .nac-signature .highlight pre > code {
+  font-size: 0.7rem;
+}
+
+/* Version notices and "Before you start": !!! new | changed | deprecated | prerequisites */
+:root {
+  --md-admonition-icon--new: url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 13h-4v4h-2v-4H7v-2h4V7h2v4h4m-5-9A10 10 0 0 0 2 12a10 10 0 0 0 10 10 10 10 0 0 0 10-10A10 10 0 0 0 12 2"/></svg>');
+  --md-admonition-icon--changed: url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 9l-4-4v3h-7v2h7v3M7 11l-4 4 4 4v-3h7v-2H7z"/></svg>');
+  --md-admonition-icon--deprecated: url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8.27 3 3 8.27v7.46L8.27 21h7.46L21 15.73V8.27L15.73 3M11 7h2v6h-2m0 2h2v2h-2"/></svg>');
+  --md-admonition-icon--prerequisites: url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9 20.42 2.79 14.21l2.83-2.83L9 14.77l9.88-9.89 2.83 2.83z"/></svg>');
+}
+
+.md-typeset :is(.admonition, details):is(.new, .changed, .deprecated, .prerequisites) > :is(.admonition-title, summary)::before {
+  -webkit-mask-image: var(--nac-notice-icon);
+  mask-image: var(--nac-notice-icon);
+}
+
+.md-typeset :is(.admonition, details).new {
+  --nac-notice-icon: var(--md-admonition-icon--new);
+  --nac-callout: var(--nac-green);
+  --nac-callout-tint: color-mix(in srgb, var(--nac-green) 12%, transparent);
+}
+
+.md-typeset :is(.admonition, details).changed {
+  --nac-notice-icon: var(--md-admonition-icon--changed);
+  --nac-callout: var(--nac-brand);
+  --nac-callout-tint: var(--nac-brand-tint);
+}
+
+.md-typeset :is(.admonition, details).deprecated {
+  --nac-notice-icon: var(--md-admonition-icon--deprecated);
+  --nac-callout: var(--nac-amber);
+  --nac-callout-tint: var(--nac-amber-tint);
+  --nac-callout-edge: color-mix(in srgb, var(--nac-amber) 35%, var(--nac-edge));
+}
+
+.md-typeset :is(.admonition, details).prerequisites {
+  --nac-notice-icon: var(--md-admonition-icon--prerequisites);
+  --nac-callout: var(--nac-text-2);
+  --nac-callout-tint: var(--nac-surface-2);
+}
+
+/* Previous/next learning navigation reads as a pair of cards on every page. */
+.md-footer__inner:not([hidden]) {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.md-footer__link--next {
+  grid-column: 2;
+  text-align: right;
+}
+
+@media screen and (max-width: 44.9375em) {
+  .md-typeset .nac-steps > :not(h3) {
+    margin-left: 0;
+  }
+
+  .md-content__inner:has(> .nac-kicker:is([data-type="guide"], [data-type="tutorial"], [data-type="concept"])) {
+    margin: 0;
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .md-typeset * {
     transition: none !important;

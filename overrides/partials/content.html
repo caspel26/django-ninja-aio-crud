@@ -1,0 +1,28 @@
+{% include "partials/actions.html" %}
+{% set meta = page.meta or {} %}
+{% set labels = {
+  "tutorial": "Tutorial", "guide": "Guide", "concept": "Concept",
+  "reference": "Reference", "migration": "Migration",
+  "release": "Releases", "benchmark": "Benchmarks"
+} %}
+{% if meta.type in labels %}
+  <div class="nac-kicker" data-type="{{ meta.type }}">
+    <span class="nac-kicker__type">{{ labels[meta.type] }}</span>
+    {% if meta.type == "tutorial" and meta.step %}
+      <span class="nac-kicker__step">Step {{ meta.step }}{% if meta.steps %} of {{ meta.steps }}{% endif %}</span>
+    {% endif %}
+    {% if meta.status in ["new", "changed", "deprecated"] %}
+      <span class="nac-kicker__status nac-kicker__status--{{ meta.status }}">
+        {% if meta.status == "new" %}New{% elif meta.status == "changed" %}Changed{% else %}Deprecated{% endif %}{% if meta.since %} in {{ meta.since }}{% endif %}
+      </span>
+    {% endif %}
+  </div>
+{% endif %}
+{% if "\u003ch1" not in page.content %}
+  <h1 id="__skip">{{ page.title | d(config.site_name, true) }}</h1>
+{% endif %}
+{{ page.content }}
+{% include "partials/tags.html" %}
+{% include "partials/source-file.html" %}
+{% include "partials/feedback.html" %}
+{% include "partials/comments.html" %}

@@ -575,3 +575,32 @@ Deferred:
   homepage baselines. Fixed along the way: dimmed demo lines and `small`
   labels (Material's 0.75 opacity) failed contrast, and the GitHub facts in the
   header did too once the API responded.
+
+### 11.8 Step 18 implementation: page patterns
+
+Pages opt into a layout with front matter; `overrides/partials/content.html`
+renders the label strip above the title, and CSS picks the layout from it.
+
+```yaml
+type: guide        # tutorial | guide | concept | reference | migration | release | benchmark
+step: 2            # tutorial only
+steps: 7           # tutorial only
+status: new        # new | changed | deprecated (optional)
+since: "3.0"       # version for the status label
+```
+
+| Pattern | Markdown |
+| --- | --- |
+| Article sheet, serif lede | automatic for `guide`, `tutorial`, `concept`; the first paragraph after the title is the lede |
+| Dense reference headings | automatic for `reference` |
+| Numbered steps | `<div class="nac-steps" markdown>` with one `###` heading per step |
+| Sync/async tabs | `=== "Sync"` / `=== "Async"` (linked across the page) |
+| API signature | `<div class="nac-signature" markdown>` around one fenced code block |
+| Version notices | `!!! new "New in 3.0"`, `!!! changed "Changed in 3.0"`, `!!! deprecated "Deprecated in 3.0"` |
+| Before you start | `!!! prerequisites "Before you start"` |
+| Callouts | `!!! note`, `tip`, `warning`, `danger`, collapsible `??? question` |
+| Previous/next | automatic from the navigation order (`navigation.footer`) |
+
+`docs/v3-components.md` shows every pattern on one page, is covered by
+`docs-tests` (52 checks pass), and is removed with the other `v3-*.md` files
+before release.
