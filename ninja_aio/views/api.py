@@ -28,6 +28,7 @@ from ninja_aio.helpers.api import ManyToManyAPI
 from ninja_aio.types import (
     BulkFailure,
     BulkResult,
+    HttpMethod,
     ModelSerializerMeta,
     VIEW_TYPES,
     BULK_TYPES,
@@ -51,7 +52,7 @@ ModelT = TypeVar("ModelT", bound=Model)
 
 @dataclass(frozen=True)
 class GeneratedRoute:
-    method: str
+    method: HttpMethod
     path: str
     auth: object
     summary: str
@@ -869,7 +870,7 @@ class APIViewSet(API, Generic[ModelT]):
         decorated = decorate_view(
             transaction_decorator, unique_view(self, plural=route.plural), *route.decorators
         )(route.handler)
-        return getattr(self.router, route.method)(
+        return getattr(self.router, route.method.value)(
             route.path,
             auth=route.auth,
             summary=route.summary,
@@ -892,7 +893,7 @@ class APIViewSet(API, Generic[ModelT]):
     def _register_create(self, handler: Callable) -> Callable:
         return self._register_generated(
             GeneratedRoute(
-                method="post",
+                method=HttpMethod.POST,
                 path=self.path,
                 auth=self.post_view_auth(),
                 summary=f"Create {self.model_verbose_name}",
@@ -965,7 +966,7 @@ class APIViewSet(API, Generic[ModelT]):
         )
         return self._register_generated(
             GeneratedRoute(
-                method="get", path=self.get_path, auth=self.get_view_auth(),
+                method=HttpMethod.GET, path=self.get_path, auth=self.get_view_auth(),
                 summary=f"List {self.model_verbose_name_plural}", description=self.list_docs,
                 response={200: paginated_schema, self.error_codes: self.error_schema},
                 handler=handler, decorators=tuple(self.extra_decorators.list), plural=True,
@@ -1027,7 +1028,7 @@ class APIViewSet(API, Generic[ModelT]):
         retrieve_schema = self._get_retrieve_schema()
         return self._register_generated(
             GeneratedRoute(
-                method="get", path=self.get_path_retrieve, auth=self.get_view_auth(),
+                method=HttpMethod.GET, path=self.get_path_retrieve, auth=self.get_view_auth(),
                 summary=f"Retrieve {self.model_verbose_name}", description=self.retrieve_docs,
                 response={200: retrieve_schema, self.error_codes: self.error_schema},
                 handler=handler, decorators=tuple(self.extra_decorators.retrieve),
@@ -1071,7 +1072,7 @@ class APIViewSet(API, Generic[ModelT]):
     def _register_update(self, handler: Callable) -> Callable:
         return self._register_generated(
             GeneratedRoute(
-                method="patch", path=self.path_retrieve, auth=self.patch_view_auth(),
+                method=HttpMethod.PATCH, path=self.path_retrieve, auth=self.patch_view_auth(),
                 summary=f"Update {self.model_verbose_name}", description=self.update_docs,
                 response={200: self.schema_update_out, self.error_codes: self.error_schema},
                 handler=handler, decorators=tuple(self.extra_decorators.update), atomic=True,
@@ -1133,7 +1134,7 @@ class APIViewSet(API, Generic[ModelT]):
         )
         return self._register_generated(
             GeneratedRoute(
-                method="delete", path=self.path_retrieve, auth=self.delete_view_auth(),
+                method=HttpMethod.DELETE, path=self.path_retrieve, auth=self.delete_view_auth(),
                 summary=f"Delete {self.model_verbose_name}", description=self.delete_docs,
                 response=response, handler=handler,
                 decorators=tuple(self.extra_decorators.delete), atomic=True,
@@ -1235,7 +1236,7 @@ class APIViewSet(API, Generic[ModelT]):
         )
 
     def _register_bulk(
-        self, method: str, auth, summary: str, description: str, handler: Callable, decorators
+        self, method: HttpMethod, auth, summary: str, description: str, handler: Callable, decorators
     ) -> Callable:
         return self._register_generated(
             GeneratedRoute(
@@ -1248,7 +1249,7 @@ class APIViewSet(API, Generic[ModelT]):
 
     def _register_bulk_create(self, handler: Callable) -> Callable:
         return self._register_bulk(
-            "post", self.post_view_auth(), "Bulk Create", self.bulk_create_docs,
+            HttpMethod.POST, self.post_view_auth(), "Bulk Create", self.bulk_create_docs,
             handler, self.extra_decorators.bulk_create,
         )
 
@@ -1311,7 +1312,7 @@ class APIViewSet(API, Generic[ModelT]):
 
     def _register_bulk_update(self, handler: Callable) -> Callable:
         return self._register_bulk(
-            "patch", self.patch_view_auth(), "Bulk Update", self.bulk_update_docs,
+            HttpMethod.PATCH, self.patch_view_auth(), "Bulk Update", self.bulk_update_docs,
             handler, self.extra_decorators.bulk_update,
         )
 
@@ -1365,7 +1366,7 @@ class APIViewSet(API, Generic[ModelT]):
 
     def _register_bulk_delete(self, handler: Callable) -> Callable:
         return self._register_bulk(
-            "delete", self.delete_view_auth(), "Bulk Delete", self.bulk_delete_docs,
+            HttpMethod.DELETE, self.delete_view_auth(), "Bulk Delete", self.bulk_delete_docs,
             handler, self.extra_decorators.bulk_delete,
         )
 
@@ -1481,49 +1482,36 @@ class APIViewSet(API, Generic[ModelT]):
 
         return hooked_handler
 
+    def _build_action_handler(
+        self, name: str, method: Callable, config: ActionConfig, http_method: HttpMethod
+    ) -> Callable:
+        if config.prefetch_object and config.detail:
+            handler = self._build_on_handler(name, method)
+        else:
+            factory = ApiMethodFactory(http_method.value)
+            handler = factory._build_handler(self, method)
+            factory._apply_metadata(handler, method)
+            handler = self._with_operation_hook(handler, name)
+            if config.detail:
+                self._rename_pk_param(handler)
+        handler.__name__ = f"{name}_{http_method.value}_{self.model_util.model_name}"
+        for decorator in reversed(config.decorators or []):
+            handler = decorator(handler)
+        return handler
+
     def _register_single_action(
         self, name: str, method: Callable, config: ActionConfig
     ) -> None:
-        """
-        Register a single @action-decorated method on the router.
-
-        For each HTTP method in config.methods, resolves the URL path,
-        auth, and decorators, then registers the handler on the router.
-        """
+        """Register an @action/@on method on the router once per configured HTTP method."""
         _, path = self._resolve_action_path(name, config)
-
         for http_method in config.methods:
-            factory = ApiMethodFactory(http_method)
-            auth = (
-                config.auth
-                if config.auth is not NOT_SET
-                else self._auth_view(http_method)
-            )
             summary = config.summary or (
-                f"{http_method.upper()} {name.replace('_', ' ').title()}"
+                f"{http_method.value.upper()} {name.replace('_', ' ').title()}"
                 f" {self.model_verbose_name}"
             )
-
-            if config.prefetch_object and config.detail:
-                # @on shorthand: pre-fetch object, hooks built into handler
-                handler = self._build_on_handler(name, method)
-            else:
-                handler = factory._build_handler(self, method)
-                factory._apply_metadata(handler, method)
-                handler = self._with_operation_hook(handler, name)
-
-                if config.detail:
-                    self._rename_pk_param(handler)
-
-            handler.__name__ = f"{name}_{http_method}_{self.model_util.model_name}"
-
-            if config.decorators:
-                for dec in reversed(config.decorators):
-                    handler = dec(handler)
-
-            registered_handler = getattr(self.router, http_method)(
+            self._operations[name] = getattr(self.router, http_method.value)(
                 path=path,
-                auth=auth,
+                auth=config.auth if config.auth is not NOT_SET else self._auth_view(http_method.value),
                 throttle=config.throttle,
                 response=config.response,
                 summary=summary,
@@ -1533,12 +1521,9 @@ class APIViewSet(API, Generic[ModelT]):
                 url_name=config.url_name,
                 include_in_schema=config.include_in_schema,
                 openapi_extra=config.openapi_extra,
-            )(handler)
-            self._operations[name] = registered_handler
-
+            )(self._build_action_handler(name, method, config, http_method))
             logger.debug(
-                f"Registered action {http_method.upper()} {path} "
-                f"for {self.model.__name__}"
+                f"Registered action {http_method.value.upper()} {path} for {self.model.__name__}"
             )
 
     def _register_actions(self) -> None:

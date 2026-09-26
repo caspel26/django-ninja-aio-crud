@@ -10,6 +10,7 @@ from pydantic import create_model
 from ninja_aio.views.api import APIViewSet, GeneratedRoute
 from ninja_aio.exceptions import ForbiddenError, NotFoundError
 from ninja_aio.schemas import RelationFilterSchema, MatchCaseFilterSchema
+from ninja_aio.types import HttpMethod
 
 # TypeVar for generic model typing in mixins
 ModelT = TypeVar("ModelT", bound=Model)
@@ -866,7 +867,7 @@ class SoftDeleteViewSetMixin(APIViewSet[ModelT]):
 
         self._register_generated(
             GeneratedRoute(
-                method="post",
+                method=HttpMethod.POST,
                 path=f"{self.path_retrieve}/restore",
                 auth=self.patch_view_auth(),
                 summary=f"Restore {self.model_verbose_name}",
@@ -903,7 +904,7 @@ class SoftDeleteViewSetMixin(APIViewSet[ModelT]):
 
         self._register_generated(
             GeneratedRoute(
-                method="delete",
+                method=HttpMethod.DELETE,
                 path=f"{self.path_retrieve}/hard-delete",
                 auth=self.delete_view_auth(),
                 summary=f"Hard Delete {self.model_verbose_name}",
