@@ -651,6 +651,10 @@ Each step must leave the branch in a coherent, testable state.
 
 - Remove approved deprecated aliases and public `.util` access.
 - Retain `_util` only where required internally.
+- Extend `@action` to `APIView` (non-detail only, auth from the view) and add
+  `OPTIONS`/`HEAD` to `HttpMethod`; deprecate the `@api_*` decorators, which
+  bypass viewset hooks, MCP registration, and mode validation.
+- Deprecate the top-level `register_admin` and `Branding` imports.
 - Run the complete suite, typing examples, benchmarks, and package build.
 
 ### Step 14: Redesign the documentation architecture

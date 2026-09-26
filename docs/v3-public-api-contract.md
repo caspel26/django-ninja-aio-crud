@@ -353,6 +353,8 @@ entries marked "remove" before the final release.
 | `create_view()`, `list_view()`, `retrieve_view()`, `update_view()`, `delete_view()` (async) | Now register sync endpoints; async factories are `acreate_view()` etc. |
 | `bulk_create_view()`, `bulk_update_view()`, `bulk_delete_view()` (async) | Now register sync endpoints; async factories are `abulk_create_view()` etc. |
 | `@action`/`@on` handlers (async only) | Accept `def` or `async def`; hooks follow the handler |
+| `@api_get`/`@api_post`/`@api_put`/`@api_patch`/`@api_delete`/`@api_options`/`@api_head` | Deprecate in favor of `@action`, which also works on `APIView` (non-detail only); remove in version 4 |
+| `register_admin`, `Branding` top-level imports | Deprecate at top level; import from `ninja_aio.admin`/`ninja_aio.docs` |
 | HTTP bulk delete (single queryset delete) | Destroy per object with delete hooks; wire format unchanged |
 | `has_changed()`/`ahas_changed()` | Keep |
 | `ModelSerializer.as_admin()` | Keep |
@@ -380,6 +382,28 @@ uses (its `execution_mode` plus the `def`/`async def` of its actions).
 Per-relation M2M handlers (`<related_name>_query_handler` and
 `<related_name>_query_params_handler`) keep a single name and must be declared
 with the kind matching the mode.
+
+Framework integrations follow the handler's declared kind: MCP tool
+invocation awaits coroutine handlers and runs sync handlers through
+`sync_to_async()`, and async authentication classes (`AsyncJwtBearer`,
+`AsyncJwtCookie`) protect sync endpoints through Django Ninja's
+`async_to_sync()` bridge.
+
+## Top-level imports
+
+The supported import surface is resolved lazily so `import ninja_aio` has no
+Django app-registry side effects:
+
+```python
+from ninja_aio import (
+    NinjaAIO, NinjaAIORouter, register_admin, Branding,
+    APIView, APIViewSet,
+    ModelSerializer, Serializer,
+    action, on, HttpMethod,
+)
+```
+
+`SchemaConfig` joins this list with the unified serializer configuration.
 
 ## Stability rules
 
