@@ -17,7 +17,7 @@ from pydantic import BaseModel, create_model
 
 from ninja_aio.schemas.helpers import DecoratorsSchema
 
-from ninja_aio.models import ModelSerializer, ModelUtil
+from ninja_aio.models import ModelUtil
 from ninja_aio.schemas import (
     GenericMessageSchema,
     M2MRelationSchema,
@@ -824,8 +824,8 @@ class APIViewSet(API, Generic[ModelT]):
         return None if source is None else source.get_schema(kind)
 
     async def aquery_params_handler(
-        self, queryset: QuerySet[ModelSerializer], filters: dict
-    ) -> QuerySet:
+        self, queryset: QuerySet[ModelT], filters: dict
+    ) -> QuerySet[ModelT]:
         """
         Override to apply custom filtering logic for list_view.
         filters is already validated and dumped.
@@ -834,8 +834,8 @@ class APIViewSet(API, Generic[ModelT]):
         return queryset
 
     def query_params_handler(
-        self, queryset: QuerySet[ModelSerializer], filters: dict
-    ) -> QuerySet:
+        self, queryset: QuerySet[ModelT], filters: dict
+    ) -> QuerySet[ModelT]:
         """Synchronous counterpart of aquery_params_handler, used by sync endpoints."""
         return queryset
 

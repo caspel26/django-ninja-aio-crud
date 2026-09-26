@@ -1,9 +1,10 @@
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase, tag
 from ninja import Schema
 
 from ninja_aio.exceptions import SerializeError
 from ninja_aio.models import transformations as model_transformations
 from ninja_aio.schemas.helpers import ObjectQuerySchema
+from tests.test_app import models as app_models
 from tests.generics.request import Request
 from tests.test_app.models import (
     TestModel,
@@ -193,3 +194,13 @@ class TransformationRuleTests(SimpleTestCase):
             model_transformations.dump_models((first, second), _OutputSchema),
             [{"name": "first"}, {"name": "second"}],
         )
+
+
+@tag("schema_config")
+class InlineCustomInputTests(TestCase):
+    def test_inline_custom_create_field_is_not_saved_on_the_model(self):
+        obj = app_models.TestModelSerializerInlineCustoms.create(
+            {"name": "inline", "description": "d", "extra_create_input": "x"}
+        )
+        self.assertEqual(obj.name, "inline")
+        self.assertTrue(app_models.TestModelSerializerInlineCustoms.is_custom("extra_create_input"))

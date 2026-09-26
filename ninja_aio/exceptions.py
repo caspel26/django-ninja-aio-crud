@@ -33,6 +33,8 @@ class BaseException(Exception):
         If `error` is a string, it is wrapped into a dict under the `error` key.
         If `error` is a dict, it is used directly. Optional `details` are merged.
         """
+        if error is None:
+            error = type(self).error or None
         self.error = (
             {"error": error} if isinstance(error, str) else dict(error or {})
         )
@@ -62,8 +64,9 @@ class SerializeError(BaseException):
 
 
 class AuthError(BaseException):
-    """Raised when authentication or authorization fails."""
+    """Raised when authentication fails (HTTP 401)."""
 
+    status_code = 401
     code = "authentication_error"
 
 
@@ -126,11 +129,26 @@ class PydanticValidationError(BaseException):
         super().__init__("Validation Error", 400, details)
 
 
+_JSON_SCALARS = (str, int, float, bool, type(None))
+
+
+def _json_safe_errors(exc: ValidationError) -> list[dict]:
+    """Pydantic error details with non-JSON context values (e.g. ValueError) as strings."""
+    details = exc.errors(include_input=False)
+    for detail in details:
+        if ctx := detail.get("ctx"):
+            detail["ctx"] = {
+                key: value if isinstance(value, _JSON_SCALARS) else str(value)
+                for key, value in ctx.items()
+            }
+    return details
+
+
 class OperationValidationError(PydanticValidationError):
     """Structured validation error from a direct serializer operation."""
 
     def __init__(self, exc: ValidationError):
-        details = exc.errors(include_input=False)
+        details = _json_safe_errors(exc)
         super().__init__(details)
         for detail in details:
             path = ".".join(str(part) for part in detail["loc"])
@@ -146,11 +164,12 @@ def _default_error(
 
 
 def _pydantic_validation_error(
-    request: HttpRequest, exc: PydanticValidationError, api: type[NinjaAPI]
+    request: HttpRequest, exc: ValidationError, api: type[NinjaAPI]
 ) -> HttpResponse:
     """Translate a pydantic ValidationError into a normalized API error response."""
-    logger.debug(f"Handling PydanticValidationError: {exc.errors(include_input=False)}")
-    error = PydanticValidationError(exc.errors(include_input=False))
+    details = _json_safe_errors(exc)
+    logger.debug(f"Handling pydantic ValidationError: {details}")
+    error = PydanticValidationError(details)
     return api.create_response(request, error.error, status=error.status_code)
 
 

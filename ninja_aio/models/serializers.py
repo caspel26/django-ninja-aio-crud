@@ -945,12 +945,15 @@ class BaseSerializer:
         Returns
         -------
         bool
-            ``True`` if the field appears in the customs category for either
-            ``create`` or ``update`` serializer types.
+            ``True`` if the field appears in the customs category (or as an
+            inline custom tuple in ``fields``) for either ``create`` or
+            ``update`` serializer types.
         """
-        return cls._is_special_field(
-            "create", field, "customs"
-        ) or cls._is_special_field("update", field, "customs")
+        return any(
+            cls._is_special_field(kind, field, "customs")
+            or any(name == field for name, *_ in cls.get_inline_customs(kind))
+            for kind in ("create", "update")
+        )
 
     @classmethod
     def is_optional(cls, field: str) -> bool:
@@ -1307,7 +1310,7 @@ class BaseSerializer:
         """
         Return synthetic custom field tuples for nested-write relations.
 
-        Overridden by ``ModelSerializer`` to translate ``CreateSerializer.nested``
+        Overridden by ``ModelSerializer`` to translate ``Schemas.create nested``
         into ``(field_name, list[ChildInSchema], default)`` tuples consumable by
         ``create_schema``. The base implementation is a no-op so ``Serializer``
         (Meta-driven) does not need to support nested writes.
@@ -2068,6 +2071,59 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
         )
 
     @classmethod
+    async def abulk_create(
+        cls: type[ModelSerializerT],
+        items: Iterable[InputData],
+        *,
+        request: HttpRequest | None = None,
+    ) -> BulkResult[ModelSerializerT]:
+        return cast(
+            BulkResult[ModelSerializerT],
+            await super().abulk_create(items, request=request),
+        )
+
+    @classmethod
+    def bulk_update(
+        cls: type[ModelSerializerT],
+        items: Iterable[InputData | tuple[models.Model | PrimaryKey, InputData]],
+        *,
+        request: HttpRequest | None = None,
+    ) -> BulkResult[ModelSerializerT]:
+        return cast(
+            BulkResult[ModelSerializerT], super().bulk_update(items, request=request)
+        )
+
+    @classmethod
+    async def abulk_update(
+        cls: type[ModelSerializerT],
+        items: Iterable[InputData | tuple[models.Model | PrimaryKey, InputData]],
+        *,
+        request: HttpRequest | None = None,
+    ) -> BulkResult[ModelSerializerT]:
+        return cast(
+            BulkResult[ModelSerializerT],
+            await super().abulk_update(items, request=request),
+        )
+
+    @classmethod
+    def get_queryset(
+        cls: type[ModelSerializerT],
+        *,
+        request: HttpRequest | None = None,
+        optimize_for: QueryPurpose | None = None,
+    ) -> models.QuerySet[ModelSerializerT]:
+        return super().get_queryset(request=request, optimize_for=optimize_for)
+
+    @classmethod
+    async def aget_queryset(
+        cls: type[ModelSerializerT],
+        *,
+        request: HttpRequest | None = None,
+        optimize_for: QueryPurpose | None = None,
+    ) -> models.QuerySet[ModelSerializerT]:
+        return await super().aget_queryset(request=request, optimize_for=optimize_for)
+
+    @classmethod
     def get(
         cls: type[ModelSerializerT],
         pk: PrimaryKey | None = None,
@@ -2350,7 +2406,7 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
         """
         nested = cls._schema_config("create").nested
         if not isinstance(nested, dict):
-            raise ImproperlyConfigured("CreateSerializer.nested must be a dict")
+            raise ImproperlyConfigured("Schemas.create nested must be a dict")
         return nested
 
     @classmethod
@@ -2382,7 +2438,7 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
             )
             if relation is None:
                 raise ImproperlyConfigured(
-                    f"{cls.__name__}.CreateSerializer.nested: unknown relation '{field_name}'"
+                    f"{cls.__name__}.Schemas.create nested: unknown relation '{field_name}'"
                 ) from exc
         child = cls.get_nested_fields()[field_name]
         if (
@@ -2393,7 +2449,7 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
             or relation.get_accessor_name() != field_name
         ):
             raise ImproperlyConfigured(
-                f"{cls.__name__}.CreateSerializer.nested['{field_name}'] must "
+                f"{cls.__name__}.Schemas.create nested['{field_name}'] must "
                 "reference the ModelSerializer for a reverse ForeignKey relation"
             )
         return relation.field.name
@@ -2455,7 +2511,7 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
         """
         Build ``(field_name, list[ChildInSchema], default)`` tuples for nested writes.
 
-        For each entry in ``CreateSerializer.nested``, generates a dedicated
+        For each entry in ``Schemas.create nested``, generates a dedicated
         input schema for the child model that excludes the FK field pointing
         back at the parent (it is injected at creation time, not supplied by
         the client).
@@ -2470,7 +2526,7 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
             return []
         path = getattr(_nested_schema_state, "path", ())
         if cls in path:
-            raise ImproperlyConfigured("Cyclic CreateSerializer.nested configuration")
+            raise ImproperlyConfigured("Cyclic Schemas.create nested configuration")
         _nested_schema_state.path = path + (cls,)
         try:
             customs = []
@@ -2814,6 +2870,51 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         return cast(
             BulkResult[ModelT], cls._bulk_create_operation(items, request=request)
         )
+
+    @classmethod
+    async def abulk_create(
+        cls: type["Serializer[ModelT]"],
+        items: Iterable[InputData],
+        *,
+        request: HttpRequest | None = None,
+    ) -> BulkResult[ModelT]:
+        return cast(BulkResult[ModelT], await super().abulk_create(items, request=request))
+
+    @classmethod
+    def bulk_update(
+        cls: type["Serializer[ModelT]"],
+        items: Iterable[InputData | tuple[models.Model | PrimaryKey, InputData]],
+        *,
+        request: HttpRequest | None = None,
+    ) -> BulkResult[ModelT]:
+        return cast(BulkResult[ModelT], super().bulk_update(items, request=request))
+
+    @classmethod
+    async def abulk_update(
+        cls: type["Serializer[ModelT]"],
+        items: Iterable[InputData | tuple[models.Model | PrimaryKey, InputData]],
+        *,
+        request: HttpRequest | None = None,
+    ) -> BulkResult[ModelT]:
+        return cast(BulkResult[ModelT], await super().abulk_update(items, request=request))
+
+    @classmethod
+    def get_queryset(
+        cls: type["Serializer[ModelT]"],
+        *,
+        request: HttpRequest | None = None,
+        optimize_for: QueryPurpose | None = None,
+    ) -> models.QuerySet[ModelT]:
+        return super().get_queryset(request=request, optimize_for=optimize_for)
+
+    @classmethod
+    async def aget_queryset(
+        cls: type["Serializer[ModelT]"],
+        *,
+        request: HttpRequest | None = None,
+        optimize_for: QueryPurpose | None = None,
+    ) -> models.QuerySet[ModelT]:
+        return await super().aget_queryset(request=request, optimize_for=optimize_for)
 
     @classmethod
     def get(

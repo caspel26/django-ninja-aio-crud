@@ -1,9 +1,12 @@
 from django.test import TestCase, tag
 from django.db import IntegrityError
 from django.http import HttpRequest
-from pydantic import BaseModel, Field, ValidationError
+import json
+
+from pydantic import BaseModel, Field, ValidationError, field_validator
 from ninja_aio.api import NinjaAIO
 from ninja_aio.exceptions import (
+    AuthError,
     BaseException,
     SerializeError,
     NotFoundError,
@@ -26,6 +29,34 @@ class DummyNestedModel(BaseModel):
 
 @tag("exceptions_base")
 class BaseExceptionTestCase(TestCase):
+    def test_subclass_error_default_is_used_without_arguments(self):
+        class PaymentRequired(BaseException):
+            error = "payment required"
+            status_code = 402
+
+        exc = PaymentRequired()
+        self.assertEqual(exc.error, {"error": "payment required"})
+        self.assertEqual(exc.status_code, 402)
+
+    def test_auth_error_defaults_to_401(self):
+        self.assertEqual(AuthError("bad token").status_code, 401)
+
+    def test_operation_validation_error_details_are_json_serializable(self):
+        class Validated(BaseModel):
+            name: str
+
+            @field_validator("name")
+            @classmethod
+            def reject(cls, value):
+                raise ValueError("Name is not allowed")
+
+        try:
+            Validated(name="x")
+        except ValidationError as exc:
+            error = OperationValidationError(exc)
+        json.dumps(error.error)
+        self.assertEqual(error.field_errors["name"], ["Value error, Name is not allowed"])
+
     def test_string_error_conversion(self):
         exc = BaseException("bad", 418, details="info")
         self.assertEqual(exc.error["error"], "bad")

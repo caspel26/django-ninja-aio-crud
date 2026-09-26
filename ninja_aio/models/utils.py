@@ -1339,6 +1339,7 @@ class ModelUtil(Generic[ModelT]):
             for name in extra_fields:
                 payload.pop(self.model._meta.get_field(name).attname, None)
             payload.update(extra_fields)
+        logger.info(f"Creating {self.model.__name__}")
         hooks = get_hooks(self.serializer_class or self.model)
         atomic = (
             transaction.atomic(using=using)
@@ -1354,6 +1355,7 @@ class ModelUtil(Generic[ModelT]):
                 )
             self._invoke_create_hooks(request, obj, payload, customs, hooks)
             self._create_nested_children(request, data, obj)
+        logger.debug(f"Created {self.model.__name__} (pk={obj.pk})")
         return obj
 
     @cached_property
@@ -1448,6 +1450,7 @@ class ModelUtil(Generic[ModelT]):
         )
 
         obj = instance or self.get_object(request, pk, is_for="read")
+        logger.info(f"Updating {self.model.__name__} (pk={obj.pk})")
         payload, customs = self.parse_input_data(
             request, data, fk_cache, partial=True
         )
@@ -1497,6 +1500,7 @@ class ModelUtil(Generic[ModelT]):
         )
 
         obj = instance or self.get_object(request, pk)
+        logger.info(f"Deleting {self.model.__name__} (pk={obj.pk})")
         hooks = get_hooks(self.serializer_class or self.model)
         atomic = (
             transaction.atomic(using=router.db_for_write(self.model))
