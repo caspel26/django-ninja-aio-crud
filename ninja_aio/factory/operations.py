@@ -1,4 +1,5 @@
 import logging
+import warnings
 from typing import (
     Callable,
     Dict,
@@ -15,6 +16,11 @@ from ninja import Router
 
 
 logger = logging.getLogger("ninja_aio.factory")
+
+
+def register_route(router: Router, method: str, path: str, **options: Any) -> Callable:
+    """Return a decorator registering a view for any HTTP method, including HEAD/OPTIONS."""
+    return router.api_operation([str(method).upper()], path, **options)
 
 
 class ApiMethodFactory:
@@ -225,9 +231,10 @@ class ApiMethodFactory:
                 logger.debug(
                     f"Registering {self.method_name.upper()} endpoint at {path}"
                 )
-                route_adder = getattr(router, self.method_name)
-                route_adder(
-                    path=path,
+                register_route(
+                    router,
+                    self.method_name,
+                    path,
                     auth=auth,
                     throttle=throttle,
                     response=response,
@@ -274,6 +281,12 @@ class ApiMethodFactory:
             openapi_extra: Optional[Dict[str, Any]] = None,
             decorators: Optional[List[Callable]] = None,  # es. [paginate(...)]
         ):
+            warnings.warn(
+                f"api_{method_name} is deprecated; use "
+                f"@action(detail=False, methods=['{method_name}'], url_path=...) instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
             return cls(method_name).build_decorator(
                 path,
                 auth=auth,

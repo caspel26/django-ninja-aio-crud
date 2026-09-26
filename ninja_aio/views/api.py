@@ -38,6 +38,7 @@ from ninja_aio.types import (
 from ninja_aio.decorators import unique_view, decorate_view, aatomic
 from ninja_aio.decorators.actions import ActionConfig
 from ninja_aio.factory import ApiMethodFactory
+from ninja_aio.factory.operations import register_route
 from ninja_aio.models import serializers
 from ninja_aio.models import transformations as model_transformations
 from ninja_aio.models.utils import bulk_failure
@@ -129,6 +130,101 @@ class API:
                 method._api_register(self)
         return self.router
 
+    async def aon_before_operation(self, request: HttpRequest, operation: str) -> None:
+        """Hook called before every CRUD/bulk/@action view. Override for view-level checks."""
+
+    def on_before_operation(self, request: HttpRequest, operation: str) -> None:
+        """Synchronous counterpart of aon_before_operation, used by sync endpoints."""
+
+    def _iter_actions(self):
+        for name in dir(self.__class__):
+            method = getattr(self.__class__, name, None)
+            config = getattr(method, "_action_config", None)
+            if config is not None:
+                yield name, method, config
+
+    def _auth_view(self, view_type: str) -> list | None:
+        """Auth applied to actions for an HTTP verb."""
+        return self.auth
+
+    def _action_summary_suffix(self) -> str:
+        return ""
+
+    def _action_name_suffix(self) -> str:
+        return type(self).__name__.lower()
+
+    def _resolve_action_path(self, name: str, config: ActionConfig) -> str:
+        return config.url_path if config.url_path is not None else name.replace("_", "-")
+
+    def _with_operation_hook(self, handler: Callable, name: str) -> Callable:
+        """Wrap an @action handler so aon_before_operation runs in the handler's mode."""
+        if inspect.iscoroutinefunction(handler):
+
+            @functools.wraps(handler)
+            async def hooked_handler(*args, **kwargs):
+                request = args[0] if args else kwargs.get("request")
+                await self.aon_before_operation(request, name)
+                return await handler(*args, **kwargs)
+
+        else:
+
+            @functools.wraps(handler)
+            def hooked_handler(*args, **kwargs):
+                request = args[0] if args else kwargs.get("request")
+                self.on_before_operation(request, name)
+                return handler(*args, **kwargs)
+
+        return hooked_handler
+
+    def _action_core_handler(
+        self, name: str, method: Callable, config: ActionConfig, http_method: HttpMethod
+    ) -> Callable:
+        factory = ApiMethodFactory(http_method.value)
+        handler = factory._build_handler(self, method)
+        factory._apply_metadata(handler, method)
+        return self._with_operation_hook(handler, name)
+
+    def _build_action_handler(
+        self, name: str, method: Callable, config: ActionConfig, http_method: HttpMethod
+    ) -> Callable:
+        handler = self._action_core_handler(name, method, config, http_method)
+        handler.__name__ = f"{name}_{http_method.value}_{self._action_name_suffix()}"
+        for decorator in reversed(config.decorators or []):
+            handler = decorator(handler)
+        return handler
+
+    def _register_single_action(
+        self, name: str, method: Callable, config: ActionConfig
+    ) -> None:
+        """Register an @action/@on method on the router once per configured HTTP method."""
+        path = self._resolve_action_path(name, config)
+        for http_method in config.methods:
+            summary = config.summary or (
+                f"{http_method.value.upper()} {name.replace('_', ' ').title()}"
+                f"{self._action_summary_suffix()}"
+            )
+            self._operations[name] = register_route(
+                self.router,
+                http_method,
+                path,
+                auth=config.auth if config.auth is not NOT_SET else self._auth_view(http_method.value),
+                throttle=config.throttle,
+                response=config.response,
+                summary=summary,
+                description=config.description,
+                tags=config.tags,
+                deprecated=config.deprecated,
+                url_name=config.url_name,
+                include_in_schema=config.include_in_schema,
+                openapi_extra=config.openapi_extra,
+            )(self._build_action_handler(name, method, config, http_method))
+            logger.debug(f"Registered action {http_method.value.upper()} {path} on {type(self).__name__}")
+
+    def _register_actions(self) -> None:
+        """Discover and register @action-decorated methods on the router."""
+        for name, method, config in self._iter_actions():
+            self._register_single_action(name, method, config)
+
     def add_views_to_route(self) -> None:
         self.api.add_router(f"{self.api_route_path}", self._add_views())
 
@@ -184,10 +280,18 @@ class APIView(API):
         self.router_tags = tags or self.router_tags or [self.router_tag]
         self.router = Router(tags=self.router_tags)
         self.error_codes = ERROR_CODES
+        self._operations: dict[str, Callable] = {}
+        for name, _, config in self._iter_actions():
+            if config.detail:
+                raise ImproperlyConfigured(
+                    f"{type(self).__name__}.{name}: detail actions (@action(detail=True), @on) "
+                    "require an APIViewSet."
+                )
 
     def _add_views(self) -> Router:
         super()._add_views()
         self.views()
+        self._register_actions()
         return self.router
 
 
@@ -558,9 +662,11 @@ class APIViewSet(API, Generic[ModelT]):
 
     def _auth_view(self, view_type: str) -> list | None:
         """
-        Resolve auth for a specific HTTP verb; falls back to self.auth if NOT_SET.
+        Resolve auth for an HTTP verb: HEAD follows GET, PUT follows PATCH, and verbs
+        without a specific setting (or set to NOT_SET) fall back to self.auth.
         """
-        auth = getattr(self, f"{view_type}_auth", None)
+        verb = {"head": "get", "put": "patch"}.get(view_type, view_type)
+        auth = getattr(self, f"{verb}_auth", NOT_SET)
         return auth if auth is not NOT_SET else self.auth
 
     def get_view_auth(self) -> list | None:
@@ -733,12 +839,6 @@ class APIViewSet(API, Generic[ModelT]):
         """Synchronous counterpart of aquery_params_handler, used by sync endpoints."""
         return queryset
 
-    async def aon_before_operation(self, request: HttpRequest, operation: str) -> None:
-        """Hook called before every CRUD/bulk/@action view. Override for view-level checks."""
-
-    def on_before_operation(self, request: HttpRequest, operation: str) -> None:
-        """Synchronous counterpart of aon_before_operation, used by sync endpoints."""
-
     async def aon_before_object_operation(self, request: HttpRequest, operation: str, obj: ModelT) -> None:
         """Hook called after fetch, before mutation (retrieve/update/delete). Override for object-level checks."""
 
@@ -761,13 +861,6 @@ class APIViewSet(API, Generic[ModelT]):
         ("_aapply_list_filters", "_apply_list_filters"),
     )
     """(async, sync) hook pairs that must be overridden together for the modes in use."""
-
-    def _iter_actions(self):
-        for name in dir(self.__class__):
-            method = getattr(self.__class__, name, None)
-            config = getattr(method, "_action_config", None)
-            if config is not None:
-                yield name, method, config
 
     def _modes_in_use(self) -> set[str]:
         modes = {self.execution_mode}
@@ -1391,23 +1484,15 @@ class APIViewSet(API, Generic[ModelT]):
         """
         pass
 
-    def _resolve_action_path(
-        self, name: str, config: ActionConfig
-    ) -> tuple[str, str]:
-        """
-        Resolve url_path and full route path for an action.
+    def _resolve_action_path(self, name: str, config: ActionConfig) -> str:
+        url_path = super()._resolve_action_path(name, config)
+        return f"{self.get_path_retrieve}/{url_path}" if config.detail else url_path
 
-        Returns
-        -------
-        tuple[str, str]
-            (url_path, route_path)
-        """
-        url_path = (
-            config.url_path if config.url_path is not None else name.replace("_", "-")
-        )
-        if config.detail:
-            return url_path, f"{self.get_path_retrieve}/{url_path}"
-        return url_path, url_path
+    def _action_summary_suffix(self) -> str:
+        return f" {self.model_verbose_name}"
+
+    def _action_name_suffix(self) -> str:
+        return self.model_util.model_name
 
     def _rename_pk_param(self, handler: Callable) -> None:
         """Rename the generic 'pk' parameter to the model's actual PK name."""
@@ -1462,74 +1547,15 @@ class APIViewSet(API, Generic[ModelT]):
         ])
         return on_handler
 
-    def _with_operation_hook(self, handler: Callable, name: str) -> Callable:
-        """Wrap an @action handler so aon_before_operation runs in the handler's mode."""
-        if inspect.iscoroutinefunction(handler):
-
-            @functools.wraps(handler)
-            async def hooked_handler(*args, **kwargs):
-                request = args[0] if args else kwargs.get("request")
-                await self.aon_before_operation(request, name)
-                return await handler(*args, **kwargs)
-
-        else:
-
-            @functools.wraps(handler)
-            def hooked_handler(*args, **kwargs):
-                request = args[0] if args else kwargs.get("request")
-                self.on_before_operation(request, name)
-                return handler(*args, **kwargs)
-
-        return hooked_handler
-
-    def _build_action_handler(
+    def _action_core_handler(
         self, name: str, method: Callable, config: ActionConfig, http_method: HttpMethod
     ) -> Callable:
         if config.prefetch_object and config.detail:
-            handler = self._build_on_handler(name, method)
-        else:
-            factory = ApiMethodFactory(http_method.value)
-            handler = factory._build_handler(self, method)
-            factory._apply_metadata(handler, method)
-            handler = self._with_operation_hook(handler, name)
-            if config.detail:
-                self._rename_pk_param(handler)
-        handler.__name__ = f"{name}_{http_method.value}_{self.model_util.model_name}"
-        for decorator in reversed(config.decorators or []):
-            handler = decorator(handler)
+            return self._build_on_handler(name, method)
+        handler = super()._action_core_handler(name, method, config, http_method)
+        if config.detail:
+            self._rename_pk_param(handler)
         return handler
-
-    def _register_single_action(
-        self, name: str, method: Callable, config: ActionConfig
-    ) -> None:
-        """Register an @action/@on method on the router once per configured HTTP method."""
-        _, path = self._resolve_action_path(name, config)
-        for http_method in config.methods:
-            summary = config.summary or (
-                f"{http_method.value.upper()} {name.replace('_', ' ').title()}"
-                f" {self.model_verbose_name}"
-            )
-            self._operations[name] = getattr(self.router, http_method.value)(
-                path=path,
-                auth=config.auth if config.auth is not NOT_SET else self._auth_view(http_method.value),
-                throttle=config.throttle,
-                response=config.response,
-                summary=summary,
-                description=config.description,
-                tags=config.tags,
-                deprecated=config.deprecated,
-                url_name=config.url_name,
-                include_in_schema=config.include_in_schema,
-                openapi_extra=config.openapi_extra,
-            )(self._build_action_handler(name, method, config, http_method))
-            logger.debug(
-                f"Registered action {http_method.value.upper()} {path} for {self.model.__name__}"
-            )
-
-    def _register_actions(self) -> None:
-        """Discover and register @action-decorated methods on the router."""
-        for name, method, config in self._iter_actions():
-            self._register_single_action(name, method, config)
 
     def _set_additional_views(self) -> Router:
         self.views()

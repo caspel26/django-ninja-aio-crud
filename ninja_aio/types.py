@@ -25,12 +25,14 @@ class HttpMethod(str, Enum):
     PUT = "put"
     PATCH = "patch"
     DELETE = "delete"
+    HEAD = "head"
+    OPTIONS = "options"
 
     def __str__(self) -> str:
         return self.value
 
 
-HttpMethodName: TypeAlias = Literal["get", "post", "put", "patch", "delete"]
+HttpMethodName: TypeAlias = Literal["get", "post", "put", "patch", "delete", "head", "options"]
 QueryPurpose: TypeAlias = Literal["read", "detail"]
 """Which read/detail relation optimizations a lookup applies."""
 BulkItemT = TypeVar("BulkItemT")
