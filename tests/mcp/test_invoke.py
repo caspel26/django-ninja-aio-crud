@@ -4,7 +4,7 @@ from django.test import TestCase, tag
 from ninja import Schema
 
 from ninja_aio import NinjaAIO
-from ninja_aio.decorators import action
+from ninja_aio.decorators import action, on
 from ninja_aio.mcp import ToolInvocationError, describe_viewset, invoke_tool
 from ninja_aio.mcp.invoke import _invoke_bulk, _invoke_crud
 from ninja_aio.views import APIViewSet
@@ -162,6 +162,64 @@ class InvokeActionTests(TestCase):
         result = await invoke_tool(spec, {"pk": obj.pk})
         self.assertEqual(result["message"], "activated")
         self.assertEqual(result["name"], "obj_activated")
+
+
+@tag("mcp")
+class InvokeSyncModeTests(TestCase):
+    """Sync handlers are dispatched through sync_to_async instead of awaited."""
+
+    @classmethod
+    def setUpTestData(cls):
+        class SyncModeAPI(APIViewSet):
+            model = models.TestModelSerializer
+            execution_mode = "sync"
+            bulk_operations = ["create"]
+
+            @action(detail=False, methods=["post"])
+            def ping(self, request, note: str):
+                return {"note": note}
+
+            @on("rename")
+            def rename(self, request, obj):
+                obj.name = "renamed"
+                obj.save(update_fields=["name"])
+                return {"name": obj.name}
+
+        cls.api = NinjaAIO(urls_namespace="mcp_invoke_sync_mode")
+        cls.viewset = SyncModeAPI(api=cls.api, prefix="mcp-invoke-sync-mode")
+        cls.viewset.add_views_to_route()
+        cls.by_name = {s.name: s for s in describe_viewset(cls.viewset)}
+
+    async def test_crud_round_trip(self):
+        created = await invoke_tool(
+            self.by_name["testmodelserializer_create"], {"name": "sync", "description": "d"}
+        )
+        pk = created["id"]
+        fetched = await invoke_tool(self.by_name["testmodelserializer_retrieve"], {"pk": pk})
+        self.assertEqual(fetched["name"], "sync")
+        listed = await invoke_tool(self.by_name["testmodelserializer_list"], {})
+        self.assertEqual(listed["count"], 1)
+        await invoke_tool(self.by_name["testmodelserializer_delete"], {"pk": pk})
+        self.assertFalse(await models.TestModelSerializer.objects.filter(pk=pk).aexists())
+
+    async def test_bulk_create(self):
+        result = await invoke_tool(
+            self.by_name["testmodelserializer_bulk_create"],
+            {"items": [{"name": "b1", "description": "d"}]},
+        )
+        self.assertEqual(result["success"]["count"], 1)
+
+    async def test_sync_actions(self):
+        obj = await models.TestModelSerializer.objects.acreate(name="obj", description="d")
+        ping = await invoke_tool(self.by_name["testmodelserializer_ping"], {"note": "hi"})
+        self.assertEqual(ping, {"note": "hi"})
+        renamed = await invoke_tool(self.by_name["testmodelserializer_rename"], {"pk": obj.pk})
+        self.assertEqual(renamed, {"name": "renamed"})
+
+    async def test_sync_errors_become_tool_invocation_errors(self):
+        with self.assertRaises(ToolInvocationError) as ctx:
+            await invoke_tool(self.by_name["testmodelserializer_retrieve"], {"pk": 999999})
+        self.assertEqual(ctx.exception.status_code, 404)
 
 
 class _EchoSchema(Schema):

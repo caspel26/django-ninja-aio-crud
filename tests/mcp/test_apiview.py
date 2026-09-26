@@ -10,6 +10,7 @@ from ninja_aio.mcp import (
 )
 from ninja_aio.views import APIView
 from tests.generics.views import GenericAPIView
+from tests.test_app import schema
 
 
 @tag("mcp")
@@ -51,6 +52,29 @@ class InvokeApiViewTests(TestCase):
     async def test_invoking_router_tool_calls_the_registered_handler(self):
         result = await invoke_tool(self.spec, {"data": {"a": 2, "b": 3}})
         self.assertEqual(result["result"], 5)
+
+
+@tag("mcp")
+class InvokeSyncApiViewTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        class SyncSumView(APIView):
+            api_route_path = "sync-sum/"
+            router_tag = "sync_sum"
+
+            def views(self):
+                @self.router.post("/", response=schema.SumSchemaOut)
+                def sync_sum(request, data: schema.SumSchemaIn):
+                    return {"result": data.a + data.b}
+
+        cls.api = NinjaAIO(urls_namespace="mcp_invoke_sync_apiview")
+        cls.view = SyncSumView(api=cls.api)
+        cls.view.add_views_to_route()
+        cls.spec = describe_api_view(cls.view)[0]
+
+    async def test_sync_endpoint_is_dispatched_off_the_event_loop(self):
+        result = await invoke_tool(self.spec, {"data": {"a": 4, "b": 5}})
+        self.assertEqual(result["result"], 9)
 
 
 @tag("mcp")

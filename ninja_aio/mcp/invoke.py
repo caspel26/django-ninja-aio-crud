@@ -1,7 +1,7 @@
 """Dispatch MCP tool calls to the already-registered operation handlers.
 
 CRUD/bulk/action ``ToolSpec``s point at ``owner._operations[spec.operation]``
-— the exact async closure django-ninja-aio-crud registered on the router for
+— the exact closure django-ninja-aio-crud registered on the router for
 that operation (see ``APIViewSet._add_views``/``_set_additional_views``/
 ``_register_single_action`` in ``ninja_aio/views/api.py``). Router
 ``ToolSpec``s (plain ``APIView`` endpoints) point at ``spec.view_func``
@@ -11,7 +11,8 @@ handler directly reuses pagination, filtering, and the
 ``aon_before_operation``/``aon_before_object_operation``/
 ``aquery_params_handler``/``on_list_queryset`` hooks exactly as the HTTP path
 does — only django-ninja's router-level ``auth=`` wiring is not applied (see
-``ninja_aio.mcp.context``).
+``ninja_aio.mcp.context``). Sync handlers (``execution_mode = "sync"`` viewsets,
+``def`` actions and endpoints) run through ``sync_to_async``.
 
 Each operation's arguments are built by a small ``(viewset, arguments) ->
 tuple`` function, looked up per ``spec.operation`` — the tables below are the
@@ -21,8 +22,10 @@ with (see the handler signatures in ``ninja_aio/views/api.py``).
 
 from __future__ import annotations
 
+import inspect
 from typing import Any, Callable, Optional
 
+from asgiref.sync import sync_to_async
 from ninja.responses import Status
 from pydantic import ValidationError
 
@@ -43,6 +46,12 @@ class ToolInvocationError(Exception):
 
     def __str__(self) -> str:
         return str(self.payload)
+
+
+async def _call(handler: Callable, *args: Any, **kwargs: Any) -> Any:
+    if inspect.iscoroutinefunction(handler):
+        return await handler(*args, **kwargs)
+    return await sync_to_async(handler)(*args, **kwargs)
 
 
 def _kwargs_from_action_params(spec: ToolSpec, arguments: dict) -> dict:
@@ -94,7 +103,7 @@ async def _invoke_crud(spec: ToolSpec, request, arguments: dict) -> Any:
     viewset = spec.owner
     handler = viewset._operations[spec.operation]
     args = _CRUD_ARG_BUILDERS[spec.operation](viewset, arguments)
-    return await handler(request, *args)
+    return await _call(handler, request, *args)
 
 
 # --- Bulk argument builders ---------------------------------------------------
@@ -123,7 +132,7 @@ async def _invoke_bulk(spec: ToolSpec, request, arguments: dict) -> Any:
     viewset = spec.owner
     handler = viewset._operations[spec.operation]
     args = _BULK_ARG_BUILDERS[spec.operation](viewset, arguments)
-    return await handler(request, *args)
+    return await _call(handler, request, *args)
 
 
 # --- Custom @action/@on and plain APIView endpoints ---------------------------
@@ -138,12 +147,12 @@ async def _invoke_action(spec: ToolSpec, request, arguments: dict) -> Any:
         pk_name = viewset.model_util.model_pk_name
         kwargs[pk_name] = arguments.get("pk")
 
-    return await handler(request, **kwargs)
+    return await _call(handler, request, **kwargs)
 
 
 async def _invoke_router(spec: ToolSpec, request, arguments: dict) -> Any:
     kwargs = _kwargs_from_action_params(spec, arguments)
-    return await spec.view_func(request, **kwargs)
+    return await _call(spec.view_func, request, **kwargs)
 
 
 _INVOKERS = {
