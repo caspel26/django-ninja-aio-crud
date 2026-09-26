@@ -3,7 +3,7 @@ import inspect
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass, replace
-from typing import Generic, List, Literal, NamedTuple, TypeVar
+from typing import Any, Generic, List, Literal, NamedTuple, TypeVar
 
 from ninja import NinjaAPI, Router, Schema, Path, Query, Status
 from ninja.constants import NOT_SET
@@ -13,7 +13,7 @@ from django.db import transaction
 from django.db.models import Model, QuerySet, prefetch_related_objects
 from django.conf import settings
 from django.core.exceptions import FieldDoesNotExist, ImproperlyConfigured
-from pydantic import create_model
+from pydantic import BaseModel, create_model
 
 from ninja_aio.schemas.helpers import DecoratorsSchema
 
@@ -1494,15 +1494,44 @@ class APIViewSet(API, Generic[ModelT]):
     def _action_name_suffix(self) -> str:
         return self.model_util.model_name
 
-    def _rename_pk_param(self, handler: Callable) -> None:
-        """Rename the generic 'pk' parameter to the model's actual PK name."""
+    def _rename_pk_param(self, handler: Callable) -> Callable:
+        """
+        Expose the generic 'pk' parameter under the model's actual PK name.
+
+        Ninja passes the path value using the exposed name, so the returned
+        wrapper maps it back to ``pk`` before calling the handler.
+        """
         pk_name = self.model_util.model_pk_name
         sig = inspect.signature(handler)
+        if pk_name == "pk" or "pk" not in sig.parameters:
+            return handler
         params = [
             p.replace(name=pk_name) if p.name == "pk" else p
             for p in sig.parameters.values()
         ]
-        handler.__signature__ = sig.replace(parameters=params)
+
+        if inspect.iscoroutinefunction(handler):
+
+            @functools.wraps(handler)
+            async def renamed(*args, **kwargs):
+                if pk_name in kwargs:
+                    kwargs["pk"] = kwargs.pop(pk_name)
+                return await handler(*args, **kwargs)
+
+        else:
+
+            @functools.wraps(handler)
+            def renamed(*args, **kwargs):
+                if pk_name in kwargs:
+                    kwargs["pk"] = kwargs.pop(pk_name)
+                return handler(*args, **kwargs)
+
+        renamed.__signature__ = sig.replace(parameters=params)
+        return renamed
+
+    def _on_handler_pk(self, value: Any) -> Any:
+        """Return the pk from Ninja's path schema (HTTP) or a raw value (MCP, direct calls)."""
+        return self._get_pk(value) if isinstance(value, BaseModel) else value
 
     def _build_on_handler(self, name: str, method: Callable) -> Callable:
         """
@@ -1520,7 +1549,8 @@ class APIViewSet(API, Generic[ModelT]):
             @functools.wraps(method)
             async def on_handler(request, **kwargs):
                 await self.aon_before_operation(request, name)
-                obj = await self._get_serializer().aget(kwargs.get(pk_name), request=request)
+                pk = self._on_handler_pk(kwargs.get(pk_name))
+                obj = await self._get_serializer().aget(pk, request=request)
                 await self.aon_before_object_operation(request, name, obj)
                 return await method(self, request, obj)
 
@@ -1529,7 +1559,8 @@ class APIViewSet(API, Generic[ModelT]):
             @functools.wraps(method)
             def on_handler(request, **kwargs):
                 self.on_before_operation(request, name)
-                obj = self._get_serializer().get(kwargs.get(pk_name), request=request)
+                pk = self._on_handler_pk(kwargs.get(pk_name))
+                obj = self._get_serializer().get(pk, request=request)
                 self.on_before_object_operation(request, name, obj)
                 return method(self, request, obj)
 
@@ -1554,7 +1585,7 @@ class APIViewSet(API, Generic[ModelT]):
             return self._build_on_handler(name, method)
         handler = super()._action_core_handler(name, method, config, http_method)
         if config.detail:
-            self._rename_pk_param(handler)
+            handler = self._rename_pk_param(handler)
         return handler
 
     def _set_additional_views(self) -> Router:
@@ -1578,11 +1609,16 @@ class APIViewSet(API, Generic[ModelT]):
         """
         Register CRUD (unless disabled), bulk, custom views, and M2M endpoints.
         If 'all' in disable only CRUD is skipped; bulk + M2M + custom still added.
+
+        Custom, action, M2M and bulk routes are registered first: Django
+        resolves URLs in order, so ``{pk}`` CRUD routes would otherwise
+        capture static segments such as ``stats`` or ``bulk/``.
         """
         super()._add_views()
+        self._set_additional_views()
         if "all" in self.disable:
             logger.debug(f"All CRUD views disabled for {self.model.__name__}")
-            return self._set_additional_views()
+            return self.router
         for views_type, (schema, view) in self._crud_views.items():
             if views_type not in self.disable and (
                 schema is not None or views_type == "delete"
@@ -1591,7 +1627,7 @@ class APIViewSet(API, Generic[ModelT]):
                 logger.debug(
                     f"Registered {views_type} view for {self.model.__name__}"
                 )
-        return self._set_additional_views()
+        return self.router
 
 
 class ReadOnlyViewSet(APIViewSet[ModelT]):
