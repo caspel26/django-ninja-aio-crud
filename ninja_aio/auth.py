@@ -1,5 +1,6 @@
 import datetime
 import logging
+from contextvars import ContextVar
 from typing import Optional
 
 from joserfc import jwt, jwk, errors
@@ -17,6 +18,12 @@ JWT_MANDATORY_CLAIMS = [
     ("iss", "JWT_ISSUER"),
     ("aud", "JWT_AUDIENCE"),
 ]
+
+# Auth instances are shared by every request, so the decoded token must live in
+# the request's own context (asyncio task or thread), never on the instance.
+_decoded_token: ContextVar[Optional[jwt.Token]] = ContextVar(
+    "ninja_aio_decoded_jwt", default=None
+)
 
 
 class JwtAuthMixin:
@@ -37,12 +44,21 @@ class JwtAuthMixin:
         algorithms (list[str]):
             List of permitted JWT algorithms for signature verification. Defaults to ["RS256"].
         dcd (jwt.Token | None):
-            Set after successful decode; holds the decoded token object (assigned dynamically).
+            The decoded token of the request being authenticated. Scoped to the
+            current request context, so concurrent requests never share it.
     """
 
     jwt_public: JwtKeys
     claims: dict[str, dict]
     algorithms: list[str] = ["RS256"]
+
+    @property
+    def dcd(self) -> Optional[jwt.Token]:
+        return _decoded_token.get()
+
+    @dcd.setter
+    def dcd(self, token: Optional[jwt.Token]) -> None:
+        _decoded_token.set(token)
 
     @classmethod
     def get_claims(cls):
@@ -63,6 +79,7 @@ class JwtAuthMixin:
         Authenticate the request and return the user if authentication is successful.
         If authentication fails, returns false.
         """
+        self.dcd = None
         if not token:
             logger.debug("No JWT token provided")
             return False

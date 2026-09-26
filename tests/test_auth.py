@@ -1,3 +1,6 @@
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+
 from django.test import TestCase, override_settings
 from django.http import HttpRequest
 from asgiref.sync import async_to_sync
@@ -114,6 +117,55 @@ class JwtAuthTests(JwtTestBase):
         bearer = TB()
         result = async_to_sync(bearer.authenticate)(HttpRequest(), token)
         self.assertEqual(result, "42")
+
+    def _shared_bearer(self):
+        pub = self.public_jwk
+
+        class SharedBearer(AsyncJwtBearer):
+            jwt_public = pub
+            claims = {
+                "iss": {"value": "test-issuer"},
+                "aud": {"value": "test-audience"},
+            }
+
+            async def auth_handler(self, request):
+                # Yield so the other request decodes its token in between.
+                await asyncio.sleep(0.01)
+                return self.dcd.claims.get("sub")
+
+        return SharedBearer()
+
+    def test_concurrent_async_requests_keep_their_own_claims(self):
+        bearer = self._shared_bearer()
+        alice = encode_jwt({"sub": "alice"}, duration=60)
+        bob = encode_jwt({"sub": "bob"}, duration=60)
+
+        async def authenticate_both():
+            return await asyncio.gather(
+                bearer.authenticate(HttpRequest(), alice),
+                bearer.authenticate(HttpRequest(), bob),
+            )
+
+        self.assertEqual(async_to_sync(authenticate_both)(), ["alice", "bob"])
+
+    def test_concurrent_threads_keep_their_own_claims(self):
+        bearer = self._shared_bearer()
+        tokens = {sub: encode_jwt({"sub": sub}, duration=60) for sub in ("alice", "bob")}
+
+        def authenticate(sub):
+            return async_to_sync(bearer.authenticate)(HttpRequest(), tokens[sub])
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(authenticate, ["alice", "bob"]))
+        self.assertEqual(results, ["alice", "bob"])
+
+    def test_failed_authentication_clears_previous_claims(self):
+        bearer = self._shared_bearer()
+        async_to_sync(bearer.authenticate)(
+            HttpRequest(), encode_jwt({"sub": "alice"}, duration=60)
+        )
+        self.assertFalse(async_to_sync(bearer.authenticate)(HttpRequest(), "not-a-jwt"))
+        self.assertIsNone(bearer.dcd)
 
     def test_async_bearer_authenticate_invalid_claims_returns_false(self):
         token = encode_jwt({"sub": "42"}, duration=60)
