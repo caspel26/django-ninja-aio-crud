@@ -1212,6 +1212,6 @@ Choose the pattern that best fits your project architecture and team structure.
 
 - :material-school: **Tutorial: Serializer** — Step-by-step guide
 
-    [:octicons-arrow-right-24: Serializer Tutorial](../../tutorial/serializer.md)
+    [:octicons-arrow-right-24: Serializer Tutorial](../../tutorial/model.md)
 
 </div>

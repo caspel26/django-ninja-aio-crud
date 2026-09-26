@@ -1,225 +1,130 @@
-# Permissions & Authorization
-
-<p class="tutorial-subtitle">
-Control who can access and modify your API resources with granular permission checks.
-</p>
-
+---
+type: tutorial
+step: 5
+steps: 7
+title: Add permissions
+description: Decide who can see and change each article.
 ---
 
-## Overview
+# Add permissions
 
-Django Ninja AIO CRUD separates **authentication** (who is the user?) from **authorization** (what can they do?). Authentication is handled by `AsyncJwtBearer` or any Django Ninja auth class. Authorization is handled by **permission mixins**.
+In this step you decide who can do what:
 
-Two mixins are available:
+- Everyone can read published articles. Drafts stay hidden.
+- Logged-in users can create and update articles.
+- Only staff users can delete or publish articles.
 
-| Mixin | Use case |
-|-------|----------|
-| `PermissionViewSetMixin` | Custom permission logic via overridable hooks |
-| `RoleBasedPermissionMixin` | Declarative role-to-operations mapping |
+## Add the permission mixin
 
----
+`PermissionViewSetMixin` gives you three methods to override. Returning `False`
+stops the request with `403`. In async viewsets the first two start with `a`.
 
-## PermissionViewSetMixin
+| Method | Runs | Use it to |
+| --- | --- | --- |
+| `has_permission` / `ahas_permission` | Before every operation | Allow or deny by operation |
+| `has_object_permission` / `ahas_object_permission` | After loading one object | Allow or deny by object |
+| `get_permission_queryset` | On the list endpoint | Hide rows |
 
-### Basic setup
+=== "Sync"
 
-```python
-from ninja_aio.views import APIViewSet
-from ninja_aio.views.mixins import PermissionViewSetMixin
+    ```python title="blog/api.py"
+    from ninja_aio.views.mixins import PermissionViewSetMixin
 
-class ArticleAPI(PermissionViewSetMixin, APIViewSet):
-    model = Article
 
-    async def a(self, request, operation):
-        """Called before any DB query."""
-        if operation in ("create", "update", "delete"):
-            return getattr(request.auth, "is_staff", False)
-        return True
-```
+    def is_staff(request):
+        user = getattr(request, "auth", None)
+        return bool(user and user.is_staff)
 
-With just this, non-staff users get a **403 Forbidden** response when trying to create, update, or delete articles, but can still list and retrieve.
 
-### Object-level permissions
+    @api.viewset(model=Article)
+    class ArticleViewSet(PermissionViewSetMixin, APIViewSet):
+        execution_mode = "sync"
+        auth = [JWTAuth()]
+        get_auth = None
 
-For row-level control, override `has_object_permission`. It receives the actual model instance **after** it's fetched from the database:
+        def has_permission(self, request, operation):
+            if operation in ("delete", "publish"):
+                return is_staff(request)
+            return True
 
-```python
-class ArticleAPI(PermissionViewSetMixin, APIViewSet):
-    model = Article
+        def has_object_permission(self, request, operation, obj):
+            if operation == "retrieve":
+                return obj.is_published
+            return True
 
-    async def a(self, request, operation):
-        return request.auth is not None
+        def get_permission_queryset(self, request, queryset):
+            return queryset.filter(is_published=True)
+    ```
 
-    async def a(self, request, operation, obj):
-        # Authors can edit their own articles; everyone else can only read
-        if operation in ("update", "delete"):
-            return obj.author_id == request.auth.id
-        return True
-```
+=== "Async"
 
-!!! info
-    `has_object_permission` is only called for **retrieve**, **update**, and **delete** operations. List views use `get_permission_queryset` instead to avoid N+1 queries.
+    ```python title="blog/api.py"
+    from ninja_aio.views.mixins import PermissionViewSetMixin
 
-### Row-level filtering
 
-Use `get_permission_queryset` to restrict which objects are visible in list views:
+    def is_staff(request):
+        user = getattr(request, "auth", None)
+        return bool(user and user.is_staff)
 
-```python
-class ArticleAPI(PermissionViewSetMixin, APIViewSet):
-    model = Article
 
-    def get_permission_queryset(self, request, queryset):
-        if not getattr(request.auth, "is_staff", False):
-            return queryset.filter(status="published")
-        return queryset
-```
+    @api.viewset(model=Article)
+    class ArticleViewSet(PermissionViewSetMixin, APIViewSet):
+        auth = [JWTAuth()]
+        get_auth = None
 
-### Complete example
+        async def ahas_permission(self, request, operation):
+            if operation in ("delete", "publish"):
+                return is_staff(request)
+            return True
 
-```python
-class ProjectAPI(PermissionViewSetMixin, APIViewSet):
-    model = Project
+        async def ahas_object_permission(self, request, operation, obj):
+            if operation == "retrieve":
+                return obj.is_published
+            return True
 
-    async def a(self, request, operation):
-        user = request.auth
-        if user is None:
-            return False
-        if operation == "create":
-            return user.can_create_projects
-        return True
+        def get_permission_queryset(self, request, queryset):
+            return queryset.filter(is_published=True)
+    ```
 
-    async def a(self, request, operation, obj):
-        user = request.auth
-        if operation in ("update", "delete"):
-            return obj.owner_id == user.id or user.is_admin
-        return True
+The operation is one of `list`, `retrieve`, `create`, `update` and `delete`.
+For custom actions it is the method name, like `publish`.
 
-    def get_permission_queryset(self, request, queryset):
-        user = request.auth
-        if user.is_admin:
-            return queryset
-        return queryset.filter(
-            Q(owner=user) | Q(members=user)
-        ).distinct()
-```
+## Try it
 
----
+| Request | Anonymous | Logged in | Staff |
+| --- | --- | --- | --- |
+| `GET /api/articles/` | Published only | Published only | Published only |
+| `GET` a draft | `403` | `403` | `403` |
+| `POST /api/articles/` | `401` | `201` | `201` |
+| `PATCH .../{id}/` | `401` | `200` | `200` |
+| `POST .../{id}/publish` | `401` | `403` | `200` |
+| `DELETE .../{id}/` | `401` | `403` | `204` |
 
-## RoleBasedPermissionMixin
+!!! note
 
-For simpler role-based access, use the declarative approach:
+    `request.auth` is only set on endpoints that require authentication. To let
+    staff users read drafts, remove `get_auth = None` so reading also needs a
+    token, then check `is_staff(request)` in `get_permission_queryset`.
+
+## Permissions by role
+
+If your user model has a `role` field, `RoleBasedPermissionMixin` maps roles to
+operations without writing any method:
 
 ```python
 from ninja_aio.views.mixins import RoleBasedPermissionMixin
 
-class BookAPI(RoleBasedPermissionMixin, APIViewSet):
-    model = Book
+
+@api.viewset(model=Article)
+class ArticleViewSet(RoleBasedPermissionMixin, APIViewSet):
+    auth = [JWTAuth()]
     permission_roles = {
-        "admin": ["create", "list", "retrieve", "update", "delete"],
-        "editor": ["create", "list", "retrieve", "update"],
+        "admin": ["list", "retrieve", "create", "update", "delete", "publish"],
+        "editor": ["list", "retrieve", "create", "update"],
         "reader": ["list", "retrieve"],
     }
 ```
 
-The mixin reads the role from `request.auth.role` by default. Customize with `role_attribute`:
+Users without a role, or with a role that is not listed, get `403`.
 
-```python
-class BookAPI(RoleBasedPermissionMixin, APIViewSet):
-    model = Book
-    role_attribute = "access_level"  # reads request.auth.access_level
-    permission_roles = {
-        "full": ["create", "list", "retrieve", "update", "delete"],
-        "readonly": ["list", "retrieve"],
-    }
-```
-
-### Bulk operations
-
-Include bulk operation names in the roles mapping:
-
-```python
-permission_roles = {
-    "admin": [
-        "create", "list", "retrieve", "update", "delete",
-        "bulk_create", "bulk_update", "bulk_delete",
-    ],
-    "editor": ["create", "list", "retrieve", "update"],
-}
-```
-
-### Custom actions
-
-`@action` endpoints are automatically checked using the action method name:
-
-```python
-from ninja_aio.decorators import action
-
-class BookAPI(RoleBasedPermissionMixin, APIViewSet):
-    model = Book
-    permission_roles = {
-        "admin": ["create", "list", "retrieve", "update", "delete", "archive"],
-        "editor": ["create", "list", "retrieve", "update"],
-    }
-
-    @action(detail=True, methods=["post"])
-    async def archive(self, request, pk):
-        # Only admin can access — checked automatically with operation="archive"
-        ...
-```
-
----
-
-## Combining with filters
-
-Permission mixins work seamlessly with filter mixins:
-
-```python
-from ninja_aio.views.mixins import (
-    PermissionViewSetMixin,
-    IcontainsFilterViewSetMixin,
-    BooleanFilterViewSetMixin,
-)
-
-class UserAPI(
-    PermissionViewSetMixin,
-    IcontainsFilterViewSetMixin,
-    BooleanFilterViewSetMixin,
-    APIViewSet,
-):
-    model = User
-    query_params = {
-        "name": (str, None),
-        "is_active": (bool, None),
-    }
-
-    async def a(self, request, operation):
-        return request.auth is not None
-```
-
-The permission check runs **first**, then filters are applied to the queryset.
-
----
-
-## Error responses
-
-When permission is denied, the API returns:
-
-```json
-{
-    "error": "forbidden",
-    "details": "Permission denied for operation: delete"
-}
-```
-
-HTTP status code: **403 Forbidden**
-
-You can customize the error by raising `ForbiddenError` directly in your hooks:
-
-```python
-from ninja_aio.exceptions import ForbiddenError
-
-async def a(self, request, operation):
-    if not request.auth:
-        raise ForbiddenError(error={"auth": "login required"})
-    return True
-```
+[Next: filter, search and sort](filtering.md){ .md-button .md-button--primary }

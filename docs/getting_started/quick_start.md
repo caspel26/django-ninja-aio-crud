@@ -1,181 +1,151 @@
-## :material-rocket-launch: Quick Start (ModelSerializer)
+---
+type: tutorial
+title: Quick start
+description: Build a working CRUD API with django-ninja-aio-crud in five minutes.
+---
 
-This guide shows how to create a CRUD API using `ModelSerializer`, which combines your Django model and serialization configuration in a single class.
+# Quick start
 
-!!! tip "Alternative Approach"
-    If you prefer to keep your models unchanged and define serialization separately, see [Quick Start (Serializer)](quick_start_serializer.md).
+Build a complete CRUD API for one model in five minutes. You need a Django
+project with an app called `blog` listed in `INSTALLED_APPS`.
 
-### 1. Create Your Model
+<div class="nac-steps" markdown>
 
-Define your model using `ModelSerializer` with embedded serializer configuration:
+### Define the model
 
-```python
-# models.py
+A `ModelSerializer` is a normal Django model with a `Schemas` class that says
+which fields each operation reads and writes.
+
+```python title="blog/models.py"
 from django.db import models
-from ninja_aio.models import ModelSerializer
+from ninja_aio import ModelSerializer, SchemaConfig
 
 
-class Article(ModelSerializer):  # (1)!
+class Article(ModelSerializer):
     title = models.CharField(max_length=200)
-    content = models.TextField()
+    body = models.TextField()
     is_published = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
-    class ReadSerializer:  # (2)!
-        fields = ["id", "title", "content", "is_published", "created_at"]
-
-    class CreateSerializer:  # (3)!
-        fields = ["title", "content"]
-        optionals = [("is_published", bool)]
-
-    class UpdateSerializer:  # (4)!
-        optionals = [
-            ("title", str),
-            ("content", str),
-            ("is_published", bool),
-        ]
+    class Schemas:
+        create = SchemaConfig(
+            fields=["title", "body"],
+            optionals=[("is_published", bool)],
+        )
+        update = SchemaConfig(
+            optionals=[("title", str), ("body", str), ("is_published", bool)],
+        )
+        read = SchemaConfig(
+            fields=["id", "title", "body", "is_published", "created_at"],
+        )
 ```
 
-1. Inherit from `ModelSerializer` instead of `models.Model` — enables auto schema generation
-2. **ReadSerializer** — defines which fields appear in GET responses (list, retrieve, update)
-3. **CreateSerializer** — defines required and optional fields for POST requests
-4. **UpdateSerializer** — all fields are optional for PATCH (partial update)
+Create the table:
 
-### 2. Create Your ViewSet
+```bash
+python manage.py makemigrations blog
+python manage.py migrate
+```
 
-Define your API views using `APIViewSet`:
+### Create the API
 
-```python
-# views.py
-from ninja_aio import NinjaAIO
-from ninja_aio.views import APIViewSet
+```python title="blog/api.py"
+from ninja_aio import NinjaAIO, APIViewSet
+
 from .models import Article
 
-api = NinjaAIO(title="My Blog API", version="1.0.0")  # (1)!
+api = NinjaAIO(title="Blog API")
 
 
-@api.viewset(model=Article)  # (2)!
+@api.viewset(model=Article)
 class ArticleViewSet(APIViewSet):
-    pass  # (3)!
+    pass
 ```
 
-1. `NinjaAIO` extends Django Ninja's `NinjaAPI` with built-in ORJSON rendering and exception handling
-2. `@api.viewset` registers the model and auto-generates all CRUD routes
-3. No configuration needed — schemas, pagination, and routes are auto-generated from the model's inner serializer classes
+### Add the URLs
 
-### 3. Configure URLs
-
-Add the API to your URL configuration:
-
-```python
-# urls.py
+```python title="project/urls.py"
 from django.urls import path
-from .views import api
+
+from blog.api import api
 
 urlpatterns = [
     path("api/", api.urls),
 ]
 ```
 
-### 4. Run Your Server
+### Try it
 
 ```bash
 python manage.py runserver
 ```
 
-Visit **[http://localhost:8000/api/docs](http://localhost:8000/api/docs)** to see your auto-generated API documentation!
+Open [http://localhost:8000/api/docs](http://localhost:8000/api/docs) to see the
+interactive docs, or call the API directly:
 
-## :material-camera: Generated API Documentation
-
-### Endpoints Overview
-
-![Swagger UI Overview](images/index/foo-index-swagger.png)
-
-Your API automatically includes:
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/article/` | List all articles (paginated) |
-| `POST` | `/article/` | Create new article |
-| `GET` | `/article/{id}` | Retrieve single article |
-| `PATCH` | `/article/{id}/` | Update article |
-| `DELETE` | `/article/{id}/` | Delete article |
-
-### :material-format-list-bulleted: List Endpoint
-
-![List Swagger](images/index/foo-index-list-swagger.png)
-
-- :material-book-multiple: Automatic pagination
-- :material-filter: Query parameter filtering
-- :material-sort: Sorting support
-
-### :material-plus-circle: Create Endpoint
-
-![Create Swagger](images/index/foo-index-create-swagger.png)
-
-- :material-check-circle: Input validation
-- :material-pencil-plus: Custom field support
-- :material-link-variant: Relationship handling
-
-### :material-eye: Retrieve Endpoint
-
-![Retrieve Swagger](images/index/foo-index-retrieve-swagger.png)
-
-- :material-file-tree: Nested relationship serialization
-- :material-lightning-bolt: Optimized queries
-
-### :material-pencil: Update Endpoint
-
-![Update Swagger](images/index/foo-index-update-swagger.png)
-
-- :material-file-document-edit: Partial updates (PATCH)
-- :material-shield-check: Field-level validation
-- :material-cog: Custom actions
-
-### :material-delete: Delete Endpoint
-
-![Delete Swagger](images/index/foo-index-delete-swagger.png)
-
-- :material-delete-sweep: Soft delete support
-- :material-sitemap: Cascade handling
-- :material-hook: Custom hooks
-
----
-
-## :material-arrow-right-circle: Next Steps
-
-<div class="grid cards" markdown>
-
--   :material-file-document-edit:{ .lg .middle } **ModelSerializer Reference**
-
-    ---
-
-    Deep dive into all ModelSerializer features
-
-    [:octicons-arrow-right-24: Learn more](../api/models/model_serializer.md)
-
--   :material-view-grid:{ .lg .middle } **APIViewSet Features**
-
-    ---
-
-    Custom endpoints, pagination, and filtering
-
-    [:octicons-arrow-right-24: Explore](../api/views/api_view_set.md)
-
--   :material-shield-lock:{ .lg .middle } **Authentication**
-
-    ---
-
-    Add JWT authentication to your API
-
-    [:octicons-arrow-right-24: Add auth](../api/authentication.md)
-
--   :material-school:{ .lg .middle } **Full Tutorial**
-
-    ---
-
-    Step-by-step guide covering all features
-
-    [:octicons-arrow-right-24: Start tutorial](../tutorial/model.md)
+```bash
+curl -X POST localhost:8000/api/articles/ \
+  -H "Content-Type: application/json" \
+  -d '{"title": "Hello", "body": "My first article"}'
+```
 
 </div>
+
+## What you get
+
+| Method | Path | What it does |
+| --- | --- | --- |
+| `GET` | `/api/articles/` | List articles, with pagination |
+| `POST` | `/api/articles/` | Create an article |
+| `GET` | `/api/articles/{id}` | Get one article |
+| `PATCH` | `/api/articles/{id}/` | Update some fields |
+| `DELETE` | `/api/articles/{id}/` | Delete an article |
+
+The list endpoint returns the items and the total count:
+
+```json
+{
+  "items": [
+    {"id": 1, "title": "Hello", "body": "My first article", "is_published": false, "created_at": "2026-09-26T10:00:00Z"}
+  ],
+  "count": 1
+}
+```
+
+## Sync or async
+
+Viewsets are async by default. To serve the same endpoints with regular sync
+views, set `execution_mode`:
+
+```python
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    execution_mode = "sync"
+```
+
+Paths, request bodies and responses stay exactly the same.
+
+## Use it from Python
+
+The model is also a CRUD API you can call in scripts, tasks and tests:
+
+=== "Sync"
+
+    ```python
+    article = Article.create({"title": "Draft", "body": "..."})
+    article = Article.update(article, {"is_published": True})
+    data = Article.model_dump(article)
+    ```
+
+=== "Async"
+
+    ```python
+    article = await Article.acreate({"title": "Draft", "body": "..."})
+    article = await Article.aupdate(article, {"is_published": True})
+    data = await Article.amodel_dump(article)
+    ```
+
+## Next steps
+
+- Keep your models as they are? See [choosing a serializer](choosing-a-serializer.md).
+- Build a full API step by step in the [tutorial](../tutorial/index.md).

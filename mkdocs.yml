@@ -9,18 +9,20 @@ use_directory_urls: true
 
 nav:
   - Home: index.md
-  - Getting Started:
+  - Get started:
     - Installation: getting_started/installation.md
-    - Quick Start (ModelSerializer): getting_started/quick_start.md
-    - Quick Start (Serializer): getting_started/quick_start_serializer.md
+    - Quick start: getting_started/quick_start.md
+    - Choosing a serializer: getting_started/choosing-a-serializer.md
   - Tutorial:
-    - 'Step 1: Define Your Model': tutorial/model.md
-    - 'Alternative: Define Your Serializer': tutorial/serializer.md
-    - 'Step 2: Create CRUD Views': tutorial/crud.md
-    - 'Step 3: Add Authentication': tutorial/authentication.md
-    - 'Step 4: Add Filtering & Pagination': tutorial/filtering.md
-    - 'Step 5: Add Permissions': tutorial/permissions.md
-    - 'Step 6: Soft Delete': tutorial/soft_delete.md
+    - tutorial/index.md
+    - 1. Define the model: tutorial/model.md
+    - 2. Create the CRUD API: tutorial/crud.md
+    - 3. Add relations: tutorial/relations.md
+    - 4. Add authentication: tutorial/authentication.md
+    - 5. Add permissions: tutorial/permissions.md
+    - 6. Filter, search and sort: tutorial/filtering.md
+    - 7. Go to production: tutorial/production.md
+    - Soft Delete: tutorial/soft_delete.md
   - API Reference:
     - Type Hints & Type Safety: api/type_hints.md
     - Views:

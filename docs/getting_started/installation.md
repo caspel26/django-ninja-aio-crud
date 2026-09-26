@@ -1,61 +1,48 @@
-## :material-package-down: Installation
+---
+type: guide
+title: Installation
+description: Install django-ninja-aio-crud and check the supported Python and Django Ninja versions.
+---
+
+# Installation
+
+Install the package from PyPI. Django Ninja comes with it.
 
 === "pip"
+
     ```bash
     pip install django-ninja-aio-crud
     ```
 
+=== "uv"
+
+    ```bash
+    uv add django-ninja-aio-crud
+    ```
+
 === "poetry"
+
     ```bash
     poetry add django-ninja-aio-crud
     ```
 
-=== "pipenv"
-    ```bash
-    pipenv install django-ninja-aio-crud
-    ```
+## Requirements
 
-!!! info "Requirements"
-    - **Python** 3.10+
-    - **Django** 4.1+ (for async ORM support)
-    - **django-ninja** >=1.3.0 (installed automatically)
+| Package | Supported versions |
+| --- | --- |
+| Python | 3.10 to 3.14 |
+| Django Ninja | 1.3 to 1.7 |
+| Django | Any version supported by your Django Ninja release |
 
----
+You don't need to add anything to `INSTALLED_APPS`. Add `"ninja_aio"` only if
+you want the [`mcp_server`](../mcp.md) management command.
 
-## :material-arrow-right-circle: Next Steps
+## Optional extras
 
-<div class="grid cards" markdown>
+```bash
+pip install "django-ninja-aio-crud[mcp]"   # AI agent integration (MCP)
+```
 
--   :material-rocket-launch:{ .lg .middle } **Quick Start (ModelSerializer)**
+## Next step
 
-    ---
-
-    Define schemas directly on your Django models
-
-    [:octicons-arrow-right-24: Get started](quick_start.md)
-
--   :material-cube-outline:{ .lg .middle } **Quick Start (Serializer)**
-
-    ---
-
-    Keep models unchanged with separate serializer classes
-
-    [:octicons-arrow-right-24: Get started](quick_start_serializer.md)
-
--   :material-school:{ .lg .middle } **Tutorial**
-
-    ---
-
-    Step-by-step guide to building a complete API
-
-    [:octicons-arrow-right-24: Start tutorial](../tutorial/model.md)
-
--   :material-book-open-variant:{ .lg .middle } **API Reference**
-
-    ---
-
-    Detailed documentation for all components
-
-    [:octicons-arrow-right-24: Explore](../api/models/model_serializer.md)
-
-</div>
+Build your first API in the [quick start](quick_start.md).
