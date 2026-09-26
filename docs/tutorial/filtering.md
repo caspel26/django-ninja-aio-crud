@@ -52,7 +52,7 @@ class ArticleViewSet(APIViewSet):
         "category": (int, None),
     }
 
-    async def query_params_handler(self, queryset, filters):
+    async def a(self, queryset, filters):
         # Filter by published status
         if filters.get("is_published") is not None:
             queryset = queryset.filter(is_published=filters["is_published"])
@@ -100,7 +100,7 @@ class ArticleViewSet(APIViewSet):
         "published_before": (str, None),
     }
 
-    async def query_params_handler(self, queryset, filters):
+    async def a(self, queryset, filters):
         # Filter by creation date
         if filters.get("created_after"):
             date = datetime.fromisoformat(filters["created_after"])
@@ -149,7 +149,7 @@ class ArticleViewSet(APIViewSet):
         "max_rating": (float, None),
     }
 
-    async def query_params_handler(self, queryset, filters):
+    async def a(self, queryset, filters):
         # Filter by views
         if filters.get("min_views"):
             queryset = queryset.filter(views__gte=filters["min_views"])
@@ -197,7 +197,7 @@ class ArticleViewSet(APIViewSet):
         "search": (str, None),
     }
 
-    async def query_params_handler(self, queryset, filters):
+    async def a(self, queryset, filters):
         if filters.get("search"):
             search_term = filters["search"]
             queryset = queryset.filter(
@@ -234,7 +234,7 @@ class ArticleViewSet(APIViewSet):
         "search": (str, None),
     }
 
-    async def query_params_handler(self, queryset, filters):
+    async def a(self, queryset, filters):
         if filters.get("search"):
             search_term = filters["search"]
 
@@ -267,7 +267,7 @@ class ArticleViewSet(APIViewSet):
         "search": (str, None),
     }
 
-    async def query_params_handler(self, queryset, filters):
+    async def a(self, queryset, filters):
         if filters.get("search"):
             search_term = filters["search"]
             query = SearchQuery(search_term)
@@ -301,7 +301,7 @@ class ArticleViewSet(APIViewSet):
         "ordering": (str, "-created_at"),  # Default: newest first
     }
 
-    async def query_params_handler(self, queryset, filters):
+    async def a(self, queryset, filters):
         ordering = filters.get("ordering", "-created_at")
 
         # Whitelist allowed ordering fields
@@ -350,7 +350,7 @@ class ArticleViewSet(APIViewSet):
         "ordering": (str, "-created_at,title"),  # Multiple fields
     }
 
-    async def query_params_handler(self, queryset, filters):
+    async def a(self, queryset, filters):
         ordering = filters.get("ordering", "-created_at,title")
 
         # Parse ordering string
@@ -401,7 +401,7 @@ class ArticleViewSet(APIViewSet):
         "tag_name": (str, None),
     }
 
-    async def query_params_handler(self, queryset, filters):
+    async def a(self, queryset, filters):
         # Filter by author username
         if filters.get("author_username"):
             queryset = queryset.filter(
@@ -448,7 +448,7 @@ class ArticleViewSet(APIViewSet):
         "tags_mode": (str, "any"),  # "any" or "all"
     }
 
-    async def query_params_handler(self, queryset, filters):
+    async def a(self, queryset, filters):
         if filters.get("tags"):
             tag_list = filters["tags"].split(',')
             mode = filters.get("tags_mode", "any")
@@ -504,7 +504,7 @@ class ArticleViewSet(APIViewSet):
         "exclude_ids": (str, None),  # Comma-separated IDs
     }
 
-    async def query_params_handler(self, queryset, filters):
+    async def a(self, queryset, filters):
         # Exclude specific author
         if filters.get("exclude_author"):
             queryset = queryset.exclude(author_id=filters["exclude_author"])
@@ -623,7 +623,7 @@ class ArticleViewSet(APIViewSet):
         # ... other filters
     }
 
-    async def query_params_handler(self, queryset, filters):
+    async def a(self, queryset, filters):
         preset = filters.get("preset")
 
         # Apply preset filters
@@ -689,7 +689,7 @@ class Article(ModelSerializer):
     # ... fields ...
 
     @classmethod
-    async def queryset_request(cls, request):
+    async def a(cls, request):
         # Always include related objects
         return cls.objects.select_related(
             'author',
@@ -732,7 +732,7 @@ class ArticleViewSet(APIViewSet):
     model = Article
     api = api
 
-    async def query_params_handler(self, queryset, filters):
+    async def a(self, queryset, filters):
         # Apply filters
         # ...
 
@@ -800,7 +800,7 @@ class ArticleViewSet(APIViewSet):
         "preset": (str, None),
     }
 
-    async def query_params_handler(self, queryset, filters):
+    async def a(self, queryset, filters):
         # Apply preset first
         preset = filters.get("preset")
         if preset == "trending":

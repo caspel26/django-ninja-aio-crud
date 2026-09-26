@@ -529,16 +529,16 @@ class ArticleSerializer(serializers.Serializer):
         )
 
     @classmethod
-    async def queryset_request(cls, request):
+    async def a(cls, request):
         """Filter and optimize queryset per request."""
         return cls._meta.model.objects.select_related("author")
 
-    async def custom_actions(self, payload, instance):
+    async def a(self, payload, instance):
         """Execute after field assignment, before save."""
         if payload.get("notify_author"):
             await send_email(instance.author.email, f"Article created: {instance.title}")
 
-    async def post_create(self, instance):
+    async def a(self, instance):
         """Execute after instance creation."""
         await AuditLog.objects.acreate(
             action="article_created",
@@ -824,12 +824,12 @@ Here's a full example with models, serializers, and views:
             if not instance.slug:
                 instance.slug = slugify(instance.title)
 
-        async def custom_actions(self, payload, instance):
+        async def a(self, payload, instance):
             if payload.get("notify_subscribers"):
                 # Implement your notification logic
                 pass
 
-        async def post_create(self, instance):
+        async def a(self, instance):
             print(f"Article created: {instance.title}")
     ```
 

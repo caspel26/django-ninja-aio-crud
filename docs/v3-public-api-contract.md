@@ -81,6 +81,7 @@ BookSerializer.get(
     pk: PK | None = None,
     *,
     request: HttpRequest | None = None,
+    optimize_for: Literal["read", "detail"] | None = None,
     **lookups: Any,
 ) -> ModelT
 
@@ -88,8 +89,21 @@ await BookSerializer.aget(
     pk: PK | None = None,
     *,
     request: HttpRequest | None = None,
+    optimize_for: Literal["read", "detail"] | None = None,
     **lookups: Any,
 ) -> ModelT
+
+BookSerializer.get_queryset(
+    *,
+    request: HttpRequest | None = None,
+    optimize_for: Literal["read", "detail"] | None = None,
+) -> QuerySet[ModelT]
+
+await BookSerializer.aget_queryset(
+    *,
+    request: HttpRequest | None = None,
+    optimize_for: Literal["read", "detail"] | None = None,
+) -> QuerySet[ModelT]
 ```
 
 Exactly one lookup strategy must be supplied: `pk` or keyword lookups. Missing
@@ -97,6 +111,13 @@ objects raise the version 3 not-found exception in both modes.
 
 Omitting both strategies or combining them raises `ValueError` before any
 database access.
+
+Both reads apply the request-scoped `queryset_request`/`aqueryset_request`
+hook. `optimize_for` adds the `select_related`/`prefetch_related` plan of the
+matching `QuerySet` scope plus the relations of the matching output schema.
+`request` and `optimize_for` are reserved names and cannot be used as keyword
+lookups. Generated viewsets read only through these methods;
+`ModelUtil` exposes the same four methods for schema-only viewsets.
 
 ### Update
 
@@ -255,23 +276,32 @@ tuples.
 `BulkResult.succeeded` contains model instances (or primary keys for destroy),
 and `BulkResult.failed` contains `BulkFailure` entries with the zero-based
 `index`, stable `code`, human-readable `message`, `fields` keyed by dotted
-nested paths, and `pk` when known. The result also exposes `has_errors`,
-`success_count`, and `failure_count`. The legacy `ModelUtil` bulk methods and
-generated HTTP bulk views retain their existing tuple/wire formats until their
-respective migration steps.
+nested paths, `pk` when known, and `error`, the version 2 error payload. The
+result also exposes `has_errors`, `success_count`, and `failure_count`.
+
+Generated HTTP bulk views use these operations and keep the version 2 wire
+format: `errors.details` lists each failure's `error` payload. HTTP bulk delete
+destroys each object through the serializer, so delete hooks run per object.
+Serializer-backed bulk operations run each item in its own transaction; plain
+models skip it because each item is a single write. The deprecated `ModelUtil`
+`bulk_*_s` methods keep their tuple format.
 
 ## Hooks and model helpers
 
 The following remain supported public extension points:
 
-- `queryset_request`
+- `queryset_request` / `aqueryset_request`
 - `has_changed` and `ahas_changed`
 - `as_admin`
 - reactive `@on_create`, `@on_update`, and `@on_delete`
 
-Lifecycle hooks are normalized in Step 7. A hook may be implemented as a
-regular or async callable under one semantic name; callers do not select hooks
-by execution mode.
+Every sync/async pair uses the plain name for the sync variant and an `a`
+prefix for the async one. This applies to serializer hooks (`queryset_request`,
+`post_create`, `custom_actions`) and viewset hooks alike. Defining a coroutine
+under a plain name, as version 2 did, raises `ImproperlyConfigured` naming the
+`a`-prefixed replacement. When a serializer overrides only one variant, the
+other execution path runs it through `async_to_sync`/`sync_to_async` at the
+hook boundary, so request-scoping hooks are never skipped.
 
 `save`, `asave`, `delete`, and `adelete` on a `ModelSerializer` model instance
 remain Django-compatible instance operations. Standalone serializer persistence
@@ -298,7 +328,7 @@ entries marked "remove" before the final release.
 | `Serializer.models_dump()` | Replace with `model_dumps()`/`amodel_dumps()` |
 | bound `Serializer(instance=...)` CRUD | Remove; pass target explicitly |
 | `ModelUtil.get_object()` | Replace with `get()`/`aget()` |
-| `ModelUtil.get_objects()` | Make internal query planning; use Django queryset APIs |
+| `ModelUtil.get_objects()` | Replace with `get_queryset()`/`aget_queryset()`; query planning becomes internal |
 | `ModelUtil.create_s()` | Replace with `create()`/`acreate()` |
 | `ModelUtil.read_s()` | Replace with `model_dump()`/`amodel_dump()` |
 | `ModelUtil.list_read_s()` | Replace with `model_dumps()`/`amodel_dumps()` |
@@ -314,7 +344,16 @@ entries marked "remove" before the final release.
 | `BaseSerializer.get_fields()` and field helpers | Make internal |
 | `BaseSerializer.get_schema_out_data()` | Make internal |
 | `BaseSerializer.get_related_schema_data()` | Make internal |
-| `queryset_request()` | Keep as extension hook; normalize sync/async invocation |
+| `queryset_request()` (async) | Rename to `aqueryset_request()`; sync variant is `queryset_request()` |
+| `post_create()`/`custom_actions()` (async) | Rename to `apost_create()`/`acustom_actions()`; sync variants use the plain names |
+| `APIViewSet.on_before_operation()` (async) | Rename to `aon_before_operation()`; sync variant is `on_before_operation()` |
+| `APIViewSet.on_before_object_operation()` (async) | Rename to `aon_before_object_operation()`; sync variant is `on_before_object_operation()` |
+| `APIViewSet.query_params_handler()` (async) | Rename to `aquery_params_handler()`; sync variant is `query_params_handler()` |
+| `has_permission()`/`has_object_permission()` (async) | Rename to `ahas_permission()`/`ahas_object_permission()`; sync variants use the plain names |
+| `create_view()`, `list_view()`, `retrieve_view()`, `update_view()`, `delete_view()` (async) | Now register sync endpoints; async factories are `acreate_view()` etc. |
+| `bulk_create_view()`, `bulk_update_view()`, `bulk_delete_view()` (async) | Now register sync endpoints; async factories are `abulk_create_view()` etc. |
+| `@action`/`@on` handlers (async only) | Accept `def` or `async def`; hooks follow the handler |
+| HTTP bulk delete (single queryset delete) | Destroy per object with delete hooks; wire format unchanged |
 | `has_changed()`/`ahas_changed()` | Keep |
 | `ModelSerializer.as_admin()` | Keep |
 | Django model `save()`/`delete()` | Keep Django behavior unchanged |
@@ -334,8 +373,13 @@ must not silently mix modes or wrap an entire endpoint in `async_to_sync()` or
 Both modes preserve the same HTTP paths, schemas, status codes, authorization,
 filtering, pagination, error responses, and OpenAPI operation IDs. Viewset
 hooks and decorators must execute in the selected mode with equivalent ordering
-and transaction semantics. Sync mode becomes available only after synchronous
-serialization, bulk operations, and hook parity are implemented and tested.
+and transaction semantics. Sync endpoints call the plain-named hooks and async
+endpoints their `a`-prefixed counterparts. Constructing a viewset fails with
+`ImproperlyConfigured` when an overridden hook would be skipped by a mode it
+uses (its `execution_mode` plus the `def`/`async def` of its actions).
+Per-relation M2M handlers (`<related_name>_query_handler` and
+`<related_name>_query_params_handler`) keep a single name and must be declared
+with the kind matching the mode.
 
 ## Stability rules
 

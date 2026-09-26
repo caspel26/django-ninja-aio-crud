@@ -531,7 +531,7 @@ class Article(ModelSerializer):
             ("schedule_publish", str, None),
         ]
 
-    async def post_create(self):
+    async def a(self):
         """Called after object creation (async)"""
         # Send notification email
         from myapp.tasks import send_new_article_notification
@@ -545,7 +545,7 @@ class Article(ModelSerializer):
             user_id=self.author_id
         )
 
-    async def custom_actions(self, payload: dict):
+    async def a(self, payload: dict):
         """Process custom fields from CreateSerializer"""
         if payload.get("notify_subscribers"):
             from myapp.tasks import notify_subscribers
@@ -710,7 +710,7 @@ Here's a complete blog model with all features:
                 from django.utils import timezone
                 self.published_at = timezone.now()
 
-        async def post_create(self):
+        async def a(self):
             # Log creation
             from myapp.models import ActivityLog
             await ActivityLog.objects.acreate(
@@ -719,7 +719,7 @@ Here's a complete blog model with all features:
                 user_id=self.author_id
             )
 
-        async def custom_actions(self, payload: dict):
+        async def a(self, payload: dict):
             if payload.get("notify_subscribers"):
                 # Send notifications (implement your notification logic)
                 from myapp.tasks import notify_article_published

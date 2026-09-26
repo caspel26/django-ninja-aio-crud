@@ -506,7 +506,7 @@ class ArticleViewSet(APIViewSet):
         "category": (int, None),
     }
 
-    async def query_params_handler(self, queryset, filters):
+    async def a(self, queryset, filters):
         if filters.get("is_published") is not None:
             queryset = queryset.filter(is_published=filters["is_published"])
         if filters.get("category"):
@@ -575,7 +575,7 @@ class Article(ModelSerializer):
     tags = models.ManyToManyField(Tag, related_name="articles")
 
     @classmethod
-    async def queryset_request(cls, request):
+    async def a(cls, request):
         # Optimize queries before pagination
         return cls.objects.select_related(
             'author',

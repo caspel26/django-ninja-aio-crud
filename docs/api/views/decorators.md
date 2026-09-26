@@ -125,7 +125,7 @@ from ninja_aio.decorators import on
     ```python
     @action(detail=True, methods=["post"], url_path="publish", response={200: ArticleSchema})
     async def publish(self, request, pk):
-        await self.on_before_operation(request, "publish")
+        await self.a(request, "publish")
         obj = await self.model_util.get_object(request, pk)
         await self.on_before_object_permission(request, "publish", obj)
         obj.status = "published"

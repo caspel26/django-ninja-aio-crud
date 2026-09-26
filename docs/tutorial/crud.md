@@ -197,7 +197,7 @@ class ArticleViewSet(APIViewSet):
         "search": (str, None),
     }
 
-    async def query_params_handler(self, queryset, filters):  # (2)!
+    async def a(self, queryset, filters):  # (2)!
         # Filter by published status
         if filters.get("is_published") is not None:
             queryset = queryset.filter(is_published=filters["is_published"])
@@ -492,7 +492,7 @@ class Article(ModelSerializer):
     # ... fields ...
 
     @classmethod
-    async def queryset_request(cls, request):
+    async def a(cls, request):
         """Filter articles based on user"""
         qs = cls.objects.select_related('author', 'category').prefetch_related('tags')
 
@@ -919,7 +919,7 @@ Here's a complete ViewSet with all features:
             "ordering": (str, "-created_at"),
         }
 
-        async def query_params_handler(self, queryset, filters):
+        async def a(self, queryset, filters):
             # Published filter
             if filters.get("is_published") is not None:
                 queryset = queryset.filter(is_published=filters["is_published"])

@@ -301,7 +301,7 @@ server = NinjaAIOMCPServer(api, request_factory=mcp_request_factory)
 ```python
 @api.viewset(Book)
 class BookViewSet(APIViewSet):
-    async def on_before_operation(self, request, operation: str) -> None:
+    async def a(self, request, operation: str) -> None:
         if not request.user.has_perm(f"library.{operation}_book"):
             raise ForbiddenError(f"Not allowed to {operation} books")
 ```

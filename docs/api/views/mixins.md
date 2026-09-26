@@ -363,13 +363,13 @@ from ninja_aio.views import APIViewSet
 class ArticleAPI(PermissionViewSetMixin, APIViewSet):
     model = Article
 
-    async def has_permission(self, request, operation):
+    async def a(self, request, operation):
         # Only staff can create/update/delete
         if operation in ("create", "update", "delete"):
             return getattr(request.auth, "is_staff", False)
         return True
 
-    async def has_object_permission(self, request, operation, obj):
+    async def a(self, request, operation, obj):
         # Users can only modify their own articles
         if operation in ("update", "delete"):
             return obj.author_id == request.auth.id
@@ -409,7 +409,7 @@ class ArticleAPI(
     model = Article
     query_params = {"title": (str, None)}
 
-    async def has_permission(self, request, operation):
+    async def a(self, request, operation):
         return request.auth is not None
 ```
 
@@ -458,7 +458,7 @@ Override `has_permission` for complex role resolution (e.g., Django groups, mult
 class GroupBasedAPI(PermissionViewSetMixin, APIViewSet):
     model = Document
 
-    async def has_permission(self, request, operation):
+    async def a(self, request, operation):
         user = request.auth
         if user is None:
             return False
@@ -596,7 +596,7 @@ class ArticleAPI(
 
 - Align `query_params` types with expected filter values; prefer Pydantic `date`/`datetime` for date filters so values implement `isoformat`.
 - Validate field names and lookups to avoid runtime errors.
-- For multiple mixins, implement your own `async def query_params_handler(...)` and chain with `await super().query_params_handler(...)` to combine behaviors.
+- For multiple mixins, implement your own `async def a(...)` and chain with `await super().a(...)` to combine behaviors.
 
 ---
 

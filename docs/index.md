@@ -373,7 +373,7 @@ Here's a real-world example with relationships:
                 ("is_published", bool),
             ]
 
-        async def custom_actions(self, payload: dict):
+        async def a(self, payload: dict):
             if payload.get("notify_subscribers"):
                 # Send notifications
                 await notify_new_article(self)
@@ -412,7 +412,7 @@ Here's a real-world example with relationships:
             "author": (int, None),
         }
 
-        async def query_params_handler(self, queryset, filters):
+        async def a(self, queryset, filters):
             if filters.get("is_published") is not None:
                 queryset = queryset.filter(is_published=filters["is_published"])
             if filters.get("category"):

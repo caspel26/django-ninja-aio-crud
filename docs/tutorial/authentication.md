@@ -450,7 +450,7 @@ class Article(ModelSerializer):
     # ... existing fields ...
 
     @classmethod
-    async def queryset_request(cls, request):
+    async def a(cls, request):
         """Filter articles based on authentication"""
         qs = cls.objects.select_related('author', 'category').prefetch_related('tags')
 
@@ -464,7 +464,7 @@ class Article(ModelSerializer):
 
         return qs.filter(is_published=True)
 
-    async def custom_actions(self, payload: dict):
+    async def a(self, payload: dict):
         """Set author from request"""
         # This is called during creation
         if hasattr(self, '_request') and self._request.auth:
@@ -472,7 +472,7 @@ class Article(ModelSerializer):
             await self.asave(update_fields=['author'])
 
         # Call parent
-        await super().custom_actions(payload)
+        await super().a(payload)
 ```
 
 ---

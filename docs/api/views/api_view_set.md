@@ -777,7 +777,7 @@ query_params = {
 Override handler:
 
 ```python
-async def query_params_handler(self, queryset, filters: dict):
+async def a(self, queryset, filters: dict):
     if filters.get("is_active") is not None:
         queryset = queryset.filter(is_active=filters["is_active"])
     if filters.get("role"):
@@ -809,7 +809,7 @@ class ArticleViewSet(APIViewSet):
                 is_for_read=True,
             )
             if filters is not None:
-                qs = await self.query_params_handler(qs, filters.model_dump())
+                qs = await self.a(qs, filters.model_dump())
             return await self.model_util.list_read_s(self.schema_out, request, qs)
 ```
 
@@ -1164,7 +1164,7 @@ This only changes what the OpenAPI/Swagger schema *documents* for those status c
 
 ## :material-lightning-bolt: Performance Tips
 
-1. Implement `@classmethod async def queryset_request(cls, request)` in your `ModelSerializer` to prefetch related objects.
+1. Implement `@classmethod async def a(cls, request)` in your `ModelSerializer` to prefetch related objects.
 2. Use database indexes on filtered fields (`query_params` and relation `filters`).
 3. Keep pagination enabled for large datasets.
 4. Prefetch reverse relations via `model_util.get_reverse_relations()` (already applied in list view).
@@ -1274,7 +1274,7 @@ class UserViewSet(APIViewSet):
         )
     ]
 
-    async def query_params_handler(self, queryset, filters):
+    async def a(self, queryset, filters):
         if filters.get("search"):
             from django.db.models import Q
             s = filters["search"]
@@ -1306,7 +1306,7 @@ class UserViewSet(APIViewSet):
         )
     ]
 
-    async def query_params_handler(self, queryset, filters):
+    async def a(self, queryset, filters):
         if filters.get("search"):
             from django.db.models import Q
             s = filters["search"]

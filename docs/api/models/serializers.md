@@ -193,16 +193,16 @@ class ArticleSerializer(serializers.Serializer):
         )
 
     @classmethod
-    async def queryset_request(cls, request):
+    async def a(cls, request):
         """Filter and optimize queryset per request."""
         return cls._meta.model.objects.select_related("author")
 
-    async def custom_actions(self, payload, instance):
+    async def a(self, payload, instance):
         """Execute custom actions with access to the instance."""
         if payload.get("notify_author"):
             await send_email(instance.author.email, f"Article created: {instance.title}")
 
-    async def post_create(self, instance):
+    async def a(self, instance):
         """Hook after instance creation."""
         await AuditLog.objects.acreate(
             action="article_created",
@@ -1012,7 +1012,7 @@ class ArticleSerializer(serializers.Serializer):
         if self.has_changed("status", instance):
             instance.status_changed_at = timezone.now()
 
-    async def post_create(self, instance):
+    async def a(self, instance):
         # async hook — use ahas_changed here
         if await self.ahas_changed("title", instance):
             await notify_subscribers_async(instance)
@@ -1146,7 +1146,7 @@ class ArticleSerializer(serializers.Serializer):
             select_related=["author"]
         )
 
-    async def custom_actions(self, payload, instance):
+    async def a(self, payload, instance):
         if payload.get("publish_now"):
             instance.is_published = True
             await sync_to_async(instance.save)()

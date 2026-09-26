@@ -614,7 +614,7 @@ class Article(ModelSerializer):
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
 
     @classmethod
-    async def queryset_request(cls, request):
+    async def a(cls, request):
         # Automatically filter by tenant
         qs = cls.objects.all()
         if hasattr(request, 'tenant_id'):

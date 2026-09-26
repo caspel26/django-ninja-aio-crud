@@ -796,11 +796,11 @@ class User(ModelSerializer):
         fields = ["username", "email"]
         customs = [("send_welcome", bool, True)]
 
-    async def custom_actions(self, payload):
+    async def a(self, payload):
         if payload.get("send_welcome"):
             await send_welcome_email(self.email)
 
-    async def post_create(self):
+    async def a(self):
         await AuditLog.objects.acreate(
             action="user_created",
             user_id=self.id
@@ -965,7 +965,7 @@ class User(ModelSerializer):
         optionals = [("email", str)]
         customs = [("reset_password", bool, False)]
 
-    async def custom_actions(self, payload):
+    async def a(self, payload):
         if payload.get("reset_password"):
             await self.send_password_reset_email()
 
@@ -1108,7 +1108,7 @@ For complex scenarios, override in ModelSerializer:
 ```python
 class Article(ModelSerializer):
     @classmethod
-    async def queryset_request(cls, request):
+    async def a(cls, request):
         return cls.objects.select_related(
             'author',
             'author__profile',  # Deep relation
@@ -1180,14 +1180,14 @@ class Book(ModelSerializer):
             ("is_published", bool),
         ]
 
-    async def custom_actions(self, payload):
+    async def a(self, payload):
         if payload.get("notify_author"):
             await send_email(
                 self.author.email,
                 f"New book created: {self.title}"
             )
 
-    async def post_create(self):
+    async def a(self):
         await AuditLog.objects.acreate(
             action="book_created",
             book_id=self.id

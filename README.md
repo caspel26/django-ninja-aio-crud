@@ -141,7 +141,7 @@ class BookViewSet(APIViewSet):
 class BookViewSet(APIViewSet):
     query_params = {"published": (bool, None), "title": (str, None)}
 
-    async def query_params_handler(self, queryset, filters):
+    async def a(self, queryset, filters):
         if filters.get("published") is not None:
             queryset = queryset.filter(published=filters["published"])
         if filters.get("title"):

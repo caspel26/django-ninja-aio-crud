@@ -140,7 +140,7 @@ class ArticleAPI(
     model = Article
     query_params = {"title": (str, None)}
 
-    async def has_permission(self, request, operation):
+    async def a(self, request, operation):
         if operation in ("hard_delete", "restore"):
             return request.auth.is_staff
         return True

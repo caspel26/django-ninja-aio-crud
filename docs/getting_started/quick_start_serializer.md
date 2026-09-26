@@ -191,12 +191,12 @@ class ArticleSerializer(serializers.Serializer):
             optionals=[("title", str), ("content", str), ("is_published", bool)]
         )
 
-    async def custom_actions(self, payload, instance):
+    async def a(self, payload, instance):
         """Execute after field assignment, before save."""
         if payload.get("notify_subscribers"):
             await send_notification(instance.title)
 
-    async def post_create(self, instance):
+    async def a(self, instance):
         """Execute after instance creation."""
         await AuditLog.objects.acreate(
             action="article_created",

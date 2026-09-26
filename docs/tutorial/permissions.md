@@ -30,7 +30,7 @@ from ninja_aio.views.mixins import PermissionViewSetMixin
 class ArticleAPI(PermissionViewSetMixin, APIViewSet):
     model = Article
 
-    async def has_permission(self, request, operation):
+    async def a(self, request, operation):
         """Called before any DB query."""
         if operation in ("create", "update", "delete"):
             return getattr(request.auth, "is_staff", False)
@@ -47,10 +47,10 @@ For row-level control, override `has_object_permission`. It receives the actual 
 class ArticleAPI(PermissionViewSetMixin, APIViewSet):
     model = Article
 
-    async def has_permission(self, request, operation):
+    async def a(self, request, operation):
         return request.auth is not None
 
-    async def has_object_permission(self, request, operation, obj):
+    async def a(self, request, operation, obj):
         # Authors can edit their own articles; everyone else can only read
         if operation in ("update", "delete"):
             return obj.author_id == request.auth.id
@@ -80,7 +80,7 @@ class ArticleAPI(PermissionViewSetMixin, APIViewSet):
 class ProjectAPI(PermissionViewSetMixin, APIViewSet):
     model = Project
 
-    async def has_permission(self, request, operation):
+    async def a(self, request, operation):
         user = request.auth
         if user is None:
             return False
@@ -88,7 +88,7 @@ class ProjectAPI(PermissionViewSetMixin, APIViewSet):
             return user.can_create_projects
         return True
 
-    async def has_object_permission(self, request, operation, obj):
+    async def a(self, request, operation, obj):
         user = request.auth
         if operation in ("update", "delete"):
             return obj.owner_id == user.id or user.is_admin
@@ -192,7 +192,7 @@ class UserAPI(
         "is_active": (bool, None),
     }
 
-    async def has_permission(self, request, operation):
+    async def a(self, request, operation):
         return request.auth is not None
 ```
 
@@ -218,7 +218,7 @@ You can customize the error by raising `ForbiddenError` directly in your hooks:
 ```python
 from ninja_aio.exceptions import ForbiddenError
 
-async def has_permission(self, request, operation):
+async def a(self, request, operation):
     if not request.auth:
         raise ForbiddenError(error={"auth": "login required"})
     return True

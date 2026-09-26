@@ -880,7 +880,7 @@ class Article(ModelSerializer):
     is_published = models.BooleanField(default=False)
 
     @classmethod
-    async def queryset_request(cls, request):
+    async def a(cls, request):
         qs = cls.objects.select_related('author').all()
 
         # Non-authenticated users see only published
@@ -901,7 +901,7 @@ Execute async logic after object creation.
 class User(ModelSerializer):
     email = models.EmailField()
 
-    async def post_create(self):
+    async def a(self):
         # Send welcome email
         from myapp.tasks import send_welcome_email
         await send_welcome_email(self.email)
@@ -931,7 +931,7 @@ class User(ModelSerializer):
             ("send_welcome_email", bool, True),
         ]
 
-    async def custom_actions(self, payload: dict):
+    async def a(self, payload: dict):
         # Validate password confirmation
         if "password_confirm" in payload:
             if payload["password_confirm"] != self.password:
@@ -1466,7 +1466,7 @@ class Article(ModelSerializer):
         excludes = ["slug", "author", "created_at"]
 
     @classmethod
-    async def queryset_request(cls, request):
+    async def a(cls, request):
         qs = cls.objects.select_related('author', 'category').prefetch_related('tags')
 
         if not request.auth:
@@ -1476,14 +1476,14 @@ class Article(ModelSerializer):
             models.Q(author=request.auth) | models.Q(is_published=True)
         )
 
-    async def post_create(self):
+    async def a(self):
         await AuditLog.objects.acreate(
             action="article_created",
             article_id=self.id,
             author_id=self.author_id
         )
 
-    async def custom_actions(self, payload: dict):
+    async def a(self, payload: dict):
         if payload.get("notify_subscribers"):
             await notify_new_article(self)
 
@@ -1571,13 +1571,13 @@ Required customs (Ellipsis) must be provided in input (create/update) or resolva
 
    ```python
    @classmethod
-   async def queryset_request(cls, request):
+   async def a(cls, request):
        return cls.objects.select_related('author').prefetch_related('tags')
    ```
 
 5. **Keep hooks focused:**
    ```python
-   async def post_create(self):
+   async def a(self):
        # Do ONE thing well
        await send_welcome_email(self.email)
    ```
