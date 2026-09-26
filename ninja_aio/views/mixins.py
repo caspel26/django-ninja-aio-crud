@@ -574,10 +574,12 @@ class PermissionViewSetMixin(APIViewSet[ModelT]):
         self, request: HttpRequest, operation: str
     ) -> None:
         """Check ahas_permission; raise ForbiddenError if denied."""
+        await super().aon_before_operation(request, operation)
         if not await self.ahas_permission(request, operation):
             self._deny(operation)
 
     def on_before_operation(self, request: HttpRequest, operation: str) -> None:
+        super().on_before_operation(request, operation)
         if not self.has_permission(request, operation):
             self._deny(operation)
 
@@ -585,12 +587,14 @@ class PermissionViewSetMixin(APIViewSet[ModelT]):
         self, request: HttpRequest, operation: str, obj: ModelT
     ) -> None:
         """Check ahas_object_permission; raise ForbiddenError if denied."""
+        await super().aon_before_object_operation(request, operation, obj)
         if not await self.ahas_object_permission(request, operation, obj):
             self._deny(operation)
 
     def on_before_object_operation(
         self, request: HttpRequest, operation: str, obj: ModelT
     ) -> None:
+        super().on_before_object_operation(request, operation, obj)
         if not self.has_object_permission(request, operation, obj):
             self._deny(operation)
 
@@ -598,6 +602,7 @@ class PermissionViewSetMixin(APIViewSet[ModelT]):
         self, request: HttpRequest, queryset: QuerySet
     ) -> QuerySet:
         """Delegate to get_permission_queryset for row-level filtering."""
+        queryset = super().on_list_queryset(request, queryset)
         return self.get_permission_queryset(request, queryset)
 
 
@@ -773,7 +778,7 @@ class SoftDeleteViewSetMixin(APIViewSet[ModelT]):
     def _reject_soft_deleted(self, operation: str, obj: ModelT) -> None:
         if (
             not self.include_deleted
-            and operation in ("retrieve", "update")
+            and operation not in ("delete", "restore", "hard_delete")
             and getattr(obj, self.soft_delete_field, False)
         ):
             raise NotFoundError(self.model)
@@ -806,12 +811,17 @@ class SoftDeleteViewSetMixin(APIViewSet[ModelT]):
         )
         return self._delete_response(serialized)
 
+    def _live_rows(self, queryset: QuerySet) -> QuerySet:
+        if self.include_deleted:
+            return queryset
+        return queryset.filter(**{self.soft_delete_field: False})
+
     def bulk_delete(self, request: HttpRequest, data: Schema) -> Status:
         """Soft-delete all matching records synchronously."""
         self.on_before_operation(request, "bulk_delete")
-        queryset = self._get_serializer().get_queryset(request=request, optimize_for="read").filter(
-            pk__in=data.ids
-        )
+        queryset = self._live_rows(
+            self._get_serializer().get_queryset(request=request, optimize_for="read")
+        ).filter(pk__in=data.ids)
         existing = set(queryset.values_list("pk", flat=True))
         if existing:
             queryset.update(**{self.soft_delete_field: True})
@@ -821,7 +831,7 @@ class SoftDeleteViewSetMixin(APIViewSet[ModelT]):
         """Soft-delete all matching records asynchronously."""
         await self.aon_before_operation(request, "bulk_delete")
         queryset = await self._get_serializer().aget_queryset(request=request, optimize_for="read")
-        queryset = queryset.filter(pk__in=data.ids)
+        queryset = self._live_rows(queryset).filter(pk__in=data.ids)
         existing = {pk async for pk in queryset.values_list("pk", flat=True)}
         if existing:
             await queryset.aupdate(**{self.soft_delete_field: True})
@@ -839,16 +849,14 @@ class SoftDeleteViewSetMixin(APIViewSet[ModelT]):
 
     def restore(self, request: HttpRequest, pk: Schema) -> Status:
         """Un-delete a soft-deleted record synchronously."""
-        self.on_before_operation(request, "restore")
-        obj = self._get_serializer().get(self._get_pk(pk), request=request)
+        obj = self._run_object_hooks(request, "restore", self._get_pk(pk))
         setattr(obj, self.soft_delete_field, False)
         obj.save(update_fields=[self.soft_delete_field])
         return Status(200, self._dump(obj, self.schema_out))
 
     async def arestore(self, request: HttpRequest, pk: Schema) -> Status:
         """Un-delete a soft-deleted record asynchronously."""
-        await self.aon_before_operation(request, "restore")
-        obj = await self._get_serializer().aget(self._get_pk(pk), request=request)
+        obj = await self._arun_object_hooks(request, "restore", self._get_pk(pk))
         setattr(obj, self.soft_delete_field, False)
         await obj.asave(update_fields=[self.soft_delete_field])
         return Status(200, await self._adump(obj, self.schema_out))
@@ -868,7 +876,7 @@ class SoftDeleteViewSetMixin(APIViewSet[ModelT]):
         self._register_generated(
             GeneratedRoute(
                 method=HttpMethod.POST,
-                path=f"{self.path_retrieve}/restore",
+                path=f"{self.get_path_retrieve}/restore",
                 auth=self.patch_view_auth(),
                 summary=f"Restore {self.model_verbose_name}",
                 description=f"Restore a soft-deleted {self.model_verbose_name}.",
@@ -880,14 +888,14 @@ class SoftDeleteViewSetMixin(APIViewSet[ModelT]):
 
     def hard_delete(self, request: HttpRequest, pk: Schema) -> Status:
         """Permanently delete a record synchronously."""
-        self.on_before_operation(request, "hard_delete")
-        self._get_serializer().destroy(self._get_pk(pk), request=request)
+        obj = self._run_object_hooks(request, "hard_delete", self._get_pk(pk))
+        self._get_serializer().destroy(obj, request=request)
         return Status(204, None)
 
     async def ahard_delete(self, request: HttpRequest, pk: Schema) -> Status:
         """Permanently delete a record asynchronously."""
-        await self.aon_before_operation(request, "hard_delete")
-        await self._get_serializer().adestroy(self._get_pk(pk), request=request)
+        obj = await self._arun_object_hooks(request, "hard_delete", self._get_pk(pk))
+        await self._get_serializer().adestroy(obj, request=request)
         return Status(204, None)
 
     def _register_hard_delete_view(self) -> None:
@@ -905,7 +913,7 @@ class SoftDeleteViewSetMixin(APIViewSet[ModelT]):
         self._register_generated(
             GeneratedRoute(
                 method=HttpMethod.DELETE,
-                path=f"{self.path_retrieve}/hard-delete",
+                path=f"{self.get_path_retrieve}/hard-delete",
                 auth=self.delete_view_auth(),
                 summary=f"Hard Delete {self.model_verbose_name}",
                 description=f"Permanently delete a {self.model_verbose_name}.",

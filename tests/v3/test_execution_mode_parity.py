@@ -230,7 +230,7 @@ def _request(method: str, **attrs):
 
 
 def _route(viewset: APIViewSet, suffix: str) -> Callable:
-    path = f"{viewset.path_retrieve}/{suffix}"
+    path = f"{viewset.get_path_retrieve}/{suffix}"
     return viewset.router.path_operations[path].operations[0].view_func
 
 

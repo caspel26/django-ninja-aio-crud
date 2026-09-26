@@ -1,9 +1,12 @@
 from django.core.exceptions import ImproperlyConfigured
 from django.test import TestCase, tag
 
-from ninja_aio import NinjaAIO
+from ninja.testing import TestClient
+
+from ninja_aio import NinjaAIO, on
 from ninja_aio.exceptions import NotFoundError
 from ninja_aio.models import ModelUtil
+from ninja_aio.views import APIViewSet, mixins
 from ninja_aio.views.mixins import SoftDeleteViewSetMixin
 from tests.generics.request import Request
 from tests.generics.views import GenericAPIViewSet
@@ -144,7 +147,7 @@ class SoftDeleteTestCase(TestCase):
 
         # Find the restore view
         ops = self.viewset.router.path_operations
-        restore_path = f"{self.viewset.path_retrieve}/restore"
+        restore_path = f"{self.viewset.get_path_retrieve}/restore"
         restore_op = ops.get(restore_path)
         self.assertIsNotNone(restore_op, f"Restore endpoint not found at {restore_path}")
         restore_view = restore_op.operations[0].view_func
@@ -163,7 +166,7 @@ class SoftDeleteTestCase(TestCase):
         obj = await self.model.objects.acreate(name="perm_del", description="d")
 
         ops = self.viewset.router.path_operations
-        hard_delete_path = f"{self.viewset.path_retrieve}/hard-delete"
+        hard_delete_path = f"{self.viewset.get_path_retrieve}/hard-delete"
         hard_delete_op = ops.get(hard_delete_path)
         self.assertIsNotNone(hard_delete_op, f"Hard delete endpoint not found at {hard_delete_path}")
         hard_delete_view = hard_delete_op.operations[0].view_func
@@ -380,3 +383,82 @@ class SoftDeleteNoObjectHooksTestCase(TestCase):
         self.assertEqual(result.status_code, 204)
         await obj.arefresh_from_db()
         self.assertTrue(obj.is_deleted)
+
+
+class _StaffOnlyRestore(mixins.PermissionViewSetMixin):
+    def has_object_permission(self, request, operation, obj):
+        return operation not in ("restore", "hard_delete") or obj.name == "allowed"
+
+
+@tag("soft_delete")
+class SoftDeleteHttpTestCase(TestCase):
+    """Soft delete over URL resolution, combined with the permission mixin."""
+
+    def _client(self, bases, namespace):
+        class ArticleAPI(*bases, APIViewSet):
+            model = models.SoftDeleteTestModel
+            execution_mode = "sync"
+            schema_in = schema.TestModelSchemaIn
+            schema_out = schema.TestModelSchemaOut
+            schema_update = schema.TestModelSchemaPatch
+            bulk_operations = ["delete"]
+
+            @on("touch")
+            def touch(self, request, obj):
+                return {"name": obj.name}
+
+        api = NinjaAIO(urls_namespace=namespace)
+        ArticleAPI(api=api, prefix="articles").add_views_to_route()
+        return TestClient(api)
+
+    def setUp(self):
+        self.live = models.SoftDeleteTestModel.objects.create(name="allowed", description="d")
+        self.gone = models.SoftDeleteTestModel.objects.create(
+            name="allowed", description="d", is_deleted=True
+        )
+        self.locked = models.SoftDeleteTestModel.objects.create(
+            name="locked", description="d", is_deleted=True
+        )
+
+    def test_extra_routes_have_a_single_slash(self):
+        client = self._client((mixins.SoftDeleteViewSetMixin,), "sd_http_paths")
+        self.assertEqual(client.post(f"/articles/{self.gone.pk}/restore").status_code, 200)
+        self.assertEqual(
+            client.delete(f"/articles/{self.live.pk}/hard-delete").status_code, 204
+        )
+
+    def test_actions_on_deleted_rows_return_404(self):
+        client = self._client((mixins.SoftDeleteViewSetMixin,), "sd_http_actions")
+        self.assertEqual(client.post(f"/articles/{self.gone.pk}/touch").status_code, 404)
+        self.assertEqual(client.post(f"/articles/{self.live.pk}/touch").status_code, 200)
+
+    def test_bulk_delete_reports_already_deleted_rows(self):
+        client = self._client((mixins.SoftDeleteViewSetMixin,), "sd_http_bulk")
+        response = client.delete(
+            "/articles/bulk/", json={"ids": [self.live.pk, self.gone.pk]}
+        )
+        body = response.json()
+        self.assertEqual(body["success"]["count"], 1)
+        self.assertEqual(body["errors"]["count"], 1)
+
+    def test_restore_and_hard_delete_check_object_permissions(self):
+        client = self._client(
+            (mixins.SoftDeleteViewSetMixin, _StaffOnlyRestore), "sd_http_perms"
+        )
+        self.assertEqual(client.post(f"/articles/{self.locked.pk}/restore").status_code, 403)
+        self.assertEqual(
+            client.delete(f"/articles/{self.locked.pk}/hard-delete").status_code, 403
+        )
+        self.assertEqual(client.post(f"/articles/{self.gone.pk}/restore").status_code, 200)
+
+    def test_mixin_order_does_not_matter(self):
+        for index, bases in enumerate(
+            (
+                (mixins.SoftDeleteViewSetMixin, _StaffOnlyRestore),
+                (_StaffOnlyRestore, mixins.SoftDeleteViewSetMixin),
+            )
+        ):
+            client = self._client(bases, f"sd_http_order_{index}")
+            listed = [item["id"] for item in client.get("/articles").json()["items"]]
+            self.assertEqual(listed, [self.live.pk])
+            self.assertEqual(client.get(f"/articles/{self.gone.pk}").status_code, 404)
