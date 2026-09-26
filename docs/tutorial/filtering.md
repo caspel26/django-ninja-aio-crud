@@ -11,7 +11,7 @@ description: Add query parameters to filter, search, sort and paginate the artic
 In this step you let clients narrow down the article list:
 
 ```text
-GET /api/articles/?title=django&category=1&search=async&ordering=-views&page=2
+GET /api/articles?title=django&category=1&search=async&ordering=-views&page=2
 ```
 
 ## Add the filters
@@ -84,7 +84,7 @@ Each mixin handles the parameters of its type, so you can combine them.
 The list is split in pages of 100 items. Clients choose the page and its size:
 
 ```text
-GET /api/articles/?page=2&page_size=20
+GET /api/articles?page=2&page_size=20
 ```
 
 Change the default size in your settings:

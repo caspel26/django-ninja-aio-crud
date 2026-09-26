@@ -95,7 +95,7 @@ curl -X POST localhost:8000/api/articles/ \
 
 | Method | Path | What it does |
 | --- | --- | --- |
-| `GET` | `/api/articles/` | List articles, with pagination |
+| `GET` | `/api/articles` | List articles, with pagination |
 | `POST` | `/api/articles/` | Create an article |
 | `GET` | `/api/articles/{id}` | Get one article |
 | `PATCH` | `/api/articles/{id}/` | Update some fields |

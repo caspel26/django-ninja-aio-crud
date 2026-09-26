@@ -167,6 +167,6 @@ protected endpoints.
 !!! tip
 
     For browser apps, you can store the token in an HttpOnly cookie instead.
-    See [cookie authentication](../auth_cookie.md).
+    See [cookie authentication](../guides/cookie-authentication.md).
 
 [Next: add permissions](permissions.md){ .md-button .md-button--primary }

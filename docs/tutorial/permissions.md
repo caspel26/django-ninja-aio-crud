@@ -93,7 +93,7 @@ For custom actions it is the method name, like `publish`.
 
 | Request | Anonymous | Logged in | Staff |
 | --- | --- | --- | --- |
-| `GET /api/articles/` | Published only | Published only | Published only |
+| `GET /api/articles` | Published only | Published only | Published only |
 | `GET` a draft | `403` | `403` | `403` |
 | `POST /api/articles/` | `401` | `201` | `201` |
 | `PATCH .../{id}/` | `401` | `200` | `200` |

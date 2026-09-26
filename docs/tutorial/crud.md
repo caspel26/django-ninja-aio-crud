@@ -51,7 +51,7 @@ You now have five endpoints:
 
 | Method | Path | Status | Body | Response |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/articles/` | 200 | | Paginated `read` |
+| `GET` | `/api/articles` | 200 | | Paginated `read` |
 | `POST` | `/api/articles/` | 201 | `create` | `read` |
 | `GET` | `/api/articles/{id}` | 200 | | `detail` |
 | `PATCH` | `/api/articles/{id}/` | 200 | `update` | `read` |

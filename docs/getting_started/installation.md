@@ -35,7 +35,7 @@ Install the package from PyPI. Django Ninja comes with it.
 | Django | Any version supported by your Django Ninja release |
 
 You don't need to add anything to `INSTALLED_APPS`. Add `"ninja_aio"` only if
-you want the [`mcp_server`](../mcp.md) management command.
+you want the [`mcp_server`](../guides/mcp.md) management command.
 
 ## Optional extras
 

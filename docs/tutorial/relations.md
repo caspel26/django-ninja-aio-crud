@@ -140,6 +140,6 @@ Each nested article leaves out its `category`, so the response doesn't loop.
 !!! tip
 
     To create a category and its articles in one request, see
-    [nested writes](../api/models/model_serializer.md).
+    [nested writes](../guides/nested-writes.md).
 
 [Next: add authentication](authentication.md){ .md-button .md-button--primary }

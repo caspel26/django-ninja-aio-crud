@@ -60,7 +60,7 @@ Test the endpoints with Django's test client:
                 "category_id": self.category.pk,
             })
 
-            response = self.client.get("/api/articles/")
+            response = self.client.get("/api/articles")
 
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.json()["count"], 1)
@@ -84,7 +84,7 @@ Test the endpoints with Django's test client:
                 "category_id": category.pk,
             })
 
-            response = await self.async_client.get("/api/articles/")
+            response = await self.async_client.get("/api/articles")
 
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.json()["count"], 1)
@@ -119,5 +119,5 @@ api = NinjaAIO(title="Blog API", docs_decorator=staff_member_required)  # staff 
 You've built a complete API. From here, explore the topics you need:
 
 - [Deployment](../deployment.md) for servers, workers and databases
-- [APIViewSet reference](../api/views/api_view_set.md) for every option
+- [Viewsets](../guides/viewsets.md) for every viewset option
 - [Troubleshooting](../troubleshooting.md) if something doesn't work

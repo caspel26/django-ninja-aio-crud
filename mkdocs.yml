@@ -22,9 +22,38 @@ nav:
     - 5. Add permissions: tutorial/permissions.md
     - 6. Filter, search and sort: tutorial/filtering.md
     - 7. Go to production: tutorial/production.md
-    - Soft Delete: tutorial/soft_delete.md
+  - Guides:
+    - Data:
+      - Schemas: guides/schemas.md
+      - Validation: guides/validation.md
+      - Use from Python: guides/python-crud.md
+      - Serialize objects: guides/dumping.md
+      - Relations: guides/relations.md
+      - Nested writes: guides/nested-writes.md
+      - Bulk operations: guides/bulk-operations.md
+      - Query optimization: guides/query-optimization.md
+    - Endpoints:
+      - Viewsets: guides/viewsets.md
+      - Custom actions: guides/custom-actions.md
+      - Routers: guides/routers.md
+      - Filtering: guides/filtering.md
+      - Pagination: guides/pagination.md
+      - Field selection: guides/field-selection.md
+      - Soft delete: guides/soft-delete.md
+    - Security:
+      - JWT authentication: guides/authentication.md
+      - Cookie authentication: guides/cookie-authentication.md
+      - Permissions: guides/permissions.md
+    - Behavior:
+      - Hooks: guides/hooks.md
+      - Errors: guides/errors.md
+    - Integrations:
+      - Django admin: guides/admin.md
+      - AI agents (MCP): guides/mcp.md
+      - Swagger UI: guides/swagger-ui.md
+      - Logging: guides/logging.md
+      - Type hints: guides/type-hints.md
   - API Reference:
-    - Type Hints & Type Safety: api/type_hints.md
     - Views:
       - APIView: api/views/api_view.md
       - APIViewSet: api/views/api_view_set.md
@@ -33,24 +62,15 @@ nav:
       - Mixins: api/views/mixins.md
     - Models:
       - ModelSerializer: api/models/model_serializer.md
-      - ModelUtil: api/models/model_util.md
       - Serializer (Meta-driven): api/models/serializers.md
-      - Validators: api/models/validators.md
-    - Auto Admin: api/admin.md
-    - Swagger UI: api/branding.md
     - Authentication: api/authentication.md
     - Exceptions: api/exceptions.md
     - Pagination: api/pagination.md
     - Renderers: api/renderers/orjson_renderer.md
-  - Authentication:
-      - JWT & AsyncJwtBearer: auth.md
-      - Cookie Auth (BFF): auth_cookie.md
-  - AI Agent Integration (MCP): mcp.md
   - Benchmarks:
       - Framework Comparison: comparison.md
       - Performance: performance.md
   - Resources:
-      - Logging: logging.md
       - Deployment: deployment.md
       - Troubleshooting: troubleshooting.md
       - Contributing: contributing.md
