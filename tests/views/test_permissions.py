@@ -49,9 +49,9 @@ class _PermissionTestBase(TestCase):
         cls.model = models.TestModelSerializer
         cls.test_util = ModelUtil(cls.model)
         cls.request = Request("/test/")
-        cls.schema_in = cls.model.generate_create_s()
-        cls.schema_out = cls.model.generate_read_s()
-        cls.schema_update = cls.model.generate_update_s()
+        cls.schema_in = cls.model.create_schema
+        cls.schema_out = cls.model.read_schema
+        cls.schema_update = cls.model.update_schema
 
     @classmethod
     def _locate_views(cls):

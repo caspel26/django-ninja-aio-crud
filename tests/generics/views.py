@@ -182,7 +182,7 @@ class Tests:
             for k, v in data.items():
                 if isinstance(v, ModelSerializer):
                     new_data[k] = await ModelUtil(v.__class__).read_s(
-                        v.__class__.generate_related_s(), self.get_request, v
+                        v.__class__.related_schema, self.get_request, v
                     )
                 elif isinstance(v, models.Model):
                     new_data[k] = await ModelUtil(v.__class__).read_s(

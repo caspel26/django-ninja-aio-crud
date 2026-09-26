@@ -334,7 +334,7 @@ class ArticleViewSet(APIViewSet):
         # Serialize articles
         from ninja_aio.models import ModelUtil
         util = ModelUtil(Article)
-        schema = Article.generate_read_s()
+        schema = Article.read_schema
 
         results = []
         for article in articles:
@@ -460,7 +460,7 @@ class ArticleViewSet(APIViewSet):
         # Serialize
         from ninja_aio.models import ModelUtil
         util = ModelUtil(Article)
-        schema = Article.generate_read_s()
+        schema = Article.read_schema
 
         results = []
         for article in articles:
@@ -470,7 +470,7 @@ class ArticleViewSet(APIViewSet):
         return results
 
     @api_post("/")
-    async def create_article(self, request, data: Article.generate_create_s()):
+    async def create_article(self, request, data: Article.create_schema):
         """Override create to set author from request"""
         # Set author from authenticated user
         data.author = request.auth.id
@@ -478,7 +478,7 @@ class ArticleViewSet(APIViewSet):
         # Use default create logic
         from ninja_aio.models import ModelUtil
         util = ModelUtil(Article)
-        schema = Article.generate_read_s()
+        schema = Article.read_schema
 
         return await util.create_s(request, data, schema)
 ```
@@ -827,7 +827,7 @@ class ArticleViewSet(APIViewSet):
         # Serialize article
         from ninja_aio.models import ModelUtil
         util = ModelUtil(Article)
-        schema = Article.generate_read_s()
+        schema = Article.read_schema
         article_data = await util.read_s(request, article, schema)
 
         # Get related articles
@@ -1042,7 +1042,7 @@ Here's a complete ViewSet with all features:
 
             from ninja_aio.models import ModelUtil
             util = ModelUtil(Article)
-            schema = Article.generate_read_s()
+            schema = Article.read_schema
 
             results = []
             for article in articles:

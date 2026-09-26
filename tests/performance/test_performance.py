@@ -101,10 +101,10 @@ class SchemaGenerationPerformanceTest(PerformanceMixin, TestCase):
         """Benchmark generating all schema types from a ModelSerializer."""
 
         def gen():
-            models.TestModelSerializer.generate_read_s()
-            models.TestModelSerializer.generate_create_s()
-            models.TestModelSerializer.generate_update_s()
-            models.TestModelSerializer.generate_detail_s()
+            models.TestModelSerializer.read_schema
+            models.TestModelSerializer.create_schema
+            models.TestModelSerializer.update_schema
+            models.TestModelSerializer.detail_schema
 
         stats = self._benchmark(gen)
         self._record("model_serializer_schema_generation", stats)
@@ -113,9 +113,9 @@ class SchemaGenerationPerformanceTest(PerformanceMixin, TestCase):
         """Benchmark generating schemas from a Meta-driven Serializer."""
 
         def gen():
-            serializers.TestModelForeignKeySerializer.generate_read_s()
-            serializers.TestModelForeignKeySerializer.generate_create_s()
-            serializers.TestModelForeignKeySerializer.generate_update_s()
+            serializers.TestModelForeignKeySerializer.read_schema
+            serializers.TestModelForeignKeySerializer.create_schema
+            serializers.TestModelForeignKeySerializer.update_schema
 
         stats = self._benchmark(gen)
         self._record("meta_serializer_schema_generation", stats)
@@ -150,8 +150,8 @@ class SchemaGenerationPerformanceTest(PerformanceMixin, TestCase):
         """Benchmark schema generation for models with FK relations."""
 
         def gen():
-            models.TestModelSerializerForeignKey.generate_read_s()
-            models.TestModelSerializerReverseForeignKey.generate_read_s()
+            models.TestModelSerializerForeignKey.read_schema
+            models.TestModelSerializerReverseForeignKey.read_schema
 
         stats = self._benchmark(gen)
         self._record("schema_with_relations", stats)
@@ -160,9 +160,9 @@ class SchemaGenerationPerformanceTest(PerformanceMixin, TestCase):
         """Benchmark schema generation including validator collection."""
 
         def gen():
-            serializers.TestModelWithValidatorsMetaSerializer.generate_create_s()
-            serializers.TestModelWithValidatorsMetaSerializer.generate_read_s()
-            serializers.TestModelWithValidatorsMetaSerializer.generate_update_s()
+            serializers.TestModelWithValidatorsMetaSerializer.create_schema
+            serializers.TestModelWithValidatorsMetaSerializer.read_schema
+            serializers.TestModelWithValidatorsMetaSerializer.update_schema
 
         stats = self._benchmark(gen)
         self._record("schema_with_validators", stats)
@@ -182,7 +182,7 @@ class SerializationPerformanceTest(PerformanceMixin, TestCase):
         cls.api = NinjaAIO(urls_namespace="perf_serialization")
         cls.util = ModelUtil(models.TestModelSerializer)
         cls.request = Request("test-model-serializers").get()
-        cls.schema_out = models.TestModelSerializer.generate_read_s()
+        cls.schema_out = models.TestModelSerializer.read_schema
         cls.obj = models.TestModelSerializer.objects.create(
             name="perf_test", description="perf_desc"
         )
@@ -221,7 +221,7 @@ class SerializationPerformanceTest(PerformanceMixin, TestCase):
 
     def test_input_parsing(self):
         """Benchmark parsing inbound request data."""
-        schema_in = models.TestModelSerializer.generate_create_s()
+        schema_in = models.TestModelSerializer.create_schema
         data = schema_in(name="parse_test", description="parse_desc")
 
         async def parse():
@@ -241,7 +241,7 @@ class SerializationPerformanceTest(PerformanceMixin, TestCase):
             test_model_serializer=parent,
         )
         util = ModelUtil(models.TestModelSerializerForeignKey)
-        schema = models.TestModelSerializerForeignKey.generate_read_s()
+        schema = models.TestModelSerializerForeignKey.read_schema
         child = models.TestModelSerializerForeignKey.objects.select_related(
             "test_model_serializer"
         ).first()

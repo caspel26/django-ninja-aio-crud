@@ -684,7 +684,7 @@ class BaseSerializer:
         schemas = tuple(
             schema
             for serializer_type in get_args(resolved_union)
-            if (schema := serializer_type.generate_related_s()) is not None
+            if (schema := serializer_type.get_schema("related")) is not None
         )
 
         if not schemas:
@@ -738,7 +738,7 @@ class BaseSerializer:
                 has_readable_fields = rel_model.get_fields(
                     "read"
                 ) or rel_model.get_custom_fields("read")
-                return rel_model.generate_related_s() if has_readable_fields else None
+                return rel_model.get_schema("related") if has_readable_fields else None
 
             # Resolve from explicit serializer mapping
             rel_serializers = cls._get_relations_serializers() or {}
@@ -754,7 +754,7 @@ class BaseSerializer:
                 return cls._generate_union_schema(resolved)
 
             # Handle single serializer
-            return resolved.generate_related_s()
+            return resolved.get_schema("related")
         finally:
             # Always pop from resolution stack when done
             cls._pop_resolution()
@@ -1507,90 +1507,43 @@ class BaseSerializer:
                 del _schema_cache[key]
 
     @classmethod
+    def _deprecated_schema(
+        cls, old: str, kind: SchemaKind, depth: int = 1
+    ) -> SchemaType | None:
+        replacement = (
+            f"{kind}_schema" if depth == 1 else f'get_schema("{kind}", depth={depth})'
+        )
+        warnings.warn(
+            f"{cls.__name__}.{old}() is deprecated; use {replacement} instead.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        return cls.get_schema(kind, depth=depth)
+
+    @classmethod
     def generate_read_s(cls, depth: int = 1) -> SchemaType | None:
-        """
-        Generate the read (Out) schema for list responses.
-
-        Performance: Results are cached per (class, depth) combination.
-
-        Parameters
-        ----------
-        depth : int, optional
-            Nesting depth for related models. Defaults to ``1``.
-
-        Returns
-        -------
-        Schema | None
-            Generated Pydantic schema, or ``None`` if no read fields are configured.
-        """
-        return cls.get_schema("read", depth=depth)
+        """Deprecated alias of ``read_schema`` / ``get_schema("read", depth=...)``."""
+        return cls._deprecated_schema("generate_read_s", "read", depth)
 
     @classmethod
     def generate_detail_s(cls, depth: int = 1) -> SchemaType | None:
-        """
-        Generate the detail (single-object) read schema.
-
-        Falls back to the standard read schema if no detail-specific
-        configuration is defined.
-
-        Performance: Results are cached per (class, depth) combination.
-
-        Parameters
-        ----------
-        depth : int, optional
-            Nesting depth for related models. Defaults to ``1``.
-
-        Returns
-        -------
-        Schema
-            Generated Pydantic schema (never ``None``; falls back to read schema).
-        """
-        return cls.get_schema("detail", depth=depth)
+        """Deprecated alias of ``detail_schema`` / ``get_schema("detail", depth=...)``."""
+        return cls._deprecated_schema("generate_detail_s", "detail", depth)
 
     @classmethod
     def generate_create_s(cls) -> SchemaType | None:
-        """
-        Generate the create (In) schema for input validation.
-
-        Performance: Results are cached per class.
-
-        Returns
-        -------
-        Schema | None
-            Generated Pydantic schema, or ``None`` if no create fields are configured.
-        """
-        return cls.get_schema("create")
+        """Deprecated alias of ``create_schema``."""
+        return cls._deprecated_schema("generate_create_s", "create")
 
     @classmethod
     def generate_update_s(cls) -> SchemaType | None:
-        """
-        Generate the update (Patch) schema for partial updates.
-
-        Performance: Results are cached per class.
-
-        Returns
-        -------
-        Schema | None
-            Generated Pydantic schema, or ``None`` if no update fields are configured.
-        """
-        return cls.get_schema("update")
+        """Deprecated alias of ``update_schema``."""
+        return cls._deprecated_schema("generate_update_s", "update")
 
     @classmethod
     def generate_related_s(cls) -> SchemaType | None:
-        """
-        Generate the related (nested) schema for embedding in parent schemas.
-
-        Includes only non-relational model fields and custom fields, preventing
-        infinite nesting of related objects.
-
-        Performance: Results are cached per class.
-
-        Returns
-        -------
-        Schema | None
-            Generated Pydantic schema, or ``None`` if no fields are configured.
-        """
-        return cls.get_schema("related")
+        """Deprecated alias of ``related_schema``."""
+        return cls._deprecated_schema("generate_related_s", "related")
 
     @classmethod
     def _validate_operation_data(
@@ -1837,7 +1790,9 @@ class BaseSerializer:
         return run_bulk(
             cls._get_model(),
             items,
-            lambda data: cls._create_operation(data, request=request, fk_cache=fk_cache),
+            lambda data: cls._create_operation(
+                data, request=request, fk_cache=fk_cache
+            ),
         )
 
     _bulk_failure = staticmethod(bulk_failure)
@@ -1896,7 +1851,9 @@ class BaseSerializer:
         return run_bulk(
             cls._get_model(),
             items,
-            lambda pair: cls._update_operation(*pair, request=request, fk_cache=fk_cache),
+            lambda pair: cls._update_operation(
+                *pair, request=request, fk_cache=fk_cache
+            ),
             cls._bulk_update_prepare,
         )
 
@@ -1911,7 +1868,9 @@ class BaseSerializer:
         return await arun_bulk(
             cls._get_model(),
             items,
-            lambda pair: cls._aupdate_operation(*pair, request=request, fk_cache=fk_cache),
+            lambda pair: cls._aupdate_operation(
+                *pair, request=request, fk_cache=fk_cache
+            ),
             cls._bulk_update_prepare,
         )
 
@@ -2036,7 +1995,12 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
 
         validate_serializer_hooks(cls)
         _register_serializer_config(
-            cls, [name for name in cls._LEGACY_CONFIG_CLASSES.values() if name in cls.__dict__]
+            cls,
+            [
+                name
+                for name in cls._LEGACY_CONFIG_CLASSES.values()
+                if name in cls.__dict__
+            ],
         )
         cls.util = ModelUtil(cls)
         cls.query_util = QueryUtil(cls)
@@ -2078,7 +2042,10 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
         *,
         request: HttpRequest | None = None,
     ) -> BulkResult[ModelSerializerT]:
-        return cast(BulkResult[ModelSerializerT], cls._bulk_create_operation(items, request=request))
+        return cast(
+            BulkResult[ModelSerializerT],
+            cls._bulk_create_operation(items, request=request),
+        )
 
     @classmethod
     def get(
@@ -2417,7 +2384,7 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
         """
         Build the create-input schema used for this model as a nested child.
 
-        Identical to ``generate_create_s()`` except ``fk_field_name`` (the FK
+        Identical to the create schema except ``fk_field_name`` (the FK
         pointing back at the nested-write parent) is always excluded, since it
         is injected programmatically rather than supplied by the client.
         Used both to type the parent's nested custom field and to re-validate
@@ -2755,7 +2722,10 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         super().__init_subclass__(**kwargs)
         from ninja_aio.models.utils import ModelUtil, register_serializer_for_model
         from ninja_aio.helpers.query import QueryUtil
-        from ninja_aio.models.hooks import collect_reactive_hooks, validate_serializer_hooks
+        from ninja_aio.models.hooks import (
+            collect_reactive_hooks,
+            validate_serializer_hooks,
+        )
 
         validate_serializer_hooks(cls)
         legacy = [
@@ -2821,7 +2791,9 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         *,
         request: HttpRequest | None = None,
     ) -> BulkResult[ModelT]:
-        return cast(BulkResult[ModelT], cls._bulk_create_operation(items, request=request))
+        return cast(
+            BulkResult[ModelT], cls._bulk_create_operation(items, request=request)
+        )
 
     @classmethod
     def get(
@@ -3105,9 +3077,7 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         )
 
     @classmethod
-    def queryset_request(
-        cls, request: HttpRequest | None
-    ) -> models.QuerySet[ModelT]:
+    def queryset_request(cls, request: HttpRequest | None) -> models.QuerySet[ModelT]:
         """Synchronous counterpart for request-scoped query construction."""
         return cls.query_util.apply_queryset_optimizations(
             queryset=cls.model._default_manager.all(),
@@ -3188,9 +3158,7 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         """Synchronous counterpart for post-create lifecycle work."""
         pass
 
-    def custom_actions(
-        self, payload: dict[str, Any], instance: models.Model
-    ) -> None:
+    def custom_actions(self, payload: dict[str, Any], instance: models.Model) -> None:
         """Synchronous counterpart for custom field handling."""
         pass
 

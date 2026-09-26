@@ -230,7 +230,7 @@ class Article(ModelSerializer):
 
 Validators are processed during schema generation:
 
-1. When `generate_create_s()`, `generate_read_s()`, etc. are called, the framework collects any `PydanticDescriptorProxy` instances (created by `@field_validator` / `@model_validator`) from the corresponding configuration class
+1. When `create_schema`, `read_schema`, etc. are first accessed, the framework collects any `PydanticDescriptorProxy` instances (created by `@field_validator` / `@model_validator`) from the corresponding configuration class
 2. After `ninja.orm.create_schema()` generates the base Pydantic schema, a subclass is created with the validators attached
 3. Pydantic discovers the validators during class creation and registers them normally
 

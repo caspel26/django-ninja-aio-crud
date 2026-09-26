@@ -38,7 +38,7 @@ book: Book = await serializer.save(book)
 data: dict = await BookSerializer.amodel_dump(book)
 
 # ✅ Optional: specify custom schema for serialization
-custom_schema = BookSerializer.generate_read_s()
+custom_schema = BookSerializer.read_schema
 data: dict = await BookSerializer.amodel_dump(book, schema=custom_schema)
 ```
 

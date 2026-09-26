@@ -457,7 +457,7 @@ util = ModelUtil(Article)
 
 # List published with default read optimizations
 items = await util.list_read_s(
-    Article.generate_read_s(),
+    Article.read_schema,
     request,
     query_data=ObjectsQuerySchema(filters={"is_published": True}),
     is_for_read=True,
@@ -465,7 +465,7 @@ items = await util.list_read_s(
 
 # Retrieve by slug with getters
 item = await util.read_s(
-    Article.generate_read_s(),
+    Article.read_schema,
     request,
     query_data=ObjectQuerySchema(getters={"slug": "my-article"}),
     is_for_read=True,

@@ -589,13 +589,18 @@ class Article(models.Model, ModelSerializer):
 
 ModelSerializer automatically generates five schema types:
 
-| Method                       | Schema Type        | Purpose                              |
-| ---------------------------- | ------------------ | ------------------------------------ |
-| `generate_create_s()`        | Input ("In")       | POST endpoint payload                |
-| `generate_update_s()`        | Input ("Patch")    | PATCH/PUT endpoint payload           |
-| `generate_read_s(depth=1)`   | Output ("Out")     | List response with nested relations  |
-| `generate_detail_s(depth=1)` | Output ("Detail")  | Single object response (retrieve)    |
-| `generate_related_s()`       | Output ("Related") | Compact nested representation        |
+| Attribute        | Schema Type        | Purpose                              |
+| ---------------- | ------------------ | ------------------------------------ |
+| `create_schema`  | Input ("In")       | POST endpoint payload                |
+| `update_schema`  | Input ("Patch")    | PATCH/PUT endpoint payload           |
+| `read_schema`    | Output ("Out")     | List response with nested relations  |
+| `detail_schema`  | Output ("Detail")  | Single object response (retrieve)    |
+| `related_schema` | Output ("Related") | Compact nested representation        |
+
+Schemas are generated lazily and cached. Use `get_schema("read", depth=2)` or `get_schema("detail", depth=2)` for a custom nesting depth.
+
+!!! warning "Deprecated"
+    The version 2 factories `generate_create_s()`, `generate_update_s()`, `generate_read_s()`, `generate_detail_s()` and `generate_related_s()` still work but emit a `DeprecationWarning`. They will be removed in version 4.
 
 **Example:**
 
@@ -611,11 +616,11 @@ class User(ModelSerializer):
         fields = ["id", "username", "email"]
 
 # Auto-generate schemas
-UserCreateSchema = User.generate_create_s()
-UserReadSchema = User.generate_read_s()
-UserDetailSchema = User.generate_detail_s()  # Falls back to read schema if DetailSerializer not defined
-UserUpdateSchema = User.generate_update_s()
-UserRelatedSchema = User.generate_related_s()
+UserCreateSchema = User.create_schema
+UserReadSchema = User.read_schema
+UserDetailSchema = User.detail_schema  # Falls back to read schema if DetailSerializer not defined
+UserUpdateSchema = User.update_schema
+UserRelatedSchema = User.related_schema
 ```
 
 ### Nested Relationship Handling

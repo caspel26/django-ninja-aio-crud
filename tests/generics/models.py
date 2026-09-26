@@ -27,9 +27,9 @@ class Tests:
             cls.pk_att = cls.model._meta.pk.attname
             cls.obj = cls.model.objects.select_related().create(**cls().create_data)
             if isinstance(cls.model, ModelSerializerMeta):
-                cls.schema_in = cls.model.generate_create_s()
-                cls.schema_out = cls.model.generate_read_s()
-                cls.schema_patch = cls.model.generate_update_s()
+                cls.schema_in = cls.model.create_schema
+                cls.schema_out = cls.model.read_schema
+                cls.schema_patch = cls.model.update_schema
 
         @property
         def serializable_fields(self) -> list:

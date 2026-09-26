@@ -172,7 +172,7 @@ class FKOptimizationTestCase(TestCase):
             test_model_serializer=self.rev_fk_1.id,
         )
 
-        read_schema = models.TestModelSerializerForeignKey.generate_read_s()
+        read_schema = models.TestModelSerializerForeignKey.read_schema
 
         result = await self.model_util.create_s(self.request, create_data, read_schema)
 
@@ -208,7 +208,7 @@ class FKOptimizationTestCase(TestCase):
             test_model_serializer=self.rev_fk_1.id,
         )
 
-        read_schema = models.TestModelSerializerForeignKey.generate_read_s()
+        read_schema = models.TestModelSerializerForeignKey.read_schema
 
         result = await self.model_util.create_s(self.request, create_data, read_schema)
 
@@ -240,7 +240,7 @@ class FKOptimizationTestCase(TestCase):
 
         update_data = UpdateSchema(test_model_serializer=self.rev_fk_2.id)
 
-        read_schema = models.TestModelSerializerForeignKey.generate_read_s()
+        read_schema = models.TestModelSerializerForeignKey.read_schema
 
         result = await self.model_util.update_s(
             self.request, update_data, existing_obj.pk, read_schema
@@ -279,7 +279,7 @@ class FKOptimizationTestCase(TestCase):
 
         update_data = UpdateSchema(test_model_serializer=self.rev_fk_2.id)
 
-        read_schema = models.TestModelSerializerForeignKey.generate_read_s()
+        read_schema = models.TestModelSerializerForeignKey.read_schema
 
         result = await self.model_util.update_s(
             self.request, update_data, existing_obj.pk, read_schema
@@ -310,7 +310,7 @@ class FKOptimizationTestCase(TestCase):
 
         create_data = CreateSchema(name="no_fk", description="No FK test")
 
-        read_schema = models.TestModelSerializer.generate_read_s()
+        read_schema = models.TestModelSerializer.read_schema
 
         result = await model_util.create_s(self.request, create_data, read_schema)
 
@@ -345,7 +345,7 @@ class FKOptimizationTestCase(TestCase):
             test_model_serializer=parent.id,
         )
 
-        read_schema = models.TestModelSerializerForeignKey.generate_read_s()
+        read_schema = models.TestModelSerializerForeignKey.read_schema
 
         result = await self.model_util.create_s(self.request, create_data, read_schema)
 
@@ -367,7 +367,7 @@ class FKOptimizationTestCase(TestCase):
             description: str
             test_model_serializer: int
 
-        read_schema = models.TestModelSerializerForeignKey.generate_read_s()
+        read_schema = models.TestModelSerializerForeignKey.read_schema
 
         # Create first object
         result1 = await self.model_util.create_s(
@@ -417,7 +417,7 @@ class FKOptimizationTestCase(TestCase):
             name="parent_model", description="Parent with reverse FK"
         )
 
-        read_schema = models.TestModelSerializerReverseForeignKey.generate_read_s()
+        read_schema = models.TestModelSerializerReverseForeignKey.read_schema
 
         # This should exercise _prefetch_reverse_relations_on_instance
         # because the ReadSerializer includes "test_model_serializer_foreign_keys"
@@ -457,7 +457,7 @@ class FKOptimizationTestCase(TestCase):
         # Update only description, not FK
         update_data = UpdateSchema(description="Updated description")
 
-        read_schema = models.TestModelSerializerForeignKey.generate_read_s()
+        read_schema = models.TestModelSerializerForeignKey.read_schema
 
         result = await self.model_util.update_s(
             self.request, update_data, existing_obj.pk, read_schema
@@ -578,7 +578,7 @@ class BulkFKCacheOptimizationTestCase(TestCase):
         calls: two sequential single creates for two different FK values must
         each resolve their own FK."""
         request = mock.Mock()
-        read_schema = models.TestModelSerializerForeignKey.generate_read_s()
+        read_schema = models.TestModelSerializerForeignKey.read_schema
 
         with _count_fk_resolutions(
             models.TestModelSerializerReverseForeignKey

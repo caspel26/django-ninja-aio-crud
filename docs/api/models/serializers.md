@@ -97,11 +97,11 @@ Generate schemas explicitly using these methods:
 
 ```python
 # Explicitly generate schemas when needed
-ArticleSerializer.generate_create_s()  # Returns create (In) schema
-ArticleSerializer.generate_read_s()    # Returns read (Out) schema for list endpoint
-ArticleSerializer.generate_detail_s()  # Returns detail (Out) schema for retrieve endpoint
-ArticleSerializer.generate_update_s()  # Returns update (Patch) schema
-ArticleSerializer.generate_related_s() # Returns related (nested) schema
+ArticleSerializer.create_schema  # Returns create (In) schema
+ArticleSerializer.read_schema    # Returns read (Out) schema for list endpoint
+ArticleSerializer.detail_schema  # Returns detail (Out) schema for retrieve endpoint
+ArticleSerializer.update_schema  # Returns update (Patch) schema
+ArticleSerializer.related_schema # Returns related (nested) schema
 ```
 
 Schemas support **forward references and circular dependencies** via string references in `relations_serializers`.
@@ -935,7 +935,7 @@ data = ArticleSerializer.model_dump(article)
 data = await ArticleSerializer.amodel_dump(article)
 
 # Use a specific schema
-custom_schema = ArticleSerializer.generate_read_s()
+custom_schema = ArticleSerializer.read_schema
 data = await ArticleSerializer.amodel_dump(article, schema=custom_schema)
 ```
 
@@ -948,7 +948,7 @@ data = ArticleSerializer.model_dumps(articles)
 data = await ArticleSerializer.amodel_dumps(Article.objects.all())
 
 # Use a specific schema
-custom_schema = ArticleSerializer.generate_read_s()
+custom_schema = ArticleSerializer.read_schema
 data = await ArticleSerializer.amodel_dumps(Article.objects.all(), schema=custom_schema)
 ```
 

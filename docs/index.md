@@ -299,7 +299,7 @@ ViewSets internally use these to build optimized querysets in list/retrieve and 
 
     ```python
     items = await ModelUtil(Article).list_read_s(
-        Article.generate_read_s(),
+        Article.read_schema,
         request,
         query_data=ObjectsQuerySchema(filters={"category": 3}),
         is_for_read=True,

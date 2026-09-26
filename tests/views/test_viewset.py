@@ -400,12 +400,12 @@ class BaseTests:
     class ModelSerializerViewSetTestCaseBase(SetUpViewSetTestCase):
         @property
         def schemas(self):
-            read_s = self.model.generate_read_s()
+            read_s = self.model.read_schema
             return (
                 read_s,
-                self.model.generate_detail_s(),
-                self.model.generate_create_s(),
-                self.model.generate_update_s(),
+                self.model.detail_schema,
+                self.model.create_schema,
+                self.model.update_schema,
                 read_s,
                 read_s,
                 None,
@@ -938,12 +938,12 @@ class ApiViewSetModelForeignKeySerializerTestCase(
 
     @property
     def schemas(self):
-        read_s = serializers.TestModelForeignKeySerializer.generate_read_s()
+        read_s = serializers.TestModelForeignKeySerializer.read_schema
         return (
             read_s,
-            serializers.TestModelForeignKeySerializer.generate_detail_s(),
-            serializers.TestModelForeignKeySerializer.generate_create_s(),
-            serializers.TestModelForeignKeySerializer.generate_update_s(),
+            serializers.TestModelForeignKeySerializer.detail_schema,
+            serializers.TestModelForeignKeySerializer.create_schema,
+            serializers.TestModelForeignKeySerializer.update_schema,
             read_s,
             read_s,
             None,
@@ -1318,7 +1318,7 @@ class DetailSchemaSerializerTestCase(TestCase):
 
     def test_serializer_generates_detail_schema(self):
         """Test that Serializer generates detail schema from Meta.schema_detail."""
-        schema_detail = self.serializer_class.generate_detail_s()
+        schema_detail = self.serializer_class.detail_schema
         self.assertIsNotNone(schema_detail)
         self.assertIn("id", schema_detail.model_fields)
         self.assertIn("name", schema_detail.model_fields)

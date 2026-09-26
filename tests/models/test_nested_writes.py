@@ -21,8 +21,8 @@ class NestedWritesTestCase(TestCase):
     def setUpTestData(cls):
         cls.request = Request("nested-orders/")
         cls.util = ModelUtil(app_models.NestedOrder)
-        cls.schema_in = app_models.NestedOrder.generate_create_s()
-        cls.schema_out = app_models.NestedOrder.generate_read_s()
+        cls.schema_in = app_models.NestedOrder.create_schema
+        cls.schema_out = app_models.NestedOrder.read_schema
 
     async def test_create_with_nested_children(self):
         data = self.schema_in(
@@ -160,7 +160,7 @@ class NestedWritesTestCase(TestCase):
         self.assertEqual(second.items, [])
 
     def test_standalone_child_schema_retains_parent_fk(self):
-        standalone = app_models.NestedOrderItem.generate_create_s()
+        standalone = app_models.NestedOrderItem.create_schema
         self.assertIn("order", standalone.model_fields)
 
     async def test_nested_children_run_lifecycle_hooks(self):
@@ -449,12 +449,12 @@ class NestedWritesTestCase(TestCase):
 
     def test_cyclic_configuration_is_rejected_and_state_is_reset(self):
         with self.assertRaisesRegex(ImproperlyConfigured, "Cyclic"):
-            app_models.NestedNode.generate_create_s()
+            app_models.NestedNode.create_schema
         self.assertTrue(app_models.NestedOrder.get_nested_customs())
 
     def test_update_schema_does_not_accept_nested_collections(self):
         self.assertNotIn(
-            "items", app_models.NestedOrder.generate_update_s().model_fields
+            "items", app_models.NestedOrder.update_schema.model_fields
         )
 
     async def test_http_create_validates_and_serializes_nested_children(self):

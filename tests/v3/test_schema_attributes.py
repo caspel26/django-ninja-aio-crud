@@ -46,10 +46,13 @@ class LazySchemaAttributeTests(SimpleTestCase):
                     serializer=serializer_class.__name__,
                     attribute=attribute,
                 ):
-                    self.assertIs(
-                        getattr(serializer_class, attribute),
-                        getattr(serializer_class, factory)(),
-                    )
+                    with self.assertWarnsMessage(
+                        DeprecationWarning,
+                        f"{serializer_class.__name__}.{factory}() is deprecated; "
+                        f"use {attribute} instead.",
+                    ):
+                        legacy = getattr(serializer_class, factory)()
+                    self.assertIs(getattr(serializer_class, attribute), legacy)
 
     def test_attribute_generation_is_lazy_and_cached(self) -> None:
         TestModelSerializer.clear_schema_cache()
@@ -72,7 +75,11 @@ class LazySchemaAttributeTests(SimpleTestCase):
         ):
             with self.subTest(kind=kind):
                 schema = TestModelSerializer.get_schema(kind, depth=0)
-                expected = getattr(TestModelSerializer, factory_name)(0)
+                with self.assertWarnsMessage(
+                    DeprecationWarning,
+                    f'use get_schema("{kind}", depth=0) instead.',
+                ):
+                    expected = getattr(TestModelSerializer, factory_name)(0)
                 self.assertIs(schema, expected)
 
     def test_get_schema_rejects_unknown_kind(self) -> None:

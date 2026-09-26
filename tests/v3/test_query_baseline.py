@@ -17,9 +17,9 @@ class V2QueryCountBaselineTests(TestCase):
         )
         cls.request = Request("v3-baseline")
         cls.util = ModelUtil(TestModelSerializer)
-        cls.create_schema = TestModelSerializer.generate_create_s()
-        cls.update_schema = TestModelSerializer.generate_update_s()
-        cls.read_schema = TestModelSerializer.generate_read_s()
+        cls.create_schema = TestModelSerializer.create_schema
+        cls.update_schema = TestModelSerializer.update_schema
+        cls.read_schema = TestModelSerializer.read_schema
 
     def assertAsyncQueryCount(self, expected, operation):
         with CaptureQueriesContext(connection) as queries:

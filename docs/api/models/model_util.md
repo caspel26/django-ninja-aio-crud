@@ -296,8 +296,8 @@ obj = await ModelUtil(Book).get_object(
 Uniform serialization methods that accept either instances or query data:
 
 ```python
-schema = Book.generate_read_s()
-detail_schema = Book.generate_detail_s()
+schema = Book.read_schema
+detail_schema = Book.detail_schema
 
 # single instance
 data = await ModelUtil(Book).read_s(schema, request, instance=obj)

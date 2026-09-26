@@ -182,9 +182,9 @@ class SyncHookTestAPI(GenericAPIViewSet):
 class HookPlainAPI(GenericAPIViewSet):
     model = HookPlainModel
     serializer_class = HookPlainSerializer
-    schema_in = HookPlainSerializer.generate_create_s()
-    schema_out = HookPlainSerializer.generate_read_s()
-    schema_update = HookPlainSerializer.generate_update_s()
+    schema_in = HookPlainSerializer.create_schema
+    schema_out = HookPlainSerializer.read_schema
+    schema_update = HookPlainSerializer.update_schema
 
 
 # ─── Tests: ModelSerializer ──────────────────────────────
@@ -598,9 +598,9 @@ class SyncSerializerHook(Serializer):
 class SyncSerializerHookAPI(GenericAPIViewSet):
     model = HookPlainModel
     serializer_class = SyncSerializerHook
-    schema_in = SyncSerializerHook.generate_create_s()
-    schema_out = SyncSerializerHook.generate_read_s()
-    schema_update = SyncSerializerHook.generate_update_s()
+    schema_in = SyncSerializerHook.create_schema
+    schema_out = SyncSerializerHook.read_schema
+    schema_update = SyncSerializerHook.update_schema
 
 
 @tag("reactive_hooks")

@@ -37,9 +37,9 @@ class NinjaAIOBenchmark(FrameworkBenchmark):
 
     def setup_endpoints(self):
         """Generate schemas for CRUD operations."""
-        self.schema_in = TestModelSerializer.generate_create_s()
-        self.schema_out = TestModelSerializer.generate_read_s()
-        self.schema_update = TestModelSerializer.generate_update_s()
+        self.schema_in = TestModelSerializer.create_schema
+        self.schema_out = TestModelSerializer.read_schema
+        self.schema_update = TestModelSerializer.update_schema
 
     async def create_item(self, data: dict) -> Any:
         """Create a single item via ModelUtil."""
@@ -98,7 +98,7 @@ class NinjaAIOBenchmark(FrameworkBenchmark):
         from ninja_aio.models import ModelUtil
 
         util = ModelUtil(TestModelSerializerForeignKey)
-        schema = TestModelSerializerForeignKey.generate_read_s()
+        schema = TestModelSerializerForeignKey.read_schema
         instance = await TestModelSerializerForeignKey.objects.select_related(
             "test_model_serializer"
         ).aget(pk=item_id)
@@ -116,7 +116,7 @@ class NinjaAIOBenchmark(FrameworkBenchmark):
         from ninja_aio.models import ModelUtil
 
         util = ModelUtil(TestModelSerializerForeignKey)
-        schema = TestModelSerializerForeignKey.generate_read_s()
+        schema = TestModelSerializerForeignKey.read_schema
         # Your framework's QuerySet config automatically handles select_related
         instance = await util.aget_object(self.request.get(), item_id, is_for="read")
         return await util.read_s(
@@ -134,7 +134,7 @@ class NinjaAIOBenchmark(FrameworkBenchmark):
         from ninja_aio.models import ModelUtil
 
         util = ModelUtil(TestModelSerializerReverseForeignKey)
-        schema = TestModelSerializerReverseForeignKey.generate_read_s()
+        schema = TestModelSerializerReverseForeignKey.read_schema
         # Your framework's _prefetch_reverse_relations handles this automatically
         instance = await util.aget_object(self.request.get(), item_id, is_for="read")
         return await util.read_s(
@@ -151,7 +151,7 @@ class NinjaAIOBenchmark(FrameworkBenchmark):
         from ninja_aio.models import ModelUtil
 
         util = ModelUtil(TestModelSerializerManyToMany)
-        schema = TestModelSerializerManyToMany.generate_read_s()
+        schema = TestModelSerializerManyToMany.read_schema
         instance = await util.aget_object(self.request.get(), item_id, is_for="read")
         return await util.read_s(
             schema=schema,
@@ -167,7 +167,7 @@ class NinjaAIOBenchmark(FrameworkBenchmark):
         from ninja_aio.models import ModelUtil
 
         util = ModelUtil(TestModelSerializerForeignKey)
-        schema = TestModelSerializerForeignKey.generate_read_s()
+        schema = TestModelSerializerForeignKey.read_schema
         # Filters + select_related + pagination - all async
         queryset = TestModelSerializerForeignKey.objects.filter(
             **filters

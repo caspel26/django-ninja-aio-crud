@@ -68,49 +68,49 @@ class SerializersTestCase(TestCase):
         warnings.simplefilter("ignore", UserWarning)  # Ignora tutti i UserWarning
 
     def test_generate_schema_out(self):
-        schema_out_fk = self.serializer_fk.generate_read_s()
+        schema_out_fk = self.serializer_fk.read_schema
         for f in ["id", "name", "description", "test_model"]:
             self.assertIn(f, schema_out_fk.model_fields)
 
-        schema_out_rfk = self.serializer_rfk.generate_read_s()
+        schema_out_rfk = self.serializer_rfk.read_schema
         for f in ["id", "name", "description", "test_model_foreign_keys"]:
             self.assertIn(f, schema_out_rfk.model_fields)
 
     def test_generate_schema_in(self):
-        schema_in_fk = self.serializer_fk.generate_create_s()
+        schema_in_fk = self.serializer_fk.create_schema
         # In schema should include declared input fields
         for f in ["name", "description", "test_model"]:
             self.assertIn(f, schema_in_fk.model_fields)
         self.assertNotIn("id", schema_in_fk.model_fields)
 
-        schema_in_rfk = self.serializer_rfk.generate_create_s()
+        schema_in_rfk = self.serializer_rfk.create_schema
         for f in ["name", "description"]:
             self.assertIn(f, schema_in_rfk.model_fields)
 
     def test_generate_schema_update(self):
         # If no fields provided for update, optional fields should be honored when declared
         # Here no explicit update config exists, so update schema may be None or empty depending on implementation
-        schema_patch_fk = self.serializer_fk.generate_update_s()
+        schema_patch_fk = self.serializer_fk.update_schema
         # Implementation returns a schema when fields/customs/excludes exist; otherwise may fallback to optionals.
         # Our Meta doesn't define update, so ensure function doesn't crash and returns a Schema or None
         self.assertTrue(
             schema_patch_fk is None or hasattr(schema_patch_fk, "model_fields")
         )
 
-        schema_patch_rfk = self.serializer_rfk.generate_update_s()
+        schema_patch_rfk = self.serializer_rfk.update_schema
         self.assertTrue(
             schema_patch_rfk is None or hasattr(schema_patch_rfk, "model_fields")
         )
 
     def test_generate_related_schema(self):
-        related_fk = self.serializer_fk.generate_related_s()
+        related_fk = self.serializer_fk.related_schema
         # Related schema should include non-relational read fields only
         for f in ["id", "name", "description"]:
             self.assertIn(f, related_fk.model_fields)
         # Forward relation declared on fk read fields should still be present as plain field in read, but not in related
         self.assertNotIn("test_model", related_fk.model_fields)
 
-        related_rfk = self.serializer_rfk.generate_related_s()
+        related_rfk = self.serializer_rfk.related_schema
         for f in ["id", "name", "description"]:
             self.assertIn(f, related_rfk.model_fields)
         # Reverse relation should be excluded from related schema
@@ -128,7 +128,7 @@ class SerializersTestCase(TestCase):
 
     def test_relation_serializer_inclusion(self):
         # Ensure that providing relations_serializers yields nested related schema in read
-        schema_out_rfk = self.serializer_rfk.generate_read_s()
+        schema_out_rfk = self.serializer_rfk.read_schema
         # The reverse relation should be represented as a field; the nested schema type comes from ninja's create_schema.
         self.assertIn("test_model_foreign_keys", schema_out_rfk.model_fields)
         # Also ensure base fields present
@@ -159,7 +159,7 @@ class UnionSerializerTestCase(TestCase):
                 }
 
         # Should resolve without errors
-        schema = UnionTestSerializer.generate_read_s()
+        schema = UnionTestSerializer.read_schema
         self.assertIsNotNone(schema)
         self.assertIn("test_model_foreign_keys", schema.model_fields)
 
@@ -179,7 +179,7 @@ class UnionSerializerTestCase(TestCase):
                 }
 
         # Should resolve without errors
-        schema = UnionStringTestSerializer.generate_read_s()
+        schema = UnionStringTestSerializer.read_schema
         self.assertIsNotNone(schema)
         self.assertIn("test_model_foreign_keys", schema.model_fields)
 
@@ -199,7 +199,7 @@ class UnionSerializerTestCase(TestCase):
                 }
 
         # Should resolve without errors
-        schema = UnionMixedTestSerializer.generate_read_s()
+        schema = UnionMixedTestSerializer.read_schema
         self.assertIsNotNone(schema)
         self.assertIn("test_model_foreign_keys", schema.model_fields)
 
@@ -220,7 +220,7 @@ class UnionSerializerTestCase(TestCase):
                 }
 
         # Should resolve without errors
-        schema = UnionAbsolutePathSerializer.generate_read_s()
+        schema = UnionAbsolutePathSerializer.read_schema
         self.assertIsNotNone(schema)
         self.assertIn("test_model_foreign_keys", schema.model_fields)
 
@@ -274,7 +274,7 @@ class UnionSerializerTestCase(TestCase):
                 }
 
         # Should work exactly as before
-        schema = SingleRefSerializer.generate_read_s()
+        schema = SingleRefSerializer.read_schema
         self.assertIsNotNone(schema)
         self.assertIn("test_model_foreign_keys", schema.model_fields)
 
@@ -292,7 +292,7 @@ class UnionSerializerTestCase(TestCase):
                 }
 
         # Should work exactly as before
-        schema = SingleStringRefSerializer.generate_read_s()
+        schema = SingleStringRefSerializer.read_schema
         self.assertIsNotNone(schema)
         self.assertIn("test_model_foreign_keys", schema.model_fields)
 
@@ -317,7 +317,7 @@ class DetailSerializerTestCase(TestCase):
                 # No schema_detail defined - should fall back to schema_out
 
         # Detail should inherit customs from read schema
-        schema_detail = DetailFallbackCustomsSerializer.generate_detail_s()
+        schema_detail = DetailFallbackCustomsSerializer.detail_schema
         self.assertIsNotNone(schema_detail)
         self.assertIn("id", schema_detail.model_fields)
         self.assertIn("name", schema_detail.model_fields)
@@ -336,7 +336,7 @@ class DetailSerializerTestCase(TestCase):
                 # No schema_detail defined - should fall back to schema_out
 
         # Detail should inherit optionals from read schema
-        schema_detail = DetailFallbackOptionalsSerializer.generate_detail_s()
+        schema_detail = DetailFallbackOptionalsSerializer.detail_schema
         self.assertIsNotNone(schema_detail)
         self.assertIn("id", schema_detail.model_fields)
         self.assertIn("name", schema_detail.model_fields)
@@ -355,8 +355,8 @@ class DetailSerializerTestCase(TestCase):
                 # No schema_detail defined - should fall back to schema_out
 
         # Detail should inherit excludes from read schema
-        schema_detail = DetailFallbackExcludesSerializer.generate_detail_s()
-        read_schema = DetailFallbackExcludesSerializer.generate_read_s()
+        schema_detail = DetailFallbackExcludesSerializer.detail_schema
+        read_schema = DetailFallbackExcludesSerializer.read_schema
         self.assertIsNotNone(schema_detail)
         # Both should have the same excludes applied
         self.assertEqual(
@@ -381,12 +381,12 @@ class DetailSerializerTestCase(TestCase):
                 )
 
         # Read schema should have the custom
-        schema_read = DetailDoesNotInheritSerializer.generate_read_s()
+        schema_read = DetailDoesNotInheritSerializer.read_schema
         self.assertIn("read_custom", schema_read.model_fields)
 
         # Detail schema does NOT inherit customs from read because schema_detail is defined
         # (Serializer fallback is at the schema level, not per-field-type)
-        schema_detail = DetailDoesNotInheritSerializer.generate_detail_s()
+        schema_detail = DetailDoesNotInheritSerializer.detail_schema
         self.assertIn("id", schema_detail.model_fields)
         self.assertIn("name", schema_detail.model_fields)
         self.assertIn("description", schema_detail.model_fields)
@@ -404,14 +404,14 @@ class DetailSerializerTestCase(TestCase):
                 )
 
         # Out schema should have fewer fields
-        schema_out = DetailTestSerializer.generate_read_s()
+        schema_out = DetailTestSerializer.read_schema
         self.assertIsNotNone(schema_out)
         self.assertIn("id", schema_out.model_fields)
         self.assertIn("name", schema_out.model_fields)
         self.assertNotIn("description", schema_out.model_fields)
 
         # Detail schema should have more fields
-        schema_detail = DetailTestSerializer.generate_detail_s()
+        schema_detail = DetailTestSerializer.detail_schema
         self.assertIsNotNone(schema_detail)
         self.assertIn("id", schema_detail.model_fields)
         self.assertIn("name", schema_detail.model_fields)
@@ -427,8 +427,8 @@ class DetailSerializerTestCase(TestCase):
                 schema_out = serializers.SchemaModelConfig(fields=["id", "name"])
 
         # Detail schema should fall back to read schema when not configured
-        schema_detail = NoDetailSerializer.generate_detail_s()
-        schema_out = NoDetailSerializer.generate_read_s()
+        schema_detail = NoDetailSerializer.detail_schema
+        schema_out = NoDetailSerializer.read_schema
         self.assertIsNotNone(schema_detail)
         # Both should have the same fields since detail falls back to read
         self.assertEqual(
@@ -451,13 +451,13 @@ class DetailSerializerTestCase(TestCase):
                 }
 
         # Out schema should be minimal
-        schema_out = DetailWithRelationsSerializer.generate_read_s()
+        schema_out = DetailWithRelationsSerializer.read_schema
         self.assertIn("id", schema_out.model_fields)
         self.assertIn("name", schema_out.model_fields)
         self.assertNotIn("test_model_foreign_keys", schema_out.model_fields)
 
         # Detail schema should include relations
-        schema_detail = DetailWithRelationsSerializer.generate_detail_s()
+        schema_detail = DetailWithRelationsSerializer.detail_schema
         self.assertIsNotNone(schema_detail)
         self.assertIn("id", schema_detail.model_fields)
         self.assertIn("name", schema_detail.model_fields)
@@ -476,7 +476,7 @@ class DetailSerializerTestCase(TestCase):
                     customs=[("extra_info", str, "default_value")],
                 )
 
-        schema_detail = DetailWithCustomsSerializer.generate_detail_s()
+        schema_detail = DetailWithCustomsSerializer.detail_schema
         self.assertIsNotNone(schema_detail)
         self.assertIn("id", schema_detail.model_fields)
         self.assertIn("name", schema_detail.model_fields)
@@ -495,7 +495,7 @@ class DetailSerializerTestCase(TestCase):
                     optionals=[("description", str)],
                 )
 
-        schema_detail = DetailWithOptionalsSerializer.generate_detail_s()
+        schema_detail = DetailWithOptionalsSerializer.detail_schema
         self.assertIsNotNone(schema_detail)
         self.assertIn("id", schema_detail.model_fields)
         self.assertIn("name", schema_detail.model_fields)
@@ -587,8 +587,8 @@ class ModelSerializerDetailFallbackTestCase(TestCase):
         """Test that ModelSerializer with DetailSerializer generates distinct schemas."""
         from tests.test_app.models import TestModelSerializerWithDetail
 
-        read_schema = TestModelSerializerWithDetail.generate_read_s()
-        detail_schema = TestModelSerializerWithDetail.generate_detail_s()
+        read_schema = TestModelSerializerWithDetail.read_schema
+        detail_schema = TestModelSerializerWithDetail.detail_schema
 
         # Read schema should have fewer fields
         self.assertIn("id", read_schema.model_fields)
@@ -615,7 +615,7 @@ class RelationsAsIdModelSerializerTestCase(TestCase):
         """Test forward FK field in relations_as_id generates int type."""
         from tests.test_app.models import BookAsId
 
-        schema = BookAsId.generate_read_s()
+        schema = BookAsId.read_schema
         self.assertIsNotNone(schema)
         self.assertIn("author_as_id", schema.model_fields)
 
@@ -631,7 +631,7 @@ class RelationsAsIdModelSerializerTestCase(TestCase):
         """Test reverse FK field in relations_as_id generates list[int] type."""
         from tests.test_app.models import AuthorAsId
 
-        schema = AuthorAsId.generate_read_s()
+        schema = AuthorAsId.read_schema
         self.assertIsNotNone(schema)
         self.assertIn("books_as_id", schema.model_fields)
 
@@ -646,7 +646,7 @@ class RelationsAsIdModelSerializerTestCase(TestCase):
         """Test forward O2O field in relations_as_id generates int type."""
         from tests.test_app.models import UserAsId
 
-        schema = UserAsId.generate_read_s()
+        schema = UserAsId.read_schema
         self.assertIsNotNone(schema)
         self.assertIn("profile_as_id", schema.model_fields)
 
@@ -660,7 +660,7 @@ class RelationsAsIdModelSerializerTestCase(TestCase):
         """Test reverse O2O field in relations_as_id generates int type."""
         from tests.test_app.models import ProfileAsId
 
-        schema = ProfileAsId.generate_read_s()
+        schema = ProfileAsId.read_schema
         self.assertIsNotNone(schema)
         self.assertIn("user_profile_as_id", schema.model_fields)
 
@@ -674,7 +674,7 @@ class RelationsAsIdModelSerializerTestCase(TestCase):
         """Test forward M2M field in relations_as_id generates list[int] type."""
         from tests.test_app.models import ArticleAsId
 
-        schema = ArticleAsId.generate_read_s()
+        schema = ArticleAsId.read_schema
         self.assertIsNotNone(schema)
         self.assertIn("tags_as_id", schema.model_fields)
 
@@ -688,7 +688,7 @@ class RelationsAsIdModelSerializerTestCase(TestCase):
         """Test reverse M2M field in relations_as_id generates list[int] type."""
         from tests.test_app.models import TagAsId
 
-        schema = TagAsId.generate_read_s()
+        schema = TagAsId.read_schema
         self.assertIsNotNone(schema)
         self.assertIn("articles_as_id", schema.model_fields)
 
@@ -710,7 +710,7 @@ class RelationsAsIdSerializerTestCase(TestCase):
         """Test forward FK field in relations_as_id with Serializer."""
         from tests.test_app.serializers import BookAsIdMetaSerializer
 
-        schema = BookAsIdMetaSerializer.generate_read_s()
+        schema = BookAsIdMetaSerializer.read_schema
         self.assertIsNotNone(schema)
         self.assertIn("test_model", schema.model_fields)
 
@@ -724,7 +724,7 @@ class RelationsAsIdSerializerTestCase(TestCase):
         """Test reverse FK field in relations_as_id with Serializer."""
         from tests.test_app.serializers import AuthorAsIdMetaSerializer
 
-        schema = AuthorAsIdMetaSerializer.generate_read_s()
+        schema = AuthorAsIdMetaSerializer.read_schema
         self.assertIsNotNone(schema)
         self.assertIn("test_model_foreign_keys", schema.model_fields)
 
@@ -738,7 +738,7 @@ class RelationsAsIdSerializerTestCase(TestCase):
         """Test forward O2O field in relations_as_id with Serializer."""
         from tests.test_app.serializers import UserAsIdMetaSerializer
 
-        schema = UserAsIdMetaSerializer.generate_read_s()
+        schema = UserAsIdMetaSerializer.read_schema
         self.assertIsNotNone(schema)
         self.assertIn("test_model", schema.model_fields)
 
@@ -752,7 +752,7 @@ class RelationsAsIdSerializerTestCase(TestCase):
         """Test reverse O2O field in relations_as_id with Serializer."""
         from tests.test_app.serializers import ProfileAsIdMetaSerializer
 
-        schema = ProfileAsIdMetaSerializer.generate_read_s()
+        schema = ProfileAsIdMetaSerializer.read_schema
         self.assertIsNotNone(schema)
         self.assertIn("test_model_one_to_one", schema.model_fields)
 
@@ -766,7 +766,7 @@ class RelationsAsIdSerializerTestCase(TestCase):
         """Test forward M2M field in relations_as_id with Serializer."""
         from tests.test_app.serializers import ArticleAsIdMetaSerializer
 
-        schema = ArticleAsIdMetaSerializer.generate_read_s()
+        schema = ArticleAsIdMetaSerializer.read_schema
         self.assertIsNotNone(schema)
         self.assertIn("test_models", schema.model_fields)
 
@@ -780,7 +780,7 @@ class RelationsAsIdSerializerTestCase(TestCase):
         """Test reverse M2M field in relations_as_id with Serializer."""
         from tests.test_app.serializers import TagAsIdMetaSerializer
 
-        schema = TagAsIdMetaSerializer.generate_read_s()
+        schema = TagAsIdMetaSerializer.read_schema
         self.assertIsNotNone(schema)
         self.assertIn("test_model_serializer_many_to_many", schema.model_fields)
 
@@ -843,7 +843,7 @@ class RelationsAsIdIntegrationTestCase(TestCase):
         """Test forward FK field serializes as ID."""
         from tests.test_app.models import BookAsId
 
-        schema = BookAsId.generate_read_s()
+        schema = BookAsId.read_schema
         result = schema.from_orm(self.book1)
 
         self.assertEqual(result.author_as_id, self.author.pk)
@@ -852,7 +852,7 @@ class RelationsAsIdIntegrationTestCase(TestCase):
         """Test forward FK field with null value serializes as None."""
         from tests.test_app.models import BookAsId
 
-        schema = BookAsId.generate_read_s()
+        schema = BookAsId.read_schema
         result = schema.from_orm(self.book_no_author)
 
         self.assertIsNone(result.author_as_id)
@@ -866,7 +866,7 @@ class RelationsAsIdIntegrationTestCase(TestCase):
             pk=self.author.pk
         )
 
-        schema = AuthorAsId.generate_read_s()
+        schema = AuthorAsId.read_schema
         result = schema.from_orm(author)
 
         self.assertIsInstance(result.books_as_id, list)
@@ -878,7 +878,7 @@ class RelationsAsIdIntegrationTestCase(TestCase):
         """Test forward O2O field serializes as ID."""
         from tests.test_app.models import UserAsId
 
-        schema = UserAsId.generate_read_s()
+        schema = UserAsId.read_schema
         result = schema.from_orm(self.user)
 
         self.assertEqual(result.profile_as_id, self.profile.pk)
@@ -892,7 +892,7 @@ class RelationsAsIdIntegrationTestCase(TestCase):
             pk=self.profile.pk
         )
 
-        schema = ProfileAsId.generate_read_s()
+        schema = ProfileAsId.read_schema
         result = schema.from_orm(profile)
 
         self.assertEqual(result.user_profile_as_id, self.user.pk)
@@ -906,7 +906,7 @@ class RelationsAsIdIntegrationTestCase(TestCase):
             pk=self.article.pk
         )
 
-        schema = ArticleAsId.generate_read_s()
+        schema = ArticleAsId.read_schema
         result = schema.from_orm(article)
 
         self.assertIsInstance(result.tags_as_id, list)
@@ -921,7 +921,7 @@ class RelationsAsIdIntegrationTestCase(TestCase):
         # Prefetch the related articles
         tag = TagAsId.objects.prefetch_related("articles_as_id").get(pk=self.tag1.pk)
 
-        schema = TagAsId.generate_read_s()
+        schema = TagAsId.read_schema
         result = schema.from_orm(tag)
 
         self.assertIsInstance(result.articles_as_id, list)
@@ -940,7 +940,7 @@ class RelationsAsIdUUIDModelSerializerTestCase(TestCase):
         """Test forward FK field with UUID PK in relations_as_id generates UUID type."""
         from tests.test_app.models import BookUUID
 
-        schema = BookUUID.generate_read_s()
+        schema = BookUUID.read_schema
         self.assertIsNotNone(schema)
         self.assertIn("author_uuid", schema.model_fields)
 
@@ -954,7 +954,7 @@ class RelationsAsIdUUIDModelSerializerTestCase(TestCase):
         """Test reverse FK field with UUID PK in relations_as_id generates list[UUID] type."""
         from tests.test_app.models import AuthorUUID
 
-        schema = AuthorUUID.generate_read_s()
+        schema = AuthorUUID.read_schema
         self.assertIsNotNone(schema)
         self.assertIn("books_uuid", schema.model_fields)
 
@@ -968,7 +968,7 @@ class RelationsAsIdUUIDModelSerializerTestCase(TestCase):
         """Test forward O2O field with UUID PK in relations_as_id generates UUID type."""
         from tests.test_app.models import UserUUID
 
-        schema = UserUUID.generate_read_s()
+        schema = UserUUID.read_schema
         self.assertIsNotNone(schema)
         self.assertIn("profile_uuid", schema.model_fields)
 
@@ -982,7 +982,7 @@ class RelationsAsIdUUIDModelSerializerTestCase(TestCase):
         """Test reverse O2O field with UUID PK in relations_as_id generates UUID type."""
         from tests.test_app.models import ProfileUUID
 
-        schema = ProfileUUID.generate_read_s()
+        schema = ProfileUUID.read_schema
         self.assertIsNotNone(schema)
         self.assertIn("user_uuid", schema.model_fields)
 
@@ -996,7 +996,7 @@ class RelationsAsIdUUIDModelSerializerTestCase(TestCase):
         """Test forward M2M field with UUID PK in relations_as_id generates list[UUID] type."""
         from tests.test_app.models import ArticleUUID
 
-        schema = ArticleUUID.generate_read_s()
+        schema = ArticleUUID.read_schema
         self.assertIsNotNone(schema)
         self.assertIn("tags_uuid", schema.model_fields)
 
@@ -1010,7 +1010,7 @@ class RelationsAsIdUUIDModelSerializerTestCase(TestCase):
         """Test reverse M2M field with UUID PK in relations_as_id generates list[UUID] type."""
         from tests.test_app.models import TagUUID
 
-        schema = TagUUID.generate_read_s()
+        schema = TagUUID.read_schema
         self.assertIsNotNone(schema)
         self.assertIn("articles_uuid", schema.model_fields)
 
@@ -1062,7 +1062,7 @@ class RelationsAsIdUUIDIntegrationTestCase(TestCase):
         from tests.test_app.models import BookUUID
         from uuid import UUID
 
-        schema = BookUUID.generate_read_s()
+        schema = BookUUID.read_schema
         result = schema.from_orm(self.book1)
 
         self.assertIsInstance(result.author_uuid, UUID)
@@ -1072,7 +1072,7 @@ class RelationsAsIdUUIDIntegrationTestCase(TestCase):
         """Test forward FK field with UUID PK and null value serializes as None."""
         from tests.test_app.models import BookUUID
 
-        schema = BookUUID.generate_read_s()
+        schema = BookUUID.read_schema
         result = schema.from_orm(self.book_no_author)
 
         self.assertIsNone(result.author_uuid)
@@ -1086,7 +1086,7 @@ class RelationsAsIdUUIDIntegrationTestCase(TestCase):
             pk=self.author.pk
         )
 
-        schema = AuthorUUID.generate_read_s()
+        schema = AuthorUUID.read_schema
         result = schema.from_orm(author)
 
         self.assertIsInstance(result.books_uuid, list)
@@ -1101,7 +1101,7 @@ class RelationsAsIdUUIDIntegrationTestCase(TestCase):
         from tests.test_app.models import UserUUID
         from uuid import UUID
 
-        schema = UserUUID.generate_read_s()
+        schema = UserUUID.read_schema
         result = schema.from_orm(self.user)
 
         self.assertIsInstance(result.profile_uuid, UUID)
@@ -1116,7 +1116,7 @@ class RelationsAsIdUUIDIntegrationTestCase(TestCase):
             pk=self.profile.pk
         )
 
-        schema = ProfileUUID.generate_read_s()
+        schema = ProfileUUID.read_schema
         result = schema.from_orm(profile)
 
         self.assertIsInstance(result.user_uuid, UUID)
@@ -1131,7 +1131,7 @@ class RelationsAsIdUUIDIntegrationTestCase(TestCase):
             pk=self.article.pk
         )
 
-        schema = ArticleUUID.generate_read_s()
+        schema = ArticleUUID.read_schema
         result = schema.from_orm(article)
 
         self.assertIsInstance(result.tags_uuid, list)
@@ -1148,7 +1148,7 @@ class RelationsAsIdUUIDIntegrationTestCase(TestCase):
 
         tag = TagUUID.objects.prefetch_related("articles_uuid").get(pk=self.tag1.pk)
 
-        schema = TagUUID.generate_read_s()
+        schema = TagUUID.read_schema
         result = schema.from_orm(tag)
 
         self.assertIsInstance(result.articles_uuid, list)
@@ -1168,7 +1168,7 @@ class RelationsAsIdStringPKModelSerializerTestCase(TestCase):
         """Test forward FK field with string PK in relations_as_id generates str type."""
         from tests.test_app.models import BookStringPK
 
-        schema = BookStringPK.generate_read_s()
+        schema = BookStringPK.read_schema
         self.assertIsNotNone(schema)
         self.assertIn("author_str", schema.model_fields)
 
@@ -1182,7 +1182,7 @@ class RelationsAsIdStringPKModelSerializerTestCase(TestCase):
         """Test reverse FK field with string PK in relations_as_id generates list[str] type."""
         from tests.test_app.models import AuthorStringPK
 
-        schema = AuthorStringPK.generate_read_s()
+        schema = AuthorStringPK.read_schema
         self.assertIsNotNone(schema)
         self.assertIn("books_str", schema.model_fields)
 
@@ -1196,7 +1196,7 @@ class RelationsAsIdStringPKModelSerializerTestCase(TestCase):
         """Test forward O2O field with string PK in relations_as_id generates str type."""
         from tests.test_app.models import UserStringPK
 
-        schema = UserStringPK.generate_read_s()
+        schema = UserStringPK.read_schema
         self.assertIsNotNone(schema)
         self.assertIn("profile_str", schema.model_fields)
 
@@ -1210,7 +1210,7 @@ class RelationsAsIdStringPKModelSerializerTestCase(TestCase):
         """Test reverse O2O field with string PK in relations_as_id generates str type."""
         from tests.test_app.models import ProfileStringPK
 
-        schema = ProfileStringPK.generate_read_s()
+        schema = ProfileStringPK.read_schema
         self.assertIsNotNone(schema)
         self.assertIn("user_str", schema.model_fields)
 
@@ -1224,7 +1224,7 @@ class RelationsAsIdStringPKModelSerializerTestCase(TestCase):
         """Test forward M2M field with string PK in relations_as_id generates list[str] type."""
         from tests.test_app.models import ArticleStringPK
 
-        schema = ArticleStringPK.generate_read_s()
+        schema = ArticleStringPK.read_schema
         self.assertIsNotNone(schema)
         self.assertIn("tags_str", schema.model_fields)
 
@@ -1238,7 +1238,7 @@ class RelationsAsIdStringPKModelSerializerTestCase(TestCase):
         """Test reverse M2M field with string PK in relations_as_id generates list[str] type."""
         from tests.test_app.models import TagStringPK
 
-        schema = TagStringPK.generate_read_s()
+        schema = TagStringPK.read_schema
         self.assertIsNotNone(schema)
         self.assertIn("articles_str", schema.model_fields)
 
@@ -1267,7 +1267,7 @@ class CustomsOnlySchemaTestCase(TestCase):
                 )
                 schema_out = serializers.SchemaModelConfig(fields=["id", "name"])
 
-        schema = CustomsOnlyCreateSerializer.generate_create_s()
+        schema = CustomsOnlyCreateSerializer.create_schema
         self.assertIsNotNone(schema)
         # Should only have the custom field, not model fields
         self.assertIn("custom_input", schema.model_fields)
@@ -1288,7 +1288,7 @@ class CustomsOnlySchemaTestCase(TestCase):
                 )
                 schema_out = serializers.SchemaModelConfig(fields=["id", "name"])
 
-        schema = CustomsOnlyUpdateSerializer.generate_update_s()
+        schema = CustomsOnlyUpdateSerializer.update_schema
         self.assertIsNotNone(schema)
         # Should only have the custom field
         self.assertIn("custom_patch_field", schema.model_fields)
@@ -1310,7 +1310,7 @@ class CustomsOnlySchemaTestCase(TestCase):
                 )
                 schema_out = serializers.SchemaModelConfig(fields=["id", "name"])
 
-        schema = CustomsAndOptionalsSerializer.generate_create_s()
+        schema = CustomsAndOptionalsSerializer.create_schema
         self.assertIsNotNone(schema)
         # Should have custom field
         self.assertIn("custom_field", schema.model_fields)
@@ -1333,7 +1333,7 @@ class CustomsOnlySchemaTestCase(TestCase):
                 )
                 schema_out = serializers.SchemaModelConfig(fields=["id", "name"])
 
-        schema = FieldsDefinedSerializer.generate_create_s()
+        schema = FieldsDefinedSerializer.create_schema
         self.assertIsNotNone(schema)
         # Should have specified fields
         self.assertIn("name", schema.model_fields)
@@ -1356,7 +1356,7 @@ class CustomsOnlySchemaTestCase(TestCase):
                 )
                 schema_out = serializers.SchemaModelConfig(fields=["id", "name"])
 
-        schema = ExcludesOnlySerializer.generate_create_s()
+        schema = ExcludesOnlySerializer.create_schema
         self.assertIsNotNone(schema)
         # With excludes but no fields, only customs are included
         # because fields=[] is passed to create_schema (no model fields)
@@ -1373,7 +1373,7 @@ class CustomsOnlySchemaTestCase(TestCase):
                 schema_in = serializers.SchemaModelConfig()
                 schema_out = serializers.SchemaModelConfig(fields=["id", "name"])
 
-        schema = EmptySchemaSerializer.generate_create_s()
+        schema = EmptySchemaSerializer.create_schema
         self.assertIsNone(schema)
 
     def test_serializer_multiple_customs_no_model_fields(self):
@@ -1391,7 +1391,7 @@ class CustomsOnlySchemaTestCase(TestCase):
                 )
                 schema_out = serializers.SchemaModelConfig(fields=["id", "name"])
 
-        schema = MultipleCustomsSerializer.generate_create_s()
+        schema = MultipleCustomsSerializer.create_schema
         self.assertIsNotNone(schema)
         # Should have all custom fields
         self.assertIn("custom1", schema.model_fields)
@@ -1456,7 +1456,7 @@ class RelationsAsIdStringPKIntegrationTestCase(TestCase):
         """Test forward FK field with string PK serializes as str."""
         from tests.test_app.models import BookStringPK
 
-        schema = BookStringPK.generate_read_s()
+        schema = BookStringPK.read_schema
         result = schema.from_orm(self.book1)
 
         self.assertIsInstance(result.author_str, str)
@@ -1467,7 +1467,7 @@ class RelationsAsIdStringPKIntegrationTestCase(TestCase):
         """Test forward FK field with string PK and null value serializes as None."""
         from tests.test_app.models import BookStringPK
 
-        schema = BookStringPK.generate_read_s()
+        schema = BookStringPK.read_schema
         result = schema.from_orm(self.book_no_author)
 
         self.assertIsNone(result.author_str)
@@ -1480,7 +1480,7 @@ class RelationsAsIdStringPKIntegrationTestCase(TestCase):
             pk=self.author.pk
         )
 
-        schema = AuthorStringPK.generate_read_s()
+        schema = AuthorStringPK.read_schema
         result = schema.from_orm(author)
 
         self.assertIsInstance(result.books_str, list)
@@ -1494,7 +1494,7 @@ class RelationsAsIdStringPKIntegrationTestCase(TestCase):
         """Test forward O2O field with string PK serializes as str."""
         from tests.test_app.models import UserStringPK
 
-        schema = UserStringPK.generate_read_s()
+        schema = UserStringPK.read_schema
         result = schema.from_orm(self.user)
 
         self.assertIsInstance(result.profile_str, str)
@@ -1509,7 +1509,7 @@ class RelationsAsIdStringPKIntegrationTestCase(TestCase):
             pk=self.profile.pk
         )
 
-        schema = ProfileStringPK.generate_read_s()
+        schema = ProfileStringPK.read_schema
         result = schema.from_orm(profile)
 
         self.assertIsInstance(result.user_str, str)
@@ -1524,7 +1524,7 @@ class RelationsAsIdStringPKIntegrationTestCase(TestCase):
             pk=self.article.pk
         )
 
-        schema = ArticleStringPK.generate_read_s()
+        schema = ArticleStringPK.read_schema
         result = schema.from_orm(article)
 
         self.assertIsInstance(result.tags_str, list)
@@ -1540,7 +1540,7 @@ class RelationsAsIdStringPKIntegrationTestCase(TestCase):
 
         tag = TagStringPK.objects.prefetch_related("articles_str").get(pk=self.tag1.pk)
 
-        schema = TagStringPK.generate_read_s()
+        schema = TagStringPK.read_schema
         result = schema.from_orm(tag)
 
         self.assertIsInstance(result.articles_str, list)
@@ -1567,7 +1567,7 @@ class InlineCustomsSerializerTestCase(TestCase):
                     fields=["id", "name", ("custom_read", str, "default_value")]
                 )
 
-        schema = InlineCustomsReadSerializer.generate_read_s()
+        schema = InlineCustomsReadSerializer.read_schema
         self.assertIsNotNone(schema)
         self.assertIn("id", schema.model_fields)
         self.assertIn("name", schema.model_fields)
@@ -1583,7 +1583,7 @@ class InlineCustomsSerializerTestCase(TestCase):
                     fields=["id", "name", ("required_custom", int)]
                 )
 
-        schema = InlineCustoms2TupleSerializer.generate_read_s()
+        schema = InlineCustoms2TupleSerializer.read_schema
         self.assertIsNotNone(schema)
         self.assertIn("id", schema.model_fields)
         self.assertIn("name", schema.model_fields)
@@ -1600,7 +1600,7 @@ class InlineCustomsSerializerTestCase(TestCase):
                 )
                 schema_out = serializers.SchemaModelConfig(fields=["id", "name"])
 
-        schema = InlineCustomsCreateSerializer.generate_create_s()
+        schema = InlineCustomsCreateSerializer.create_schema
         self.assertIsNotNone(schema)
         self.assertIn("name", schema.model_fields)
         self.assertIn("extra_input", schema.model_fields)
@@ -1619,7 +1619,7 @@ class InlineCustomsSerializerTestCase(TestCase):
                 )
                 schema_out = serializers.SchemaModelConfig(fields=["id", "name"])
 
-        schema = InlineCustomsUpdateSerializer.generate_update_s()
+        schema = InlineCustomsUpdateSerializer.update_schema
         self.assertIsNotNone(schema)
         self.assertIn("update_flag", schema.model_fields)
         self.assertIn("name", schema.model_fields)
@@ -1635,7 +1635,7 @@ class InlineCustomsSerializerTestCase(TestCase):
                     customs=[("explicit_custom", int, 0)],
                 )
 
-        schema = CombinedCustomsSerializer.generate_read_s()
+        schema = CombinedCustomsSerializer.read_schema
         self.assertIsNotNone(schema)
         self.assertIn("id", schema.model_fields)
         self.assertIn("name", schema.model_fields)
@@ -1685,8 +1685,8 @@ class InlineCustomsSerializerTestCase(TestCase):
                     fields=["id", "name", "description", ("detail_extra", str, "extra")]
                 )
 
-        read_schema = DetailInlineCustomsSerializer.generate_read_s()
-        detail_schema = DetailInlineCustomsSerializer.generate_detail_s()
+        read_schema = DetailInlineCustomsSerializer.read_schema
+        detail_schema = DetailInlineCustomsSerializer.detail_schema
 
         # Read schema should NOT have detail_extra
         self.assertNotIn("detail_extra", read_schema.model_fields)
@@ -1707,7 +1707,7 @@ class InlineCustomsSerializerTestCase(TestCase):
                     fields=["id", "name", ("computed", str, "computed_value")]
                 )
 
-        related_schema = RelatedInlineCustomsSerializer.generate_related_s()
+        related_schema = RelatedInlineCustomsSerializer.related_schema
         self.assertIsNotNone(related_schema)
         self.assertIn("id", related_schema.model_fields)
         self.assertIn("name", related_schema.model_fields)
@@ -1724,7 +1724,7 @@ class InlineCustomsSerializerTestCase(TestCase):
                 )
                 schema_out = serializers.SchemaModelConfig(fields=["id"])
 
-        schema = OnlyInlineCustomsSerializer.generate_create_s()
+        schema = OnlyInlineCustomsSerializer.create_schema
         self.assertIsNotNone(schema)
         self.assertIn("custom_only", schema.model_fields)
         # Should NOT have any model fields auto-included
@@ -1743,7 +1743,7 @@ class InlineCustomsModelSerializerTestCase(TestCase):
         """Test ModelSerializer ReadSerializer with inline customs."""
         from tests.test_app.models import TestModelSerializerInlineCustoms
 
-        schema = TestModelSerializerInlineCustoms.generate_read_s()
+        schema = TestModelSerializerInlineCustoms.read_schema
         self.assertIsNotNone(schema)
         self.assertIn("id", schema.model_fields)
         self.assertIn("name", schema.model_fields)
@@ -1753,7 +1753,7 @@ class InlineCustomsModelSerializerTestCase(TestCase):
         """Test ModelSerializer CreateSerializer with inline customs."""
         from tests.test_app.models import TestModelSerializerInlineCustoms
 
-        schema = TestModelSerializerInlineCustoms.generate_create_s()
+        schema = TestModelSerializerInlineCustoms.create_schema
         self.assertIsNotNone(schema)
         self.assertIn("name", schema.model_fields)
         self.assertIn("extra_create_input", schema.model_fields)
@@ -1913,18 +1913,14 @@ class UnionSchemaTestCase(TestCase):
                 model = TestModelForeignKey
                 schema_out = serializers.SchemaModelConfig(fields=[])
 
-            @classmethod
-            def generate_related_s(cls):
-                return None
+            related_schema = None
 
         class EmptySerializer2(serializers.Serializer):
             class Meta:
                 model = TestModelForeignKey
                 schema_out = serializers.SchemaModelConfig(fields=[])
 
-            @classmethod
-            def generate_related_s(cls):
-                return None
+            related_schema = None
 
         empty_union = Union[EmptySerializer1, EmptySerializer2]
         result = serializers.BaseSerializer._generate_union_schema(empty_union)
@@ -1944,9 +1940,7 @@ class UnionSchemaTestCase(TestCase):
                 model = TestModelForeignKey
                 schema_out = serializers.SchemaModelConfig(fields=[])
 
-            @classmethod
-            def generate_related_s(cls):
-                return None
+            related_schema = None
 
         mixed_union = Union[ValidSerializer, EmptySerializer]
         result = serializers.BaseSerializer._generate_union_schema(mixed_union)
@@ -2032,7 +2026,7 @@ class ModelValidationTestCase(TestCase):
                 class Meta:
                     schema_out = serializers.SchemaModelConfig(fields=["id"])
 
-            NoModelSerializer.generate_read_s()
+            NoModelSerializer.read_schema
         self.assertIn("Meta.model must be defined", str(cm.exception))
 
     def test_serializer_with_non_model_raises_error(self):
@@ -2047,7 +2041,7 @@ class ModelValidationTestCase(TestCase):
                     model = NotAModel
                     schema_out = serializers.SchemaModelConfig(fields=["id"])
 
-            NonModelSerializer.generate_read_s()
+            NonModelSerializer.read_schema
         self.assertIn("must be a Django model", str(cm.exception))
 
 
@@ -2078,7 +2072,7 @@ class ValidatorsOnSerializersTestCase(TestCase):
         from tests.test_app.models import TestModelWithValidators
         from pydantic import ValidationError
 
-        schema = TestModelWithValidators.generate_create_s()
+        schema = TestModelWithValidators.create_schema
         with self.assertRaises(ValidationError) as cm:
             schema(name="ab", description="test")
         self.assertIn("Name must be at least 3 characters", str(cm.exception))
@@ -2087,7 +2081,7 @@ class ValidatorsOnSerializersTestCase(TestCase):
         """Test that @field_validator on CreateSerializer accepts valid input."""
         from tests.test_app.models import TestModelWithValidators
 
-        schema = TestModelWithValidators.generate_create_s()
+        schema = TestModelWithValidators.create_schema
         instance = schema(name="abc", description="test")
         self.assertEqual(instance.name, "abc")
 
@@ -2096,7 +2090,7 @@ class ValidatorsOnSerializersTestCase(TestCase):
         from tests.test_app.models import TestModelWithValidators
         from pydantic import ValidationError
 
-        schema = TestModelWithValidators.generate_update_s()
+        schema = TestModelWithValidators.update_schema
         with self.assertRaises(ValidationError) as cm:
             schema(name="   ")
         self.assertIn("Name cannot be blank", str(cm.exception))
@@ -2105,7 +2099,7 @@ class ValidatorsOnSerializersTestCase(TestCase):
         """Test that @field_validator on UpdateSerializer accepts valid input."""
         from tests.test_app.models import TestModelWithValidators
 
-        schema = TestModelWithValidators.generate_update_s()
+        schema = TestModelWithValidators.update_schema
         instance = schema(name="valid")
         self.assertEqual(instance.name, "valid")
 
@@ -2113,7 +2107,7 @@ class ValidatorsOnSerializersTestCase(TestCase):
         """Test that @model_validator on ReadSerializer is applied to output schema."""
         from tests.test_app.models import TestModelWithValidators
 
-        schema = TestModelWithValidators.generate_read_s()
+        schema = TestModelWithValidators.read_schema
         # model_validator(mode="after") should be present on the schema
         self.assertIn(
             "add_display_check", schema.__pydantic_decorators__.model_validators
@@ -2123,7 +2117,7 @@ class ValidatorsOnSerializersTestCase(TestCase):
         """Test that serializers without validators still work normally."""
         from tests.test_app.models import TestModelSerializer
 
-        schema = TestModelSerializer.generate_create_s()
+        schema = TestModelSerializer.create_schema
         instance = schema(name="ab", description="test")
         self.assertEqual(instance.name, "ab")  # No min-length validator here
 
@@ -2134,7 +2128,7 @@ class ValidatorsOnSerializersTestCase(TestCase):
         from tests.test_app.serializers import TestModelWithValidatorsMetaSerializer
         from pydantic import ValidationError
 
-        schema = TestModelWithValidatorsMetaSerializer.generate_create_s()
+        schema = TestModelWithValidatorsMetaSerializer.create_schema
         with self.assertRaises(ValidationError) as cm:
             schema(name="ab", description="test")
         self.assertIn("Name must be at least 3 characters", str(cm.exception))
@@ -2143,7 +2137,7 @@ class ValidatorsOnSerializersTestCase(TestCase):
         """Test that CreateValidators @field_validator accepts valid input."""
         from tests.test_app.serializers import TestModelWithValidatorsMetaSerializer
 
-        schema = TestModelWithValidatorsMetaSerializer.generate_create_s()
+        schema = TestModelWithValidatorsMetaSerializer.create_schema
         instance = schema(name="abc", description="test")
         self.assertEqual(instance.name, "abc")
 
@@ -2152,7 +2146,7 @@ class ValidatorsOnSerializersTestCase(TestCase):
         from tests.test_app.serializers import TestModelWithValidatorsMetaSerializer
         from pydantic import ValidationError
 
-        schema = TestModelWithValidatorsMetaSerializer.generate_update_s()
+        schema = TestModelWithValidatorsMetaSerializer.update_schema
         with self.assertRaises(ValidationError) as cm:
             schema(name="   ")
         self.assertIn("Name cannot be blank", str(cm.exception))
@@ -2161,7 +2155,7 @@ class ValidatorsOnSerializersTestCase(TestCase):
         """Test that ReadValidators @model_validator is applied to output schema."""
         from tests.test_app.serializers import TestModelWithValidatorsMetaSerializer
 
-        schema = TestModelWithValidatorsMetaSerializer.generate_read_s()
+        schema = TestModelWithValidatorsMetaSerializer.read_schema
         self.assertIn(
             "add_display_check", schema.__pydantic_decorators__.model_validators
         )
@@ -2504,32 +2498,32 @@ class ModelSerializerModelConfigTestCase(TestCase):
 
     def test_create_schema_has_model_config(self):
         """model_config from CreateSerializer should be present on the generated create schema."""
-        schema = app_models.TestModelWithModelConfig.generate_create_s()
+        schema = app_models.TestModelWithModelConfig.create_schema
         self.assertIsNotNone(schema)
         self.assertTrue(schema.model_config.get("str_strip_whitespace"))
 
     def test_read_schema_has_model_config(self):
         """model_config from ReadSerializer should be present on the generated read schema."""
-        schema = app_models.TestModelWithModelConfig.generate_read_s()
+        schema = app_models.TestModelWithModelConfig.read_schema
         self.assertIsNotNone(schema)
         self.assertTrue(schema.model_config.get("str_strip_whitespace"))
 
     def test_update_schema_has_model_config(self):
         """model_config from UpdateSerializer should be present on the generated update schema."""
-        schema = app_models.TestModelWithModelConfig.generate_update_s()
+        schema = app_models.TestModelWithModelConfig.update_schema
         self.assertIsNotNone(schema)
         self.assertTrue(schema.model_config.get("str_strip_whitespace"))
 
     def test_model_config_strips_whitespace(self):
         """str_strip_whitespace=True should actually strip whitespace on input validation."""
-        schema = app_models.TestModelWithModelConfig.generate_create_s()
+        schema = app_models.TestModelWithModelConfig.create_schema
         instance = schema(name="  hello  ", description="  world  ")
         self.assertEqual(instance.name, "hello")
         self.assertEqual(instance.description, "world")
 
     def test_schema_without_model_config_unchanged(self):
         """Schemas on models without model_config should still work normally."""
-        schema = app_models.TestModelSerializer.generate_create_s()
+        schema = app_models.TestModelSerializer.create_schema
         self.assertIsNotNone(schema)
         # Default config should not strip whitespace
         instance = schema(name="  hello  ", description="  world  ")
@@ -2548,25 +2542,25 @@ class MetaSerializerModelConfigTestCase(TestCase):
 
     def test_create_schema_has_model_config(self):
         """model_config_override from schema_in should be present on the generated create schema."""
-        schema = self.serializer.generate_create_s()
+        schema = self.serializer.create_schema
         self.assertIsNotNone(schema)
         self.assertTrue(schema.model_config.get("str_strip_whitespace"))
 
     def test_read_schema_has_model_config(self):
         """model_config_override from schema_out should be present on the generated read schema."""
-        schema = self.serializer.generate_read_s()
+        schema = self.serializer.read_schema
         self.assertIsNotNone(schema)
         self.assertTrue(schema.model_config.get("str_strip_whitespace"))
 
     def test_update_schema_has_model_config(self):
         """model_config_override from schema_update should be present on the generated update schema."""
-        schema = self.serializer.generate_update_s()
+        schema = self.serializer.update_schema
         self.assertIsNotNone(schema)
         self.assertTrue(schema.model_config.get("str_strip_whitespace"))
 
     def test_model_config_strips_whitespace(self):
         """str_strip_whitespace=True should actually strip whitespace on input validation."""
-        schema = self.serializer.generate_create_s()
+        schema = self.serializer.create_schema
         instance = schema(name="  hello  ", description="  world  ")
         self.assertEqual(instance.name, "hello")
         self.assertEqual(instance.description, "world")
@@ -2575,7 +2569,7 @@ class MetaSerializerModelConfigTestCase(TestCase):
         """Serializers without model_config_override should still work normally."""
         from tests.test_app.serializers import TestModelForeignKeySerializer as fk_ser
 
-        schema = fk_ser.generate_create_s()
+        schema = fk_ser.create_schema
         self.assertIsNotNone(schema)
 
 
@@ -2626,7 +2620,7 @@ class ModelSerializerSchemaOverridesTestCase(TestCase):
 
     def test_read_schema_model_dump_override(self):
         """model_dump override on ReadSerializer should transform output."""
-        schema = app_models.TestModelWithSchemaOverrides.generate_read_s()
+        schema = app_models.TestModelWithSchemaOverrides.read_schema
         self.assertIsNotNone(schema)
         instance = schema(id=1, name="hello", description="world")
         data = instance.model_dump()
@@ -2634,7 +2628,7 @@ class ModelSerializerSchemaOverridesTestCase(TestCase):
 
     def test_super_works_in_override(self):
         """Bare super() should work correctly in overridden methods."""
-        schema = app_models.TestModelWithSchemaOverrides.generate_read_s()
+        schema = app_models.TestModelWithSchemaOverrides.read_schema
         instance = schema(id=1, name="test", description="desc")
         data = instance.model_dump()
         # super().model_dump() should have returned all fields
@@ -2644,7 +2638,7 @@ class ModelSerializerSchemaOverridesTestCase(TestCase):
 
     def test_override_with_kwargs(self):
         """Override should pass through kwargs to super().model_dump()."""
-        schema = app_models.TestModelWithSchemaOverrides.generate_read_s()
+        schema = app_models.TestModelWithSchemaOverrides.read_schema
         instance = schema(id=1, name="hello", description="world")
         data = instance.model_dump(exclude={"description"})
         self.assertNotIn("description", data)
@@ -2665,7 +2659,7 @@ class MetaSerializerSchemaOverridesTestCase(TestCase):
 
     def test_read_schema_model_dump_override(self):
         """model_dump override on ReadValidators should transform output."""
-        schema = self.serializer.generate_read_s()
+        schema = self.serializer.read_schema
         self.assertIsNotNone(schema)
         instance = schema(id=1, name="hello", description="world")
         data = instance.model_dump()
@@ -2673,7 +2667,7 @@ class MetaSerializerSchemaOverridesTestCase(TestCase):
 
     def test_super_works_in_override(self):
         """Bare super() should work correctly in overridden methods."""
-        schema = self.serializer.generate_read_s()
+        schema = self.serializer.read_schema
         instance = schema(id=1, name="test", description="desc")
         data = instance.model_dump()
         self.assertIn("id", data)
@@ -3161,7 +3155,7 @@ class SerializerGetDumpSchemaTestCase(TestCase):
 
     def test_get_dump_schema_uses_detail_schema(self):
         """Default single-object dumps use the generated detail schema."""
-        detail_schema = TestModelForeignKeySerializer.generate_detail_s()
+        detail_schema = TestModelForeignKeySerializer.detail_schema
         schema = TestModelForeignKeySerializer._dump_schema("detail", None)
         self.assertIsNotNone(schema)
         self.assertEqual(schema, detail_schema)

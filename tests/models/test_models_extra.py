@@ -59,9 +59,9 @@ class ModelUtilParseInputTestCase(TestCase):
         cls.fk_rev = app_models.TestModelSerializerReverseForeignKey.objects.create(
             name="rev", description="rev"
         )
-        cls.schema_create = CustomOptionalSerializer.generate_create_s()
-        cls.schema_update = CustomOptionalSerializer.generate_update_s()
-        cls.fk_schema_in = app_models.TestModelSerializerForeignKey.generate_create_s()
+        cls.schema_create = CustomOptionalSerializer.create_schema
+        cls.schema_update = CustomOptionalSerializer.update_schema
+        cls.fk_schema_in = app_models.TestModelSerializerForeignKey.create_schema
         cls.util_custom = ModelUtil(CustomOptionalSerializer)
         cls.util_fk = ModelUtil(app_models.TestModelSerializerForeignKey)
 
@@ -99,7 +99,7 @@ class ModelUtilParseInputTestCase(TestCase):
             class Meta:
                 app_label = app_models.TestModelSerializer._meta.app_label
 
-        schema_in = BinSerializer.generate_create_s()
+        schema_in = BinSerializer.create_schema
         util = ModelUtil(BinSerializer)
         good_bytes = b"hello"
         b64 = base64.b64encode(good_bytes).decode()
@@ -187,7 +187,7 @@ class ModelUtilReadSQuerysetErrorTestCase(TestCase):
         cls.obj = app_models.TestModelSerializer.objects.create(
             name="a", description="b"
         )
-        cls.schema_out = app_models.TestModelSerializer.generate_read_s()
+        cls.schema_out = app_models.TestModelSerializer.read_schema
         cls.util = ModelUtil(app_models.TestModelSerializer)
 
     async def test_read_s_without_lookup_raises(self):

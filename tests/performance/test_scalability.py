@@ -106,7 +106,7 @@ class BatchSerializationScalabilityTest(ScalabilityMixin, TestCase):
     def setUpTestData(cls):
         cls.request = Request("test-batch-scalability").get()
         cls.util = ModelUtil(models.TestModelSerializer)
-        cls.schema_out = models.TestModelSerializer.generate_read_s()
+        cls.schema_out = models.TestModelSerializer.read_schema
 
         max_size = max(DATASET_SIZES)
         batch_size = 5000
@@ -191,7 +191,7 @@ class SyncToAsyncOverheadTest(ScalabilityMixin, TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.util = ModelUtil(models.TestModelSerializer)
-        cls.schema_out = models.TestModelSerializer.generate_read_s()
+        cls.schema_out = models.TestModelSerializer.read_schema
         cls.request = Request("test-overhead").get()
 
         models.TestModelSerializer.objects.bulk_create(
@@ -372,10 +372,10 @@ class RelationSerializationScalabilityTest(ScalabilityMixin, TestCase):
         FK relation serialization overhead should stay under 5x compared to simple objects.
         """
         util_simple = ModelUtil(models.TestModelSerializer)
-        schema_simple = models.TestModelSerializer.generate_read_s()
+        schema_simple = models.TestModelSerializer.read_schema
 
         util_fk = ModelUtil(models.TestModelSerializerForeignKey)
-        schema_fk = models.TestModelSerializerForeignKey.generate_read_s()
+        schema_fk = models.TestModelSerializerForeignKey.read_schema
 
         size = 5000
 
@@ -508,7 +508,7 @@ class SerializationCompletenessTest(ScalabilityMixin, TestCase):
     def setUpTestData(cls):
         cls.request = Request("test-completeness").get()
         cls.util = ModelUtil(models.TestModelSerializer)
-        cls.schema_out = models.TestModelSerializer.generate_read_s()
+        cls.schema_out = models.TestModelSerializer.read_schema
 
         models.TestModelSerializer.objects.bulk_create(
             [

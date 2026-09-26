@@ -578,7 +578,7 @@ class ArticleViewSet(APIViewSet):
 
     # Override update to check ownership
     @api_patch("/{pk}/")
-    async def update(self, request, pk: int, data: Article.generate_update_s()):
+    async def update(self, request, pk: int, data: Article.update_schema):
         """Update article (owner or admin only)"""
         try:
             article = await Article.objects.aget(pk=pk)
@@ -596,7 +596,7 @@ class ArticleViewSet(APIViewSet):
         # Update article
         from ninja_aio.models import ModelUtil
         util = ModelUtil(Article)
-        schema = Article.generate_read_s()
+        schema = Article.read_schema
 
         return await util.update_s(request, article, data, schema)
 
