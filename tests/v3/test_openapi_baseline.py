@@ -5,9 +5,17 @@ from typing import Any, Mapping, TypeAlias
 from django.test import SimpleTestCase
 
 from ninja_aio import NinjaAIO
+from tests.helpers.test_many_to_many_api import (
+    TestM2MViewSet,
+    TestM2MWithSerializerClassViewSet,
+)
 from tests.test_app.views import (
+    FieldSelectionTestAPI,
+    RoleBasedPermissionTestAPI,
+    SoftDeleteTestAPI,
     TestModelForeignKeySerializerAPI,
     TestModelSerializerAPI,
+    TestModelSerializerBulkAPI,
 )
 
 
@@ -68,17 +76,45 @@ class V2OpenAPIBaselineTests(SimpleTestCase):
 
     def test_representative_crud_openapi_contracts(self) -> None:
         for label, viewset_class, snapshot_name in self.cases:
-            with self.subTest(serializer_style=label):
-                api = NinjaAIO(urls_namespace=f"v3_baseline_{label}")
-                viewset = viewset_class(
-                    api=api,
-                    prefix="/items",
-                    tags=["baseline"],
-                )
-                viewset.add_views_to_route()
-                actual = _snapshot(api.get_openapi_schema(path_prefix="/api"))
-                expected = json.loads(
-                    (SNAPSHOT_DIR / snapshot_name).read_text(encoding="utf-8")
-                )
-                actual = _normalize_generated_suffixes(actual, expected)
-                self.assertEqual(actual, expected)
+            for mode in ("async", "sync"):
+                with self.subTest(serializer_style=label, execution_mode=mode):
+                    api = NinjaAIO(urls_namespace=f"v3_baseline_{label}_{mode}")
+                    mode_class = type(
+                        viewset_class.__name__, (viewset_class,), {"execution_mode": mode}
+                    )
+                    viewset = mode_class(api=api, prefix="/items", tags=["baseline"])
+                    viewset.add_views_to_route()
+                    actual = _snapshot(api.get_openapi_schema(path_prefix="/api"))
+                    expected = json.loads(
+                        (SNAPSHOT_DIR / snapshot_name).read_text(encoding="utf-8")
+                    )
+                    actual = _normalize_generated_suffixes(actual, expected)
+                    self.assertEqual(actual, expected)
+
+
+class ExecutionModeOpenAPIParityTests(SimpleTestCase):
+    """Sync and async viewsets must publish the exact same OpenAPI document."""
+
+    cases = {
+        "bulk": TestModelSerializerBulkAPI,
+        "m2m": TestM2MViewSet,
+        "m2m_serializer_class": TestM2MWithSerializerClassViewSet,
+        "soft_delete": SoftDeleteTestAPI,
+        "field_selection": FieldSelectionTestAPI,
+        "permissions_and_actions": RoleBasedPermissionTestAPI,
+    }
+
+    def _document(self, label: str, viewset_class, mode: str) -> dict:
+        api = NinjaAIO(urls_namespace=f"v3_parity_{label}_{mode}")
+        mode_class = type(viewset_class.__name__, (viewset_class,), {"execution_mode": mode})
+        mode_class(api=api, prefix="/items", tags=["parity"]).add_views_to_route()
+        return api.get_openapi_schema(path_prefix="/api")
+
+    def test_full_openapi_document_matches_across_modes(self) -> None:
+        for label, viewset_class in self.cases.items():
+            with self.subTest(case=label):
+                sync_doc = self._document(label, viewset_class, "sync")
+                async_doc = self._document(label, viewset_class, "async")
+                self.assertEqual(sync_doc["paths"], async_doc["paths"])
+                self.assertEqual(sync_doc.get("components"), async_doc.get("components"))
+                self.assertGreater(len(sync_doc["paths"]), 2)

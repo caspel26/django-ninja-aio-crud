@@ -3,12 +3,13 @@ import inspect
 import logging
 from typing import Any, Coroutine, List
 
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.http import HttpRequest
 from ninja import Path, Query, Schema, Status
 from pydantic import create_model
 from ninja_aio.decorators import unique_view, decorate_view
 from ninja_aio.models import ModelSerializer, ModelUtil
+from ninja_aio.models import transformations as model_transformations
 from ninja_aio.schemas import (
     M2MRelationSchema,
     M2MSchemaIn,
@@ -155,7 +156,7 @@ class ManyToManyAPI:
 
     -----------------------------------------------------------------------
 
-    _check_m2m_objs(request, objs_pks, related_model, related_manager, related_name, instance, remove=False)
+    _acheck_m2m_objs(request, objs_pks, related_model, related_manager, related_name, instance, remove=False)
     Validate requested primary keys for add/remove operations against the current
     relation state. Performs existence checks and logical consistency (e.g., prevents
     adding already-related objects or removing non-related objects). Uses `_get_query_handler`
@@ -182,8 +183,8 @@ class ManyToManyAPI:
 
     -----------------------------------------------------------------------
 
-    _collect_m2m(request, pks, model, related_manager, related_name, instance, remove=False)
-    Wrapper around _check_m2m_objs that short-circuits on empty PK lists.
+    _acollect_m2m(request, pks, model, related_manager, related_name, instance, remove=False)
+    Wrapper around _acheck_m2m_objs that short-circuits on empty PK lists.
 
     Parameters:
         request (HttpRequest)
@@ -195,7 +196,7 @@ class ManyToManyAPI:
         remove (bool): Operation type flag.
 
     Returns:
-        tuple[list[str], list[str], list[Model]]: See _check_m2m_objs.
+        tuple[list[str], list[str], list[Model]]: See _acheck_m2m_objs.
 
     -----------------------------------------------------------------------
 
@@ -207,7 +208,7 @@ class ManyToManyAPI:
 
     _register_manage_relation_view(...)
     Registers the POST endpoint for adding/removing related objects. Validates via
-    `_collect_m2m` and executes mutations concurrently using `aadd`/`aremove` with
+    `_acollect_m2m` and executes mutations concurrently using `aadd`/`aremove` with
     `asyncio.gather`. Aggregates per-PK results and errors into a standardized payload.
 
     -----------------------------------------------------------------------
@@ -246,6 +247,28 @@ class ManyToManyAPI:
         self.default_auth = self.view_set.m2m_auth
         self.related_model_util = self.view_set.model_util
         self.relations_filters_schemas = self._generate_m2m_filters_schemas()
+        self._paginator = self.pagination_class()
+        self._validate_handlers()
+
+    def _validate_handlers(self) -> None:
+        """Reject per-relation handlers whose kind cannot run in the viewset's mode."""
+        sync = self.view_set.execution_mode == "sync"
+        for relation in self.relations:
+            name = relation.related_name
+            # Async endpoints accept either kind of query_params handler.
+            checks = (
+                (f"{name}_query_params_handler", self._get_query_params_handler(name), sync),
+                (f"{name}_query_handler", self._get_query_handler(name), True),
+            )
+            for attr, handler, strict in checks:
+                if handler is None or not strict:
+                    continue
+                if inspect.iscoroutinefunction(handler) == sync:
+                    kind = "a regular function" if sync else "a coroutine function"
+                    raise ImproperlyConfigured(
+                        f"{type(self.view_set).__name__}.{attr} must be {kind} "
+                        f"for execution_mode='{self.view_set.execution_mode}'"
+                    )
 
     @property
     def views_action_map(self):
@@ -283,7 +306,7 @@ class ManyToManyAPI:
         except (ValidationError, TypeError, ValueError):
             return value
 
-    async def _check_m2m_objs(
+    async def _acheck_m2m_objs(
         self,
         request: HttpRequest,
         objs_pks: list,
@@ -298,9 +321,7 @@ class ManyToManyAPI:
         Returns (errors, details, objects_to_process).
         Uses per-PK query handler if available, else falls back to ModelUtil lookup by pk.
         """
-        errors, objs_detail, objs = [], [], []
         rel_obj_pks = {rel_obj.pk async for rel_obj in related_manager.all()}
-        rel_model_name = related_model._meta.verbose_name.capitalize()
         query_handler = self._get_query_handler(related_name)
         pk_field = related_model._meta.pk
 
@@ -320,6 +341,50 @@ class ManyToManyAPI:
             async for obj in qs.filter(**{f"{pk_name}__in": objs_pks}):
                 resolved[obj.pk] = obj
 
+        return self._m2m_outcome(objs_pks, resolved, rel_obj_pks, related_model, remove)
+
+    def _check_m2m_objs(
+        self,
+        request: HttpRequest,
+        objs_pks: list,
+        related_model: ModelSerializer | Model,
+        related_manager: QuerySet,
+        related_name: str,
+        instance: ModelSerializer | Model,
+        remove: bool = False,
+    ):
+        """Synchronous counterpart of ``_acheck_m2m_objs``."""
+        rel_obj_pks = {rel_obj.pk for rel_obj in related_manager.all()}
+        query_handler = self._get_query_handler(related_name)
+        pk_field = related_model._meta.pk
+
+        if query_handler:
+            resolved = {
+                self._normalize_pk(pk_field, obj_pk): query_handler(
+                    request, obj_pk, instance
+                ).first()
+                for obj_pk in objs_pks
+            }
+        else:
+            qs = ModelUtil(related_model).get_objects(request)
+            resolved = {
+                obj.pk: obj
+                for obj in qs.filter(**{f"{pk_field.attname}__in": objs_pks})
+            }
+
+        return self._m2m_outcome(objs_pks, resolved, rel_obj_pks, related_model, remove)
+
+    def _m2m_outcome(
+        self,
+        objs_pks: list,
+        resolved: dict,
+        rel_obj_pks: set,
+        related_model: ModelSerializer | Model,
+        remove: bool,
+    ) -> tuple[list[str], list[str], list[Model]]:
+        errors, objs_detail, objs = [], [], []
+        rel_model_name = related_model._meta.verbose_name.capitalize()
+        pk_field = related_model._meta.pk
         for obj_pk in objs_pks:
             rel_obj = resolved.get(self._normalize_pk(pk_field, obj_pk))
             if rel_obj is None:
@@ -341,7 +406,7 @@ class ManyToManyAPI:
             )
         return errors, objs_detail, objs
 
-    async def _collect_m2m(
+    async def _acollect_m2m(
         self,
         request: HttpRequest,
         pks: list,
@@ -353,13 +418,30 @@ class ManyToManyAPI:
     ):
         if not pks:
             return ([], [], [])
-        return await self._check_m2m_objs(
+        return await self._acheck_m2m_objs(
             request,
             pks,
             reletad_model,
             related_manager,
             related_name,
             instance,
+            remove=remove,
+        )
+
+    def _collect_m2m(
+        self,
+        request: HttpRequest,
+        pks: list,
+        related_model: ModelSerializer | Model,
+        related_manager: QuerySet,
+        related_name: str,
+        instance: ModelSerializer | Model,
+        remove: bool = False,
+    ):
+        if not pks:
+            return ([], [], [])
+        return self._check_m2m_objs(
+            request, pks, related_model, related_manager, related_name, instance,
             remove=remove,
         )
 
@@ -387,60 +469,114 @@ class ManyToManyAPI:
         verbose_name_plural: str,
         decorators: list,
     ):
-        _paginator = self.pagination_class()
-        _input_class = self.pagination_class.Input
-        _default_pagination = _input_class()
-        _paginated_schema = create_model(
+        input_class = self.pagination_class.Input
+        default_pagination = input_class()
+        paginated_schema = create_model(
             f"Paginated{related_schema.__name__}",
             __base__=Schema,
             items=(List[related_schema], ...),
             count=(int, ...),
         )
+        relation = {
+            "related_name": related_name,
+            "rel_util": rel_util,
+            "related_schema": related_schema,
+        }
 
-        @self.router.get(
+        if self.view_set.execution_mode == "sync":
+
+            def get_related(
+                request: HttpRequest,
+                pk: Path[self.path_schema],  # type: ignore
+                filters: Query[filters_schema] = None,  # type: ignore
+                ninja_pagination: input_class = Query(default_pagination),  # type: ignore
+            ):
+                return self.list_related(request, pk, filters, ninja_pagination, **relation)
+
+        else:
+
+            async def get_related(
+                request: HttpRequest,
+                pk: Path[self.path_schema],  # type: ignore
+                filters: Query[filters_schema] = None,  # type: ignore
+                ninja_pagination: input_class = Query(default_pagination),  # type: ignore
+            ):
+                return await self.alist_related(
+                    request, pk, filters, ninja_pagination, **relation
+                )
+
+        return self.router.get(
             self._get_api_path(rel_path, append_slash=append_slash),
             response={
-                200: _paginated_schema,
+                200: paginated_schema,
                 self.view_set.error_codes: self.view_set.error_schema,
             },
             auth=m2m_auth,
             summary=f"Get {verbose_name_plural}",
             description=f"Get all related {verbose_name_plural}",
+        )(
+            decorate_view(
+                unique_view(f"get_{self.related_model_util.model_name}_{rel_path}"),
+                *decorators,
+            )(get_related)
         )
-        @decorate_view(
-            unique_view(f"get_{self.related_model_util.model_name}_{rel_path}"),
-            *decorators,
+
+    def _page_bounds(self, ninja_pagination: Schema) -> tuple[int, int]:
+        if not isinstance(ninja_pagination, self.pagination_class.Input):
+            ninja_pagination = self.pagination_class.Input()
+        return self.view_set._get_page_params(self._paginator, ninja_pagination)
+
+    def list_related(
+        self,
+        request: HttpRequest,
+        pk: Schema,
+        filters: Schema | None,
+        ninja_pagination: Schema,
+        *,
+        related_name: str,
+        rel_util: ModelUtil,
+        related_schema: type[Schema],
+    ) -> Status:
+        """List related objects synchronously."""
+        obj = self.view_set._get_serializer().get(self.view_set._get_pk(pk), request=request)
+        related_qs = getattr(obj, related_name).all()
+        query_handler = self._get_query_params_handler(related_name)
+        if filters is not None and query_handler:
+            related_qs = query_handler(related_qs, filters.model_dump())
+        count = related_qs.count()
+        offset, page_size = self._page_bounds(ninja_pagination)
+        sliced_qs = model_transformations.apply_relation_plan(
+            related_qs[offset : offset + page_size],
+            model_transformations.schema_relation_plan(rel_util.model, related_schema),
         )
-        async def get_related(
-            request: HttpRequest,
-            pk: Path[self.path_schema],  # type: ignore
-            filters: Query[filters_schema] = None,  # type: ignore
-            ninja_pagination: _input_class = Query(_default_pagination),  # type: ignore
-        ):
-            if not isinstance(ninja_pagination, _input_class):
-                ninja_pagination = _default_pagination
+        items = rel_util.model_dumps(list(sliced_qs), schema=related_schema)
+        return Status(200, {"items": items, "count": count})
 
-            obj = await self.related_model_util.aget_object(
-                request, self.view_set._get_pk(pk)
-            )
-            related_manager = getattr(obj, related_name)
-            related_qs = related_manager.all()
-
-            query_handler = self._get_query_params_handler(related_name)
-            if filters is not None and query_handler:
-                if inspect.iscoroutinefunction(query_handler):
-                    related_qs = await query_handler(related_qs, filters.model_dump())
-                else:
-                    related_qs = query_handler(related_qs, filters.model_dump())
-
-            count = await related_qs.acount()
-            offset, page_size = self.view_set._get_page_params(
-                _paginator, ninja_pagination
-            )
-            sliced_qs = related_qs[offset : offset + page_size]
-
-            items = await rel_util.list_read_s(related_schema, request, sliced_qs)
-            return Status(200, {"items": items, "count": count})
+    async def alist_related(
+        self,
+        request: HttpRequest,
+        pk: Schema,
+        filters: Schema | None,
+        ninja_pagination: Schema,
+        *,
+        related_name: str,
+        rel_util: ModelUtil,
+        related_schema: type[Schema],
+    ) -> Status:
+        """List related objects asynchronously."""
+        obj = await self.view_set._get_serializer().aget(self.view_set._get_pk(pk), request=request)
+        related_qs = getattr(obj, related_name).all()
+        query_handler = self._get_query_params_handler(related_name)
+        if filters is not None and query_handler:
+            if inspect.iscoroutinefunction(query_handler):
+                related_qs = await query_handler(related_qs, filters.model_dump())
+            else:
+                related_qs = query_handler(related_qs, filters.model_dump())
+        count = await related_qs.acount()
+        offset, page_size = self._page_bounds(ninja_pagination)
+        sliced_qs = related_qs[offset : offset + page_size]
+        items = await rel_util.amodel_dumps(sliced_qs, schema=related_schema)
+        return Status(200, {"items": items, "count": count})
 
     def _resolve_action_schema(self, add: bool, remove: bool):
         return self.views_action_map[(add, remove)]
@@ -458,10 +594,33 @@ class ManyToManyAPI:
         decorators: list,
     ):
         action, schema_in = self._resolve_action_schema(m2m_add, m2m_remove)
-        plural = verbose_name_plural
-        summary = f"{action} {plural}"
+        summary = f"{action} {verbose_name_plural}"
+        relation = {
+            "related_model": related_model,
+            "related_name": related_name,
+            "m2m_add": m2m_add,
+            "m2m_remove": m2m_remove,
+        }
 
-        @self.router.post(
+        if self.view_set.execution_mode == "sync":
+
+            def manage_related(
+                request: HttpRequest,
+                pk: Path[self.path_schema],  # type: ignore
+                data: schema_in,  # type: ignore
+            ):
+                return self.manage_related(request, pk, data, **relation)
+
+        else:
+
+            async def manage_related(
+                request: HttpRequest,
+                pk: Path[self.path_schema],  # type: ignore
+                data: schema_in,  # type: ignore
+            ):
+                return await self.amanage_related(request, pk, data, **relation)
+
+        return self.router.post(
             self._get_api_path(rel_path),
             response={
                 200: M2MSchemaOut,
@@ -470,62 +629,92 @@ class ManyToManyAPI:
             auth=m2m_auth,
             summary=summary,
             description=summary,
+        )(
+            decorate_view(
+                unique_view(f"manage_{self.related_model_util.model_name}_{rel_path}"),
+                *decorators,
+            )(manage_related)
         )
-        @decorate_view(
-            unique_view(f"manage_{self.related_model_util.model_name}_{rel_path}"),
-            *decorators,
+
+    @staticmethod
+    def _requested_pks(data: Schema, m2m_add: bool, m2m_remove: bool) -> tuple[list, list]:
+        add_pks = getattr(data, "add", []) if m2m_add else []
+        remove_pks = getattr(data, "remove", []) if m2m_remove else []
+        return add_pks, remove_pks
+
+    @staticmethod
+    def _manage_response(related_name: str, added: tuple, removed: tuple) -> Status:
+        results = added[1] + removed[1]
+        errors = added[0] + removed[0]
+        logger.info(
+            f"M2M manage {related_name}: {len(results)} succeeded, {len(errors)} errors"
         )
-        async def manage_related(
-            request: HttpRequest,
-            pk: Path[self.path_schema],  # type: ignore
-            data: schema_in,  # type: ignore
-        ):
-            obj = await self.related_model_util.aget_object(
-                request, self.view_set._get_pk(pk)
-            )
-            related_manager: QuerySet = getattr(obj, related_name)
+        return Status(
+            200,
+            M2MSchemaOut(
+                results={"count": len(results), "details": results},
+                errors={"count": len(errors), "details": errors},
+            ),
+        )
 
-            add_pks = getattr(data, "add", []) if m2m_add else []
-            remove_pks = getattr(data, "remove", []) if m2m_remove else []
+    def manage_related(
+        self,
+        request: HttpRequest,
+        pk: Schema,
+        data: Schema,
+        *,
+        related_model: ModelSerializer | Model,
+        related_name: str,
+        m2m_add: bool,
+        m2m_remove: bool,
+    ) -> Status:
+        """Add and/or remove related objects synchronously."""
+        obj = self.view_set._get_serializer().get(self.view_set._get_pk(pk), request=request)
+        related_manager = getattr(obj, related_name)
+        add_pks, remove_pks = self._requested_pks(data, m2m_add, m2m_remove)
+        added = self._collect_m2m(
+            request, add_pks, related_model, related_manager, related_name, obj
+        )
+        removed = self._collect_m2m(
+            request, remove_pks, related_model, related_manager, related_name, obj,
+            remove=True,
+        )
+        if added[2]:
+            related_manager.add(*added[2])
+        if removed[2]:
+            related_manager.remove(*removed[2])
+        return self._manage_response(related_name, added, removed)
 
-            add_errors, add_details, add_objs = await self._collect_m2m(
-                request,
-                add_pks,
-                related_model,
-                related_manager,
-                related_name,
-                obj,
-            )
-            remove_errors, remove_details, remove_objs = await self._collect_m2m(
-                request,
-                remove_pks,
-                related_model,
-                related_manager,
-                related_name,
-                obj,
-                remove=True,
-            )
-
-            tasks = []
-            if add_objs:
-                tasks.append(related_manager.aadd(*add_objs))
-            if remove_objs:
-                tasks.append(related_manager.aremove(*remove_objs))
-            if tasks:
-                await asyncio.gather(*tasks)
-
-            results = add_details + remove_details
-            errors = add_errors + remove_errors
-            logger.info(
-                f"M2M manage {related_name}: {len(results)} succeeded, {len(errors)} errors"
-            )
-            return Status(
-                200,
-                M2MSchemaOut(
-                    results={"count": len(results), "details": results},
-                    errors={"count": len(errors), "details": errors},
-                ),
-            )
+    async def amanage_related(
+        self,
+        request: HttpRequest,
+        pk: Schema,
+        data: Schema,
+        *,
+        related_model: ModelSerializer | Model,
+        related_name: str,
+        m2m_add: bool,
+        m2m_remove: bool,
+    ) -> Status:
+        """Add and/or remove related objects asynchronously."""
+        obj = await self.view_set._get_serializer().aget(self.view_set._get_pk(pk), request=request)
+        related_manager = getattr(obj, related_name)
+        add_pks, remove_pks = self._requested_pks(data, m2m_add, m2m_remove)
+        added = await self._acollect_m2m(
+            request, add_pks, related_model, related_manager, related_name, obj
+        )
+        removed = await self._acollect_m2m(
+            request, remove_pks, related_model, related_manager, related_name, obj,
+            remove=True,
+        )
+        tasks = []
+        if added[2]:
+            tasks.append(related_manager.aadd(*added[2]))
+        if removed[2]:
+            tasks.append(related_manager.aremove(*removed[2]))
+        if tasks:
+            await asyncio.gather(*tasks)
+        return self._manage_response(related_name, added, removed)
 
     def _build_views(self, relation: M2MRelationSchema):
         model = relation.model

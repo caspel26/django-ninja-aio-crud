@@ -287,7 +287,7 @@ class FullListViewScalabilityTest(ScalabilityMixin, TestCase):
         """
         Verify the full list_view (page=1) stays under threshold with large datasets.
         """
-        view = self.viewset.list_view()
+        view = self.viewset.alist_view()
         pagination = self.viewset.pagination_class.Input(page=1)
         filters = self.viewset.filters_schema()
         timings = {}

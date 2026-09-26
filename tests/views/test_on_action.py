@@ -112,14 +112,14 @@ class OnActionExecutionTestCase(TestCase):
         self.assertEqual(obj.name, "renamed_base")
 
     async def test_on_handler_calls_on_before_operation(self):
-        """on_before_operation is called by the built on_handler."""
+        """aon_before_operation is called by the built on_handler."""
         await self.model.objects.all().adelete()
         obj = await self.model.objects.acreate(name="hook_test", description="d")
 
         called_operations = []
 
         class TrackingViewSet(views.OnActionTestAPI):
-            async def on_before_operation(self, request, operation):
+            async def aon_before_operation(self, request, operation):
                 called_operations.append(operation)
 
         vs = TrackingViewSet()

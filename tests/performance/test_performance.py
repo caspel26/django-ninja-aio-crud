@@ -225,7 +225,7 @@ class SerializationPerformanceTest(PerformanceMixin, TestCase):
         data = schema_in(name="parse_test", description="parse_desc")
 
         async def parse():
-            await self.util.parse_input_data(self.request, data)
+            await self.util.aparse_input_data(self.request, data)
 
         stats = self._benchmark_async(parse)
         self._record("input_parsing", stats)
@@ -279,7 +279,7 @@ class CRUDPerformanceTest(PerformanceMixin, TestCase):
 
     def test_create_performance(self):
         """Benchmark create endpoint throughput."""
-        view = self.viewset.create_view()
+        view = self.viewset.acreate_view()
         schema_in = self.viewset.schema_in
         counter = [0]
 
@@ -295,7 +295,7 @@ class CRUDPerformanceTest(PerformanceMixin, TestCase):
 
     def test_list_performance(self):
         """Benchmark list endpoint with pagination."""
-        view = self.viewset.list_view()
+        view = self.viewset.alist_view()
         pagination = self.viewset.pagination_class.Input(page=1)
         filters = self.viewset.filters_schema()
 
@@ -312,7 +312,7 @@ class CRUDPerformanceTest(PerformanceMixin, TestCase):
     def test_retrieve_performance(self):
         """Benchmark single object retrieval."""
         obj = models.TestModelSerializer.objects.first()
-        view = self.viewset.retrieve_view()
+        view = self.viewset.aretrieve_view()
         path_schema = self.viewset.path_schema(id=obj.pk)
 
         async def retrieve():
@@ -324,7 +324,7 @@ class CRUDPerformanceTest(PerformanceMixin, TestCase):
     def test_update_performance(self):
         """Benchmark update endpoint."""
         obj = models.TestModelSerializer.objects.first()
-        view = self.viewset.update_view()
+        view = self.viewset.aupdate_view()
         schema_update = self.viewset.schema_update
         path_schema = self.viewset.path_schema(id=obj.pk)
         data = schema_update(description="updated_desc")
@@ -337,7 +337,7 @@ class CRUDPerformanceTest(PerformanceMixin, TestCase):
 
     def test_delete_performance(self):
         """Benchmark delete endpoint throughput."""
-        view = self.viewset.delete_view()
+        view = self.viewset.adelete_view()
         objs = models.TestModelSerializer.objects.bulk_create(
             [
                 models.TestModelSerializer(
@@ -411,7 +411,7 @@ class FilterPerformanceTest(PerformanceMixin, TestCase):
 
     def test_icontains_filter(self):
         """Benchmark icontains string filtering."""
-        view = self.viewset.list_view()
+        view = self.viewset.alist_view()
         pagination = self.viewset.pagination_class.Input(page=1)
         filters = self.viewset.filters_schema(name="filter_5")
 
@@ -427,7 +427,7 @@ class FilterPerformanceTest(PerformanceMixin, TestCase):
 
     def test_boolean_filter(self):
         """Benchmark boolean field filtering."""
-        view = self.viewset.list_view()
+        view = self.viewset.alist_view()
         pagination = self.viewset.pagination_class.Input(page=1)
         filters = self.viewset.filters_schema(active=True)
 
@@ -443,7 +443,7 @@ class FilterPerformanceTest(PerformanceMixin, TestCase):
 
     def test_numeric_filter(self):
         """Benchmark numeric field filtering."""
-        view = self.viewset.list_view()
+        view = self.viewset.alist_view()
         pagination = self.viewset.pagination_class.Input(page=1)
         filters = self.viewset.filters_schema(age=50)
 
@@ -459,7 +459,7 @@ class FilterPerformanceTest(PerformanceMixin, TestCase):
 
     def test_relation_filter(self):
         """Benchmark relation-based filtering."""
-        view = self.relation_viewset.list_view()
+        view = self.relation_viewset.alist_view()
         pagination = self.relation_viewset.pagination_class.Input(page=1)
         filters = self.relation_viewset.filters_schema(test_model_serializer=1)
 
@@ -475,7 +475,7 @@ class FilterPerformanceTest(PerformanceMixin, TestCase):
 
     def test_match_case_filter(self):
         """Benchmark match case conditional filtering."""
-        view = self.match_viewset.list_view()
+        view = self.match_viewset.alist_view()
         pagination = self.match_viewset.pagination_class.Input(page=1)
         filters = self.match_viewset.filters_schema(is_approved=True)
 
@@ -491,7 +491,7 @@ class FilterPerformanceTest(PerformanceMixin, TestCase):
 
     def test_combined_filters(self):
         """Benchmark multiple filters applied simultaneously."""
-        view = self.viewset.list_view()
+        view = self.viewset.alist_view()
         pagination = self.viewset.pagination_class.Input(page=1)
         filters = self.viewset.filters_schema(
             name="filter", active=True, age=10
@@ -541,7 +541,7 @@ class MultiFKPerformanceTest(PerformanceMixin, TestCase):
 
     def test_create_with_3_fks(self):
         """Benchmark create with 3 FK fields (batch resolution)."""
-        view = self.viewset.create_view()
+        view = self.viewset.acreate_view()
         schema_in = self.viewset.schema_in
         counter = [0]
 
@@ -561,7 +561,7 @@ class MultiFKPerformanceTest(PerformanceMixin, TestCase):
 
     def test_bulk_create_with_3_fks(self):
         """Benchmark bulk create with 3 FK fields (50 objects)."""
-        view = self.viewset.bulk_create_view()
+        view = self.viewset.abulk_create_view()
         schema_in = self.viewset.schema_in
 
         items = [
@@ -605,7 +605,7 @@ class LargeListPerformanceTest(PerformanceMixin, TestCase):
 
     def test_list_1000_page_20(self):
         """List 1000 records, page size 20."""
-        view = self.viewset.list_view()
+        view = self.viewset.alist_view()
         pagination = self.viewset.pagination_class.Input(page=1, page_size=20)
         filters = self.viewset.filters_schema()
 
@@ -621,7 +621,7 @@ class LargeListPerformanceTest(PerformanceMixin, TestCase):
 
     def test_list_1000_page_100(self):
         """List 1000 records, page size 100."""
-        view = self.viewset.list_view()
+        view = self.viewset.alist_view()
         pagination = self.viewset.pagination_class.Input(page=1, page_size=100)
         filters = self.viewset.filters_schema()
 

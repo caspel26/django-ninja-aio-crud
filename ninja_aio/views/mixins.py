@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from typing import List, TypeVar
+from typing import TypeVar
 
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Model, QuerySet, Q
@@ -7,12 +7,9 @@ from django.http import HttpRequest, JsonResponse
 from ninja import Path, Query, Schema, Status
 from pydantic import create_model
 
-from ninja_aio.views.api import APIViewSet
-from ninja_aio.decorators import unique_view, decorate_view, aatomic
+from ninja_aio.views.api import APIViewSet, GeneratedRoute
 from ninja_aio.exceptions import ForbiddenError, NotFoundError
 from ninja_aio.schemas import RelationFilterSchema, MatchCaseFilterSchema
-from ninja_aio.schemas.api import BulkResultSchema
-from ninja_aio.schemas.helpers import QuerySchema
 
 # TypeVar for generic model typing in mixins
 ModelT = TypeVar("ModelT", bound=Model)
@@ -30,7 +27,7 @@ class IcontainsFilterViewSetMixin(APIViewSet[ModelT]):
     Usage:
         - Include this mixin in a viewset class that exposes a queryset and
           passes a dictionary of filters (e.g., from request query params) to
-          `query_params_handler`.
+          `aquery_params_handler`.
         - Only string values are considered; non-string values are ignored.
 
     Example:
@@ -63,12 +60,19 @@ class IcontainsFilterViewSetMixin(APIViewSet[ModelT]):
               evaluation time.
     """
 
-    async def query_params_handler(self, queryset, filters):
+    async def aquery_params_handler(self, queryset, filters):
         """
         Apply icontains filter to the queryset based on provided filters.
         """
-        base_qs = await super().query_params_handler(queryset, filters)
-        return base_qs.filter(
+        base_qs = await super().aquery_params_handler(queryset, filters)
+        return self._icontains_filter(base_qs, filters)
+
+    def query_params_handler(self, queryset, filters):
+        base_qs = super().query_params_handler(queryset, filters)
+        return self._icontains_filter(base_qs, filters)
+
+    def _icontains_filter(self, queryset, filters):
+        return queryset.filter(
             **{
                 f"{key}__icontains": value
                 for key, value in filters.items()
@@ -89,7 +93,7 @@ class BooleanFilterViewSetMixin(APIViewSet[ModelT]):
     that expose queryable endpoints.
 
     Methods:
-        query_params_handler(queryset, filters):
+        aquery_params_handler(queryset, filters):
             Apply boolean filters to the given queryset based on the provided
             dictionary. Only keys with boolean values are included in the filter.
 
@@ -107,12 +111,19 @@ class BooleanFilterViewSetMixin(APIViewSet[ModelT]):
                   filtered clone.
     """
 
-    async def query_params_handler(self, queryset, filters):
+    async def aquery_params_handler(self, queryset, filters):
         """
         Apply boolean filter to the queryset based on provided filters.
         """
-        base_qs = await super().query_params_handler(queryset, filters)
-        return base_qs.filter(
+        base_qs = await super().aquery_params_handler(queryset, filters)
+        return self._boolean_filter(base_qs, filters)
+
+    def query_params_handler(self, queryset, filters):
+        base_qs = super().query_params_handler(queryset, filters)
+        return self._boolean_filter(base_qs, filters)
+
+    def _boolean_filter(self, queryset, filters):
+        return queryset.filter(
             **{
                 key: value
                 for key, value in filters.items()
@@ -133,7 +144,7 @@ class NumericFilterViewSetMixin(APIViewSet[ModelT]):
     that expose queryable endpoints.
 
     Methods:
-        query_params_handler(queryset, filters):
+        aquery_params_handler(queryset, filters):
             Apply numeric filters to the given queryset based on the provided
             dictionary. Only keys with numeric values are included in the filter.
 
@@ -151,12 +162,19 @@ class NumericFilterViewSetMixin(APIViewSet[ModelT]):
                   filtered clone.
     """
 
-    async def query_params_handler(self, queryset, filters):
+    async def aquery_params_handler(self, queryset, filters):
         """
         Apply numeric filter to the queryset based on provided filters.
         """
-        base_qs = await super().query_params_handler(queryset, filters)
-        return base_qs.filter(
+        base_qs = await super().aquery_params_handler(queryset, filters)
+        return self._numeric_filter(base_qs, filters)
+
+    def query_params_handler(self, queryset, filters):
+        base_qs = super().query_params_handler(queryset, filters)
+        return self._numeric_filter(base_qs, filters)
+
+    def _numeric_filter(self, queryset, filters):
+        return queryset.filter(
             **{
                 key: value
                 for key, value in filters.items()
@@ -189,18 +207,25 @@ class DateFilterViewSetMixin(APIViewSet[ModelT]):
 
     _compare_attr: str = ""
 
-    async def query_params_handler(self, queryset, filters):
+    async def aquery_params_handler(self, queryset, filters):
         """
         Apply date/datetime filters using `_compare_attr`.
 
-        - Delegates to `super().query_params_handler` first.
+        - Delegates to `super().aquery_params_handler` first.
         - Applies filters for keys whose values implement `isoformat`.
 
         Returns:
         - QuerySet filtered with lookups in the form: field<_compare_attr>=value.
         """
-        base_qs = await super().query_params_handler(queryset, filters)
-        return base_qs.filter(
+        base_qs = await super().aquery_params_handler(queryset, filters)
+        return self._date_filter(base_qs, filters)
+
+    def query_params_handler(self, queryset, filters):
+        base_qs = super().query_params_handler(queryset, filters)
+        return self._date_filter(base_qs, filters)
+
+    def _date_filter(self, queryset, filters):
+        return queryset.filter(
             **{
                 f"{key}{self._compare_attr}": value
                 for key, value in filters.items()
@@ -357,11 +382,18 @@ class RelationFilterViewSetMixin(APIViewSet[ModelT]):
     def relations_filters_fields(self):
         return [rel_filter.query_param for rel_filter in self.relations_filters]
 
-    async def query_params_handler(self, queryset, filters):
+    async def aquery_params_handler(self, queryset, filters):
         """
         Apply relation filters to the queryset based on configured relations_filters.
         """
-        base_qs = await super().query_params_handler(queryset, filters)
+        base_qs = await super().aquery_params_handler(queryset, filters)
+        return self._relation_filter(base_qs, filters)
+
+    def query_params_handler(self, queryset, filters):
+        base_qs = super().query_params_handler(queryset, filters)
+        return self._relation_filter(base_qs, filters)
+
+    def _relation_filter(self, queryset, filters):
         rel_filters = {}
         for rel_filter in self.relations_filters:
             value = filters.get(rel_filter.query_param)
@@ -370,7 +402,7 @@ class RelationFilterViewSetMixin(APIViewSet[ModelT]):
                 rel_filter.query_filter
             ):
                 rel_filters[rel_filter.query_filter] = value
-        return base_qs.filter(**rel_filters) if rel_filters else base_qs
+        return queryset.filter(**rel_filters) if rel_filters else queryset
 
 
 class MatchCaseFilterViewSetMixin(APIViewSet[ModelT]):
@@ -436,8 +468,15 @@ class MatchCaseFilterViewSetMixin(APIViewSet[ModelT]):
             return queryset
         return qs_method(**validated_lookup)
 
-    async def query_params_handler(self, queryset, filters):
-        base_qs = await super().query_params_handler(queryset, filters)
+    async def aquery_params_handler(self, queryset, filters):
+        base_qs = await super().aquery_params_handler(queryset, filters)
+        return self._match_case_filter(base_qs, filters)
+
+    def query_params_handler(self, queryset, filters):
+        base_qs = super().query_params_handler(queryset, filters)
+        return self._match_case_filter(base_qs, filters)
+
+    def _match_case_filter(self, queryset, filters):
         for filter_match in self.filters_match_cases:
             value = filters.get(filter_match.query_param)
             if value is None:
@@ -445,19 +484,19 @@ class MatchCaseFilterViewSetMixin(APIViewSet[ModelT]):
             case_filter = (
                 filter_match.cases.true if value else filter_match.cases.false
             )
-            base_qs = self._apply_case_filter(base_qs, case_filter)
-        return base_qs
+            queryset = self._apply_case_filter(queryset, case_filter)
+        return queryset
 
 
 class PermissionViewSetMixin(APIViewSet[ModelT]):
     """
-    Mixin adding async permission checks to all CRUD operations.
+    Mixin adding permission checks to all CRUD operations.
 
-    Provides three overridable hooks:
+    Provides three overridable hooks (async shown; sync variants drop the ``a``):
 
-    - ``has_permission(request, operation)`` — view-level check executed
+    - ``ahas_permission(request, operation)`` — view-level check executed
       before any DB query. Return ``False`` to deny (raises 403).
-    - ``has_object_permission(request, operation, obj)`` — object-level
+    - ``ahas_object_permission(request, operation, obj)`` — object-level
       check executed after fetching the instance but before mutation.
       Only called for retrieve / update / delete. Return ``False`` to deny.
     - ``get_permission_queryset(request, queryset)`` — row-level filtering
@@ -471,31 +510,49 @@ class PermissionViewSetMixin(APIViewSet[ModelT]):
         class BookAPI(PermissionViewSetMixin, APIViewSet):
             model = Book
 
-            async def has_permission(self, request, operation):
+            async def ahas_permission(self, request, operation):
                 if operation in ("create", "update", "delete"):
                     return request.auth.is_staff
                 return True
 
-            async def has_object_permission(self, request, operation, obj):
+            async def ahas_object_permission(self, request, operation, obj):
                 return obj.owner_id == request.auth.id
 
     The mixin works with filter mixins, bulk views, and ``@action``
     endpoints. Permission is checked using the action name as the
     ``operation`` string for custom actions.
+
+    Sync endpoints (``execution_mode = "sync"`` or ``def`` actions) call
+    ``has_permission`` / ``has_object_permission`` instead;
+    override those for sync mode.
     """
 
     _has_object_hooks = True
+    _mode_hooks = APIViewSet._mode_hooks + (
+        ("ahas_permission", "has_permission"),
+        ("ahas_object_permission", "has_object_permission"),
+    )
 
-    async def has_permission(
+    async def ahas_permission(
         self, request: HttpRequest, operation: str
     ) -> bool:
         """View-level permission check. Override for custom logic."""
         return True
 
-    async def has_object_permission(
+    def has_permission(self, request: HttpRequest, operation: str) -> bool:
+        """Synchronous view-level permission check used by sync endpoints."""
+        return True
+
+    async def ahas_object_permission(
         self, request: HttpRequest, operation: str, obj: ModelT
     ) -> bool:
         """Object-level permission check. Override for custom logic."""
+        return True
+
+    def has_object_permission(
+        self, request: HttpRequest, operation: str, obj: ModelT
+    ) -> bool:
+        """Synchronous object-level permission check used by sync endpoints."""
         return True
 
     def get_permission_queryset(
@@ -512,18 +569,28 @@ class PermissionViewSetMixin(APIViewSet[ModelT]):
             details=f"Permission denied for operation: {operation}"
         )
 
-    async def on_before_operation(
+    async def aon_before_operation(
         self, request: HttpRequest, operation: str
     ) -> None:
-        """Check has_permission; raise ForbiddenError if denied."""
-        if not await self.has_permission(request, operation):
+        """Check ahas_permission; raise ForbiddenError if denied."""
+        if not await self.ahas_permission(request, operation):
             self._deny(operation)
 
-    async def on_before_object_operation(
+    def on_before_operation(self, request: HttpRequest, operation: str) -> None:
+        if not self.has_permission(request, operation):
+            self._deny(operation)
+
+    async def aon_before_object_operation(
         self, request: HttpRequest, operation: str, obj: ModelT
     ) -> None:
-        """Check has_object_permission; raise ForbiddenError if denied."""
-        if not await self.has_object_permission(request, operation, obj):
+        """Check ahas_object_permission; raise ForbiddenError if denied."""
+        if not await self.ahas_object_permission(request, operation, obj):
+            self._deny(operation)
+
+    def on_before_object_operation(
+        self, request: HttpRequest, operation: str, obj: ModelT
+    ) -> None:
+        if not self.has_object_permission(request, operation, obj):
             self._deny(operation)
 
     def on_list_queryset(
@@ -559,10 +626,16 @@ class RoleBasedPermissionMixin(PermissionViewSetMixin[ModelT]):
     permission_roles: dict[str, list[str]] = {}
     role_attribute: str = "role"
 
-    async def has_permission(
+    async def ahas_permission(
         self, request: HttpRequest, operation: str
     ) -> bool:
         """Check if the user's role allows the requested operation."""
+        return self._role_allows(request, operation)
+
+    def has_permission(self, request: HttpRequest, operation: str) -> bool:
+        return self._role_allows(request, operation)
+
+    def _role_allows(self, request: HttpRequest, operation: str) -> bool:
         if not self.permission_roles:
             return True
         auth = getattr(request, "auth", None)
@@ -615,16 +688,23 @@ class SearchViewSetMixin(APIViewSet[ModelT]):
             **{self.search_param: (str | None, None)},
         )
 
-    async def _apply_list_filters(self, qs: QuerySet, filters=None) -> QuerySet:
+    async def _aapply_list_filters(self, qs: QuerySet, filters=None) -> QuerySet:
         """Extract search param and apply OR icontains filter before other filters."""
-        if filters is not None and self.search_fields:
-            search_value = getattr(filters, self.search_param, None)
-            if search_value:
-                search_q = Q()
-                for field in self.search_fields:
-                    search_q |= Q(**{f"{field}__icontains": search_value})
-                qs = qs.filter(search_q)
-        return await super()._apply_list_filters(qs, filters)
+        return await super()._aapply_list_filters(self._apply_search(qs, filters), filters)
+
+    def _apply_list_filters(self, qs: QuerySet, filters=None) -> QuerySet:
+        return super()._apply_list_filters(self._apply_search(qs, filters), filters)
+
+    def _apply_search(self, qs: QuerySet, filters) -> QuerySet:
+        if filters is None or not self.search_fields:
+            return qs
+        search_value = getattr(filters, self.search_param, None)
+        if not search_value:
+            return qs
+        search_q = Q()
+        for field in self.search_fields:
+            search_q |= Q(**{f"{field}__icontains": search_value})
+        return qs.filter(search_q)
 
 
 class SoftDeleteViewSetMixin(APIViewSet[ModelT]):
@@ -676,11 +756,20 @@ class SoftDeleteViewSetMixin(APIViewSet[ModelT]):
             qs = qs.filter(**{self.soft_delete_field: False})
         return qs
 
-    async def on_before_object_operation(
+    async def aon_before_object_operation(
         self, request: HttpRequest, operation: str, obj: ModelT
     ) -> None:
         """Block retrieve/update on soft-deleted records (unless include_deleted)."""
-        await super().on_before_object_operation(request, operation, obj)
+        await super().aon_before_object_operation(request, operation, obj)
+        self._reject_soft_deleted(operation, obj)
+
+    def on_before_object_operation(
+        self, request: HttpRequest, operation: str, obj: ModelT
+    ) -> None:
+        super().on_before_object_operation(request, operation, obj)
+        self._reject_soft_deleted(operation, obj)
+
+    def _reject_soft_deleted(self, operation: str, obj: ModelT) -> None:
         if (
             not self.include_deleted
             and operation in ("retrieve", "update")
@@ -688,81 +777,58 @@ class SoftDeleteViewSetMixin(APIViewSet[ModelT]):
         ):
             raise NotFoundError(self.model)
 
-    def delete_view(self) -> Callable:
-        """
-        Override delete to soft-delete (set flag instead of removing row).
-        """
-
-        @self.router.delete(
-            self.path_retrieve,
-            auth=self.delete_view_auth(),
-            summary=f"Delete {self.model_verbose_name}",
-            description=self.delete_docs,
-            response={204: None, self.error_codes: self.error_schema},
+    def delete(self, request: HttpRequest, pk: Schema) -> Status:
+        """Soft-delete: set the flag instead of removing the row."""
+        obj_pk = self._get_pk(pk)
+        obj = self._run_object_hooks(request, "delete", obj_pk)
+        if obj is None:
+            obj = self._get_serializer().get(obj_pk, request=request)
+        setattr(obj, self.soft_delete_field, True)
+        obj.save(update_fields=[self.soft_delete_field])
+        serialized = (
+            self._dump(obj, self.schema_delete_out) if self.schema_delete_out else None
         )
-        @decorate_view(aatomic, unique_view(self), *self.extra_decorators.delete)
-        async def delete(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
-            _pk = self._get_pk(pk)
-            obj = await self._run_object_hooks(request, "delete", _pk)
-            if obj is None:
-                obj = await self.model_util.aget_object(request, _pk)
-            setattr(obj, self.soft_delete_field, True)
-            await obj.asave(update_fields=[self.soft_delete_field])
-            return Status(204, None)
+        return self._delete_response(serialized)
 
-        return delete
-
-    def bulk_delete_view(self) -> Callable:
-        """
-        Override bulk delete to soft-delete all matching records.
-        """
-
-        @self.router.delete(
-            self.bulk_path,
-            auth=self.delete_view_auth(),
-            summary=f"Bulk Delete {self.model_verbose_name_plural}",
-            description=self.bulk_delete_docs,
-            response={200: BulkResultSchema, self.error_codes: self.error_schema},
+    async def adelete(self, request: HttpRequest, pk: Schema) -> Status:
+        """Soft-delete: set the flag instead of removing the row."""
+        obj_pk = self._get_pk(pk)
+        obj = await self._arun_object_hooks(request, "delete", obj_pk)
+        if obj is None:
+            obj = await self._get_serializer().aget(obj_pk, request=request)
+        setattr(obj, self.soft_delete_field, True)
+        await obj.asave(update_fields=[self.soft_delete_field])
+        serialized = (
+            await self._adump(obj, self.schema_delete_out)
+            if self.schema_delete_out
+            else None
         )
-        @decorate_view(
-            unique_view(self, plural=True), *self.extra_decorators.bulk_delete
+        return self._delete_response(serialized)
+
+    def bulk_delete(self, request: HttpRequest, data: Schema) -> Status:
+        """Soft-delete all matching records synchronously."""
+        self.on_before_operation(request, "bulk_delete")
+        queryset = self._get_serializer().get_queryset(request=request, optimize_for="read").filter(
+            pk__in=data.ids
         )
-        async def bulk_delete(
-            request: HttpRequest, data: self.bulk_delete_schema  # type: ignore
-        ):
-            await self.on_before_operation(request, "bulk_delete")
-            pks = data.ids
-            if not pks:
-                return Status(200, self._bulk_result([], []))
+        existing = set(queryset.values_list("pk", flat=True))
+        if existing:
+            queryset.update(**{self.soft_delete_field: True})
+        return self._soft_bulk_response(data.ids, existing)
 
-            qs = await self.model_util.aget_objects(request, is_for="read")
-            matched_qs = qs.filter(
-                **{f"{self.model_util.model_pk_name}__in": pks}
-            )
+    async def abulk_delete(self, request: HttpRequest, data: Schema) -> Status:
+        """Soft-delete all matching records asynchronously."""
+        await self.aon_before_operation(request, "bulk_delete")
+        queryset = await self._get_serializer().aget_queryset(request=request, optimize_for="read")
+        queryset = queryset.filter(pk__in=data.ids)
+        existing = {pk async for pk in queryset.values_list("pk", flat=True)}
+        if existing:
+            await queryset.aupdate(**{self.soft_delete_field: True})
+        return self._soft_bulk_response(data.ids, existing)
 
-            existing_pks = set()
-            async for pk_val in matched_qs.values_list(
-                self.model_util.model_pk_name, flat=True
-            ):
-                existing_pks.add(pk_val)
-
-            error_details = []
-            for pk in pks:
-                if pk not in existing_pks:
-                    from ninja_aio.exceptions import NotFoundError as NFE
-
-                    error_details.append(NFE(self.model).error)
-
-            success_details = []
-            if existing_pks:
-                await qs.filter(
-                    **{f"{self.model_util.model_pk_name}__in": existing_pks}
-                ).aupdate(**{self.soft_delete_field: True})
-                success_details = [pk for pk in pks if pk in existing_pks]
-
-            return Status(200, self._bulk_result(success_details, error_details))
-
-        return bulk_delete
+    def _soft_bulk_response(self, pks: list, existing: set) -> Status:
+        errors = [NotFoundError(self.model).error for pk in pks if pk not in existing]
+        return Status(200, self._bulk_result([pk for pk in pks if pk in existing], errors))
 
     def views(self):
         """Register restore and hard-delete endpoints."""
@@ -770,44 +836,83 @@ class SoftDeleteViewSetMixin(APIViewSet[ModelT]):
         self._register_restore_view()
         self._register_hard_delete_view()
 
+    def restore(self, request: HttpRequest, pk: Schema) -> Status:
+        """Un-delete a soft-deleted record synchronously."""
+        self.on_before_operation(request, "restore")
+        obj = self._get_serializer().get(self._get_pk(pk), request=request)
+        setattr(obj, self.soft_delete_field, False)
+        obj.save(update_fields=[self.soft_delete_field])
+        return Status(200, self._dump(obj, self.schema_out))
+
+    async def arestore(self, request: HttpRequest, pk: Schema) -> Status:
+        """Un-delete a soft-deleted record asynchronously."""
+        await self.aon_before_operation(request, "restore")
+        obj = await self._get_serializer().aget(self._get_pk(pk), request=request)
+        setattr(obj, self.soft_delete_field, False)
+        await obj.asave(update_fields=[self.soft_delete_field])
+        return Status(200, await self._adump(obj, self.schema_out))
+
     def _register_restore_view(self) -> None:
         """POST /{pk}/restore — un-delete a soft-deleted record."""
+        if self.execution_mode == "sync":
 
-        @self.router.post(
-            f"{self.path_retrieve}/restore",
-            auth=self.patch_view_auth(),
-            summary=f"Restore {self.model_verbose_name}",
-            description=f"Restore a soft-deleted {self.model_verbose_name}.",
-            response={200: self.schema_out, self.error_codes: self.error_schema},
-        )
-        @decorate_view(aatomic, unique_view(self))
-        async def restore(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
-            await self.on_before_operation(request, "restore")
-            _pk = self._get_pk(pk)
-            obj = await self.model_util.aget_object(request, _pk)
-            setattr(obj, self.soft_delete_field, False)
-            await obj.asave(update_fields=[self.soft_delete_field])
-            return Status(
-                200,
-                await self.model_util.read_s(self.schema_out, request, obj),
+            def restore(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
+                return self.restore(request, pk)
+
+        else:
+
+            async def restore(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
+                return await self.arestore(request, pk)
+
+        self._register_generated(
+            GeneratedRoute(
+                method="post",
+                path=f"{self.path_retrieve}/restore",
+                auth=self.patch_view_auth(),
+                summary=f"Restore {self.model_verbose_name}",
+                description=f"Restore a soft-deleted {self.model_verbose_name}.",
+                response={200: self.schema_out, self.error_codes: self.error_schema},
+                handler=restore,
+                atomic=True,
             )
+        )
+
+    def hard_delete(self, request: HttpRequest, pk: Schema) -> Status:
+        """Permanently delete a record synchronously."""
+        self.on_before_operation(request, "hard_delete")
+        self._get_serializer().destroy(self._get_pk(pk), request=request)
+        return Status(204, None)
+
+    async def ahard_delete(self, request: HttpRequest, pk: Schema) -> Status:
+        """Permanently delete a record asynchronously."""
+        await self.aon_before_operation(request, "hard_delete")
+        await self._get_serializer().adestroy(self._get_pk(pk), request=request)
+        return Status(204, None)
 
     def _register_hard_delete_view(self) -> None:
         """DELETE /{pk}/hard-delete — permanently remove a record."""
+        if self.execution_mode == "sync":
 
-        @self.router.delete(
-            f"{self.path_retrieve}/hard-delete",
-            auth=self.delete_view_auth(),
-            summary=f"Hard Delete {self.model_verbose_name}",
-            description=f"Permanently delete a {self.model_verbose_name}.",
-            response={204: None, self.error_codes: self.error_schema},
+            def hard_delete(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
+                return self.hard_delete(request, pk)
+
+        else:
+
+            async def hard_delete(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
+                return await self.ahard_delete(request, pk)
+
+        self._register_generated(
+            GeneratedRoute(
+                method="delete",
+                path=f"{self.path_retrieve}/hard-delete",
+                auth=self.delete_view_auth(),
+                summary=f"Hard Delete {self.model_verbose_name}",
+                description=f"Permanently delete a {self.model_verbose_name}.",
+                response={204: None, self.error_codes: self.error_schema},
+                handler=hard_delete,
+                atomic=True,
+            )
         )
-        @decorate_view(aatomic, unique_view(self))
-        async def hard_delete(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
-            await self.on_before_operation(request, "hard_delete")
-            _pk = self._get_pk(pk)
-            await self.model_util.delete_s(request, _pk)
-            return Status(204, None)
 
 
 class FieldSelectionViewSetMixin(APIViewSet[ModelT]):
@@ -854,107 +959,60 @@ class FieldSelectionViewSetMixin(APIViewSet[ModelT]):
         valid = requested & available
         return valid or None
 
-    def list_view(self) -> Callable:
-        """Register list endpoint with optional field selection."""
-        _paginator = self.pagination_class()
-        _input_class = self.pagination_class.Input
-        _default_pagination = _input_class()
-        _paginated_schema = create_model(
-            f"Paginated{self.schema_out.__name__}",
-            __base__=Schema,
-            items=(List[self.schema_out], ...),
-            count=(int, ...),
+    def _select_fields(self, result: Status, raw: str | None, schema: type):
+        requested = self._parse_requested_fields(raw, schema)
+        if requested is None:
+            return result
+        return JsonResponse({k: v for k, v in result.value.items() if k in requested})
+
+    def _select_list_fields(self, result: Status, filters: Schema | None):
+        requested = self._parse_requested_fields(
+            getattr(filters, self._fields_param, None), self.schema_out
         )
-        _fields_param = self._fields_param
-        _schema_out = self.schema_out
+        if requested is None:
+            return result
+        items = [
+            {k: v for k, v in item.items() if k in requested}
+            for item in result.value["items"]
+        ]
+        return JsonResponse({"items": items, "count": result.value["count"]})
 
-        @self.router.get(
-            self.get_path,
-            auth=self.get_view_auth(),
-            summary=f"List {self.model_verbose_name_plural}",
-            description=self.list_docs,
-            response={200: _paginated_schema, self.error_codes: self.error_schema},
+    def list(self, request: HttpRequest, filters, ninja_pagination):
+        """List with optional field selection."""
+        return self._select_list_fields(
+            super().list(request, filters, ninja_pagination), filters
         )
-        @decorate_view(unique_view(self, plural=True), *self.extra_decorators.list)
-        async def list(
-            request: HttpRequest,
-            filters: Query[self.filters_schema] = None,  # type: ignore
-            ninja_pagination: _input_class = Query(_default_pagination),  # type: ignore
-        ):
-            if not isinstance(ninja_pagination, _input_class):
-                ninja_pagination = _default_pagination
 
-            requested_fields = self._parse_requested_fields(
-                getattr(filters, _fields_param, None), _schema_out
-            )
-
-            await self.on_before_operation(request, "list")
-
-            qs = await self.model_util.aget_objects(
-                request, query_data=self._get_query_data(), is_for="read",
-            )
-            qs = self.on_list_queryset(request, qs)
-            qs = await self._apply_list_filters(qs, filters)
-
-            count = await qs.acount()
-            offset, page_size = self._get_page_params(_paginator, ninja_pagination)
-            sliced_qs = qs[offset : offset + page_size]
-
-            items = await self.model_util.list_read_s(
-                _schema_out, request, sliced_qs, is_for="read"
-            )
-
-            if requested_fields is not None:
-                items = [
-                    {k: v for k, v in item.items() if k in requested_fields}
-                    for item in items
-                ]
-                return JsonResponse({"items": items, "count": count})
-
-            return Status(200, {"items": items, "count": count})
-
-        return list
+    async def alist(self, request: HttpRequest, filters, ninja_pagination):
+        """List with optional field selection."""
+        return self._select_list_fields(
+            await super().alist(request, filters, ninja_pagination), filters
+        )
 
     def retrieve_view(self) -> Callable:
-        """Register retrieve endpoint with optional field selection."""
-        retrieve_schema = self._get_retrieve_schema()
-        _fields_param = self._fields_param
+        """Register the synchronous retrieve endpoint with optional field selection."""
 
-        @self.router.get(
-            self.get_path_retrieve,
-            auth=self.get_view_auth(),
-            summary=f"Retrieve {self.model_verbose_name}",
-            description=self.retrieve_docs,
-            response={200: retrieve_schema, self.error_codes: self.error_schema},
-        )
-        @decorate_view(unique_view(self), *self.extra_decorators.retrieve)
+        def retrieve(
+            request: HttpRequest,
+            pk: Path[self.path_schema],  # type: ignore
+            fields: Query[str] = None,  # type: ignore
+        ):
+            return self._select_fields(
+                self.retrieve(request, pk), fields, self._get_retrieve_schema()
+            )
+
+        return self._register_retrieve(retrieve)
+
+    def aretrieve_view(self) -> Callable:
+        """Register the asynchronous retrieve endpoint with optional field selection."""
+
         async def retrieve(
             request: HttpRequest,
             pk: Path[self.path_schema],  # type: ignore
             fields: Query[str] = None,  # type: ignore
         ):
-            _pk = self._get_pk(pk)
-            _is_for = "detail" if self.schema_detail else "read"
-            obj = await self._run_object_hooks(request, "retrieve", _pk, is_for=_is_for)
+            return self._select_fields(
+                await self.aretrieve(request, pk), fields, self._get_retrieve_schema()
+            )
 
-            requested_fields = self._parse_requested_fields(fields, retrieve_schema)
-
-            if obj is not None:
-                data = await self.model_util.read_s(retrieve_schema, request, obj)
-            else:
-                query_data = self._get_query_data()
-                data = await self.model_util.read_s(
-                    retrieve_schema,
-                    request,
-                    query_data=QuerySchema(
-                        getters={"pk": _pk}, **query_data.model_dump()
-                    ),
-                    is_for=_is_for,
-                )
-
-            if requested_fields is not None:
-                return JsonResponse({k: v for k, v in data.items() if k in requested_fields})
-
-            return Status(200, data)
-
-        return retrieve
+        return self._register_retrieve(retrieve)

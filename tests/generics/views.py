@@ -191,7 +191,7 @@ class Tests:
             return new_data
 
         async def _create_view(self):
-            view = self.viewset.create_view()
+            view = self.viewset.acreate_view()
             result = await view(self.post_request, self.create_data)
             self.assertEqual(result.status_code, 201)
             content = result.value
@@ -223,7 +223,7 @@ class Tests:
             await self._create_view()
 
         async def test_list(self):
-            view = self.viewset.list_view()
+            view = self.viewset.alist_view()
             result = await view(self.get_request, **self.list_kwargs)
             self.assertEqual(result.status_code, 200)
             content = result.value
@@ -237,7 +237,7 @@ class Tests:
             self.assertEqual(await self._parse_output_data(self.response_data), item)
 
         async def test_retrieve(self):
-            view = self.viewset.retrieve_view()
+            view = self.viewset.aretrieve_view()
             result = await view(self.get_request, self._path_schema(1))
             self.assertEqual(result.status_code, 200)
             content = result.value
@@ -247,7 +247,7 @@ class Tests:
         async def test_retrieve_object_not_found(self):
             with self.assertRaises(NotFoundError) as exc:
                 await self.model.objects.select_related().all().adelete()
-                view = self.viewset.retrieve_view()
+                view = self.viewset.aretrieve_view()
                 await view(self.get_request, self._path_schema(1))
             self.assertEqual(exc.exception.status_code, 404)
             self.assertEqual(
@@ -256,7 +256,7 @@ class Tests:
             )
 
         async def test_update(self):
-            view = self.viewset.update_view()
+            view = self.viewset.aupdate_view()
             result = await view(
                 self.patch_request, self.update_data, self._path_schema(1)
             )
@@ -269,7 +269,7 @@ class Tests:
             )
 
         async def test_delete(self):
-            view = self.viewset.delete_view()
+            view = self.viewset.adelete_view()
             pk = self.obj_content[self.pk_att]
             result = await view(self.delete_request, self._path_schema(pk))
             self.assertEqual(result.status_code, 204)
@@ -313,7 +313,7 @@ class Tests:
         @classmethod
         async def _create_relation(cls, data: dict) -> int:
             cls.relation_viewset.api = cls.api
-            view = cls.relation_viewset.create_view()
+            view = cls.relation_viewset.acreate_view()
             result = await view(
                 cls.post_request, cls.relation_viewset.schema_in(**data)
             )
@@ -344,7 +344,7 @@ class Tests:
 
         async def _create_view(self):
             create_content = await super()._create_view()
-            rel_view = self.relation_viewset.create_view()
+            rel_view = self.relation_viewset.acreate_view()
             await rel_view(
                 self.post_request,
                 self.relation_viewset.schema_in(

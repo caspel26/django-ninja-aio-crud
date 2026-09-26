@@ -8,8 +8,8 @@ that operation (see ``APIViewSet._add_views``/``_set_additional_views``/
 directly — django-ninja's own ``Operation.view_func`` (see
 ``ninja_aio.mcp.introspect.describe_api_view``). Either way, calling the
 handler directly reuses pagination, filtering, and the
-``on_before_operation``/``on_before_object_operation``/
-``query_params_handler``/``on_list_queryset`` hooks exactly as the HTTP path
+``aon_before_operation``/``aon_before_object_operation``/
+``aquery_params_handler``/``on_list_queryset`` hooks exactly as the HTTP path
 does — only django-ninja's router-level ``auth=`` wiring is not applied (see
 ``ninja_aio.mcp.context``).
 

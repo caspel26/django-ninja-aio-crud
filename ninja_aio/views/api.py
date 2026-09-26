@@ -2,18 +2,20 @@ import functools
 import inspect
 import logging
 from collections.abc import Callable
-from typing import Generic, List, TypeVar
+from dataclasses import dataclass, replace
+from typing import Generic, List, Literal, NamedTuple, TypeVar
 
 from ninja import NinjaAPI, Router, Schema, Path, Query, Status
 from ninja.constants import NOT_SET
 from ninja.pagination import AsyncPaginationBase, PageNumberPagination
 from django.http import HttpRequest
-from django.db.models import Model, QuerySet
+from django.db import transaction
+from django.db.models import Model, QuerySet, prefetch_related_objects
 from django.conf import settings
-from django.core.exceptions import FieldDoesNotExist
+from django.core.exceptions import FieldDoesNotExist, ImproperlyConfigured
 from pydantic import create_model
 
-from ninja_aio.schemas.helpers import ModelQuerySetSchema, QuerySchema, DecoratorsSchema
+from ninja_aio.schemas.helpers import DecoratorsSchema
 
 from ninja_aio.models import ModelSerializer, ModelUtil
 from ninja_aio.schemas import (
@@ -21,8 +23,11 @@ from ninja_aio.schemas import (
     M2MRelationSchema,
     BulkResultSchema,
 )
+from ninja_aio.exceptions import SerializeError
 from ninja_aio.helpers.api import ManyToManyAPI
 from ninja_aio.types import (
+    BulkFailure,
+    BulkResult,
     ModelSerializerMeta,
     VIEW_TYPES,
     BULK_TYPES,
@@ -33,6 +38,8 @@ from ninja_aio.decorators import unique_view, decorate_view, aatomic
 from ninja_aio.decorators.actions import ActionConfig
 from ninja_aio.factory import ApiMethodFactory
 from ninja_aio.models import serializers
+from ninja_aio.models import transformations as model_transformations
+from ninja_aio.models.utils import bulk_failure
 
 logger = logging.getLogger("ninja_aio.views")
 
@@ -40,6 +47,30 @@ ERROR_CODES = frozenset({400, 401, 403, 404})
 
 # TypeVar for generic model typing in ViewSets
 ModelT = TypeVar("ModelT", bound=Model)
+
+
+@dataclass(frozen=True)
+class GeneratedRoute:
+    method: str
+    path: str
+    auth: object
+    summary: str
+    description: str
+    response: dict
+    handler: Callable
+    decorators: tuple = ()
+    atomic: bool = False
+    plural: bool = False
+
+
+class ViewSchemas(NamedTuple):
+    schema_out: type[Schema] | None
+    schema_detail: type[Schema] | None
+    schema_in: type[Schema] | None
+    schema_update: type[Schema] | None
+    schema_create_out: type[Schema] | None
+    schema_update_out: type[Schema] | None
+    schema_delete_out: type[Schema] | None
 
 
 class API:
@@ -171,7 +202,7 @@ class APIViewSet(API, Generic[ModelT]):
         class BookAPI(APIViewSet[Book]):  # Explicitly typed
             async def my_method(self, request):
                 # self.model_util is typed as ModelUtil[Book]
-                book: Book = await self.model_util.get_object(request, pk=1)
+                book: Book = await self._get_serializer().aget(1, request=request)
                 # IDE knows book.title, book.author, etc.
 
     If you use serializer methods instead, type the Serializer:
@@ -263,7 +294,7 @@ class APIViewSet(API, Generic[ModelT]):
 
     Overridable hooks:
         views(): Register extra custom endpoints on self.router.
-        query_params_handler(queryset, filters): Sync/Async hook to apply list filters.
+        aquery_params_handler(queryset, filters): Sync/Async hook to apply list filters.
         <related_name>_query_params_handler(queryset, filters): Async hook for per-M2M filtering.
 
     Error responses:
@@ -310,6 +341,7 @@ class APIViewSet(API, Generic[ModelT]):
     ordering_fields: list[str] = []
     default_ordering: str | list[str] = []
     require_update_fields: bool = False
+    execution_mode: Literal["async", "sync"] = "async"
 
     def __init__(
         self,
@@ -318,6 +350,8 @@ class APIViewSet(API, Generic[ModelT]):
         prefix: str = None,
         tags: list[str] = None,
     ) -> None:
+        if self.execution_mode not in ("async", "sync"):
+            raise ValueError("execution_mode must be 'async' or 'sync'")
         self.api = api or self.api
         self.error_codes = ERROR_CODES
         self.model: type[ModelT] = model or self.model
@@ -376,6 +410,7 @@ class APIViewSet(API, Generic[ModelT]):
             if not self.m2m_relations
             else ManyToManyAPI(relations=self.m2m_relations, view_set=self)
         )
+        self._validate_mode_hooks()
         logger.debug(
             f"APIViewSet initialized for {self.model.__name__} at /{self.api_route_path}"
         )
@@ -385,12 +420,14 @@ class APIViewSet(API, Generic[ModelT]):
         """
         Mapping of CRUD operation name to (response schema, view factory).
         """
+        create_factory = self.create_view if self.execution_mode == "sync" else self.acreate_view
+        list_factory = self.list_view if self.execution_mode == "sync" else self.alist_view
         return {
-            "create": (self.schema_in, self.create_view),
-            "list": (self.schema_out, self.list_view),
-            "retrieve": (self.schema_out, self.retrieve_view),
-            "update": (self.schema_update, self.update_view),
-            "delete": (None, self.delete_view),
+            "create": (self.schema_in, create_factory),
+            "list": (self.schema_out, list_factory),
+            "retrieve": (self.schema_out, self.retrieve_view if self.execution_mode == "sync" else self.aretrieve_view),
+            "update": (self.schema_update, self.update_view if self.execution_mode == "sync" else self.aupdate_view),
+            "delete": (None, self.delete_view if self.execution_mode == "sync" else self.adelete_view),
         }
 
     @property
@@ -400,11 +437,14 @@ class APIViewSet(API, Generic[ModelT]):
         Only operations listed in bulk_operations are included.
         """
         mapping = {
-            "create": (self.schema_in, self.bulk_create_view),
-            "update": (self.bulk_update_schema, self.bulk_update_view),
-            "delete": (None, self.bulk_delete_view),
+            "create": (self.schema_in, self._by_mode(self.bulk_create_view, self.abulk_create_view)),
+            "update": (self.bulk_update_schema, self._by_mode(self.bulk_update_view, self.abulk_update_view)),
+            "delete": (None, self._by_mode(self.bulk_delete_view, self.abulk_delete_view)),
         }
         return {k: v for k, v in mapping.items() if k in self.bulk_operations}
+
+    def _by_mode(self, sync_factory: Callable, async_factory: Callable) -> Callable:
+        return sync_factory if self.execution_mode == "sync" else async_factory
 
     def _check_relations_filters(self, filter: str) -> bool:
         return filter in getattr(self, "relations_filters_fields", [])
@@ -562,7 +602,15 @@ class APIViewSet(API, Generic[ModelT]):
             fields["ordering"] = (str, None)
         return self._generate_schema(fields, "FiltersSchema")
 
-    async def _apply_list_filters(
+    def _apply_list_filters(self, qs: QuerySet, filters: Schema | None) -> QuerySet:
+        if filters is None and not self.ordering_fields:
+            return qs
+        filters_dict, ordering_value = self._list_filter_data(filters)
+        if filters_dict:
+            qs = self.query_params_handler(qs, filters_dict)
+        return self._apply_ordering(qs, ordering_value)
+
+    async def _aapply_list_filters(
         self,
         qs: QuerySet,
         filters: Schema | None,
@@ -572,17 +620,17 @@ class APIViewSet(API, Generic[ModelT]):
 
         Returns the filtered and ordered queryset.
         """
-        if filters is not None:
-            filters_dict = filters.model_dump()
-            ordering_value = (
-                filters_dict.pop("ordering", None) if self.ordering_fields else None
-            )
-            if filters_dict:
-                qs = await self.query_params_handler(qs, filters_dict)
-            qs = self._apply_ordering(qs, ordering_value)
-        elif self.ordering_fields:
-            qs = self._apply_ordering(qs, None)
-        return qs
+        if filters is None and not self.ordering_fields:
+            return qs
+        filters_dict, ordering_value = self._list_filter_data(filters)
+        if filters_dict:
+            qs = await self.aquery_params_handler(qs, filters_dict)
+        return self._apply_ordering(qs, ordering_value)
+
+    def _list_filter_data(self, filters: Schema | None) -> tuple[dict, str | None]:
+        values = filters.model_dump() if filters is not None else {}
+        ordering = values.pop("ordering", None) if self.ordering_fields else None
+        return values, ordering
 
     @staticmethod
     def _get_page_params(
@@ -637,75 +685,38 @@ class APIViewSet(API, Generic[ModelT]):
         """
         return getattr(data, self.model_util.model_pk_name)
 
-    def _get_query_data(self) -> ModelQuerySetSchema:
+    def get_schemas(self) -> ViewSchemas:
         """
-        Return default query data for list/retrieve views.
+        Resolve the view schemas: explicit attributes win, missing ones are
+        generated by the ModelSerializer or serializer_class when available.
+
+        schema_create_out / schema_update_out fall back to schema_out;
+        schema_delete_out stays None (204 No Content) unless set.
         """
-        return (
-            ModelQuerySetSchema()
-            if not isinstance(self.model, ModelSerializerMeta)
-            else self.model.query_util.read_config
+        schema_out = self._resolve_schema(self.schema_out, "read")
+        return ViewSchemas(
+            schema_out=schema_out,
+            schema_detail=self._resolve_schema(self.schema_detail, "detail"),
+            schema_in=self._resolve_schema(self.schema_in, "create"),
+            schema_update=self._resolve_schema(self.schema_update, "update"),
+            schema_create_out=self.schema_create_out or schema_out,
+            schema_update_out=self.schema_update_out or schema_out,
+            schema_delete_out=self.schema_delete_out,
         )
 
-    def get_schemas(
-        self,
-    ) -> tuple[
-        Schema | None,
-        Schema | None,
-        Schema | None,
-        Schema | None,
-        Schema | None,
-        Schema | None,
-        Schema | None,
-    ]:
-        """
-        Compute and return (schema_out, schema_detail, schema_in, schema_update,
-        schema_create_out, schema_update_out, schema_delete_out).
-
-        - If model is a ModelSerializer (ModelSerializerMeta), auto-generate read/detail/create/update schemas.
-        - Otherwise, use existing schemas or generate from serializer_class if provided.
-        - schema_create_out / schema_update_out fall back to schema_out when not set.
-        - schema_delete_out defaults to None (204 No Content) when not set.
-        """
-        # ModelSerializer case: prefer explicitly set schemas, otherwise generate from the model
-        if isinstance(self.model, ModelSerializerMeta):
-            schema_out = self.schema_out or self.model.generate_read_s()
-            return (
-                schema_out,
-                self.schema_detail or self.model.generate_detail_s(),
-                self.schema_in or self.model.generate_create_s(),
-                self.schema_update or self.model.generate_update_s(),
-                self.schema_create_out or schema_out,
-                self.schema_update_out or schema_out,
-                self.schema_delete_out,
-            )
-
-        # Non-ModelSerializer: start from provided schemas
-        schema_out, schema_detail, schema_in, schema_update = (
-            self.schema_out,
-            self.schema_detail,
-            self.schema_in,
-            self.schema_update,
+    def _resolve_schema(
+        self, explicit: type[Schema] | None, kind: str
+    ) -> type[Schema] | None:
+        if explicit is not None:
+            return explicit
+        source = (
+            self.model
+            if isinstance(self.model, ModelSerializerMeta)
+            else self.serializer_class
         )
+        return None if source is None else source.get_schema(kind)
 
-        # If a serializer_class is available, generate from it
-        if self.serializer_class:
-            schema_in = schema_in or self.serializer_class.generate_create_s()
-            schema_out = schema_out or self.serializer_class.generate_read_s()
-            schema_detail = schema_detail or self.serializer_class.generate_detail_s()
-            schema_update = schema_update or self.serializer_class.generate_update_s()
-
-        return (
-            schema_out,
-            schema_detail,
-            schema_in,
-            schema_update,
-            self.schema_create_out or schema_out,
-            self.schema_update_out or schema_out,
-            self.schema_delete_out,
-        )
-
-    async def query_params_handler(
+    async def aquery_params_handler(
         self, queryset: QuerySet[ModelSerializer], filters: dict
     ) -> QuerySet:
         """
@@ -715,20 +726,89 @@ class APIViewSet(API, Generic[ModelT]):
         """
         return queryset
 
-    async def on_before_operation(self, request: HttpRequest, operation: str) -> None:
+    def query_params_handler(
+        self, queryset: QuerySet[ModelSerializer], filters: dict
+    ) -> QuerySet:
+        """Synchronous counterpart of aquery_params_handler, used by sync endpoints."""
+        return queryset
+
+    async def aon_before_operation(self, request: HttpRequest, operation: str) -> None:
         """Hook called before every CRUD/bulk/@action view. Override for view-level checks."""
 
-    async def on_before_object_operation(self, request: HttpRequest, operation: str, obj: ModelT) -> None:
+    def on_before_operation(self, request: HttpRequest, operation: str) -> None:
+        """Synchronous counterpart of aon_before_operation, used by sync endpoints."""
+
+    async def aon_before_object_operation(self, request: HttpRequest, operation: str, obj: ModelT) -> None:
         """Hook called after fetch, before mutation (retrieve/update/delete). Override for object-level checks."""
+
+    def on_before_object_operation(
+        self, request: HttpRequest, operation: str, obj: ModelT
+    ) -> None:
+        """Synchronous counterpart of aon_before_object_operation, used by sync endpoints."""
 
     def on_list_queryset(self, request: HttpRequest, queryset: QuerySet) -> QuerySet:
         """Hook to filter the list queryset before pagination. Override for row-level filtering."""
         return queryset
 
     _has_object_hooks: bool = False
-    """Set to True by mixins that override on_before_object_operation."""
+    """Set to True by mixins that override aon_before_object_operation."""
 
-    async def _run_object_hooks(
+    _mode_hooks: tuple[tuple[str, str], ...] = (
+        ("aon_before_operation", "on_before_operation"),
+        ("aon_before_object_operation", "on_before_object_operation"),
+        ("aquery_params_handler", "query_params_handler"),
+        ("_aapply_list_filters", "_apply_list_filters"),
+    )
+    """(async, sync) hook pairs that must be overridden together for the modes in use."""
+
+    def _iter_actions(self):
+        for name in dir(self.__class__):
+            method = getattr(self.__class__, name, None)
+            config = getattr(method, "_action_config", None)
+            if config is not None:
+                yield name, method, config
+
+    def _modes_in_use(self) -> set[str]:
+        modes = {self.execution_mode}
+        for _, method, _ in self._iter_actions():
+            modes.add("async" if inspect.iscoroutinefunction(method) else "sync")
+        return modes
+
+    def _hook_owner(self, name: str) -> type:
+        return next(klass for klass in type(self).__mro__ if name in klass.__dict__)
+
+    def _validate_mode_hooks(self) -> None:
+        """Fail at startup when an overridden hook would be skipped by an endpoint mode."""
+        self._validate_hook_naming()
+        for mode in sorted(self._modes_in_use()):
+            self._validate_hook_owners(mode)
+
+    def _validate_hook_naming(self) -> None:
+        for async_name, sync_name in self._mode_hooks:
+            if inspect.iscoroutinefunction(getattr(self, sync_name)):
+                raise ImproperlyConfigured(
+                    f"{type(self).__name__}.{sync_name} is async; rename it to "
+                    f"{async_name} (sync hooks use the plain name)."
+                )
+            if not inspect.iscoroutinefunction(getattr(self, async_name)):
+                raise ImproperlyConfigured(f"{type(self).__name__}.{async_name} must be async.")
+
+    def _validate_hook_owners(self, mode: str) -> None:
+        for async_name, sync_name in self._mode_hooks:
+            active, inactive = (
+                (sync_name, async_name) if mode == "sync" else (async_name, sync_name)
+            )
+            active_owner = self._hook_owner(active)
+            inactive_owner = self._hook_owner(inactive)
+            if inactive_owner is not active_owner and issubclass(
+                inactive_owner, active_owner
+            ):
+                raise ImproperlyConfigured(
+                    f"{type(self).__name__} overrides {inactive}() but not "
+                    f"{active}(), which its {mode} endpoints call."
+                )
+
+    async def _arun_object_hooks(
         self,
         request: HttpRequest,
         operation: str,
@@ -738,101 +818,185 @@ class APIViewSet(API, Generic[ModelT]):
         """
         Run view-level and object-level hooks, returning the fetched object.
 
-        Combines on_before_operation, get_object, and on_before_object_operation
+        Combines aon_before_operation, get_object, and aon_before_object_operation
         into a single call used by retrieve, update, and delete views.
         Skips the object fetch when no object-level hooks are registered
         (avoids a redundant query when update_s/delete_s will fetch again).
         """
-        await self.on_before_operation(request, operation)
+        await self.aon_before_operation(request, operation)
         if not self._has_object_hooks:
             return None
-        obj = await self.model_util.aget_object(request, pk, is_for=is_for)
-        await self.on_before_object_operation(request, operation, obj)
+        obj = await self._get_serializer().aget(pk, request=request, optimize_for=is_for)
+        await self.aon_before_object_operation(request, operation, obj)
         return obj
 
-    def create_view(self) -> Callable:
-        """
-        Register create endpoint.
-        """
+    def _run_object_hooks(
+        self, request: HttpRequest, operation: str, pk: int | str,
+        is_for: str | None = None,
+    ) -> ModelT | None:
+        self.on_before_operation(request, operation)
+        if not self._has_object_hooks:
+            return None
+        obj = self._get_serializer().get(pk, request=request, optimize_for=is_for)
+        self.on_before_object_operation(request, operation, obj)
+        return obj
 
-        @self.router.post(
-            self.path,
-            auth=self.post_view_auth(),
-            summary=f"Create {self.model_verbose_name}",
-            description=self.create_docs,
-            response={201: self.schema_create_out, self.error_codes: self.error_schema},
-        )
-        @decorate_view(aatomic, unique_view(self), *self.extra_decorators.create)
-        async def create(request: HttpRequest, data: self.schema_in):  # type: ignore
-            await self.on_before_operation(request, "create")
-            return Status(
-                201, await self.model_util.create_s(request, data, self.schema_create_out)
+    def _get_serializer(self):
+        """Return the CRUD facade: the serializer, or model_util for schema-only viewsets."""
+        if isinstance(self.model, ModelSerializerMeta):
+            return self.model
+        return self.serializer_class or self.model_util
+
+    def _relation_plan(self, schema: type[Schema]) -> model_transformations.RelationPlan:
+        return model_transformations.schema_relation_plan(self.model_util.model, schema)
+
+    def _dump(self, obj: ModelT, schema: type[Schema]) -> dict:
+        plan = self._relation_plan(schema)
+        relations = (*plan.select_related, *plan.prefetch_related)
+        if relations:
+            prefetch_related_objects([obj], *relations)
+        return self._get_serializer().model_dump(obj, schema=schema)
+
+    async def _adump(self, obj: ModelT, schema: type[Schema]) -> dict:
+        return await self._get_serializer().amodel_dump(obj, schema=schema)
+
+    def _register_generated(self, route: GeneratedRoute) -> Callable:
+        transaction_decorator = None
+        if route.atomic:
+            transaction_decorator = (
+                transaction.atomic if self.execution_mode == "sync" else aatomic
             )
+        decorated = decorate_view(
+            transaction_decorator, unique_view(self, plural=route.plural), *route.decorators
+        )(route.handler)
+        return getattr(self.router, route.method)(
+            route.path,
+            auth=route.auth,
+            summary=route.summary,
+            description=route.description,
+            response=route.response,
+        )(decorated)
 
-        return create
+    def create(self, request: HttpRequest, data: Schema) -> Status:
+        """Execute a synchronous create. Override to customize the operation."""
+        self.on_before_operation(request, "create")
+        obj = self._get_serializer().create(data, request=request)
+        return Status(201, self._dump(obj, self.schema_create_out))
 
-    def list_view(self) -> Callable:
-        """
-        Register list endpoint with pagination and optional filters.
+    async def acreate(self, request: HttpRequest, data: Schema) -> Status:
+        """Execute an asynchronous create. Override to customize the operation."""
+        await self.aon_before_operation(request, "create")
+        obj = await self._get_serializer().acreate(data, request=request)
+        return Status(201, await self._adump(obj, self.schema_create_out))
 
-        Pagination is applied before serialization: only page_size objects are
-        fetched and serialized instead of the entire queryset.
-        """
-        _paginator = self.pagination_class()
-        _input_class = self.pagination_class.Input
-        _default_pagination = _input_class()
-        _paginated_schema = create_model(
+    def _register_create(self, handler: Callable) -> Callable:
+        return self._register_generated(
+            GeneratedRoute(
+                method="post",
+                path=self.path,
+                auth=self.post_view_auth(),
+                summary=f"Create {self.model_verbose_name}",
+                description=self.create_docs,
+                response={201: self.schema_create_out, self.error_codes: self.error_schema},
+                handler=handler,
+                decorators=tuple(self.extra_decorators.create),
+                atomic=True,
+            )
+        )
+
+    def create_view(self) -> Callable:
+        """Register the synchronous create endpoint."""
+        def create(request: HttpRequest, data: self.schema_in):  # type: ignore
+            return self.create(request, data)
+
+        return self._register_create(create)
+
+    def acreate_view(self) -> Callable:
+        """Register the asynchronous create endpoint."""
+        async def create(request: HttpRequest, data: self.schema_in):  # type: ignore
+            return await self.acreate(request, data)
+
+        return self._register_create(create)
+
+    def list(
+        self, request: HttpRequest, filters: Schema | None, ninja_pagination: Schema,
+    ) -> Status:
+        """Execute a synchronous paginated list. Override to customize the operation."""
+        paginator, ninja_pagination = self._prepare_list_pagination(ninja_pagination)
+        self.on_before_operation(request, "list")
+        qs = self._get_serializer().get_queryset(request=request, optimize_for="read")
+        qs = self.on_list_queryset(request, qs)
+        qs = self._apply_list_filters(qs, filters)
+        count = qs.count()
+        offset, page_size = self._get_page_params(paginator, ninja_pagination)
+        sliced_qs = model_transformations.apply_relation_plan(
+            qs[offset : offset + page_size], self._relation_plan(self.schema_out)
+        )
+        items = self._get_serializer().model_dumps(list(sliced_qs), schema=self.schema_out)
+        return Status(200, {"items": items, "count": count})
+
+    async def alist(
+        self, request: HttpRequest, filters: Schema | None, ninja_pagination: Schema,
+    ) -> Status:
+        """Execute an asynchronous paginated list. Override to customize the operation."""
+        paginator, ninja_pagination = self._prepare_list_pagination(ninja_pagination)
+        await self.aon_before_operation(request, "list")
+        qs = await self._get_serializer().aget_queryset(request=request, optimize_for="read")
+        qs = self.on_list_queryset(request, qs)
+        qs = await self._aapply_list_filters(qs, filters)
+        count = await qs.acount()
+        offset, page_size = self._get_page_params(paginator, ninja_pagination)
+        sliced_qs = qs[offset : offset + page_size]
+        items = await self._get_serializer().amodel_dumps(sliced_qs, schema=self.schema_out)
+        return Status(200, {"items": items, "count": count})
+
+    def _prepare_list_pagination(self, pagination_input: Schema) -> tuple[AsyncPaginationBase, Schema]:
+        paginator = self.pagination_class()
+        if not isinstance(pagination_input, self.pagination_class.Input):
+            pagination_input = self.pagination_class.Input()
+        return paginator, pagination_input
+
+    def _register_list(self, handler: Callable) -> Callable:
+        paginated_schema = create_model(
             f"Paginated{self.schema_out.__name__}",
             __base__=Schema,
             items=(List[self.schema_out], ...),
             count=(int, ...),
         )
+        return self._register_generated(
+            GeneratedRoute(
+                method="get", path=self.get_path, auth=self.get_view_auth(),
+                summary=f"List {self.model_verbose_name_plural}", description=self.list_docs,
+                response={200: paginated_schema, self.error_codes: self.error_schema},
+                handler=handler, decorators=tuple(self.extra_decorators.list), plural=True,
+            )
+        )
 
-        @self.router.get(
-            self.get_path,
-            auth=self.get_view_auth(),
-            summary=f"List {self.model_verbose_name_plural}",
-            description=self.list_docs,
-            response={
-                200: _paginated_schema,
-                self.error_codes: self.error_schema,
-            },
-        )
-        @decorate_view(
-            unique_view(self, plural=True),
-            *self.extra_decorators.list,
-        )
+    def list_view(self) -> Callable:
+        """Register the synchronous list endpoint."""
+        input_class = self.pagination_class.Input
+
+        def list(
+            request: HttpRequest,
+            filters: Query[self.filters_schema] = None,  # type: ignore
+            ninja_pagination: input_class = Query(input_class()),  # type: ignore
+        ):
+            return self.list(request, filters, ninja_pagination)
+
+        return self._register_list(list)
+
+    def alist_view(self) -> Callable:
+        """Register the asynchronous list endpoint."""
+        input_class = self.pagination_class.Input
+
         async def list(
             request: HttpRequest,
             filters: Query[self.filters_schema] = None,  # type: ignore
-            ninja_pagination: _input_class = Query(_default_pagination),  # type: ignore
+            ninja_pagination: input_class = Query(input_class()),  # type: ignore
         ):
-            if not isinstance(ninja_pagination, _input_class):
-                ninja_pagination = _default_pagination
+            return await self.alist(request, filters, ninja_pagination)
 
-            await self.on_before_operation(request, "list")
-
-            qs = await self.model_util.aget_objects(
-                request,
-                query_data=self._get_query_data(),
-                is_for="read",
-            )
-            qs = self.on_list_queryset(request, qs)
-            qs = await self._apply_list_filters(qs, filters)
-
-            count = await qs.acount()
-
-            offset, page_size = self._get_page_params(
-                _paginator, ninja_pagination
-            )
-            sliced_qs = qs[offset : offset + page_size]
-
-            items = await self.model_util.list_read_s(
-                self.schema_out, request, sliced_qs, is_for="read"
-            )
-            return Status(200, {"items": items, "count": count})
-
-        return list
+        return self._register_list(list)
 
     def _get_retrieve_schema(self) -> type[Schema]:
         """
@@ -841,115 +1005,154 @@ class APIViewSet(API, Generic[ModelT]):
         """
         return self.schema_detail or self.schema_out
 
-    def retrieve_view(self) -> Callable:
-        """
-        Register retrieve endpoint.
-        """
+    def retrieve(self, request: HttpRequest, pk: Schema) -> Status:
+        """Execute a synchronous retrieve. Override to customize the operation."""
+        obj_pk = self._get_pk(pk)
+        is_for = "detail" if self.schema_detail else "read"
+        obj = self._run_object_hooks(request, "retrieve", obj_pk, is_for)
+        if obj is None:
+            obj = self._get_serializer().get(obj_pk, request=request, optimize_for=is_for)
+        return Status(200, self._dump(obj, self._get_retrieve_schema()))
+
+    async def aretrieve(self, request: HttpRequest, pk: Schema) -> Status:
+        """Execute an asynchronous retrieve. Override to customize the operation."""
+        obj_pk = self._get_pk(pk)
+        is_for = "detail" if self.schema_detail else "read"
+        obj = await self._arun_object_hooks(request, "retrieve", obj_pk, is_for=is_for)
+        if obj is None:
+            obj = await self._get_serializer().aget(obj_pk, request=request, optimize_for=is_for)
+        return Status(200, await self._adump(obj, self._get_retrieve_schema()))
+
+    def _register_retrieve(self, handler: Callable) -> Callable:
         retrieve_schema = self._get_retrieve_schema()
-
-        @self.router.get(
-            self.get_path_retrieve,
-            auth=self.get_view_auth(),
-            summary=f"Retrieve {self.model_verbose_name}",
-            description=self.retrieve_docs,
-            response={200: retrieve_schema, self.error_codes: self.error_schema},
+        return self._register_generated(
+            GeneratedRoute(
+                method="get", path=self.get_path_retrieve, auth=self.get_view_auth(),
+                summary=f"Retrieve {self.model_verbose_name}", description=self.retrieve_docs,
+                response={200: retrieve_schema, self.error_codes: self.error_schema},
+                handler=handler, decorators=tuple(self.extra_decorators.retrieve),
+            )
         )
-        @decorate_view(unique_view(self), *self.extra_decorators.retrieve)
-        async def retrieve(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
-            _pk = self._get_pk(pk)
-            _is_for = "detail" if self.schema_detail else "read"
-            obj = await self._run_object_hooks(
-                request, "retrieve", _pk, is_for=_is_for,
-            )
-            if obj is not None:
-                return Status(
-                    200,
-                    await self.model_util.read_s(retrieve_schema, request, obj),
-                )
-            query_data = self._get_query_data()
-            return Status(
-                200,
-                await self.model_util.read_s(
-                    retrieve_schema,
-                    request,
-                    query_data=QuerySchema(
-                        getters={"pk": _pk}, **query_data.model_dump()
-                    ),
-                    is_for=_is_for,
-                ),
-            )
 
-        return retrieve
+    def retrieve_view(self) -> Callable:
+        """Register the synchronous retrieve endpoint."""
+        def retrieve(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
+            return self.retrieve(request, pk)
+
+        return self._register_retrieve(retrieve)
+
+    def aretrieve_view(self) -> Callable:
+        """Register the asynchronous retrieve endpoint."""
+        async def retrieve(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
+            return await self.aretrieve(request, pk)
+
+        return self._register_retrieve(retrieve)
+
+    def update(self, request: HttpRequest, data: Schema, pk: Schema) -> Status:
+        """Execute a synchronous update. Override to customize the operation."""
+        obj_pk = self._get_pk(pk)
+        loaded = self._run_object_hooks(request, "update", obj_pk)
+        self._check_update_payload(data)
+        obj = self._get_serializer().update(loaded or obj_pk, data, request=request)
+        return Status(200, self._dump(obj, self.schema_update_out))
+
+    async def aupdate(self, request: HttpRequest, data: Schema, pk: Schema) -> Status:
+        """Execute an asynchronous update. Override to customize the operation."""
+        obj_pk = self._get_pk(pk)
+        loaded = await self._arun_object_hooks(request, "update", obj_pk)
+        self._check_update_payload(data)
+        obj = await self._get_serializer().aupdate(loaded or obj_pk, data, request=request)
+        return Status(200, await self._adump(obj, self.schema_update_out))
+
+    def _check_update_payload(self, data: Schema) -> None:
+        if self.require_update_fields and not data.model_dump(exclude_unset=True):
+            raise SerializeError("No fields provided for update.")
+
+    def _register_update(self, handler: Callable) -> Callable:
+        return self._register_generated(
+            GeneratedRoute(
+                method="patch", path=self.path_retrieve, auth=self.patch_view_auth(),
+                summary=f"Update {self.model_verbose_name}", description=self.update_docs,
+                response={200: self.schema_update_out, self.error_codes: self.error_schema},
+                handler=handler, decorators=tuple(self.extra_decorators.update), atomic=True,
+            )
+        )
 
     def update_view(self) -> Callable:
-        """
-        Register update endpoint.
-        """
+        """Register the synchronous update endpoint."""
+        def update(
+            request: HttpRequest,
+            data: self.schema_update,  # type: ignore
+            pk: Path[self.path_schema],  # type: ignore
+        ):
+            return self.update(request, data, pk)
 
-        @self.router.patch(
-            self.path_retrieve,
-            auth=self.patch_view_auth(),
-            summary=f"Update {self.model_verbose_name}",
-            description=self.update_docs,
-            response={200: self.schema_update_out, self.error_codes: self.error_schema},
-        )
-        @decorate_view(aatomic, unique_view(self), *self.extra_decorators.update)
+        return self._register_update(update)
+
+    def aupdate_view(self) -> Callable:
+        """Register the asynchronous update endpoint."""
         async def update(
             request: HttpRequest,
             data: self.schema_update,  # type: ignore
             pk: Path[self.path_schema],  # type: ignore
         ):
-            _pk = self._get_pk(pk)
-            await self._run_object_hooks(request, "update", _pk)
-            return Status(
-                200,
-                await self.model_util.update_s(
-                    request,
-                    data,
-                    _pk,
-                    self.schema_update_out,
-                    self.require_update_fields,
-                ),
-            )
+            return await self.aupdate(request, data, pk)
 
-        return update
+        return self._register_update(update)
 
-    def delete_view(self) -> Callable:
-        """
-        Register delete endpoint.
+    def delete(self, request: HttpRequest, pk: Schema) -> Status:
+        """Execute a synchronous delete. Override to customize the operation."""
+        obj_pk = self._get_pk(pk)
+        obj = self._run_object_hooks(request, "delete", obj_pk)
+        serialized = None
+        if self.schema_delete_out:
+            obj = obj or self._get_serializer().get(obj_pk, request=request)
+            serialized = self._dump(obj, self.schema_delete_out)
+        self._get_serializer().destroy(obj or obj_pk, request=request)
+        return self._delete_response(serialized)
 
-        When schema_delete_out is set the endpoint fetches and serializes the object
-        before deleting it and returns 200 with the serialized data.
-        Otherwise it returns 204 No Content (default behaviour).
-        """
-        _delete_schema = self.schema_delete_out
-        _response = (
-            {200: _delete_schema, self.error_codes: self.error_schema}
-            if _delete_schema
+    async def adelete(self, request: HttpRequest, pk: Schema) -> Status:
+        """Execute an asynchronous delete. Override to customize the operation."""
+        obj_pk = self._get_pk(pk)
+        obj = await self._arun_object_hooks(request, "delete", obj_pk)
+        serialized = None
+        if self.schema_delete_out:
+            obj = obj or await self._get_serializer().aget(obj_pk, request=request)
+            serialized = await self._adump(obj, self.schema_delete_out)
+        await self._get_serializer().adestroy(obj or obj_pk, request=request)
+        return self._delete_response(serialized)
+
+    def _delete_response(self, serialized: dict | None) -> Status:
+        return Status(200, serialized) if self.schema_delete_out else Status(204, None)
+
+    def _register_delete(self, handler: Callable) -> Callable:
+        response = (
+            {200: self.schema_delete_out, self.error_codes: self.error_schema}
+            if self.schema_delete_out
             else {204: None, self.error_codes: self.error_schema}
         )
-
-        @self.router.delete(
-            self.path_retrieve,
-            auth=self.delete_view_auth(),
-            summary=f"Delete {self.model_verbose_name}",
-            description=self.delete_docs,
-            response=_response,
-        )
-        @decorate_view(aatomic, unique_view(self), *self.extra_decorators.delete)
-        async def delete(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
-            _pk = self._get_pk(pk)
-            await self._run_object_hooks(request, "delete", _pk)
-            if _delete_schema:
-                obj = await self.model_util.aget_object(request, _pk)
-                serialized = await self.model_util.read_s(_delete_schema, request, obj)
-                await self.model_util.delete_s(request, _pk, instance=obj)
-                return Status(200, serialized)
-            return Status(
-                204, await self.model_util.delete_s(request, _pk)
+        return self._register_generated(
+            GeneratedRoute(
+                method="delete", path=self.path_retrieve, auth=self.delete_view_auth(),
+                summary=f"Delete {self.model_verbose_name}", description=self.delete_docs,
+                response=response, handler=handler,
+                decorators=tuple(self.extra_decorators.delete), atomic=True,
             )
+        )
 
-        return delete
+    def delete_view(self) -> Callable:
+        """Register the synchronous delete endpoint."""
+        def delete(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
+            return self.delete(request, pk)
+
+        return self._register_delete(delete)
+
+    def adelete_view(self) -> Callable:
+        """Register the asynchronous delete endpoint."""
+        async def delete(request: HttpRequest, pk: Path[self.path_schema]):  # type: ignore
+            return await self.adelete(request, pk)
+
+        return self._register_delete(delete)
 
     @staticmethod
     def _bulk_result(success: list, errors: list) -> dict:
@@ -958,6 +1161,15 @@ class APIViewSet(API, Generic[ModelT]):
             "success": {"count": len(success), "details": success},
             "errors": {"count": len(errors), "details": errors},
         }
+
+    def _bulk_response(self, result: BulkResult, details: List | None = None) -> Status:
+        """Render a BulkResult with the legacy wire format."""
+        if details is None:
+            extract = self._get_bulk_detail_extractor() or (lambda obj: obj.pk)
+            details = [extract(obj) for obj in result.succeeded]
+        return Status(
+            200, self._bulk_result(details, [failure.error for failure in result.failed])
+        )
 
     def _get_bulk_detail_extractor(self) -> Callable | None:
         """
@@ -1010,99 +1222,166 @@ class APIViewSet(API, Generic[ModelT]):
             ids=(List[pk_python_type], ...),
         )
 
-    def bulk_create_view(self) -> Callable:
-        """
-        Register bulk create endpoint.
-        """
+    def bulk_create(self, request: HttpRequest, data: List[Schema]) -> Status:
+        """Execute a synchronous bulk create. Override to customize the operation."""
+        self.on_before_operation(request, "bulk_create")
+        return self._bulk_response(self._get_serializer().bulk_create(data, request=request))
 
-        @self.router.post(
-            self.bulk_path,
-            auth=self.post_view_auth(),
-            summary=f"Bulk Create {self.model_verbose_name_plural}",
-            description=self.bulk_create_docs,
-            response={200: BulkResultSchema, self.error_codes: self.error_schema},
+    async def abulk_create(self, request: HttpRequest, data: List[Schema]) -> Status:
+        """Execute an asynchronous bulk create. Override to customize the operation."""
+        await self.aon_before_operation(request, "bulk_create")
+        return self._bulk_response(
+            await self._get_serializer().abulk_create(data, request=request)
         )
-        @decorate_view(
-            unique_view(self, plural=True), *self.extra_decorators.bulk_create
-        )
-        async def bulk_create(
-            request: HttpRequest, data: List[self.schema_in]  # type: ignore
-        ):
-            await self.on_before_operation(request, "bulk_create")
-            success, errors = await self.model_util.bulk_create_s(
-                request, data, self._get_bulk_detail_extractor()
+
+    def _register_bulk(
+        self, method: str, auth, summary: str, description: str, handler: Callable, decorators
+    ) -> Callable:
+        return self._register_generated(
+            GeneratedRoute(
+                method=method, path=self.bulk_path, auth=auth,
+                summary=f"{summary} {self.model_verbose_name_plural}", description=description,
+                response={200: BulkResultSchema, self.error_codes: self.error_schema},
+                handler=handler, decorators=tuple(decorators), plural=True,
             )
-            return Status(200, self._bulk_result(success, errors))
+        )
 
-        return bulk_create
+    def _register_bulk_create(self, handler: Callable) -> Callable:
+        return self._register_bulk(
+            "post", self.post_view_auth(), "Bulk Create", self.bulk_create_docs,
+            handler, self.extra_decorators.bulk_create,
+        )
+
+    def bulk_create_view(self) -> Callable:
+        """Register the synchronous bulk create endpoint."""
+        def bulk_create(request: HttpRequest, data: List[self.schema_in]):  # type: ignore
+            return self.bulk_create(request, data)
+
+        return self._register_bulk_create(bulk_create)
+
+    def abulk_create_view(self) -> Callable:
+        """Register the asynchronous bulk create endpoint."""
+        async def bulk_create(request: HttpRequest, data: List[self.schema_in]):  # type: ignore
+            return await self.abulk_create(request, data)
+
+        return self._register_bulk_create(bulk_create)
+
+    def bulk_update(self, request: HttpRequest, data: List[Schema]) -> Status:
+        """Execute a synchronous bulk update. Override to customize the operation."""
+        self.on_before_operation(request, "bulk_update")
+        items, rejected = self._prepare_bulk_update(data)
+        result = self._get_serializer().bulk_update(
+            [item for _, item in items], request=request
+        )
+        return self._bulk_response(self._merge_bulk_rejections(result, items, rejected))
+
+    async def abulk_update(self, request: HttpRequest, data: List[Schema]) -> Status:
+        """Execute an asynchronous bulk update. Override to customize the operation."""
+        await self.aon_before_operation(request, "bulk_update")
+        items, rejected = self._prepare_bulk_update(data)
+        result = await self._get_serializer().abulk_update(
+            [item for _, item in items], request=request
+        )
+        return self._bulk_response(self._merge_bulk_rejections(result, items, rejected))
+
+    def _prepare_bulk_update(self, data: List[Schema]) -> tuple[List, List[BulkFailure]]:
+        """Split items into ``(index, (pk, update_data))`` pairs and rejected empty payloads."""
+        pk_name = self.model_util.model_pk_name
+        items, rejected = [], []
+        for index, item in enumerate(data):
+            fields = item.model_dump(exclude_unset=True)
+            pk = fields.pop(pk_name)
+            if self.require_update_fields and not fields:
+                rejected.append(
+                    bulk_failure(index, SerializeError("No fields provided for update."), pk)
+                )
+            else:
+                items.append((index, (pk, self.schema_update(**fields))))
+        return items, rejected
+
+    @staticmethod
+    def _merge_bulk_rejections(
+        result: BulkResult, items: List, rejected: List[BulkFailure]
+    ) -> BulkResult:
+        positions = [index for index, _ in items]
+        failed = [replace(failure, index=positions[failure.index]) for failure in result.failed]
+        return BulkResult(
+            result.succeeded, sorted(failed + rejected, key=lambda failure: failure.index)
+        )
+
+    def _register_bulk_update(self, handler: Callable) -> Callable:
+        return self._register_bulk(
+            "patch", self.patch_view_auth(), "Bulk Update", self.bulk_update_docs,
+            handler, self.extra_decorators.bulk_update,
+        )
 
     def bulk_update_view(self) -> Callable:
-        """
-        Register bulk update endpoint.
-        """
-        pk_name = self.model_util.model_pk_name
+        """Register the synchronous bulk update endpoint."""
+        def bulk_update(request: HttpRequest, data: List[self.bulk_update_schema]):  # type: ignore
+            return self.bulk_update(request, data)
 
-        @self.router.patch(
-            self.bulk_path,
-            auth=self.patch_view_auth(),
-            summary=f"Bulk Update {self.model_verbose_name_plural}",
-            description=self.bulk_update_docs,
-            response={
-                200: BulkResultSchema,
-                self.error_codes: self.error_schema,
-            },
-        )
-        @decorate_view(
-            unique_view(self, plural=True), *self.extra_decorators.bulk_update
-        )
-        async def bulk_update(
-            request: HttpRequest,
-            data: List[self.bulk_update_schema],  # type: ignore
-        ):
-            await self.on_before_operation(request, "bulk_update")
-            data_list = []
-            for item in data:
-                pk = getattr(item, pk_name)
-                update_fields = {
-                    k: v for k, v in item.model_dump().items() if k != pk_name
-                }
-                update_data = self.schema_update(**update_fields)
-                data_list.append((pk, update_data))
-            success, errors = await self.model_util.bulk_update_s(
-                request,
-                data_list,
-                self._get_bulk_detail_extractor(),
-                self.require_update_fields,
-            )
-            return Status(200, self._bulk_result(success, errors))
+        return self._register_bulk_update(bulk_update)
 
-        return bulk_update
+    def abulk_update_view(self) -> Callable:
+        """Register the asynchronous bulk update endpoint."""
+        async def bulk_update(request: HttpRequest, data: List[self.bulk_update_schema]):  # type: ignore
+            return await self.abulk_update(request, data)
+
+        return self._register_bulk_update(bulk_update)
+
+    def bulk_delete(self, request: HttpRequest, data: Schema) -> Status:
+        """Execute a synchronous bulk delete. Override to customize the operation."""
+        self.on_before_operation(request, "bulk_delete")
+        found = {
+            obj.pk: obj
+            for obj in self._get_serializer().get_queryset(request=request).filter(pk__in=data.ids)
+        }
+        result = self._get_serializer().bulk_destroy(
+            [found.get(pk, pk) for pk in data.ids], request=request
+        )
+        return self._bulk_delete_response(result, found)
+
+    async def abulk_delete(self, request: HttpRequest, data: Schema) -> Status:
+        """Execute an asynchronous bulk delete. Override to customize the operation."""
+        await self.aon_before_operation(request, "bulk_delete")
+        queryset = await self._get_serializer().aget_queryset(request=request)
+        found = {obj.pk: obj async for obj in queryset.filter(pk__in=data.ids)}
+        result = await self._get_serializer().abulk_destroy(
+            [found.get(pk, pk) for pk in data.ids], request=request
+        )
+        return self._bulk_delete_response(result, found)
+
+    def _bulk_delete_response(self, result: BulkResult, found: dict) -> Status:
+        fields = self._get_bulk_detail_fields()
+        if not fields:
+            return self._bulk_response(result, list(result.succeeded))
+        details = {
+            pk: obj.serializable_value(fields[0])
+            if len(fields) == 1
+            else {name: obj.serializable_value(name) for name in fields}
+            for pk, obj in found.items()
+        }
+        return self._bulk_response(result, [details[pk] for pk in result.succeeded])
+
+    def _register_bulk_delete(self, handler: Callable) -> Callable:
+        return self._register_bulk(
+            "delete", self.delete_view_auth(), "Bulk Delete", self.bulk_delete_docs,
+            handler, self.extra_decorators.bulk_delete,
+        )
 
     def bulk_delete_view(self) -> Callable:
-        """
-        Register bulk delete endpoint.
-        """
+        """Register the synchronous bulk delete endpoint."""
+        def bulk_delete(request: HttpRequest, data: self.bulk_delete_schema):  # type: ignore
+            return self.bulk_delete(request, data)
 
-        @self.router.delete(
-            self.bulk_path,
-            auth=self.delete_view_auth(),
-            summary=f"Bulk Delete {self.model_verbose_name_plural}",
-            description=self.bulk_delete_docs,
-            response={200: BulkResultSchema, self.error_codes: self.error_schema},
-        )
-        @decorate_view(
-            unique_view(self, plural=True), *self.extra_decorators.bulk_delete
-        )
-        async def bulk_delete(
-            request: HttpRequest, data: self.bulk_delete_schema  # type: ignore
-        ):
-            await self.on_before_operation(request, "bulk_delete")
-            deleted_pks, errors = await self.model_util.bulk_delete_s(
-                request, data.ids, self._get_bulk_detail_fields()
-            )
-            return Status(200, self._bulk_result(deleted_pks, errors))
+        return self._register_bulk_delete(bulk_delete)
 
-        return bulk_delete
+    def abulk_delete_view(self) -> Callable:
+        """Register the asynchronous bulk delete endpoint."""
+        async def bulk_delete(request: HttpRequest, data: self.bulk_delete_schema):  # type: ignore
+            return await self.abulk_delete(request, data)
+
+        return self._register_bulk_delete(bulk_delete)
 
     def views(self):
         """
@@ -1143,22 +1422,30 @@ class APIViewSet(API, Generic[ModelT]):
         """
         Build a handler for ``@on``-decorated detail methods.
 
-        Runs ``on_before_operation``, fetches the object by pk, runs
-        ``on_before_object_operation``, then calls ``method(self, request, obj)``.
-        The returned function carries a ``__signature__`` that exposes
-        ``(request, pk)`` to Ninja for URL-parameter extraction.
+        Runs ``aon_before_operation``, fetches the object by pk, runs
+        ``aon_before_object_operation``, then calls ``method(self, request, obj)``.
+        Sync methods get the sync hooks and ORM calls. The returned function
+        carries a ``__signature__`` that exposes ``(request, pk)`` to Ninja.
         """
-        _viewset = self
-        _orig = method
         pk_name = self.model_util.model_pk_name
 
-        @functools.wraps(method)
-        async def on_handler(request, **kwargs):
-            await _viewset.on_before_operation(request, name)
-            pk = kwargs.get(pk_name)
-            obj = await _viewset.model_util.aget_object(request, pk)
-            await _viewset.on_before_object_operation(request, name, obj)
-            return await _orig(_viewset, request, obj)
+        if inspect.iscoroutinefunction(method):
+
+            @functools.wraps(method)
+            async def on_handler(request, **kwargs):
+                await self.aon_before_operation(request, name)
+                obj = await self._get_serializer().aget(kwargs.get(pk_name), request=request)
+                await self.aon_before_object_operation(request, name, obj)
+                return await method(self, request, obj)
+
+        else:
+
+            @functools.wraps(method)
+            def on_handler(request, **kwargs):
+                self.on_before_operation(request, name)
+                obj = self._get_serializer().get(kwargs.get(pk_name), request=request)
+                self.on_before_object_operation(request, name, obj)
+                return method(self, request, obj)
 
         on_handler.__signature__ = inspect.Signature([
             inspect.Parameter(
@@ -1173,6 +1460,26 @@ class APIViewSet(API, Generic[ModelT]):
             ),
         ])
         return on_handler
+
+    def _with_operation_hook(self, handler: Callable, name: str) -> Callable:
+        """Wrap an @action handler so aon_before_operation runs in the handler's mode."""
+        if inspect.iscoroutinefunction(handler):
+
+            @functools.wraps(handler)
+            async def hooked_handler(*args, **kwargs):
+                request = args[0] if args else kwargs.get("request")
+                await self.aon_before_operation(request, name)
+                return await handler(*args, **kwargs)
+
+        else:
+
+            @functools.wraps(handler)
+            def hooked_handler(*args, **kwargs):
+                request = args[0] if args else kwargs.get("request")
+                self.on_before_operation(request, name)
+                return handler(*args, **kwargs)
+
+        return hooked_handler
 
     def _register_single_action(
         self, name: str, method: Callable, config: ActionConfig
@@ -1203,23 +1510,7 @@ class APIViewSet(API, Generic[ModelT]):
             else:
                 handler = factory._build_handler(self, method)
                 factory._apply_metadata(handler, method)
-
-                # Wrap handler with on_before_operation hook
-                original_handler = handler
-
-                @functools.wraps(original_handler)
-                async def hooked_handler(
-                    *args,
-                    _action_name=name,
-                    _viewset=self,
-                    _orig=original_handler,
-                    **kwargs,
-                ):
-                    request = args[0] if args else kwargs.get("request")
-                    await _viewset.on_before_operation(request, _action_name)
-                    return await _orig(*args, **kwargs)
-
-                handler = hooked_handler
+                handler = self._with_operation_hook(handler, name)
 
                 if config.detail:
                     self._rename_pk_param(handler)
@@ -1252,13 +1543,7 @@ class APIViewSet(API, Generic[ModelT]):
 
     def _register_actions(self) -> None:
         """Discover and register @action-decorated methods on the router."""
-        for name in dir(self.__class__):
-            method = getattr(self.__class__, name, None)
-            if method is None:
-                continue
-            config = getattr(method, "_action_config", None)
-            if config is None:
-                continue
+        for name, method, config in self._iter_actions():
             self._register_single_action(name, method, config)
 
     def _set_additional_views(self) -> Router:

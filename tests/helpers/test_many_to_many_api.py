@@ -96,7 +96,7 @@ class Tests:
         @classmethod
         def _create_base_object(cls):
             """Create base object. Override for different creation methods."""
-            create_view = cls.viewset.create_view()
+            create_view = cls.viewset.acreate_view()
             result = async_to_sync(create_view)(
                 cls.request.post(),
                 cls.viewset.schema_in(name="base", description="base"),
@@ -494,7 +494,7 @@ class TestM2MWithQueryHandlerViewSet(GenericAPIViewSet):
 
 
 class TestM2MWithAsyncQueryParamsHandlerViewSet(GenericAPIViewSet):
-    """ViewSet with an async query_params_handler for M2M relations."""
+    """ViewSet with an async aquery_params_handler for M2M relations."""
 
     model = models.TestModelSerializerManyToMany
     m2m_relations = [
@@ -507,7 +507,7 @@ class TestM2MWithAsyncQueryParamsHandlerViewSet(GenericAPIViewSet):
     ]
 
     async def test_model_serializers_query_params_handler(self, queryset, filters):
-        """Async version of query_params_handler."""
+        """Async version of aquery_params_handler."""
         name_filter = filters.get("name")
         if name_filter:
             queryset = queryset.filter(name=name_filter)
@@ -516,7 +516,7 @@ class TestM2MWithAsyncQueryParamsHandlerViewSet(GenericAPIViewSet):
 
 @tag("m2m", "coverage", "query_handler")
 class M2MQueryHandlerTestCase(TestCase):
-    """Cover helpers/api.py:295 — _check_m2m_objs with query_handler."""
+    """Cover helpers/api.py:295 — _acheck_m2m_objs with query_handler."""
 
     @classmethod
     def setUpTestData(cls):
@@ -527,7 +527,7 @@ class M2MQueryHandlerTestCase(TestCase):
         cls.pk_att = cls.viewset.model_util.model_pk_name
 
         # Create base object
-        create_view = cls.viewset.create_view()
+        create_view = cls.viewset.acreate_view()
         result = async_to_sync(create_view)(
             cls.request.post(),
             cls.viewset.schema_in(name="base", description="base"),
@@ -578,7 +578,7 @@ class M2MNotFoundTestCase(TestCase):
         cls.request = Request(cls.viewset.path)
         cls.pk_att = cls.viewset.model_util.model_pk_name
 
-        create_view = cls.viewset.create_view()
+        create_view = cls.viewset.acreate_view()
         result = async_to_sync(create_view)(
             cls.request.post(),
             cls.viewset.schema_in(name="base", description="base"),
@@ -610,7 +610,7 @@ class M2MNotFoundTestCase(TestCase):
 
 @tag("m2m", "coverage", "async_query_params")
 class M2MAsyncQueryParamsHandlerTestCase(TestCase):
-    """Cover helpers/api.py:402 — async query_params_handler in get_related."""
+    """Cover helpers/api.py:402 — async aquery_params_handler in get_related."""
 
     @classmethod
     def setUpTestData(cls):
@@ -620,7 +620,7 @@ class M2MAsyncQueryParamsHandlerTestCase(TestCase):
         cls.request = Request(cls.viewset.path)
         cls.pk_att = cls.viewset.model_util.model_pk_name
 
-        create_view = cls.viewset.create_view()
+        create_view = cls.viewset.acreate_view()
         result = async_to_sync(create_view)(
             cls.request.post(),
             cls.viewset.schema_in(name="base", description="base"),
@@ -647,7 +647,7 @@ class M2MAsyncQueryParamsHandlerTestCase(TestCase):
         return action_schema(add=add or [], remove=remove or [])
 
     async def test_get_related_with_async_filter(self):
-        """get_related should use async query_params_handler when available."""
+        """get_related should use async aquery_params_handler when available."""
         # Add related objects first
         data = self._manage_data(add=self.related_pks)
         await self.manage_view(self.request.post(), self.path_schema, data)
@@ -720,7 +720,7 @@ class NormalizePkTestCase(TestCase):
 @tag("m2m", "uuid", "regression")
 class M2MUUIDPkRegressionTestCase(TestCase):
     """
-    Regression: _check_m2m_objs must match dict keys built from obj.pk (UUID)
+    Regression: _acheck_m2m_objs must match dict keys built from obj.pk (UUID)
     against request payload pks (str), which JSON always delivers as strings.
     """
 
@@ -737,7 +737,7 @@ class M2MUUIDPkRegressionTestCase(TestCase):
     async def test_add_with_string_uuid_pks_resolves(self):
         """Batched path: string UUIDs from JSON must resolve to objects."""
         str_pks = [str(t.pk) for t in self.tags[:2]]
-        errors, details, objs = await self.viewset.m2m_api._check_m2m_objs(
+        errors, details, objs = await self.viewset.m2m_api._acheck_m2m_objs(
             self.request.post(),
             str_pks,
             models.TagUUID,
@@ -753,7 +753,7 @@ class M2MUUIDPkRegressionTestCase(TestCase):
         """Remove path: already-related UUIDs passed as strings must match."""
         await self.article.tags_uuid.aadd(*self.tags[:2])
         str_pks = [str(self.tags[0].pk)]
-        errors, details, objs = await self.viewset.m2m_api._check_m2m_objs(
+        errors, details, objs = await self.viewset.m2m_api._acheck_m2m_objs(
             self.request.post(),
             str_pks,
             models.TagUUID,
@@ -767,7 +767,7 @@ class M2MUUIDPkRegressionTestCase(TestCase):
 
     async def test_nonexistent_uuid_string_yields_not_found(self):
         bogus = str(uuid.uuid4())
-        errors, details, objs = await self.viewset.m2m_api._check_m2m_objs(
+        errors, details, objs = await self.viewset.m2m_api._acheck_m2m_objs(
             self.request.post(),
             [bogus],
             models.TagUUID,
@@ -796,7 +796,7 @@ class M2MUUIDPkQueryHandlerRegressionTestCase(TestCase):
 
     async def test_add_with_string_uuid_pks_resolves_via_handler(self):
         str_pks = [str(t.pk) for t in self.tags]
-        errors, details, objs = await self.viewset.m2m_api._check_m2m_objs(
+        errors, details, objs = await self.viewset.m2m_api._acheck_m2m_objs(
             self.request.post(),
             str_pks,
             models.TagUUID,

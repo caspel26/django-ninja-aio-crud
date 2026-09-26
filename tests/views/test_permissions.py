@@ -127,7 +127,7 @@ class PermissionViewSetMixinTestCase(_PermissionTestBase):
         result = async_to_sync(self.list_view)(req)
         self.assertEqual(result.status_code, 200)
 
-    # -- has_permission denied ------------------------------------------------
+    # -- ahas_permission denied ------------------------------------------------
 
     def test_create_denied(self):
         req = _request_with(self.request.post(), _allow=False)
@@ -162,7 +162,7 @@ class PermissionViewSetMixinTestCase(_PermissionTestBase):
         with self.assertRaises(ForbiddenError):
             async_to_sync(self.delete_view)(req, pk=self._pk_schema(created["id"]))
 
-    # -- has_object_permission denied -----------------------------------------
+    # -- ahas_object_permission denied -----------------------------------------
 
     def test_retrieve_object_permission_denied(self):
         created = self._create_instance()
@@ -204,9 +204,9 @@ class PermissionViewSetMixinTestCase(_PermissionTestBase):
         """Base mixin hooks return True by default (no override)."""
         mixin = PermissionViewSetMixin.__new__(PermissionViewSetMixin)
         req = self.request.get()
-        self.assertTrue(async_to_sync(mixin.has_permission)(req, "create"))
+        self.assertTrue(async_to_sync(mixin.ahas_permission)(req, "create"))
         self.assertTrue(
-            async_to_sync(mixin.has_object_permission)(req, "retrieve", None)
+            async_to_sync(mixin.ahas_object_permission)(req, "retrieve", None)
         )
 
 
@@ -347,7 +347,7 @@ class RoleBasedPermissionMixinTestCase(_PermissionTestBase):
     def test_empty_permission_roles_allows_all(self):
         mixin = RoleBasedPermissionMixin.__new__(RoleBasedPermissionMixin)
         mixin.permission_roles = {}
-        result = async_to_sync(mixin.has_permission)(self.request.get(), "create")
+        result = async_to_sync(mixin.ahas_permission)(self.request.get(), "create")
         self.assertTrue(result)
 
     def test_dict_auth_support(self):
@@ -356,7 +356,7 @@ class RoleBasedPermissionMixinTestCase(_PermissionTestBase):
         mixin.role_attribute = "role"
         req = self.request.post()
         req.auth = {"role": "admin"}
-        result = async_to_sync(mixin.has_permission)(req, "create")
+        result = async_to_sync(mixin.ahas_permission)(req, "create")
         self.assertTrue(result)
 
     # -- Bulk operations ------------------------------------------------------

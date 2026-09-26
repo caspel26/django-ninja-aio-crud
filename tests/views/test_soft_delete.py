@@ -82,7 +82,7 @@ class SoftDeleteTestCase(TestCase):
         await self.model.objects.all().adelete()
         obj = await self.model.objects.acreate(name="del_me", description="d")
 
-        view = self.viewset.delete_view()
+        view = self.viewset.adelete_view()
         result = await view(self.delete_request, self.viewset.path_schema(**{self.pk_att: obj.pk}))
         self.assertEqual(result.status_code, 204)
 
@@ -98,7 +98,7 @@ class SoftDeleteTestCase(TestCase):
         await self.model.objects.acreate(name="visible", description="d", is_deleted=False)
         await self.model.objects.acreate(name="hidden", description="d", is_deleted=True)
 
-        view = self.viewset.list_view()
+        view = self.viewset.alist_view()
         result = await view(self.get_request)
         self.assertEqual(result.status_code, 200)
         self.assertEqual(result.value["count"], 1)
@@ -108,7 +108,7 @@ class SoftDeleteTestCase(TestCase):
         await self.model.objects.all().adelete()
         obj = await self.model.objects.acreate(name="gone", description="d", is_deleted=True)
 
-        view = self.viewset.retrieve_view()
+        view = self.viewset.aretrieve_view()
         with self.assertRaises(NotFoundError):
             await view(self.get_request, self.viewset.path_schema(**{self.pk_att: obj.pk}))
 
@@ -117,7 +117,7 @@ class SoftDeleteTestCase(TestCase):
         await self.model.objects.all().adelete()
         obj = await self.model.objects.acreate(name="gone", description="d", is_deleted=True)
 
-        view = self.viewset.update_view()
+        view = self.viewset.aupdate_view()
         update_data = schema.TestModelSchemaPatch(description="new")
         with self.assertRaises(NotFoundError):
             await view(
@@ -131,7 +131,7 @@ class SoftDeleteTestCase(TestCase):
         await self.model.objects.all().adelete()
         obj = await self.model.objects.acreate(name="gone", description="d", is_deleted=True)
 
-        view = self.viewset.delete_view()
+        view = self.viewset.adelete_view()
         result = await view(self.delete_request, self.viewset.path_schema(**{self.pk_att: obj.pk}))
         self.assertEqual(result.status_code, 204)
         await obj.arefresh_from_db()
@@ -206,7 +206,7 @@ class SoftDeleteBulkTestCase(TestCase):
         await self.model.objects.acreate(name="keep", description="d")
 
         delete_data = self.viewset.bulk_delete_schema(ids=[obj1.pk, obj2.pk])
-        view = self.viewset.bulk_delete_view()
+        view = self.viewset.abulk_delete_view()
         result = await view(self.delete_request, delete_data)
 
         self.assertEqual(result.status_code, 200)
@@ -227,7 +227,7 @@ class SoftDeleteBulkTestCase(TestCase):
         obj = await self.model.objects.acreate(name="exists", description="d")
 
         delete_data = self.viewset.bulk_delete_schema(ids=[obj.pk, 99999])
-        view = self.viewset.bulk_delete_view()
+        view = self.viewset.abulk_delete_view()
         result = await view(self.delete_request, delete_data)
 
         self.assertEqual(result.value["success"]["count"], 1)
@@ -239,7 +239,7 @@ class SoftDeleteBulkTestCase(TestCase):
     async def test_bulk_soft_delete_empty(self):
         """Bulk soft delete with empty list is a no-op."""
         delete_data = self.viewset.bulk_delete_schema(ids=[])
-        view = self.viewset.bulk_delete_view()
+        view = self.viewset.abulk_delete_view()
         result = await view(self.delete_request, delete_data)
 
         self.assertEqual(result.value["success"]["count"], 0)
@@ -269,7 +269,7 @@ class SoftDeleteIncludeDeletedTestCase(TestCase):
         await self.model.objects.acreate(name="active", description="d", is_deleted=False)
         await self.model.objects.acreate(name="deleted", description="d", is_deleted=True)
 
-        view = self.viewset.list_view()
+        view = self.viewset.alist_view()
         result = await view(self.request.get())
         self.assertEqual(result.value["count"], 2)
 
@@ -278,7 +278,7 @@ class SoftDeleteIncludeDeletedTestCase(TestCase):
         await self.model.objects.all().adelete()
         obj = await self.model.objects.acreate(name="deleted", description="d", is_deleted=True)
 
-        view = self.viewset.retrieve_view()
+        view = self.viewset.aretrieve_view()
         result = await view(
             self.request.get(),
             self.viewset.path_schema(**{self.pk_att: obj.pk}),
@@ -290,7 +290,7 @@ class SoftDeleteIncludeDeletedTestCase(TestCase):
         await self.model.objects.all().adelete()
         obj = await self.model.objects.acreate(name="deleted", description="d", is_deleted=True)
 
-        view = self.viewset.update_view()
+        view = self.viewset.aupdate_view()
         update_data = schema.TestModelSchemaPatch(description="updated")
         result = await view(
             self.request.patch(),
@@ -324,7 +324,7 @@ class SoftDeleteCustomFieldTestCase(TestCase):
         await self.model.objects.all().adelete()
         obj = await self.model.objects.acreate(name="custom", description="d")
 
-        view = self.viewset.delete_view()
+        view = self.viewset.adelete_view()
         result = await view(
             self.request.delete(),
             self.viewset.path_schema(**{self.pk_att: obj.pk}),
@@ -339,7 +339,7 @@ class SoftDeleteCustomFieldTestCase(TestCase):
         await self.model.objects.acreate(name="visible", description="d", deleted=False)
         await self.model.objects.acreate(name="hidden", description="d", deleted=True)
 
-        view = self.viewset.list_view()
+        view = self.viewset.alist_view()
         result = await view(self.request.get())
         self.assertEqual(result.value["count"], 1)
 
@@ -372,7 +372,7 @@ class SoftDeleteNoObjectHooksTestCase(TestCase):
         await self.model.objects.all().adelete()
         obj = await self.model.objects.acreate(name="no_hooks", description="d")
 
-        view = self.viewset.delete_view()
+        view = self.viewset.adelete_view()
         result = await view(
             self.request.delete(),
             self.viewset.path_schema(**{self.pk_att: obj.pk}),
