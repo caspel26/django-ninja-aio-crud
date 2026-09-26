@@ -462,3 +462,8 @@ class SoftDeleteHttpTestCase(TestCase):
             listed = [item["id"] for item in client.get("/articles").json()["items"]]
             self.assertEqual(listed, [self.live.pk])
             self.assertEqual(client.get(f"/articles/{self.gone.pk}").status_code, 404)
+
+    def test_include_deleted_keeps_deleted_rows_for_bulk_delete(self):
+        viewset = views.SoftDeleteIncludeDeletedTestAPI()
+        queryset = models.SoftDeleteTestModel.objects.all()
+        self.assertIs(viewset._live_rows(queryset), queryset)

@@ -1374,8 +1374,6 @@ class ModelUtil(Generic[ModelT]):
                 "after_save",
                 "on_create_after_save",
                 "on_delete",
-                "save",
-                "delete",
             )
         )
 

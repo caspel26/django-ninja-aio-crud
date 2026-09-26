@@ -975,3 +975,9 @@ class LifecycleConsistencyTests(TestCase):
         await NullableHookModel.aupdate(obj, {"shout": True})
         await obj.arefresh_from_db()
         self.assertEqual(obj.name, "QUIET")
+
+    async def test_public_serializer_save_fires_field_update_hooks(self):
+        obj = await HookPlainModel.objects.acreate(name="saved", status="draft")
+        obj.status = "published"
+        await HookPlainSerializer().save(obj)
+        self.assertEqual(self._events(), ["ser_update_status"])
