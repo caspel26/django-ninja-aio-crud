@@ -57,6 +57,13 @@ class ClassifyFieldsTestCase(TestCase):
         config = _classify_fields(models.TestModelSerializerWithReadCustoms)
         self.assertIsInstance(config["list_display"], tuple)
 
+    def test_update_optionals_are_editable(self):
+        """Fields declared as update optionals are not readonly."""
+        config = _classify_fields(models.TestModelSerializerForeignKey)
+        self.assertNotIn("test_model_serializer", config["readonly_fields"])
+        self.assertNotIn("description", config["readonly_fields"])
+        self.assertIn("name", config["readonly_fields"])
+
     def test_custom_fields_are_readonly(self):
         """Custom fields from get_custom_fields should be readonly."""
         config = _classify_fields(models.TestModelSerializerWithReadCustoms)
@@ -167,6 +174,11 @@ class RegisterAdminTestCase(TestCase):
         decorator = register_admin(site=self.test_site)
         result = decorator(models.TestModelSerializerWithReadCustoms)
         self.assertIs(result, models.TestModelSerializerWithReadCustoms)
+
+    def test_rejects_classes_that_are_not_model_serializers(self):
+        with self.assertRaisesRegex(TypeError, "expects a ModelSerializer"):
+            register_admin(models.TestModel, site=self.test_site)
+        self.assertNotIn(models.TestModel, self.test_site._registry)
 
 
 @tag("admin")
