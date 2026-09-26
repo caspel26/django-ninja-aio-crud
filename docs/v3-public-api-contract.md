@@ -309,9 +309,12 @@ helpers become private implementation details behind the CRUD facade.
 
 ## Version 2 compatibility decisions
 
-Version 3 does not preserve aliases merely because they existed in version 2.
-Temporary aliases may exist during branch development, but Step 13 removes the
-entries marked "remove" before the final release.
+Version 3 does not promote version 2 APIs, but it does not break code that can
+keep working: every entry marked "Replace", "Make internal", "Rename", or
+"Deprecate" stays available as an alias that emits a `DeprecationWarning`,
+and version 4 removes those aliases. Only APIs whose meaning changed under the
+same name (for example `Serializer.create()` and `create_view()` becoming
+sync) break in version 3, and the migration guide lists each of them.
 
 | Version 2 API | Version 3 disposition |
 | --- | --- |
@@ -353,6 +356,8 @@ entries marked "remove" before the final release.
 | `create_view()`, `list_view()`, `retrieve_view()`, `update_view()`, `delete_view()` (async) | Now register sync endpoints; async factories are `acreate_view()` etc. |
 | `bulk_create_view()`, `bulk_update_view()`, `bulk_delete_view()` (async) | Now register sync endpoints; async factories are `abulk_create_view()` etc. |
 | `@action`/`@on` handlers (async only) | Accept `def` or `async def`; hooks follow the handler |
+| `@action` (viewsets only) | Also available on `APIView` for non-detail actions; detail actions and `@on` still require `APIViewSet` |
+| Action auth for verbs without `<verb>_auth` (`put`) | Security fix: previously public; `put` now follows `patch_auth`, `head` follows `get_auth`, others fall back to `auth` |
 | `@api_get`/`@api_post`/`@api_put`/`@api_patch`/`@api_delete`/`@api_options`/`@api_head` | Deprecate in favor of `@action`, which also works on `APIView` (non-detail only); remove in version 4 |
 | `register_admin`, `Branding` top-level imports | Deprecate at top level; import from `ninja_aio.admin`/`ninja_aio.docs` |
 | `CreateSerializer`/`ReadSerializer`/`UpdateSerializer`/`DetailSerializer` inner classes | Deprecate in favor of `Schemas` + `SchemaConfig`; remove in version 4 |

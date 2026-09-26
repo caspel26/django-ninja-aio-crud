@@ -649,7 +649,8 @@ Each step must leave the branch in a coherent, testable state.
 
 ### Step 13: Remove version 2 APIs from the version 3 surface
 
-- Remove approved deprecated aliases and public `.util` access.
+- Turn approved version 2 APIs into deprecated aliases (removed in version 4)
+  and move framework code off them, including public `.util` access.
 - Retain `_util` only where required internally.
 - Extend `@action` to `APIView` (non-detail only, auth from the view) and add
   `OPTIONS`/`HEAD` to `HttpMethod`; deprecate the `@api_*` decorators, which
