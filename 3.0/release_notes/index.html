@@ -3352,78 +3352,93 @@
 
 <h1 id="release-notes"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M5.5 9A1.5 1.5 0 0 0 7 7.5 1.5 1.5 0 0 0 5.5 6 1.5 1.5 0 0 0 4 7.5 1.5 1.5 0 0 0 5.5 9m11.91 2.58c.36.36.59.86.59 1.42 0 .55-.22 1.05-.59 1.41l-5 5a1.996 1.996 0 0 1-2.83 0l-6.99-6.99C2.22 12.05 2 11.55 2 11V6c0-1.11.89-2 2-2h5c.55 0 1.05.22 1.41.58zm-3.87-5.87 1-1 6.87 6.87c.37.36.59.87.59 1.42s-.22 1.05-.58 1.41l-5.38 5.38-1-1L20.75 13z"/></svg></span> Release Notes<a class="headerlink" href="#release-notes" title="Permanent link">&para;</a></h1>
 <div class="release-selector"><label class="release-selector-label">Select version</label><div class="release-dropdown" id="release-dropdown"><button class="release-dropdown-toggle" id="release-toggle" type="button"><span class="release-dropdown-toggle-text">v3.0.0  —  Sep 27, 2026</span><svg class="release-dropdown-chevron" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M7 10l5 5 5-5z"/></svg></button><div class="release-dropdown-menu" id="release-menu"><button class="release-dropdown-item release-dropdown-item--active" data-value="v3-0-0" type="button"><span class="release-dropdown-item-tag">v3.0.0</span><span class="release-dropdown-latest">Latest</span><span class="release-dropdown-item-date">Sep 27, 2026</span></button><button class="release-dropdown-item" data-value="v2-36-0" type="button"><span class="release-dropdown-item-tag">v2.36.0</span><span class="release-dropdown-item-date">Sep 21, 2026</span></button></div></div></div>
-<div class="release-display"><div class="release-card release-card--latest" data-version="v3-0-0"><div class="release-card-header"><h4><a href="https://github.com/caspel26/django-ninja-aio-crud/releases/tag/v3.0.0">v3.0.0</a> <span class="release-badge release-badge--latest">Latest</span></h4><span class="release-card-date">Sep 27, 2026</span></div><div class="release-card-body"><p>Version 3 introduces explicit sync and async APIs, consistent serializer hooks,<br />
-and safer writes. It supports Python 3.10–3.14, Django 5.2–6.0, and Django Ninja<br />
-1.7.x. Review the <a href="../migration/">migration guide</a> before upgrading.</p>
-<h3 id="apis-and-schemas">APIs and schemas</h3>
+<div class="release-display"><div class="release-card release-card--latest" data-version="v3-0-0"><div class="release-card-header"><h4><a href="https://github.com/caspel26/django-ninja-aio-crud/releases/tag/v3.0.0">v3.0.0</a> <span class="release-badge release-badge--latest">Latest</span></h4><span class="release-card-date">Sep 27, 2026</span></div><div class="release-card-body"><hr />
+<h3 id="new-features">✨ New Features</h3>
+<h4 id="explicit-sync-and-async-apis">🔄 Explicit Sync and Async APIs</h4>
+<blockquote>
+<p><code>ninja_aio/models/serializers.py</code>, <code>ninja_aio/views/api.py</code></p>
+</blockquote>
+<p>Version 3 gives <code>ModelSerializer</code> and standalone <code>Serializer</code> the same class-based CRUD facade. Plain method names run synchronously; methods prefixed with <code>a</code> run asynchronously. Viewsets can serve either execution mode while retaining the same response contracts and hooks:</p>
+<div class="highlight"><pre><span></span><code><span class="nd">@api</span><span class="o">.</span><span class="n">viewset</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">Article</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">ArticleViewSet</span><span class="p">(</span><span class="n">APIViewSet</span><span class="p">):</span>
+    <span class="n">execution_mode</span> <span class="o">=</span> <span class="s2">"sync"</span>  <span class="c1"># async remains the default</span>
+</code></pre></div>
+
+<p>Use <code>Article.create(data)</code> in sync code and <code>await Article.acreate(data)</code> in async code. The same naming applies to updates, serialization, lookups, and bulk operations. This supports WSGI applications, ASGI applications, management commands, and background tasks through one public API.</p>
+<h4 id="declarative-schemas">🧩 Declarative Schemas</h4>
+<blockquote>
+<p><code>ninja_aio/models/config.py</code>, <code>ninja_aio/models/serializers.py</code>, <code>ninja_aio/models/checks.py</code></p>
+</blockquote>
+<p>The <code>Schemas</code> declaration and <code>SchemaConfig</code> replace scattered inner serializer declarations. Create, update, read, and detail schemas are generated lazily, cached, and validated by Django's system checks:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">django.db</span><span class="w"> </span><span class="kn">import</span> <span class="n">models</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">ninja_aio</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModelSerializer</span><span class="p">,</span> <span class="n">SchemaConfig</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Article</span><span class="p">(</span><span class="n">ModelSerializer</span><span class="p">):</span>
+    <span class="n">title</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">CharField</span><span class="p">(</span><span class="n">max_length</span><span class="o">=</span><span class="mi">200</span><span class="p">)</span>
+
+    <span class="k">class</span><span class="w"> </span><span class="nc">Schemas</span><span class="p">:</span>
+        <span class="n">create</span> <span class="o">=</span> <span class="n">SchemaConfig</span><span class="p">(</span><span class="n">fields</span><span class="o">=</span><span class="p">[</span><span class="s2">"title"</span><span class="p">])</span>
+        <span class="n">update</span> <span class="o">=</span> <span class="n">SchemaConfig</span><span class="p">(</span><span class="n">optionals</span><span class="o">=</span><span class="p">[(</span><span class="s2">"title"</span><span class="p">,</span> <span class="nb">str</span><span class="p">)])</span>
+        <span class="n">read</span> <span class="o">=</span> <span class="n">SchemaConfig</span><span class="p">(</span><span class="n">fields</span><span class="o">=</span><span class="p">[</span><span class="s2">"id"</span><span class="p">,</span> <span class="s2">"title"</span><span class="p">])</span>
+</code></pre></div>
+
+<p>Foreign-key inputs accept both the field name and its <code>_id</code> spelling while preserving custom aliases. The public package also ships type information and a <code>py.typed</code> marker.</p>
+<h4 id="structured-bulk-results">📦 Structured Bulk Results</h4>
+<blockquote>
+<p><code>ninja_aio/models/utils.py</code>, <code>ninja_aio/types.py</code></p>
+</blockquote>
+<p>Bulk writes expose typed success/error results and protect each item independently. If an item's hook fails after writing to the database, that item's row and hook writes roll back; other successful items remain saved. Bulk delete runs delete hooks for every object, and bulk update/delete apply object permissions to each item.</p>
+<h4 id="api-mounts-mcp-and-admin">🤖 API Mounts, MCP, and Admin</h4>
+<blockquote>
+<p><code>ninja_aio/mcp/</code>, <code>ninja_aio/admin.py</code>, <code>ninja_aio/api.py</code></p>
+</blockquote>
+<p>Repeated API mounts receive unique OpenAPI operation IDs and distinct MCP tool names derived from their routes. Generated admin forms include optional update fields, making the serializer's editable field contract available in Django Admin too.</p>
+<hr />
+<h3 id="bug-fixes-and-hardening">🐛 Bug Fixes and Hardening</h3>
+<h4 id="transactions-and-hook-parity">🛡️ Transactions and Hook Parity</h4>
+<blockquote>
+<p><code>ninja_aio/models/hooks.py</code>, <code>ninja_aio/models/utils.py</code></p>
+</blockquote>
+<p>Sync and async operations now run equivalent hooks in a consistent order. Writes with post-write hooks and nested writes roll back when a hook fails. Field update hooks run only when the client supplies a field and its value changes. Async hooks use the <code>a</code> prefix; incompatible declarations fail during startup checks.</p>
+<h4 id="patch-and-error-handling">📝 PATCH and Error Handling</h4>
+<blockquote>
+<p><code>ninja_aio/models/serializers.py</code>, <code>ninja_aio/exceptions.py</code></p>
+</blockquote>
+<p>PATCH changes only supplied fields, so omitted fields retain their values. An explicit <code>null</code> is saved when the update schema permits it. Database constraint failures return <code>409</code>, ambiguous object lookups return <code>400</code>, and authentication failures return <code>401</code> by default.</p>
+<h4 id="authentication-and-object-permissions">🔐 Authentication and Object Permissions</h4>
+<blockquote>
+<p><code>ninja_aio/auth.py</code>, <code>ninja_aio/views/mixins.py</code>, <code>ninja_aio/helpers/api.py</code></p>
+</blockquote>
+<p>JWT authentication keeps decoded claims local to each request, including concurrent requests from different users. Sync endpoints can use async authentication handlers. Detail actions, bulk operations, and many-to-many endpoints enforce object permissions; soft-delete visibility and restore/delete permissions apply consistently across endpoint styles.</p>
+<hr />
+<h3 id="performance-improvements">⚡ Performance Improvements</h3>
+<blockquote>
+<p><code>ninja_aio/models/utils.py</code>, <code>ninja_aio/models/serializers.py</code>, <code>ninja_aio/models/transformations.py</code></p>
+</blockquote>
+<p>Eligible simple async bulk creates use a single sync bridge while retaining per-item transactions. Models with async hooks or custom relation handling continue through the async path. Relation serialization reuses populated caches, and foreign-key input schemas are built in one pass.</p>
+<p>Compared with the previous v3 implementation, recorded benchmark runs measured roughly <strong>39–42% less cold FK schema time</strong> and <strong>64–77% less simple bulk-create time</strong> across SQLite and PostgreSQL. These are microbenchmarks, not production latency guarantees; see the <a href="https://github.com/caspel26/django-ninja-aio-crud/blob/v3.0.0/benchmarks/README.md">benchmark methodology</a>.</p>
+<hr />
+<h3 id="documentation-and-examples">📚 Documentation and Examples</h3>
+<p>The rebuilt docs cover sync/async APIs, schemas, hooks, transactions, permissions, and integrations, with executable examples and migration recipes. Older documentation versions retain their historical content and use the new site style.</p>
+<p>The runnable library app mounts the same domain through sync and async APIs, including authentication, permissions, relations, bulk writes, Admin, background tasks, and MCP. Its <strong>63 tests</strong> cover request parity, complete user journeys, rollback, concurrent user isolation, and query scaling. A real blog migration is documented with a reproducible patch.</p>
+<p>CI covers Python/Django combinations, PostgreSQL, browser checks, and hash-verified dependency locks. Publishing uses a verified Flit CLI/backend pair.</p>
+<hr />
+<h3 id="breaking-changes-and-migration">⚠️ Breaking Changes and Migration</h3>
+<p>This is a major release. Some async methods previously used plain names: change awaited calls to their <code>a</code> counterparts, and rename async hooks similarly. Review the changed PATCH, authentication, permission, and error behavior before upgrading.</p>
+<p>Compatibility aliases emit <code>DeprecationWarning</code> and are scheduled for removal in version 4. Python <strong>3.10–3.14</strong>, Django <strong>5.2–6.0</strong>, and Django Ninja <strong>1.7.x</strong> are supported.</p>
+<p>See the <a href="../migration/">migration guide</a>, <a href="../migration/breaking-changes/">breaking changes</a>, <a href="../migration/deprecations/">deprecations</a>, and <a href="../migration/recipes/">migration recipes</a>.</p>
+<hr />
+<h3 id="summary">🎯 Summary</h3>
+<p>Version 3 makes sync and async APIs explicit, unifies schema declarations and hook behavior, and strengthens transaction and permission handling. Migration guidance and a tested example application accompany the public API changes.</p>
+<p><strong>Key benefits:</strong></p>
 <ul>
-<li>Plain serializer methods are synchronous; async methods use the <code>a</code> prefix,<br />
-  such as <code>acreate</code>, <code>aupdate</code>, and <code>amodel_dump</code>. Both <code>ModelSerializer</code> and<br />
-  standalone <code>Serializer</code> expose class-based CRUD methods.</li>
-<li>Viewsets support <code>execution_mode = "sync"</code> alongside the default async mode.</li>
-<li>Declare create, update, read, and detail schemas using <code>Schemas</code> and<br />
-<code>SchemaConfig</code>. Schema attributes are generated lazily and cached.</li>
-<li>Foreign-key input accepts both the field name and its <code>_id</code> spelling while<br />
-  preserving custom aliases. Relation loading avoids unnecessary queries and<br />
-  reuses populated relation caches.</li>
-<li>Public APIs include type information and the <code>py.typed</code> marker.</li>
-</ul>
-<h3 id="writes-hooks-and-errors">Writes, hooks, and errors</h3>
-<ul>
-<li>PATCH changes only supplied fields. Explicit <code>null</code> is saved when the input<br />
-  schema permits it; omitted fields keep their existing values.</li>
-<li>Sync and async operations run equivalent hooks. Async hooks use the <code>a</code><br />
-  prefix, and incompatible hook declarations fail during startup checks.</li>
-<li>Writes with post-write hooks and nested writes roll back on failure. Bulk<br />
-  operations protect each item independently and return typed success/error<br />
-  results; failed items do not discard successful items.</li>
-<li>Bulk delete invokes delete hooks for each object. Field update hooks run only<br />
-  when a supplied field changes.</li>
-<li>Database constraint failures return <code>409</code>; ambiguous object lookups return<br />
-<code>400</code>. Authentication failures return <code>401</code> by default.</li>
-</ul>
-<h3 id="authentication-permissions-and-integrations">Authentication, permissions, and integrations</h3>
-<ul>
-<li>JWT authentication keeps decoded claims local to each request. Sync endpoints<br />
-  can use async authentication handlers.</li>
-<li>Detail actions, bulk updates/deletes, and many-to-many operations enforce<br />
-  object permissions. Soft-delete visibility and restore/delete permissions<br />
-  apply consistently across endpoint styles.</li>
-<li>Repeated API mounts receive unique OpenAPI operation IDs and distinct MCP tool<br />
-  names derived from their routes.</li>
-<li>Generated admin forms include optional update fields.</li>
-</ul>
-<h3 id="performance">Performance</h3>
-<ul>
-<li>Simple async bulk creates use a single sync bridge when model customizations<br />
-  permit it, retaining per-item transactions. Models with async hooks or custom<br />
-  relation handling continue through the async path.</li>
-<li>Foreign-key input schemas are built in one pass. Compared with the previous<br />
-  v3 implementation, the recorded benchmark runs measured roughly 39–42% less<br />
-  cold FK schema time and 64–77% less simple bulk-create time across SQLite and<br />
-  PostgreSQL. These are microbenchmarks, not production latency guarantees; see<br />
-<a href="https://github.com/caspel26/django-ninja-aio-crud/blob/v3.0.0/benchmarks/README.md">the benchmark methodology</a>.</li>
-</ul>
-<h3 id="documentation-and-examples">Documentation and examples</h3>
-<ul>
-<li>Rebuilt documentation includes API references, executable examples,<br />
-  migration recipes, breaking changes, and deprecation guidance.</li>
-<li>The runnable library app mounts the same domain through sync and async APIs,<br />
-  with authentication, permissions, relations, hooks, bulk operations, admin,<br />
-  background tasks, and MCP. Its 63 tests cover both request parity and complete<br />
-  user journeys, including rollback and concurrent user isolation.</li>
-<li>A real blog migration is documented with a reproducible patch.</li>
-<li>CI covers supported Python/Django combinations, PostgreSQL, browser checks,<br />
-  and hash-verified dependency locks. Publishing uses a verified Flit tool pair.</li>
-</ul>
-<h3 id="migration">Migration</h3>
-<p>Some async methods previously used plain names: change awaited calls to their<br />
-<code>a</code> counterparts. Rename async hooks similarly, and review changed PATCH,<br />
-authentication, permission, and error behavior. Existing compatibility aliases<br />
-emit <code>DeprecationWarning</code> and are scheduled for removal in version 4.</p>
-<p>See <a href="../migration/breaking-changes/">breaking changes</a>,<br />
-<a href="../migration/deprecations/">deprecations</a>, and<br />
-<a href="../migration/recipes/">migration recipes</a>.</p></div><div class="release-card-footer"><a href="https://github.com/caspel26/django-ninja-aio-crud/releases/tag/v3.0.0">GitHub Release</a> · <a href="https://github.com/caspel26/django-ninja-aio-crud/compare/v2.36.0...v3.0.0">Diff</a></div></div>
+<li>🔄 Matching sync and async APIs across viewsets, serializers, commands, and tasks.</li>
+<li>🧩 Lazy, cached schemas with clear declarations and foreign-key aliases.</li>
+<li>🛡️ Transaction-protected hooks and per-item bulk rollback.</li>
+<li>🔐 Consistent object permissions and request-local JWT state.</li>
+<li>⚡ Faster eligible bulk writes and cold foreign-key schema generation.</li>
+<li>📚 Rebuilt documentation, migration recipes, and a runnable application.</li>
+</ul></div><div class="release-card-footer"><a href="https://github.com/caspel26/django-ninja-aio-crud/releases/tag/v3.0.0">GitHub Release</a> · <a href="https://github.com/caspel26/django-ninja-aio-crud/compare/v2.36.0...v3.0.0">Diff</a></div></div>
 <div class="release-card" data-version="v2-36-0" style="display:none"><div class="release-card-header"><h4><a href="https://github.com/caspel26/django-ninja-aio-crud/releases/tag/v2.36.0">v2.36.0</a></h4><span class="release-card-date">Sep 21, 2026</span></div><div class="release-card-body"><hr />
 <h3 id="new-features">✨ New Features</h3>
 <h4 id="configurable-error-schema">🧩 Configurable Error Schema</h4>
