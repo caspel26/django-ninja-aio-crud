@@ -1,156 +1,74 @@
-# :material-code-json: ORJSON Renderer
-
-Django Ninja AIO uses an internal ORJSON-based renderer for fast JSON serialization. It is enabled automatically when you use `NinjaAIO` — no configuration required.
-
-<div class="grid cards" markdown>
-
--   :material-lightning-bolt:{ .lg .middle } **Fast**
-
-    ---
-
-    ORJSON is significantly faster than Python's built-in `json` module
-
--   :material-cog:{ .lg .middle } **Configurable**
-
-    ---
-
-    Customize serialization options via Django settings
-
--   :material-arrow-right-bold:{ .lg .middle } **Passthrough**
-
-    ---
-
-    `HttpResponse` objects bypass the renderer automatically
-
-</div>
-
+---
+type: reference
+title: JSON renderer and parser
+description: Lookup page for the orjson renderer and parser that NinjaAIO uses by default.
 ---
 
-## :material-cog: Configuration
+# JSON renderer and parser
 
-Configure serialization options via Django settings:
+`NinjaAIO` renders responses with `ORJSONRenderer` and parses JSON request
+bodies with `ORJSONParser`. Both use [orjson](https://github.com/ijl/orjson).
+You do not need to configure them.
 
-=== "Single option"
+```python
+from ninja_aio.renders import ORJSONRenderer
+from ninja_aio.parsers import ORJSONParser
+```
 
-    ```python
-    # settings.py
-    import orjson
+## ORJSONRenderer
 
-    NINJA_AIO_ORJSON_RENDERER_OPTION = orjson.OPT_INDENT_2
-    ```
+A Django Ninja `BaseRenderer` with `media_type = "application/json"`.
 
-=== "Multiple options"
+| Value in the response | Rendered as |
+| --- | --- |
+| `bytes` | Base64 string |
+| `IPv4Address`, `IPv6Address`, pydantic `AnyUrl` | String |
+| Django `HttpResponse` returned by the view | Sent as is |
+| Anything else | orjson output |
 
-    ```python
-    # settings.py
-    import orjson
+| Attribute | Type | Default | Description |
+| --- | --- | --- | --- |
+| `option` | `int \| None` | `NINJA_AIO_ORJSON_RENDERER_OPTION` | orjson option flags passed to `orjson.dumps` |
 
-    NINJA_AIO_ORJSON_RENDERER_OPTION = (
-        orjson.OPT_INDENT_2 | orjson.OPT_NON_STR_KEYS
-    )
-    ```
+## ORJSONParser
 
-=== "No configuration"
+A Django Ninja `Parser` that reads the JSON body with `orjson.loads`. Form data
+and files are parsed as in Django Ninja.
 
-    ```python
-    # settings.py
-    # If NINJA_AIO_ORJSON_RENDERER_OPTION is not set,
-    # default orjson.dumps options are used (compact output).
-    ```
+## Renderer options
 
-### Available options
+Set `NINJA_AIO_ORJSON_RENDERER_OPTION` to any orjson option. Combine flags with
+`|`:
 
-| Option | Description |
-|---|---|
-| `OPT_INDENT_2` | Pretty-print with 2-space indentation |
-| `OPT_NON_STR_KEYS` | Allow non-string dict keys |
-| `OPT_SORT_KEYS` | Sort dictionary keys in output |
-| `OPT_NAIVE_UTC` | Serialize naive datetimes as UTC |
-| `OPT_UTC_Z` | Use `Z` suffix instead of `+00:00` for UTC |
-| `OPT_OMIT_MICROSECONDS` | Omit microseconds from datetime output |
+```python title="settings.py"
+import orjson
 
-!!! tip
-    Combine options with the `|` (bitwise OR) operator. See the [orjson documentation](https://github.com/ijl/orjson#option) for the full list.
+NINJA_AIO_ORJSON_RENDERER_OPTION = orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS
+```
 
----
+The value is read once, when the framework is imported. See
+[Settings](../settings.md).
 
-## :material-arrow-right-bold: HttpResponse Passthrough
+## Use a different renderer or parser
 
-The renderer automatically detects when you return a Django `HttpResponse` (or any `HttpResponseBase` subclass) and passes it through without JSON serialization.
+Pass an instance to `NinjaAIO`:
 
-=== "Custom content type"
+```python title="blog/api.py"
+from ninja.parser import Parser
+from ninja.renderers import JSONRenderer
 
-    ```python
-    from django.http import HttpResponse
+from ninja_aio import NinjaAIO
 
-    @api.get("/public-key")
-    def get_public_key(request):
-        return HttpResponse(
-            settings.JWT_PUBLIC_KEY.as_pem(),
-            content_type="application/x-pem-file",
-            status=200,
-        )
-    ```
+api = NinjaAIO(title="Blog API", renderer=JSONRenderer(), parser=Parser())
+```
 
-=== "Streaming response"
+| Argument | Type | Default | Description |
+| --- | --- | --- | --- |
+| `renderer` | `BaseRenderer \| None` | `None` | `None` uses `ORJSONRenderer()` |
+| `parser` | `Parser \| None` | `None` | `None` uses `ORJSONParser()` |
 
-    ```python
-    from django.http import StreamingHttpResponse
+## See also
 
-    @api.get("/download")
-    def download_file(request):
-        return StreamingHttpResponse(
-            file_iterator(),
-            content_type="application/octet-stream",
-        )
-    ```
-
-!!! warning "Important"
-    When returning an `HttpResponse` directly, set the `status` parameter on the `HttpResponse` itself. Do not use a tuple return like `return 200, HttpResponse(...)` — the response bypasses the renderer entirely.
-
----
-
-## :material-frequently-asked-questions: Supported Types
-
-ORJSON natively handles types that Python's `json` module cannot:
-
-| Type | Behavior |
-|---|---|
-| `datetime`, `date`, `time` | ISO 8601 format |
-| `UUID` | String representation |
-| `Decimal` | Serialized as number |
-| `numpy` arrays | Serialized as lists |
-| `dataclass` instances | Serialized as dicts |
-| `bytes` | Not supported — convert to string first |
-
----
-
-## :material-arrow-right-circle: See Also
-
-<div class="grid cards" markdown>
-
--   :material-view-grid:{ .lg .middle } **APIViewSet**
-
-    ---
-
-    Auto-generated CRUD endpoints using orjson rendering
-
-    [:octicons-arrow-right-24: Learn more](../views/api_view_set.md)
-
--   :material-file-document-edit:{ .lg .middle } **ModelSerializer**
-
-    ---
-
-    Schema generation for fast JSON serialization
-
-    [:octicons-arrow-right-24: Learn more](../models/model_serializer.md)
-
--   :material-rocket-launch:{ .lg .middle } **Quick Start**
-
-    ---
-
-    Get up and running in minutes
-
-    [:octicons-arrow-right-24: Get started](../../getting_started/quick_start.md)
-
-</div>
+- [Settings](../settings.md)
+- [Viewsets](../../guides/viewsets.md)
+- [Errors](../../guides/errors.md)

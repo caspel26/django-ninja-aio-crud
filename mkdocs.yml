@@ -60,20 +60,22 @@ nav:
     - Request lifecycle: concepts/lifecycle.md
     - Transactions: concepts/transactions.md
     - Schema generation: concepts/schema-generation.md
-  - API Reference:
-    - Views:
-      - APIView: api/views/api_view.md
-      - APIViewSet: api/views/api_view_set.md
-      - NinjaAIORouter: api/views/router.md
-      - Decorators: api/views/decorators.md
-      - Mixins: api/views/mixins.md
-    - Models:
-      - ModelSerializer: api/models/model_serializer.md
-      - Serializer (Meta-driven): api/models/serializers.md
+  - Reference:
+    - api/index.md
+    - ModelSerializer: api/models/model_serializer.md
+    - Serializer: api/models/serializers.md
+    - SchemaConfig: api/schema-config.md
+    - APIViewSet: api/views/api_view_set.md
+    - APIView: api/views/api_view.md
+    - NinjaAIORouter: api/views/router.md
+    - Decorators: api/views/decorators.md
+    - Mixins: api/views/mixins.md
     - Authentication: api/authentication.md
     - Exceptions: api/exceptions.md
     - Pagination: api/pagination.md
-    - Renderers: api/renderers/orjson_renderer.md
+    - JSON renderer: api/renderers/orjson_renderer.md
+    - Types: api/types.md
+    - Settings: api/settings.md
   - Migration:
     - migration/index.md
     - Breaking changes: migration/breaking-changes.md
