@@ -185,3 +185,84 @@ class LegacyMigrationCommandTests(SimpleTestCase):
             with self.assertRaises(ValueError):
                 migrate.export_preview_versions(output, [{"version": "2.36"}])
             self.assertEqual(outside.read_text(), "original")
+
+
+class LegacyDocsIntegrationTests(SimpleTestCase):
+    def test_preparation_preserves_page_metadata_and_copies_the_current_theme(self):
+        import tempfile
+        import yaml
+
+        with tempfile.TemporaryDirectory() as root:
+            worktree = Path(root).resolve() / "wt-2.36"
+            (worktree / "docs").mkdir(parents=True)
+            (worktree / "mkdocs.yml").write_text("site_name: Legacy\ntheme:\n  name: material\nextra:\n  old: kept\nnav: []\n")
+            (worktree / "docs/index.md").write_text("---\ntitle: Legacy landing\n---\n# Old home\n")
+            (worktree / "docs/extra.css").write_text("old styles")
+            with mock.patch.object(migrate.subprocess, "run") as run:
+                prepared = migrate.prepare("2.36", "5a07d01", Path(root))
+            self.assertEqual(prepared, worktree)
+            self.assertEqual(run.call_args_list[1].args[0][-3:], ["--", str(worktree), "5a07d01"])
+            config = yaml.safe_load((worktree / "mkdocs.yml").read_text())
+            self.assertEqual(config["extra"]["nac_version"], "2.36")
+            self.assertEqual(config["extra"]["old"], "kept")
+            self.assertIn("stylesheets/legacy.css", config["extra_css"])
+            self.assertTrue((worktree / "docs/images/brand/mark-dark-64.png").is_file())
+            self.assertFalse((worktree / "docs/extra.css").exists())
+            self.assertFalse((worktree / "overrides/home.html").exists())
+            self.assertIn("Legacy landing", (worktree / "docs/index.md").read_text())
+            self.assertIn("legacy_home.html", (worktree / "docs/index.md").read_text())
+            self.assertIn("Upgrade to 3.0", (worktree / "overrides/legacy_home.html").read_text())
+
+    def test_legacy_home_without_frontmatter_and_missing_home_are_supported(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as root:
+            worktree = Path(root)
+            migrate.adapt_home(worktree)
+            (worktree / "docs").mkdir()
+            (worktree / "docs/index.md").write_text("# Old home")
+            migrate.adapt_home(worktree)
+            self.assertIn("legacy_home.html", (worktree / "docs/index.md").read_text())
+        result = migrate.replace_block("site_name: Legacy\n", "theme", "theme:\n  name: material\n")
+        self.assertIn("site_name: Legacy", result)
+        self.assertTrue(result.endswith("  name: material\n"))
+
+    def test_published_metadata_is_read_as_json_without_invoking_a_shell(self):
+        with mock.patch.object(migrate.subprocess, "check_output", return_value='[{"version":"2.36"}]') as command:
+            self.assertEqual(migrate.published_versions(), [{"version": "2.36"}])
+        self.assertEqual(command.call_args.args[0], ["git", "show", "origin/gh-pages:versions.json"])
+
+    def test_preview_cli_rejects_missing_or_outside_output_before_running_git(self):
+        for argv in (["migrate.py", "build"], ["migrate.py", "build", "--out", "/etc/legacy-preview"]):
+            with self.subTest(argv=argv), mock.patch.object(sys, "argv", argv), mock.patch.object(migrate, "published_versions") as published, mock.patch("sys.stderr"):
+                with self.assertRaises(SystemExit) as exit_status:
+                    migrate.main()
+                self.assertEqual(exit_status.exception.code, 2)
+            published.assert_not_called()
+
+    def test_help_entry_point_does_not_read_history_or_build_anything(self):
+        import runpy
+
+        with mock.patch.object(sys, "argv", ["migrate.py", "--help"]), mock.patch.dict(sys.modules, {"home": home}), mock.patch("subprocess.check_output") as git, mock.patch("sys.stdout"):
+            with self.assertRaises(SystemExit) as exit_status:
+                runpy.run_path(str(ROOT / "docs-legacy/migrate.py"), run_name="__main__")
+        self.assertEqual(exit_status.exception.code, 0)
+        git.assert_not_called()
+
+    def test_partial_or_zero_benchmarks_do_not_break_legacy_rendering(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as root:
+            worktree = Path(root)
+            (worktree / "docs").mkdir()
+            page = worktree / "docs/comparison.md"
+            page.write_text("# No benchmark table")
+            self.assertEqual(home._benchmarks(worktree), "")
+            page.write_text("| Operation | ninja-aio |\n| List | n/a |\n")
+            self.assertEqual(home._benchmarks(worktree), "")
+            page.write_text("| Operation | ninja-aio | Other |\n| List | 0.0 | 0.0 |\n")
+            self.assertIn("0.00 ms", home._benchmarks(worktree))
+            (worktree / "ninja_aio/views").mkdir(parents=True)
+            (worktree / "ninja_aio/models.py").write_text("class Serializer(): pass\n")
+            (worktree / "ninja_aio/views/api.py").write_text("def bulk_create(): pass\n")
+            self.assertIn("Bulk operations", home.render_home(worktree))

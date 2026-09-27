@@ -216,7 +216,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("mode", choices=["build", "deploy"])
     parser.add_argument("versions", nargs="*", type=validate_version, help="Versions to rebuild (default: all published 1.x/2.x)")
-    parser.add_argument("--out", type=preview_directory, help="Preview directory within the repository or system temporary folder")
+    parser.add_argument("--out", type=pathlib.Path, help="Preview directory within the repository or system temporary folder")
     parser.add_argument("--keep", action="store_true", help="Keep the worktrees after building")
     args = parser.parse_args()
     if args.out is not None:

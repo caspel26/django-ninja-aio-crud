@@ -146,7 +146,7 @@ def _benchmarks(worktree: pathlib.Path) -> str:
     pairs = [(n, float(v.group())) for n, v in zip(names, values) if v]
     if len(pairs) < 2:
         return ""
-    top = max(v for _, v in pairs)
+    top = max(v for _, v in pairs) or 1.0
     bars = []
     for name, value in pairs:
         own = "aio" in name.lower()
