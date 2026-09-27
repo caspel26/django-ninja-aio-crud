@@ -61,7 +61,7 @@ Run the server and visit `/api/docs`.
 
 <div class="nac-signature" markdown>
 
-```python
+```text
 Article.create(data: dict | Schema, *, request: HttpRequest | None = None) -> Article
 ```
 

@@ -30,6 +30,10 @@ jobs:
           cache-dependency-path: docs-tests/package-lock.json
       - name: Install build dependencies
         run: pip install -r docs-tests/requirements.txt
+      - name: Validate Python examples
+        run: |
+          pip install -e '.[mcp]'
+          python -W error::DeprecationWarning docs-tests/python/manage.py test test_examples
       - name: Build documentation
         run: zensical build --strict
       - name: Install browser tests

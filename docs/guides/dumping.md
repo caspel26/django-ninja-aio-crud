@@ -95,9 +95,11 @@ data = Article.model_dump(article)  # no query
 `model_dumps` and `amodel_dumps` accept a list of instances or a queryset. A
 queryset that has not run yet is loaded with its relations in one go.
 
-A foreign key that is `None` counts as loaded. Fields skipped with `only()` or
-`defer()` are not loaded for you: the dump raises
+A foreign key that is `None` counts as loaded. In sync mode, fields skipped
+with `only()` or `defer()` raise
 `ValueError: Synchronous dump requires preloaded fields and relations`.
+Async dumps can load deferred fields, which can add a query per field and
+object. Select the fields your output schema needs before dumping a batch.
 
 ## Forbid queries during a sync dump
 

@@ -14,7 +14,19 @@ npm test
 Use Zensical for the v3 site: the visual baselines were generated with its
 classic theme. `docs/requirements.txt` supports the legacy MkDocs tooling.
 
-The suite checks desktop and mobile visuals, WCAG 2 AA accessibility, keyboard
+Python checks compile every public Python block and execute the quick start,
+tutorial models, standalone serializer, URL wiring, and sync/async publish
+actions directly from the Markdown source:
+
+```sh
+python -m pip install -e '.[mcp]'
+python -W error::DeprecationWarning docs-tests/python/manage.py test test_examples
+```
+
+Partial examples receive their documented model and API context; syntax checks
+alone do not establish that every fragment is a complete runnable program.
+
+The browser suite checks desktop and mobile visuals, WCAG 2 AA accessibility, keyboard
 controls, and cold-load budgets for the homepage, relations guide, and serializer
 reference. It runs against the local `site/` directory and does not deploy.
 
