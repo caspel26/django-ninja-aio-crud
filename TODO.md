@@ -56,6 +56,7 @@
 | 30 | Admin actions from ViewSet | `admin.py` | `@action` endpoints become available as Django Admin actions. `@action("publish")` → admin "Publish selected" action. |
 | 31 | ETag / Conditional requests | `views/api.py` | HTTP caching with `ETag`, `If-None-Match`, `If-Modified-Since` on retrieve/list. |
 | 32 | Deadlock retry in `aatomic` | `decorators/views.py` | Configurable exponential backoff with deadlock detection. |
+| 36 | Redeploy 1.x/2.x docs with the v3 theme | `docs-legacy/` | At the v3 release: preview with `python docs-legacy/migrate.py build --out /tmp/legacy-site`, then `python docs-legacy/migrate.py deploy` (with `GITHUB_TOKEN` set) and push `gh-pages`. |
 
 ---
 

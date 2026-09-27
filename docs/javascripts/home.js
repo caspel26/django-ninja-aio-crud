@@ -117,7 +117,7 @@
     const showcase = home.querySelector(".nac-showcase");
     if (showcase) setupRoutes(showcase, setupFileTabs(showcase));
     home.querySelectorAll("[data-nac-mode]").forEach(setupModeToggle);
-    home.querySelectorAll("[data-spotlight]").forEach(setupSpotlight);
+    home.querySelectorAll("[data-spotlight], .grid.cards > ul > li").forEach(setupSpotlight);
     home.querySelectorAll("[data-nac-copy]").forEach(setupCopy);
   };
 
