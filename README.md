@@ -3,8 +3,8 @@
 </p>
 
 <p align="center">
-  <strong>Async CRUD framework for Django Ninja</strong><br>
-  Automatic schema generation · Filtering · Pagination · Auth · M2M management
+  <strong>CRUD framework for Django Ninja, sync or async</strong><br>
+  Serializer-first schemas · Relations · Filtering · Pagination · Auth · Permissions
 </p>
 
 <p align="center">
@@ -28,560 +28,222 @@
 
 ---
 
+django-ninja-aio-crud builds complete REST APIs on top of Django Ninja. You say
+which fields each operation reads and writes, register a viewset, and get
+create, list, retrieve, update and delete endpoints with validation,
+pagination and interactive docs. The same serializer is also a CRUD API you can
+call from Python, in sync or async code.
+
 ## Features
 
 | | Feature | Description |
 |---|---|---|
-| **🔒 Type Safety** | Generic classes | Full IDE autocomplete and type checking with generic `ModelUtil`, `Serializer`, and `APIViewSet` |
-| **Meta-driven Serializer** | Dynamic schemas | Generate CRUD schemas for existing Django models without changing base classes |
-| **Async CRUD ViewSets** | Full operations | Create, list, retrieve, update, delete — all async |
-| **Auto Schemas** | Pydantic generation | Automatic read/create/update schemas from `ModelSerializer` |
-| **Dynamic Query Params** | Runtime schemas | Built with `pydantic.create_model` for flexible filtering |
-| **Per-method Auth** | Granular control | `auth`, `get_auth`, `post_auth`, etc. |
-| **Async Pagination** | Customizable | `PageNumberPagination`, `CursorPagination`, or custom — DB-level slicing |
-| **M2M Relations** | Add/remove/list | Endpoints via `M2MRelationSchema` with filtering support |
-| **Reverse Relations** | Nested serialization | Automatic handling of reverse FK and M2M |
-| **Nested Writes** | Atomic creation | Create a parent and owned reverse-FK children in one request |
-| **Auto Admin Relations** | Inlines and widgets | Generate FK/O2O inlines and standard M2M dual-list widgets |
-| **Bulk Operations** | Create/update/delete | Opt-in bulk endpoints with partial success semantics and configurable response fields |
-| **Custom Actions** | `@action` decorator | Detail and list actions with auth inheritance, custom decorators, and auto URL generation |
-| **Lifecycle Hooks** | Extensible | `before_save`, `after_save`, `custom_actions`, `on_delete`, and more |
-| **Schema Validators** | Pydantic validators | `@field_validator` and `@model_validator` on serializer classes |
-| **ORJSON Renderer** | Performance | Built-in fast JSON rendering via `NinjaAIO` |
-| **AI Agent Integration** | MCP tools | Expose ViewSets as [MCP](https://modelcontextprotocol.io) tools for any MCP client |
+| ⚡ | Sync and async | Every viewset runs async by default, or sync with `execution_mode = "sync"` |
+| 🐍 | Python CRUD API | `create`, `get`, `update`, `destroy`, `model_dump` and their async versions on every serializer |
+| 📐 | Schemas | Declare `create`, `update`, `read` and `detail` with `class Schemas` and `SchemaConfig` |
+| 🔗 | Relations | Nested reads, relations as ids, and nested writes for child objects |
+| 📦 | Bulk operations | Bulk create, update and delete with per-item results |
+| 🔍 | Filtering | Filter, search, ordering and pagination mixins |
+| 🛡️ | Permissions | Viewset and object-level permission checks, including role-based access |
+| 🗑️ | Soft delete | Mark rows as deleted instead of removing them |
+| 🔑 | Authentication | JWT bearer and cookie auth, with per-method settings |
+| 🪝 | Hooks | Reactive `@on_create`, `@on_update` and `@on_delete` hooks on your models |
+| 🧰 | Django admin | Register a `ModelSerializer` in the admin with `@register_admin` |
+| 🤖 | MCP server | Expose your viewsets as [MCP](https://modelcontextprotocol.io) tools |
+| 🔒 | Type safety | Generic `Serializer` and `APIViewSet` classes for IDE autocomplete |
 
----
+## Install
 
-## See It In Action
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/caspel26/django-ninja-aio-crud/main/docs/images/quickstart-demo.gif" alt="django-ninja-aio-crud quick start demo" width="720">
-</p>
-
-<p align="center">
-  A <code>ModelSerializer</code>-based model, wired to a viewset, serving full CRUD in a few lines — no manual schemas or endpoint wiring. See <a href="https://django-ninja-aio.com">the docs</a> for the full walkthrough.
-</p>
-
----
-
-## Quick Start
-
-### Option A: Meta-driven Serializer (existing models)
-
-Use this if you already have Django models and don't want to change their base class.
-
-```python
-from ninja_aio.models import serializers
-from ninja_aio.views import APIViewSet
-from ninja_aio import NinjaAIO
-from . import models
-
-class BookSerializer(serializers.Serializer):
-    class Meta:
-        model = models.Book
-        schema_in = serializers.SchemaModelConfig(fields=["title", "published"])
-        schema_out = serializers.SchemaModelConfig(fields=["id", "title", "published"])
-        schema_update = serializers.SchemaModelConfig(
-            optionals=[("title", str), ("published", bool)]
-        )
-
-api = NinjaAIO()
-
-@api.viewset(models.Book)
-class BookViewSet(APIViewSet):
-    serializer_class = BookSerializer
+```bash
+pip install django-ninja-aio-crud
 ```
 
-### Option B: ModelSerializer (new projects)
+Requires Python 3.10-3.14 and Django Ninja 1.3-1.7.
 
-Define models with built-in serialization for minimal boilerplate.
+## Quick start
 
-**models.py**
+Define the model. A `ModelSerializer` is a normal Django model with a `Schemas`
+class that says which fields each operation reads and writes.
 
 ```python
+# blog/models.py
 from django.db import models
-from ninja_aio.models import ModelSerializer
+from ninja_aio import ModelSerializer, SchemaConfig
 
-class Book(ModelSerializer):
-    title = models.CharField(max_length=120)
-    published = models.BooleanField(default=True)
 
-    class ReadSerializer:
-        fields = ["id", "title", "published"]
+class Article(ModelSerializer):
+    title = models.CharField(max_length=200)
+    body = models.TextField()
+    is_published = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
 
-    class CreateSerializer:
-        fields = ["title", "published"]
-
-    class UpdateSerializer:
-        optionals = [("title", str), ("published", bool)]
+    class Schemas:
+        create = SchemaConfig(
+            fields=["title", "body"],
+            optionals=[("is_published", bool)],
+        )
+        update = SchemaConfig(
+            optionals=[("title", str), ("body", str), ("is_published", bool)],
+        )
+        read = SchemaConfig(
+            fields=["id", "title", "body", "is_published", "created_at"],
+        )
 ```
 
-**views.py**
+Create the API and add the URLs:
 
 ```python
-from ninja_aio import NinjaAIO
-from ninja_aio.views import APIViewSet
-from .models import Book
+# blog/api.py
+from ninja_aio import NinjaAIO, APIViewSet
 
-api = NinjaAIO()
+from .models import Article
 
-@api.viewset(Book)
-class BookViewSet(APIViewSet):
+api = NinjaAIO(title="Blog API")
+
+
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
     pass
 ```
 
-> Visit `/docs` — CRUD endpoints ready.
-
----
-
-## Query Filtering
-
 ```python
-@api.viewset(Book)
-class BookViewSet(APIViewSet):
-    query_params = {"published": (bool, None), "title": (str, None)}
+# project/urls.py
+from django.urls import path
 
-    async def a(self, queryset, filters):
-        if filters.get("published") is not None:
-            queryset = queryset.filter(published=filters["published"])
-        if filters.get("title"):
-            queryset = queryset.filter(title__icontains=filters["title"])
-        return queryset
-```
+from blog.api import api
 
-```
-GET /book/?published=true&title=python
-```
-
----
-
-## Many-to-Many Relations
-
-```python
-from ninja_aio.schemas import M2MRelationSchema
-
-class Tag(ModelSerializer):
-    name = models.CharField(max_length=50)
-    class ReadSerializer:
-        fields = ["id", "name"]
-
-class Article(ModelSerializer):
-    title = models.CharField(max_length=120)
-    tags = models.ManyToManyField(Tag, related_name="articles")
-    class ReadSerializer:
-        fields = ["id", "title", "tags"]
-
-@api.viewset(Article)
-class ArticleViewSet(APIViewSet):
-    m2m_relations = [
-        M2MRelationSchema(
-            model=Tag,
-            related_name="tags",
-            filters={"name": (str, "")}
-        )
-    ]
-
-    async def tags_query_params_handler(self, queryset, filters):
-        n = filters.get("name")
-        if n:
-            queryset = queryset.filter(name__icontains=n)
-        return queryset
-```
-
-**Endpoints:**
-
-```
-GET  /article/{pk}/tag?name=dev
-POST /article/{pk}/tag/    body: {"add": [1, 2], "remove": [3]}
-```
-
----
-
-## Nested Creation
-
-Declare owned child relations on the parent's create config:
-
-```python
-class Order(ModelSerializer):
-    name = models.CharField(max_length=120)
-
-    class CreateSerializer:
-        fields = ["name"]
-        nested = {"items": OrderItem}
-```
-
-`OrderItem` must be a `ModelSerializer` with a foreign key to `Order` and
-`related_name="items"`. Its parent FK is excluded from the nested input and
-injected automatically. One request creates the order and its items, rolling
-back the whole graph if a child fails. Nested writes are currently create-only.
-
-See [Nested Writes](docs/api/models/model_serializer.md#nested-writes) and
-[Auto Admin Relations](docs/api/admin.md#relations-inlines--m2m-widgets).
-
----
-
-## Authentication (JWT)
-
-```python
-from ninja_aio.auth import AsyncJwtBearer
-from joserfc import jwk
-
-class JWTAuth(AsyncJwtBearer):
-    jwt_public = jwk.RSAKey.import_key("-----BEGIN PUBLIC KEY----- ...")
-    jwt_alg = "RS256"
-    claims = {"sub": {"essential": True}}
-
-    async def auth_handler(self, request):
-        book_id = self.dcd.claims.get("sub")
-        return await Book.objects.aget(id=book_id)
-
-@api.viewset(Book)
-class SecureBookViewSet(APIViewSet):
-    auth = [JWTAuth()]
-    get_auth = None  # list/retrieve remain public
-```
-
----
-
-## Lifecycle Hooks
-
-Available on every save/delete cycle:
-
-| Hook | When |
-|---|---|
-| `on_create_before_save` | Before first save |
-| `on_create_after_save` | After first save |
-| `before_save` | Before any save |
-| `after_save` | After any save |
-| `on_delete` | After deletion |
-| `custom_actions(payload)` | Create/update custom field logic |
-| `post_create()` | After create commit |
-
----
-
-## Custom Endpoints
-
-### Option A: `@action` Decorator (recommended)
-
-```python
-from ninja import Schema, Status
-from ninja_aio.decorators import action
-
-class StatsSchema(Schema):
-    total: int
-
-@api.viewset(Book)
-class BookViewSet(APIViewSet):
-    @action(detail=False, methods=["get"], url_path="stats", response=StatsSchema)
-    async def stats(self, request):
-        total = await Book.objects.acount()
-        return {"total": total}
-
-    @action(detail=True, methods=["post"], url_path="publish")
-    async def publish(self, request, pk):
-        book = await self.model_util.get_object(request, pk)
-        book.published = True
-        await book.asave()
-        return Status(200, {"message": "published"})
-```
-
-```
-GET  /book/stats/       → {"total": 42}
-POST /book/{pk}/publish/ → {"message": "published"}
-```
-
-### Option B: operations Decorators
-
-```python
-from ninja_aio.decorators import api_get
-
-@api.viewset(Book)
-class BookViewSet(APIViewSet):
-    @api_get("/stats/")
-    async def stats(self, request):
-        total = await Book.objects.acount()
-        return {"total": total}
-```
-
----
-
-## AI Agent Integration (MCP)
-
-Expose every registered `APIViewSet` — CRUD, bulk operations, and custom `@action`/`@on` endpoints — as well as any custom `APIView`, as [MCP](https://modelcontextprotocol.io) tools any MCP client can call directly.
-
-```sh
-pip install "django-ninja-aio-crud[mcp]"
-```
-
-### Option A: `manage.py mcp_server` (recommended)
-
-Add `"ninja_aio"` to `INSTALLED_APPS` to pick up the bundled management command:
-
-```python
-INSTALLED_APPS = [
-    ...,
-    "ninja_aio",
+urlpatterns = [
+    path("api/", api.urls),
 ]
 ```
 
-```sh
-python manage.py mcp_server myproject.api.api
-```
+Run `python manage.py runserver` and open http://localhost:8000/api/docs.
 
-Or set a default so you can drop the argument:
+| Method | Path | What it does |
+| --- | --- | --- |
+| `GET` | `/api/articles` | List articles, with pagination |
+| `POST` | `/api/articles/` | Create an article |
+| `GET` | `/api/articles/{id}` | Get one article |
+| `PATCH` | `/api/articles/{id}/` | Update some fields |
+| `DELETE` | `/api/articles/{id}/` | Delete an article |
 
-```python
-# settings.py
-NINJA_AIO_MCP_API = "myproject.api.api"
-```
+## Keep your models as they are
 
-```json
-{
-  "mcpServers": {
-    "myproject": {
-      "type": "stdio",
-      "command": "python",
-      "args": ["manage.py", "mcp_server"]
-    }
-  }
-}
-```
-
-### Option B: standalone script
+Use a `Serializer` when you don't want to change your model's base class:
 
 ```python
-# mcp_server.py
-import asyncio
-import django
-django.setup()
+# blog/serializers.py
+from ninja_aio import Serializer, SchemaConfig
 
-from myproject.api import api  # your NinjaAIO() instance with @api.viewset(...) registered
-from ninja_aio.mcp import run_mcp_server
+from .models import Article
 
-if __name__ == "__main__":
-    asyncio.run(run_mcp_server(api))
-```
 
-```json
-{
-  "mcpServers": {
-    "myproject": {
-      "type": "stdio",
-      "command": "python",
-      "args": ["mcp_server.py"]
-    }
-  }
-}
-```
-
-Every `@api.viewset(...)`-registered ViewSet and `@api.view(...)`-registered View is picked up automatically (or pass `viewsets=[...]`/`views=[...]` explicitly). Tools are named `<model>_<operation>` for ViewSets — e.g. `book_create`, `book_list`, `book_retrieve`, `book_update`, `book_delete`, `book_bulk_create`, `book_publish` — and `<viewclass>_<function>_<method>` for plain Views — e.g. `bookview_stats_get`.
-
-> **⚠️ Auth caveat:** tool calls invoke the same registered view logic as HTTP requests (filters, pagination, and `on_before_operation`/`on_before_object_operation`/`query_params_handler` hooks all run identically) but bypass django-ninja's `auth=` wiring, since that applies at the router layer, not inside the handler. Pass `request_factory` to attach your own `request.user`/auth context, and use viewset hooks to enforce authorization for MCP-driven calls:
-
-```python
-from ninja_aio.mcp import NinjaAIOMCPServer
-
-def mcp_request_factory():
-    from django.test.client import AsyncRequestFactory
-    request = AsyncRequestFactory().get("/mcp/")
-    request.user = get_service_account_user()  # your own resolution logic
-    return request
-
-server = NinjaAIOMCPServer(api, request_factory=mcp_request_factory)
-```
-
----
-
-## Bulk Operations
-
-```python
-@api.viewset(Book)
-class BookViewSet(APIViewSet):
-    bulk_operations = ["create", "update", "delete"]
-    bulk_response_fields = "title"  # Optional: return titles instead of PKs
-```
-
-```
-POST   /book/bulk/  body: [{...}, {...}]         → {"success": {"count": 2, "details": ["Book 1", "Book 2"]}}
-PATCH  /book/bulk/  body: [{id, ...}, {id, ...}] → {"success": {"count": 2, "details": ["Updated 1", "Updated 2"]}}
-DELETE /book/bulk/  body: {"ids": [1, 2]}         → {"success": {"count": 2, "details": ["Book 1", "Book 2"]}}
-```
-
----
-
-## Pagination
-
-Default: `PageNumberPagination`. Override per ViewSet:
-
-```python
-from ninja.pagination import PageNumberPagination, CursorPagination
-
-class LargePagination(PageNumberPagination):
-    page_size = 50
-    max_page_size = 200
-
-@api.viewset(Book)
-class BookViewSet(APIViewSet):
-    pagination_class = LargePagination
-    # Or use cursor-based pagination for large datasets:
-    # pagination_class = CursorPagination
-```
-
----
-
-## Schema Validators
-
-Add Pydantic `@field_validator` and `@model_validator` directly on serializer classes for input validation.
-
-### ModelSerializer
-
-Declare validators on inner serializer classes:
-
-```python
-from django.db import models
-from pydantic import field_validator, model_validator
-from ninja_aio.models import ModelSerializer
-
-class Book(ModelSerializer):
-    title = models.CharField(max_length=120)
-    description = models.TextField(blank=True)
-
-    class CreateSerializer:
-        fields = ["title", "description"]
-
-        @field_validator("title")
-        @classmethod
-        def validate_title_min_length(cls, v):
-            if len(v) < 3:
-                raise ValueError("Title must be at least 3 characters")
-            return v
-
-    class UpdateSerializer:
-        optionals = [("title", str), ("description", str)]
-
-        @field_validator("title")
-        @classmethod
-        def validate_title_not_empty(cls, v):
-            if v is not None and len(v.strip()) == 0:
-                raise ValueError("Title cannot be blank")
-            return v
-
-    class ReadSerializer:
-        fields = ["id", "title", "description"]
-
-        @model_validator(mode="after")
-        def enrich_output(self):
-            # Transform or enrich the output schema
-            return self
-```
-
-### Meta-driven Serializer
-
-Use dedicated `{Type}Validators` inner classes:
-
-```python
-from pydantic import field_validator, model_validator
-from ninja_aio.models import serializers
-from . import models
-
-class BookSerializer(serializers.Serializer):
+class ArticleSerializer(Serializer[Article]):
     class Meta:
-        model = models.Book
-        schema_in = serializers.SchemaModelConfig(fields=["title", "description"])
-        schema_out = serializers.SchemaModelConfig(fields=["id", "title", "description"])
-        schema_update = serializers.SchemaModelConfig(
-            optionals=[("title", str), ("description", str)]
-        )
+        model = Article
+
+    class Schemas:
+        create = SchemaConfig(fields=["title", "body"])
+        update = SchemaConfig(optionals=[("title", str), ("body", str)])
+        read = SchemaConfig(fields=["id", "title", "body"])
+```
+
+```python
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    serializer_class = ArticleSerializer
+```
+
+## Sync or async
+
+Viewsets are async by default. To serve the same endpoints with regular sync
+views, set `execution_mode`:
+
+```python
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    execution_mode = "sync"
+```
+
+The model is also a CRUD API you can call in scripts, tasks and tests:
+
+```python
+# Sync
+article = Article.create({"title": "Draft", "body": "..."})
+article = Article.update(article, {"is_published": True})
+data = Article.model_dump(article)
+```
+
+```python
+# Async
+article = await Article.acreate({"title": "Draft", "body": "..."})
+article = await Article.aupdate(article, {"is_published": True})
+data = await Article.amodel_dump(article)
+```
+
+## Custom actions
+
+```python
+from ninja_aio import APIViewSet, action, on
+
+
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    @on("publish")
+    async def publish(self, request, obj):
+        obj.is_published = True
+        await obj.asave(update_fields=["is_published"])
+        return await Article.amodel_dump(obj)
+
+    @action(detail=False, url_path="stats")
+    async def stats(self, request):
+        return {"total": await Article.objects.acount()}
+```
+
+This adds `POST /api/articles/{id}/publish` and `GET /api/articles/stats`.
+
+## Validators
+
+Add Pydantic validators to a `CreateValidators` or `UpdateValidators` class:
+
+```python
+from pydantic import field_validator
+
+
+class Article(ModelSerializer):
+    # fields and Schemas as above
 
     class CreateValidators:
         @field_validator("title")
         @classmethod
-        def validate_title_min_length(cls, v):
-            if len(v) < 3:
-                raise ValueError("Title must be at least 3 characters")
-            return v
-
-    class UpdateValidators:
-        @field_validator("title")
-        @classmethod
-        def validate_title_not_empty(cls, v):
-            if v is not None and len(v.strip()) == 0:
+        def title_not_blank(cls, value: str) -> str:
+            if not value.strip():
                 raise ValueError("Title cannot be blank")
-            return v
-
-    class ReadValidators:
-        @model_validator(mode="after")
-        def enrich_output(self):
-            return self
+            return value.strip()
 ```
 
-**Validator class mapping:**
+Invalid input returns `422` with the error message.
 
-| Schema type | ModelSerializer | Serializer (Meta-driven) |
-|---|---|---|
-| Create | `CreateSerializer` | `CreateValidators` |
-| Update | `UpdateSerializer` | `UpdateValidators` |
-| Read | `ReadSerializer` | `ReadValidators` |
-| Detail | `DetailSerializer` | `DetailValidators` |
+## Upgrading from 2.x
 
----
+Version 3 replaces the inner `ReadSerializer`/`CreateSerializer` classes and
+`Meta.schema_in`/`schema_out` with a single `class Schemas`, adds sync
+viewsets and the Python CRUD API. Follow the
+[migration guide](https://django-ninja-aio.com/migration/) to upgrade.
 
-## Disable Operations
+## Links
 
-```python
-@api.viewset(Book)
-class ReadOnlyBookViewSet(APIViewSet):
-    disable = ["update", "delete"]
-```
-
----
-
-## Framework Comparison
-
-How does Django Ninja AIO compare to other Python REST frameworks? We benchmark against Django Ninja, ADRF, and FastAPI — focusing on complex async operations like reverse FK and M2M serialization.
-
-| Framework | Lines of Code | Reverse FK Handling | Auto Prefetch | CRUD Automation |
-|---|---|---|---|---|
-| **Django Ninja AIO** | **~20** | Automatic | Yes | Full |
-| **FastAPI** | ~80+ | Manual async iteration | No | None |
-| **ADRF** | ~45+ | Needs serializer config | Manual | Partial |
-
-**[View Full Comparison](https://django-ninja-aio.com/comparison/)** — Code examples, benchmark results, and interactive charts
-
----
-
-## Performance
-
-View live benchmarks tracking schema generation, serialization, and CRUD throughput:
-
-**[Live Performance Report](https://caspel26.github.io/django-ninja-aio-crud/)** — Interactive charts with historical trends
-
-### Performance Tips
-
-- Use `queryset_request` classmethod to `select_related` / `prefetch_related`
-- Index frequently filtered fields
-- Keep pagination enabled for large datasets
-- Limit slices (`queryset = queryset[:1000]`) for heavy searches
-
----
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Add tests for your changes
-4. Run lint: `ruff check .`
-5. Open a Pull Request
-
----
+- [Documentation](https://django-ninja-aio.com)
+- [Tutorial](https://django-ninja-aio.com/tutorial/)
+- [Guides](https://django-ninja-aio.com/guides/schemas/)
+- [Release notes](https://django-ninja-aio.com/release_notes/)
+- [Contributing](https://django-ninja-aio.com/contributing/)
 
 ## Support
 
 If you find this project useful, consider giving it a star or supporting development:
 
 <a href="https://buymeacoffee.com/caspel26"><img src="https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black" alt="Buy me a coffee"></a>
-
----
 
 ## License
 
