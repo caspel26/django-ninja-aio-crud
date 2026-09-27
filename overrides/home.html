@@ -4,228 +4,229 @@
 <div class="md-content nac-home" data-md-component="content">
   <article class="md-content__inner md-typeset">
 
-    <section class="nac-hero">
-      <div class="nac-hero__copy">
-        <a class="nac-hero__release" href="{{ 'release_notes/' | url }}"><b>3.0</b> Sync and async, one API <span aria-hidden="true">&rarr;</span></a>
-        <h1 class="nac-hero__title">The Django model is the API.</h1>
-        <p class="nac-hero__sub">
-          Say which fields each operation reads and writes. You get Django Ninja endpoints,
-          request validation and an OpenAPI schema, served sync or async.
-        </p>
-        <div class="nac-hero__actions">
-          <a class="md-button md-button--primary" href="{{ 'getting_started/quick_start/' | url }}">Get started</a>
-          <button class="nac-install" type="button" data-nac-copy="pip install django-ninja-aio-crud">
-            <span class="nac-install__prompt" aria-hidden="true">$</span>
-            <code>pip install django-ninja-aio-crud</code>
-            <span class="nac-install__state">Copy</span>
-          </button>
-        </div>
-        <ul class="nac-hero__facts" aria-label="Requirements">
-          <li>Python <b>3.10&ndash;3.14</b></li>
-          <li>Django Ninja <b>1.3&ndash;1.7</b></li>
-          <li>MIT license</li>
-        </ul>
+    <div class="nac-home__bg" aria-hidden="true">
+      <span class="nac-orb nac-orb--a"></span>
+      <span class="nac-orb nac-orb--b"></span>
+      <span class="nac-orb nac-orb--c"></span>
+    </div>
+
+    <section class="nac-hero" aria-labelledby="nac-hero-title">
+      <a class="nac-pill" href="{{ 'release_notes/' | url }}" data-reveal>
+        <span class="nac-pill__tag">New</span>
+        <span>3.0: one serializer, sync or async</span>
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+      <h1 class="nac-hero__title" id="nac-hero-title" data-reveal>
+        Your Django models,<br><span class="nac-gradient-text">served as REST APIs.</span>
+      </h1>
+      <p class="nac-hero__sub" data-reveal>
+        Say which fields each operation reads and writes. django-ninja-aio-crud builds
+        the Django Ninja endpoints, validation and OpenAPI schema, and serves them sync or async.
+      </p>
+      <div class="nac-hero__actions" data-reveal>
+        <a class="nac-btn nac-btn--primary" href="{{ 'getting_started/quick_start/' | url }}">
+          Get started
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
+        <a class="nac-btn nac-btn--ghost" href="{{ 'tutorial/' | url }}">Take the tutorial</a>
+        <button class="nac-install" type="button" data-nac-copy="pip install django-ninja-aio-crud" aria-label="Copy install command">
+          <span class="nac-install__prompt" aria-hidden="true">$</span>
+          <code>pip install django-ninja-aio-crud</code>
+          <span class="nac-install__state" aria-live="polite">Copy</span>
+        </button>
       </div>
-      <div class="nac-hero__art" aria-hidden="true">
-        <img class="nac-art nac-art--dark" src="{{ 'images/brand/mark-dark-256.png' | url }}" alt="" width="256" height="256">
-        <img class="nac-art nac-art--light" src="{{ 'images/brand/mark-light-256.png' | url }}" alt="" width="256" height="256">
-      </div>
+      <ul class="nac-hero__facts" aria-label="Requirements" data-reveal>
+        <li>Python <b>3.10&ndash;3.14</b></li>
+        <li>Django Ninja <b>1.3&ndash;1.7</b></li>
+        <li>MIT license</li>
+      </ul>
     </section>
 
-    <section class="nac-demo" data-active-op="list" aria-label="Example">
-      <div class="nac-demo__bar">
-        <div class="nac-seg" role="tablist" aria-label="Operation">
-          <button role="tab" type="button" data-op="list" data-kind="read">List</button>
-          <button role="tab" type="button" data-op="create" data-kind="create">Create</button>
-          <button role="tab" type="button" data-op="retrieve" data-kind="read">Retrieve</button>
-          <button role="tab" type="button" data-op="update" data-kind="update">Update</button>
-          <button role="tab" type="button" data-op="delete" data-kind="none">Delete</button>
+    <section class="nac-showcase" aria-label="Example" data-reveal>
+      <div class="nac-window">
+        <div class="nac-window__bar">
+          <span class="nac-window__dots" aria-hidden="true"><i></i><i></i><i></i></span>
+          <div class="nac-window__tabs" role="tablist" aria-label="Example files">
+            <button type="button" role="tab" aria-selected="true" aria-controls="nac-file-models" id="nac-tab-models" data-file="models">models.py</button>
+            <button type="button" role="tab" aria-selected="false" aria-controls="nac-file-api" id="nac-tab-api" data-file="api" tabindex="-1">api.py</button>
+          </div>
         </div>
-        <span class="nac-demo__hint">Hover a field to follow it</span>
+        <div class="nac-window__body">
+          <div class="nac-code" role="tabpanel" id="nac-file-models" aria-labelledby="nac-tab-models" data-file-panel="models">
+<pre><code><span class="k">from</span> django.db <span class="k">import</span> models
+<span class="k">from</span> ninja_aio <span class="k">import</span> ModelSerializer, SchemaConfig
+
+
+<span class="k">class</span> <span class="f">Article</span>(ModelSerializer):
+    title <span class="o">=</span> models.<span class="f">CharField</span>(max_length<span class="o">=</span><span class="m">200</span>)
+    body <span class="o">=</span> models.<span class="f">TextField</span>()
+    is_published <span class="o">=</span> models.<span class="f">BooleanField</span>(default<span class="o">=</span><span class="b">False</span>)
+
+    <span class="k">class</span> <span class="f">Schemas</span>:
+        <span class="hl" data-op="create">create <span class="o">=</span> <span class="f">SchemaConfig</span>(fields<span class="o">=</span>[<span class="s">"title"</span>, <span class="s">"body"</span>])</span>
+        <span class="hl" data-op="update">update <span class="o">=</span> <span class="f">SchemaConfig</span>(optionals<span class="o">=</span>[(<span class="s">"title"</span>, <span class="b">str</span>), (<span class="s">"body"</span>, <span class="b">str</span>)])</span>
+        <span class="hl" data-op="read">read <span class="o">=</span> <span class="f">SchemaConfig</span>(fields<span class="o">=</span>[<span class="s">"id"</span>, <span class="s">"title"</span>, <span class="s">"body"</span>])</span></code></pre>
+          </div>
+          <div class="nac-code" role="tabpanel" id="nac-file-api" aria-labelledby="nac-tab-api" data-file-panel="api" hidden>
+<pre><code><span class="k">from</span> ninja_aio <span class="k">import</span> NinjaAIO, APIViewSet
+<span class="k">from</span> .models <span class="k">import</span> Article
+
+api <span class="o">=</span> <span class="f">NinjaAIO</span>(title<span class="o">=</span><span class="s">"Blog API"</span>)
+
+
+<span class="d">@api.viewset</span>(model<span class="o">=</span>Article)
+<span class="k">class</span> <span class="f">ArticleViewSet</span>(APIViewSet):
+    <span class="c"># "async" by default, or "sync"</span>
+    execution_mode <span class="o">=</span> <span class="s">"async"</span></code></pre>
+          </div>
+        </div>
       </div>
-      <div class="nac-demo__grid">
-        <div class="nac-demo__pane">
-          <div class="nac-demo__label"><span>blog/models.py</span><span>you write</span></div>
-<pre class="nac-code"><code><span class="k">from</span> ninja_aio <span class="k">import</span> ModelSerializer, SchemaConfig
 
-
-<span class="k">class</span> <span class="n">Article</span>(ModelSerializer):
-    <span data-field="title">title</span> = models.CharField(max_length=<span class="m">200</span>)
-    <span data-field="body">body</span> = models.TextField()
-    <span data-field="is_published">is_published</span> = models.BooleanField(default=<span class="k">False</span>)
-
-    <span class="k">class</span> <span class="n">Schemas</span>:
-<span class="nac-line" data-kind-line="create">        create = SchemaConfig(fields=[<span class="s" data-field="title">"title"</span>, <span class="s" data-field="body">"body"</span>])</span><span class="nac-line" data-kind-line="update">        update = SchemaConfig(optionals=[(<span class="s" data-field="is_published">"is_published"</span>, bool)])</span><span class="nac-line" data-kind-line="read">        read = SchemaConfig(fields=[<span class="s" data-field="id">"id"</span>, <span class="s" data-field="title">"title"</span>, <span class="s" data-field="is_published">"is_published"</span>])</span>
-
-
-<span class="d">@api.viewset</span>(model=Article)
-<span class="k">class</span> <span class="n">ArticleViewSet</span>(APIViewSet):
-    execution_mode = <span class="s">"sync"</span>  <span class="c"># or "async"</span></code></pre>
-        </div>
-
-        <div class="nac-demo__pane">
-          <div class="nac-demo__label"><span>HTTP</span><span>you get</span></div>
-          <div data-op-panel="list">
-            <div class="nac-http"><span><span class="nac-method">GET</span>/api/articles/</span><span class="nac-status"><b>200</b> OK</span></div>
-<pre class="nac-code"><code>{
-  <span class="s">"items"</span>: [
-    {
-      <span class="s" data-field="id">"id"</span>: <span class="m">1</span>,
-      <span class="s" data-field="title">"title"</span>: <span class="s">"Sync or async?"</span>,
-      <span class="s" data-field="is_published">"is_published"</span>: <span class="k">true</span>
-    }
-  ],
+      <div class="nac-routes" aria-label="Generated endpoints">
+        <p class="nac-routes__label">Generated endpoints</p>
+        <ul>
+          <li data-route="read" style="--i: 0"><span class="nac-method nac-method--get">GET</span><code>/api/articles</code><span class="nac-routes__what">List, paginated</span></li>
+          <li data-route="create" style="--i: 1"><span class="nac-method nac-method--post">POST</span><code>/api/articles/</code><span class="nac-routes__what">Create</span></li>
+          <li data-route="read" style="--i: 2"><span class="nac-method nac-method--get">GET</span><code>/api/articles/{id}</code><span class="nac-routes__what">Retrieve</span></li>
+          <li data-route="update" style="--i: 3"><span class="nac-method nac-method--patch">PATCH</span><code>/api/articles/{id}/</code><span class="nac-routes__what">Partial update</span></li>
+          <li data-route="delete" style="--i: 4"><span class="nac-method nac-method--delete">DELETE</span><code>/api/articles/{id}/</code><span class="nac-routes__what">Delete</span></li>
+        </ul>
+        <div class="nac-routes__response" aria-label="Example response">
+          <span class="nac-routes__status">200 OK</span>
+<pre><code>{
+  <span class="s">"items"</span>: [{ <span class="s">"id"</span>: <span class="m">1</span>, <span class="s">"title"</span>: <span class="s">"Hello"</span>, <span class="s">"body"</span>: <span class="s">"..."</span> }],
   <span class="s">"count"</span>: <span class="m">1</span>
 }</code></pre>
-          </div>
-          <div data-op-panel="create" hidden>
-            <div class="nac-http"><span><span class="nac-method">POST</span>/api/articles/</span><span class="nac-status"><b>201</b> Created</span></div>
-<pre class="nac-code"><code><span class="c">// request</span>
-{<span class="s" data-field="title">"title"</span>: <span class="s">"Draft"</span>, <span class="s" data-field="body">"body"</span>: <span class="s">"..."</span>}
-
-<span class="c">// response</span>
-{
-  <span class="s" data-field="id">"id"</span>: <span class="m">2</span>,
-  <span class="s" data-field="title">"title"</span>: <span class="s">"Draft"</span>,
-  <span class="s" data-field="is_published">"is_published"</span>: <span class="k">false</span>
-}</code></pre>
-          </div>
-          <div data-op-panel="retrieve" hidden>
-            <div class="nac-http"><span><span class="nac-method">GET</span>/api/articles/1</span><span class="nac-status"><b>200</b> OK</span></div>
-<pre class="nac-code"><code>{
-  <span class="s" data-field="id">"id"</span>: <span class="m">1</span>,
-  <span class="s" data-field="title">"title"</span>: <span class="s">"Sync or async?"</span>,
-  <span class="s" data-field="is_published">"is_published"</span>: <span class="k">true</span>
-}</code></pre>
-          </div>
-          <div data-op-panel="update" hidden>
-            <div class="nac-http"><span><span class="nac-method">PATCH</span>/api/articles/1/</span><span class="nac-status"><b>200</b> OK</span></div>
-<pre class="nac-code"><code><span class="c">// request: every field is optional</span>
-{<span class="s" data-field="is_published">"is_published"</span>: <span class="k">false</span>}
-
-<span class="c">// response</span>
-{
-  <span class="s" data-field="id">"id"</span>: <span class="m">1</span>,
-  <span class="s" data-field="title">"title"</span>: <span class="s">"Sync or async?"</span>,
-  <span class="s" data-field="is_published">"is_published"</span>: <span class="k">false</span>
-}</code></pre>
-          </div>
-          <div data-op-panel="delete" hidden>
-            <div class="nac-http"><span><span class="nac-method">DELETE</span>/api/articles/1/</span><span class="nac-status"><b>204</b> No Content</span></div>
-<pre class="nac-code"><code><span class="c">// no response body</span></code></pre>
-          </div>
-        </div>
-
-        <div class="nac-demo__pane">
-          <div class="nac-demo__label"><span>OpenAPI</span><span>generated</span></div>
-          <div data-op-panel="list">
-            <p class="nac-oa__name">PaginatedarticleSchemaOut</p>
-            <ul class="nac-oa">
-              <li><span>items</span><span>articleSchemaOut[]</span></li>
-              <li><span>count</span><span>integer</span></li>
-            </ul>
-            <p class="nac-oa__name">articleSchemaOut</p>
-            <ul class="nac-oa">
-              <li><span data-field="id">id</span><span>integer</span></li>
-              <li><span data-field="title">title</span><span>string &le; 200</span></li>
-              <li><span data-field="is_published">is_published</span><span>boolean</span></li>
-            </ul>
-          </div>
-          <div data-op-panel="create" hidden>
-            <p class="nac-oa__name">articleSchemaIn</p>
-            <ul class="nac-oa">
-              <li><span data-field="title">title</span><span>string &le; 200, required</span></li>
-              <li><span data-field="body">body</span><span>string, required</span></li>
-            </ul>
-          </div>
-          <div data-op-panel="retrieve" hidden>
-            <p class="nac-oa__name">articleSchemaOut</p>
-            <ul class="nac-oa">
-              <li><span data-field="id">id</span><span>integer</span></li>
-              <li><span data-field="title">title</span><span>string &le; 200</span></li>
-              <li><span data-field="is_published">is_published</span><span>boolean</span></li>
-            </ul>
-          </div>
-          <div data-op-panel="update" hidden>
-            <p class="nac-oa__name">articleSchemaPatch</p>
-            <ul class="nac-oa">
-              <li><span data-field="is_published">is_published</span><span>boolean, optional</span></li>
-            </ul>
-          </div>
-          <div data-op-panel="delete" hidden>
-            <p class="nac-oa__name">204 response</p>
-            <ul class="nac-oa">
-              <li><span>body</span><span>none</span></li>
-            </ul>
-          </div>
         </div>
       </div>
     </section>
 
-    <section class="nac-section" aria-labelledby="nac-caps">
-      <div class="nac-section__head">
-        <h2 id="nac-caps">Everything around the endpoint.</h2>
-        <p>Each feature is one setting or mixin on the viewset, and works the same in sync and async mode.</p>
-      </div>
-      <dl class="nac-caps">
-        <div><dt><a href="{{ 'tutorial/filtering/' | url }}">Filtering and search</a> <code>query_params</code></dt><dd>Typed query parameters, checked against your model fields.</dd></div>
-        <div><dt><a href="{{ 'api/pagination/' | url }}">Pagination</a> <code>pagination_class</code></dt><dd>Page-number pagination by default. Swap in your own class per viewset.</dd></div>
-        <div><dt><a href="{{ 'auth/' | url }}">Authentication</a> <code>AsyncJwtBearer</code></dt><dd>JWT bearer or HttpOnly cookie auth, set per method with <code>get_auth</code>, <code>post_auth</code> and friends.</dd></div>
-        <div><dt><a href="{{ 'tutorial/permissions/' | url }}">Permissions</a> <code>PermissionViewSetMixin</code></dt><dd>Object-level permission checks, or role-based rules per operation.</dd></div>
-        <div><dt><a href="{{ 'api/views/api_view_set/' | url }}">Bulk operations</a> <code>bulk_operations</code></dt><dd>Create, update and delete many rows; each item succeeds or fails on its own.</dd></div>
-        <div><dt><a href="{{ 'api/models/model_serializer/' | url }}">Nested writes</a> <code>SchemaConfig(nested=...)</code></dt><dd>Create a parent and its children in a single request.</dd></div>
-        <div><dt><a href="{{ 'tutorial/soft_delete/' | url }}">Soft delete</a> <code>SoftDeleteViewSetMixin</code></dt><dd>Mark rows as deleted, restore them, or remove them for good.</dd></div>
-        <div><dt><a href="{{ 'mcp/' | url }}">AI agents</a> <code>manage.py mcp_server</code></dt><dd>Expose the same viewsets as MCP tools, with the same permissions.</dd></div>
-      </dl>
+    <section class="nac-section" aria-labelledby="nac-steps-title">
+      <header class="nac-section__head" data-reveal>
+        <p class="nac-eyebrow">How it works</p>
+        <h2 id="nac-steps-title">Three steps from model to API</h2>
+      </header>
+      <ol class="nac-flow">
+        <li data-reveal style="--d: 0">
+          <span class="nac-flow__num">1</span>
+          <h3>Describe the fields</h3>
+          <p>A <code>Schemas</code> class lists what each operation reads and writes.</p>
+        </li>
+        <li data-reveal style="--d: 1">
+          <span class="nac-flow__num">2</span>
+          <h3>Register a viewset</h3>
+          <p>One decorator on a class with no body is enough to start.</p>
+        </li>
+        <li data-reveal style="--d: 2">
+          <span class="nac-flow__num">3</span>
+          <h3>Ship the endpoints</h3>
+          <p>Five validated routes and an OpenAPI schema, sync or async.</p>
+        </li>
+      </ol>
     </section>
 
-    <section class="nac-section nac-split" aria-labelledby="nac-python">
-      <div>
-        <h2 id="nac-python">Call it from Python, too.</h2>
-        <p>The same class is your CRUD API in scripts, Celery tasks and tests. Sync and async are separate methods.</p>
-        <a class="nac-arrow" href="{{ 'api/models/model_serializer/' | url }}">ModelSerializer reference</a>
-      </div>
-      <div class="nac-codecard" data-nac-tabs>
-        <div class="nac-codecard__head">
-          <div class="nac-seg" role="tablist" aria-label="Execution mode">
-            <button role="tab" type="button" data-tab="sync">Sync</button>
-            <button role="tab" type="button" data-tab="async">Async</button>
+    <section class="nac-section" aria-labelledby="nac-features-title">
+      <header class="nac-section__head" data-reveal>
+        <p class="nac-eyebrow">Features</p>
+        <h2 id="nac-features-title">Everything a real API needs</h2>
+        <p>Start with five lines. Add the rest when you need it.</p>
+      </header>
+      <div class="nac-bento">
+        <a class="nac-card nac-card--wide" href="{{ 'concepts/sync-and-async/' | url }}" data-reveal data-spotlight>
+          <span class="nac-card__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h11l-3-3M20 17H9l3 3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          <h3>Sync or async, same code</h3>
+          <p>Set <code>execution_mode</code> on a viewset. Paths, bodies and responses don't change.</p>
+          <div class="nac-toggle" data-nac-mode aria-hidden="true">
+            <span class="nac-toggle__opt is-on">async</span><span class="nac-toggle__opt">sync</span><span class="nac-toggle__thumb"></span>
           </div>
-          <span class="nac-codecard__file">blog/tasks.py</span>
-        </div>
-<pre class="nac-code" data-panel="sync"><code>article = Article.create({<span class="s">"title"</span>: <span class="s">"Draft"</span>, <span class="s">"body"</span>: <span class="s">"..."</span>})
-article = Article.update(article, {<span class="s">"is_published"</span>: <span class="k">True</span>})
-data = Article.model_dump(article)
-Article.destroy(article)</code></pre>
-<pre class="nac-code" data-panel="async" hidden><code>article = <span class="k">await</span> Article.acreate({<span class="s">"title"</span>: <span class="s">"Draft"</span>, <span class="s">"body"</span>: <span class="s">"..."</span>})
-article = <span class="k">await</span> Article.aupdate(article, {<span class="s">"is_published"</span>: <span class="k">True</span>})
-data = <span class="k">await</span> Article.amodel_dump(article)
-<span class="k">await</span> Article.adestroy(article)</code></pre>
+        </a>
+        <a class="nac-card" href="{{ 'guides/relations/' | url }}" data-reveal data-spotlight>
+          <span class="nac-card__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="18" cy="12" r="2.5" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="6" cy="18" r="2.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8.3 7.2l7.4 3.6M8.3 16.8l7.4-3.6" fill="none" stroke="currentColor" stroke-width="1.7"/></svg></span>
+          <h3>Relations</h3>
+          <p>Nested reads, nested writes and many-to-many endpoints.</p>
+        </a>
+        <a class="nac-card" href="{{ 'guides/filtering/' | url }}" data-reveal data-spotlight>
+          <span class="nac-card__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 5h16l-6 7v6l-4 2v-8z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg></span>
+          <h3>Filters and search</h3>
+          <p>Typed query parameters, ordering and pagination.</p>
+        </a>
+        <a class="nac-card" href="{{ 'guides/authentication/' | url }}" data-reveal data-spotlight>
+          <span class="nac-card__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="10" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8 10V7a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="1.7"/></svg></span>
+          <h3>Auth and permissions</h3>
+          <p>JWT out of the box, per-operation auth and row-level rules.</p>
+        </a>
+        <a class="nac-card" href="{{ 'guides/hooks/' | url }}" data-reveal data-spotlight>
+          <span class="nac-card__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3v5M12 16v5M3 12h5M16 12h5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.7"/></svg></span>
+          <h3>Lifecycle hooks</h3>
+          <p>Run code before and after every save and delete.</p>
+        </a>
+        <a class="nac-card nac-card--wide" href="{{ 'guides/custom-actions/' | url }}" data-reveal data-spotlight>
+          <span class="nac-card__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M13 3L5 14h6l-1 7 8-11h-6z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg></span>
+          <h3>Custom actions</h3>
+          <p>Add endpoints next to CRUD with <code>@on</code> and <code>@action</code>. The object is loaded for you.</p>
+<pre class="nac-card__code"><code><span class="d">@on</span>(<span class="s">"publish"</span>)
+<span class="k">async def</span> <span class="f">publish</span>(self, request, obj): ...</code></pre>
+        </a>
+        <a class="nac-card" href="{{ 'guides/mcp/' | url }}" data-reveal data-spotlight>
+          <span class="nac-card__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12" rx="3" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="9.5" cy="12" r="1.3" fill="currentColor"/><circle cx="14.5" cy="12" r="1.3" fill="currentColor"/><path d="M12 3v3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span>
+          <h3>MCP server</h3>
+          <p>Expose your viewsets as tools for AI agents.</p>
+        </a>
       </div>
     </section>
 
-    <section class="nac-section nac-split" aria-labelledby="nac-bench">
-      <div>
-        <h2 id="nac-bench">Measured, not claimed.</h2>
-        <p>Hand-written Django Ninja and FastAPI endpoints are a little faster; they also do less. The striped bar is cut off to keep the scale readable.</p>
-        <a class="nac-arrow" href="{{ 'comparison/' | url }}">Full comparison</a>
+    <section class="nac-section nac-perf" aria-labelledby="nac-perf-title">
+      <div class="nac-perf__copy" data-reveal>
+        <p class="nac-eyebrow">Performance</p>
+        <h2 id="nac-perf-title">Automation that costs microseconds</h2>
+        <p>Median time for the list endpoint, same models and database for every framework.</p>
+        <a class="nac-link-arrow" href="{{ 'comparison/' | url }}">See all benchmarks</a>
       </div>
-      <div>
-        <div class="nac-bars" role="table" aria-label="List endpoint, median milliseconds">
-          <div class="nac-bar is-self" role="row"><span role="cell">django-ninja-aio-crud</span><span class="nac-bar__track" aria-hidden="true"><span style="--w: 83%"></span></span><span role="cell">0.25 ms</span></div>
-          <div class="nac-bar" role="row"><span role="cell">FastAPI</span><span class="nac-bar__track" aria-hidden="true"><span style="--w: 72%"></span></span><span role="cell">0.22 ms</span></div>
-          <div class="nac-bar" role="row"><span role="cell">Django Ninja</span><span class="nac-bar__track" aria-hidden="true"><span style="--w: 64%"></span></span><span role="cell">0.19 ms</span></div>
-          <div class="nac-bar is-clipped" role="row"><span role="cell">ADRF</span><span class="nac-bar__track" aria-hidden="true"><span style="--w: 100%"></span></span><span role="cell">13.94 ms</span></div>
-        </div>
-        <p class="nac-note">Median of 100 requests listing 20 rows. Python 3.14, SQLite in memory.</p>
+      <div class="nac-bars" role="table" aria-label="List endpoint, median milliseconds" data-reveal>
+        <div class="nac-bar is-self" role="row"><span role="cell">django-ninja-aio-crud</span><span class="nac-bar__track" aria-hidden="true"><span style="--w: 1.7%"></span></span><span role="cell">0.24 ms</span></div>
+        <div class="nac-bar" role="row"><span role="cell">FastAPI</span><span class="nac-bar__track" aria-hidden="true"><span style="--w: 1.6%"></span></span><span role="cell">0.22 ms</span></div>
+        <div class="nac-bar" role="row"><span role="cell">Django Ninja</span><span class="nac-bar__track" aria-hidden="true"><span style="--w: 1.3%"></span></span><span role="cell">0.18 ms</span></div>
+        <div class="nac-bar" role="row"><span role="cell">ADRF</span><span class="nac-bar__track" aria-hidden="true"><span style="--w: 100%"></span></span><span role="cell">13.84 ms</span></div>
       </div>
     </section>
 
-    <section class="nac-section" aria-label="Where to start">
+    <section class="nac-section" aria-labelledby="nac-paths-title">
+      <header class="nac-section__head" data-reveal>
+        <p class="nac-eyebrow">Where to go next</p>
+        <h2 id="nac-paths-title">Pick your path</h2>
+      </header>
       <div class="nac-paths">
-        <a class="nac-path" href="{{ 'getting_started/quick_start/' | url }}"><small>5 minutes</small><strong>Quick start</strong><span>One model, five endpoints and Swagger UI.</span></a>
-        <a class="nac-path" href="{{ 'tutorial/model/' | url }}"><small>Step by step</small><strong>Tutorial</strong><span>A blog API, from models to permissions.</span></a>
-        <a class="nac-path" href="{{ 'api/views/api_view_set/' | url }}"><small>Reference</small><strong>APIViewSet</strong><span>Every setting a viewset accepts.</span></a>
+        <a class="nac-path" href="{{ 'getting_started/quick_start/' | url }}" data-reveal style="--d: 0">
+          <span class="nac-path__kicker">5 minutes</span>
+          <h3>Quick start</h3>
+          <p>One model, five endpoints, running locally.</p>
+        </a>
+        <a class="nac-path" href="{{ 'tutorial/' | url }}" data-reveal style="--d: 1">
+          <span class="nac-path__kicker">Step by step</span>
+          <h3>Tutorial</h3>
+          <p>Build a blog API with relations, auth and tests.</p>
+        </a>
+        <a class="nac-path" href="{{ 'guides/' | url }}" data-reveal style="--d: 2">
+          <span class="nac-path__kicker">Recipes</span>
+          <h3>Guides</h3>
+          <p>Focused how-tos for every feature.</p>
+        </a>
+        <a class="nac-path" href="{{ 'migration/' | url }}" data-reveal style="--d: 3">
+          <span class="nac-path__kicker">From 2.x</span>
+          <h3>Upgrade to 3.0</h3>
+          <p>What changed and how to move your code.</p>
+        </a>
+      </div>
+    </section>
+
+    <section class="nac-cta" aria-labelledby="nac-cta-title" data-reveal>
+      <img class="nac-cta__mark nac-art--dark" src="{{ 'images/brand/mark-dark-256.png' | url }}" alt="" width="128" height="128">
+      <img class="nac-cta__mark nac-art--light" src="{{ 'images/brand/mark-light-256.png' | url }}" alt="" width="128" height="128">
+      <h2 id="nac-cta-title">Build your first endpoint now</h2>
+      <p>Install the package and follow the quick start.</p>
+      <div class="nac-hero__actions">
+        <a class="nac-btn nac-btn--primary" href="{{ 'getting_started/quick_start/' | url }}">Get started</a>
+        <a class="nac-btn nac-btn--ghost" href="https://github.com/caspel26/django-ninja-aio-crud">Star on GitHub</a>
       </div>
     </section>
 

@@ -5,6 +5,7 @@ description: Say which fields each operation reads and writes, and get Django Ni
 hide:
   - navigation
   - toc
+  - footer
 ---
 
 # django-ninja-aio-crud

@@ -1,100 +1,126 @@
-// Homepage interactions: operation demo, linked fields, sync/async tabs, install copy.
 (() => {
-  const moveThumb = (tablist) => {
-    const selected = tablist.querySelector('[aria-selected="true"]');
-    if (!selected) return;
-    tablist.style.setProperty("--thumb-x", `${selected.offsetLeft}px`);
-    tablist.style.setProperty("--thumb-w", `${selected.offsetWidth}px`);
-  };
+  const timers = [];
+  const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  const selectTab = (tablist, button) => {
-    tablist.querySelectorAll('[role="tab"]').forEach((tab) => {
-      const active = tab === button;
-      tab.setAttribute("aria-selected", String(active));
-      tab.tabIndex = active ? 0 : -1;
-    });
-    moveThumb(tablist);
-  };
-
-  const setupDemo = (demo) => {
-    const tablist = demo.querySelector('[role="tablist"]');
-    const choose = (op) => {
-      demo.dataset.activeOp = op;
-      const button = tablist.querySelector(`[data-op="${op}"]`);
-      selectTab(tablist, button);
-      demo.querySelectorAll("[data-op-panel]").forEach((panel) => {
-        panel.hidden = panel.dataset.opPanel !== op;
-      });
-      demo.querySelectorAll("[data-kind-line]").forEach((line) => {
-        line.classList.toggle("is-used", line.dataset.kindLine === button.dataset.kind);
-      });
-    };
-    tablist.addEventListener("click", (event) => {
-      const tab = event.target.closest("[data-op]");
-      if (tab) choose(tab.dataset.op);
-    });
-    tablist.addEventListener("keydown", (event) => {
-      if (!["ArrowLeft", "ArrowRight"].includes(event.key)) return;
-      const tabs = [...tablist.querySelectorAll("[data-op]")];
-      const index = tabs.indexOf(document.activeElement);
-      const next = tabs[(index + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length];
-      choose(next.dataset.op);
-      next.focus();
-    });
-
-    const link = (event) => {
-      const field = event.target.closest("[data-field]")?.dataset.field;
-      demo.querySelectorAll("[data-field]").forEach((node) => {
-        node.classList.toggle("is-linked", node.dataset.field === field);
-      });
-    };
-    demo.addEventListener("mouseover", link);
-    demo.addEventListener("focusin", link);
-    demo.addEventListener("mouseleave", () =>
-      demo.querySelectorAll(".is-linked").forEach((node) => node.classList.remove("is-linked")),
+  const setupReveal = (home) => {
+    const targets = home.querySelectorAll("[data-reveal]");
+    if (!("IntersectionObserver" in window)) {
+      targets.forEach((el) => el.classList.add("is-visible"));
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          entry.target.classList.add("is-visible");
+          observer.unobserve(entry.target);
+        });
+      },
+      { rootMargin: "0px 0px -8% 0px", threshold: 0.12 },
     );
-    choose(demo.dataset.activeOp || "list");
+    targets.forEach((el) => observer.observe(el));
   };
 
-  const setupModeTabs = (card) => {
-    const tablist = card.querySelector('[role="tablist"]');
-    const choose = (mode) => {
-      selectTab(tablist, tablist.querySelector(`[data-tab="${mode}"]`));
-      card.querySelectorAll("[data-panel]").forEach((panel) => {
-        panel.hidden = panel.dataset.panel !== mode;
+  const setupFileTabs = (showcase) => {
+    const tabs = [...showcase.querySelectorAll("[data-file]")];
+    const select = (tab, focus) => {
+      tabs.forEach((other) => {
+        const on = other === tab;
+        other.setAttribute("aria-selected", String(on));
+        other.tabIndex = on ? 0 : -1;
+        showcase.querySelector(`[data-file-panel="${other.dataset.file}"]`).hidden = !on;
       });
-      localStorage.setItem("nac-mode", mode);
+      if (focus) tab.focus();
     };
-    tablist.addEventListener("click", (event) => {
-      const tab = event.target.closest("[data-tab]");
-      if (tab) choose(tab.dataset.tab);
+    tabs.forEach((tab, index) => {
+      tab.addEventListener("click", () => select(tab));
+      tab.addEventListener("keydown", (event) => {
+        const step = { ArrowRight: 1, ArrowLeft: -1 }[event.key];
+        if (!step) return;
+        event.preventDefault();
+        select(tabs[(index + step + tabs.length) % tabs.length], true);
+      });
     });
-    choose(localStorage.getItem("nac-mode") || "sync");
+    return select;
+  };
+
+  const setupRoutes = (showcase, selectFile) => {
+    const routes = [...showcase.querySelectorAll("[data-route]")];
+    const modelsTab = showcase.querySelector('[data-file="models"]');
+    let auto = !reduced();
+    let index = 0;
+
+    const link = (route) => {
+      showcase.querySelectorAll(".is-linked").forEach((el) => el.classList.remove("is-linked"));
+      if (!route) return;
+      route.classList.add("is-linked");
+      showcase.querySelector(`.hl[data-op="${route.dataset.route}"]`)?.classList.add("is-linked");
+    };
+
+    routes.forEach((route) => {
+      route.addEventListener("mouseenter", () => {
+        auto = false;
+        if (modelsTab.getAttribute("aria-selected") !== "true") selectFile(modelsTab);
+        link(route);
+      });
+      route.addEventListener("mouseleave", () => link(null));
+    });
+
+    timers.push(
+      setInterval(() => {
+        if (!auto || !showcase.classList.contains("is-visible")) return;
+        if (modelsTab.getAttribute("aria-selected") !== "true") return;
+        link(routes[index % routes.length]);
+        index += 1;
+      }, 2200),
+    );
+  };
+
+  const setupModeToggle = (toggle) => {
+    if (reduced()) return;
+    const [asyncOpt, syncOpt] = toggle.querySelectorAll(".nac-toggle__opt");
+    timers.push(
+      setInterval(() => {
+        const sync = toggle.classList.toggle("is-sync");
+        asyncOpt.classList.toggle("is-on", !sync);
+        syncOpt.classList.toggle("is-on", sync);
+      }, 2600),
+    );
+  };
+
+  const setupSpotlight = (card) => {
+    card.addEventListener("pointermove", (event) => {
+      const rect = card.getBoundingClientRect();
+      card.style.setProperty("--x", `${event.clientX - rect.left}px`);
+      card.style.setProperty("--y", `${event.clientY - rect.top}px`);
+    });
   };
 
   const setupCopy = (button) => {
     const state = button.querySelector(".nac-install__state");
     button.addEventListener("click", () => {
       navigator.clipboard?.writeText(button.dataset.nacCopy);
-      button.dataset.state = "copied";
+      button.classList.add("is-copied");
       state.textContent = "Copied";
       setTimeout(() => {
-        delete button.dataset.state;
+        button.classList.remove("is-copied");
         state.textContent = "Copy";
       }, 1400);
     });
   };
 
   const init = () => {
+    timers.splice(0).forEach(clearInterval);
     const home = document.querySelector(".nac-home");
     if (!home) return;
-    home.querySelectorAll(".nac-demo").forEach(setupDemo);
-    home.querySelectorAll("[data-nac-tabs]").forEach(setupModeTabs);
+    setupReveal(home);
+    const showcase = home.querySelector(".nac-showcase");
+    if (showcase) setupRoutes(showcase, setupFileTabs(showcase));
+    home.querySelectorAll("[data-nac-mode]").forEach(setupModeToggle);
+    home.querySelectorAll("[data-spotlight]").forEach(setupSpotlight);
     home.querySelectorAll("[data-nac-copy]").forEach(setupCopy);
-    document.fonts?.ready.then(() => home.querySelectorAll(".nac-seg").forEach(moveThumb));
   };
 
-  window.addEventListener("resize", () => document.querySelectorAll(".nac-seg").forEach(moveThumb));
   if (typeof document$ !== "undefined") {
     document$.subscribe(init);
   } else {

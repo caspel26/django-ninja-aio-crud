@@ -121,7 +121,6 @@ theme:
     - navigation.expand
     - navigation.path
     - toc.follow
-    - toc.integrate
     - content.code.copy
     - content.code.select
     - content.code.annotate
@@ -133,6 +132,7 @@ theme:
     - search.share
 
 extra:
+  nac_version: "3.0"
   project:
     name: django-ninja-aio-crud
     pypi: django-ninja-aio-crud
@@ -236,5 +236,6 @@ extra_css:
   - stylesheets/pages.css
 
 extra_javascript:
+  - javascripts/theme.js
   - javascripts/a11y.js
   - javascripts/home.js
