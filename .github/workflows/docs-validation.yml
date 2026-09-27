@@ -29,18 +29,19 @@ jobs:
           cache: npm
           cache-dependency-path: docs-tests/package-lock.json
       - name: Install build dependencies
-        run: pip install -r docs-tests/requirements.txt
+        run: |
+          pip install --only-binary :all: --require-hashes -r .github/requirements/docs.txt
+          python -m flit install --symlink --deps none
       - name: Validate Python examples
         run: |
-          pip install -e '.[mcp]'
           python -W error::DeprecationWarning docs-tests/python/manage.py test test_examples
       - name: Build documentation
         run: zensical build --strict
       - name: Install browser tests
         working-directory: docs-tests
         run: |
-          npm ci
-          npx playwright install --with-deps chromium
+          npm ci --ignore-scripts
+          ./node_modules/.bin/playwright install --with-deps chromium
       - name: Validate visuals, accessibility, and performance budgets
         working-directory: docs-tests
         env:

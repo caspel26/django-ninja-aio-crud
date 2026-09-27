@@ -48,3 +48,8 @@ artifacts; it does not commit changes or deploy the site.
 Review screenshot differences before deliberately updating baselines with
 `npm run update`. The validation workflow uploads browser reports for inspection
 and has read-only repository permissions.
+
+CI uses the hash-locked dependency files in `.github/requirements/`. Installs
+require wheels and verified hashes, and npm installs disable lifecycle scripts.
+Playwright runs from the installed local executable rather than downloading
+packages through npx. See the lock directory's README for regeneration commands.
