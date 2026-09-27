@@ -30,7 +30,6 @@ import subprocess
 import sys
 import tempfile
 
-import yaml
 from home import render_home
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
@@ -38,6 +37,20 @@ HERE = pathlib.Path(__file__).resolve().parent
 PAGES_BRANCH = "origin/gh-pages"
 THEME_CSS = ["tokens.css", "shell.css", "components.css", "pages.css", "legacy.css"]
 THEME_JS = ["theme.js", "a11y.js", "home.js"]
+VERSION_PATTERN = r"[12]\.[0-9]+(?:\.[0-9]+)?"
+COMMIT_PATTERN = r"[0-9a-fA-F]{7,64}"
+
+
+def validate_version(version: str) -> str:
+    if not re.fullmatch(VERSION_PATTERN, version):
+        raise ValueError("Legacy versions must be numeric 1.x/2.x identifiers (for example 2.36 or 1.0.0)")
+    return version
+
+
+def validate_commit(commit: str) -> str:
+    if not re.fullmatch(COMMIT_PATTERN, commit):
+        raise ValueError("Deployment commits must be hexadecimal Git object IDs")
+    return commit
 
 
 
@@ -53,7 +66,7 @@ def source_commits() -> dict[str, str]:
     """Map each version to the commit of its most recent mike deploy."""
     commits: dict[str, str] = {}
     for subject in git("log", PAGES_BRANCH, "--format=%s").splitlines():
-        match = re.match(r"Deployed (\w+) to ([\w.]+)", subject)
+        match = re.fullmatch(rf"Deployed ({COMMIT_PATTERN}) to ({VERSION_PATTERN})(?: with .*)?", subject)
         if match and match.group(2) not in commits:
             commits[match.group(2)] = match.group(1)
     return commits
@@ -76,12 +89,14 @@ def replace_block(text: str, key: str, block: str) -> str:
 
 
 def install_command(version: str) -> str:
+    version = validate_version(version)
     parts = version.split(".")
     spec = ".".join(parts + ["0"] * (3 - len(parts)))
     return f"pip install django-ninja-aio-crud~={spec}"
 
 
 def patch_config(worktree: pathlib.Path, version: str) -> None:
+    version = validate_version(version)
     current = (REPO / "mkdocs.yml").read_text()
     start, end = top_level_block(current, "theme")
     config = worktree / "mkdocs.yml"
@@ -101,6 +116,8 @@ def patch_config(worktree: pathlib.Path, version: str) -> None:
 
 
 def adapt_home(worktree: pathlib.Path) -> None:
+    import yaml
+
     index = worktree / "docs/index.md"
     if not index.exists():
         return
@@ -115,10 +132,12 @@ def adapt_home(worktree: pathlib.Path) -> None:
 
 
 def prepare(version: str, commit: str, root: pathlib.Path) -> pathlib.Path:
-    worktree = root / f"wt-{version}"
+    version = validate_version(version)
+    commit = validate_commit(commit)
+    worktree = root.resolve() / f"wt-{version}"
     if worktree.exists():
-        subprocess.run(["git", "worktree", "remove", "--force", str(worktree)], cwd=REPO, check=True)
-    subprocess.run(["git", "worktree", "add", "--detach", "-q", str(worktree), commit], cwd=REPO, check=True)
+        subprocess.run(["git", "worktree", "remove", "--force", "--", str(worktree)], cwd=REPO, check=True)
+    subprocess.run(["git", "worktree", "add", "--detach", "-q", "--", str(worktree), commit], cwd=REPO, check=True)
 
     shutil.rmtree(worktree / "overrides", ignore_errors=True)
     shutil.copytree(REPO / "overrides", worktree / "overrides", ignore=shutil.ignore_patterns("home.html"))
@@ -135,7 +154,7 @@ def prepare(version: str, commit: str, root: pathlib.Path) -> pathlib.Path:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("mode", choices=["build", "deploy"])
-    parser.add_argument("versions", nargs="*", help="Versions to rebuild (default: all published 1.x/2.x)")
+    parser.add_argument("versions", nargs="*", type=validate_version, help="Versions to rebuild (default: all published 1.x/2.x)")
     parser.add_argument("--out", type=pathlib.Path, help="Output folder for build mode")
     parser.add_argument("--keep", action="store_true", help="Keep the worktrees after building")
     args = parser.parse_args()
@@ -145,6 +164,13 @@ def main() -> int:
     published = published_versions()
     commits = source_commits()
     wanted = args.versions or [v["version"] for v in published if v["version"].split(".")[0] in {"1", "2"}]
+    try:
+        wanted = [validate_version(version) for version in wanted]
+        for version in wanted:
+            if version in commits:
+                validate_commit(commits[version])
+    except ValueError as exc:
+        parser.error(str(exc))
     root = pathlib.Path(tempfile.mkdtemp(prefix="nac-legacy-"))
     failed = []
 
@@ -159,13 +185,13 @@ def main() -> int:
         if args.mode == "build":
             command = [sys.executable, "-m", "mkdocs", "build", "-q", "-d", str((args.out / version).resolve())]
         else:
-            command = [sys.executable, "-m", "mike", "deploy", "--ignore-remote-status", version]
+            command = [sys.executable, "-m", "mike", "deploy", "--ignore-remote-status", "--", version]
         result = subprocess.run(command, cwd=worktree, capture_output=True, text=True)
         if result.returncode != 0:
             print(result.stderr[-2000:])
             failed.append(version)
         if not args.keep:
-            subprocess.run(["git", "worktree", "remove", "--force", str(worktree)], cwd=REPO, check=False)
+            subprocess.run(["git", "worktree", "remove", "--force", "--", str(worktree)], cwd=REPO, check=False)
 
     if args.mode == "build":
         args.out.mkdir(parents=True, exist_ok=True)
