@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from .decorators import action as action, on as on
     from .types import HttpMethod as HttpMethod
 
-__version__ = "2.36.0"
+__version__ = "3.0.0"
 
 _EXPORTS = {
     "NinjaAIO": ".api",
