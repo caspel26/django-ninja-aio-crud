@@ -1,6 +1,27 @@
 /* Styles for components used by the 2.x docs, drawn in the v3 style.
    Loaded only by builds made with docs-legacy/migrate.py. */
 
+/* Keep longer legacy version labels on one line in the mobile notice. */
+.md-typeset .nac-pill__tag {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* Material's version notice can sit outside the element carrying theme tokens. */
+.md-banner--warning {
+  background: #302719;
+  color: #faf7f0;
+}
+
+.md-banner--warning a {
+  color: #d6bbff;
+}
+
+.md-banner--warning .md-typeset,
+.md-banner--warning .md-typeset strong {
+  color: inherit;
+}
+
 /* The feature grid mixes wide and narrow cards per version: pack them without holes. */
 .md-typeset .nac-bento {
   grid-auto-flow: dense;
