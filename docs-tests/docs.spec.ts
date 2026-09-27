@@ -10,7 +10,6 @@ const PAGES = {
   reference: "/api/models/model_serializer/",
   migration: "/migration/breaking-changes/",
   releases: "/release_notes/",
-  patterns: "/v3-components/",
 };
 
 const SCHEMES = { dark: "slate", light: "default" } as const;

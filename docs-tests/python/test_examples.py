@@ -39,10 +39,7 @@ def execute(path, index, namespace):
 class DocumentationSyntaxTests(SimpleTestCase):
     def test_every_public_python_block_compiles(self):
         count = 0
-        # The internal contract contains signature notation, not Python programs.
         for path in sorted((ROOT / "docs").rglob("*.md")):
-            if path.name == "v3-public-api-contract.md":
-                continue
             for example in blocks(path):
                 with self.subTest(example=example.filename):
                     compile(example.code, example.filename, "exec", flags=ast.PyCF_ALLOW_TOP_LEVEL_AWAIT)
