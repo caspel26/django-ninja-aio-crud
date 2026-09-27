@@ -64,6 +64,12 @@ The parity suite compares status, body, database state, and query counts for the
 same requests in both modes. PostgreSQL sequence state is restored between the
 two test scenarios because sequence allocations survive transaction rollback.
 
+The release journey tests also use Django's ASGI client to log in, create and
+edit a book, borrow and return it, then restore and delete it across both API
+mounts. They check concurrent user isolation, rollback of a failed bulk item's
+hook writes, expired and wrong-audience tokens, successful cookie writes with
+CSRF, nullable dates, and constant catalogue query counts as the dataset grows.
+
 Set `LIBRARY_SQLITE_PATH=/tmp/library-demo.sqlite3` to use a separate SQLite file.
 For PostgreSQL, install `.[postgres]` from the repository root, create an empty
 database, and set `LIBRARY_DATABASE_BACKEND=postgresql` plus `PGDATABASE`, `PGUSER`,
