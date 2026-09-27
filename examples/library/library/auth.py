@@ -14,7 +14,7 @@ CLAIMS = {
 class MemberLookup:
     claims = CLAIMS
 
-    async def auth_handler(self, request):
+    async def auth_handler(self, _request):
         return await (
             Member.objects.select_related("user")
             .filter(user_id=self.dcd.claims["sub"], user__is_active=True)

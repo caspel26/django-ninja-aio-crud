@@ -1,5 +1,7 @@
 """Fill the database with sample data using the sync serializer methods."""
 
+import secrets
+
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 
@@ -11,9 +13,11 @@ class Command(BaseCommand):
     help = "Create sample users, authors, books, tags and a loan."
 
     def handle(self, *args, **options):
-        User = get_user_model()
-        librarian_user = User.objects.create_user("librarian", password="librarian")
-        reader_user = User.objects.create_user("reader", password="reader")
+        user_model = get_user_model()
+        librarian_password = secrets.token_urlsafe(24)
+        reader_password = secrets.token_urlsafe(24)
+        librarian_user = user_model.objects.create_user("librarian", password=librarian_password)
+        reader_user = user_model.objects.create_user("reader", password=reader_password)
         Member.objects.create(user=librarian_user, name="Libby", role="librarian")
         reader = Member.objects.create(user=reader_user, name="Rita", role="member")
 
@@ -45,3 +49,6 @@ class Command(BaseCommand):
             f"Created {Book.objects.count()} books; bulk create: "
             f"{len(result.succeeded)} saved, {len(result.failed)} failed."
         )
+
+        self.stdout.write(f"Generated librarian password: {librarian_password}")
+        self.stdout.write(f"Generated reader password: {reader_password}")

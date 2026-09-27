@@ -128,3 +128,17 @@ class MCPMemberContextTests(LibraryTestCase):
         from library.mcp_server import member_request_factory
         with self.assertRaisesRegex(ValueError, "No active library member"):
             await member_request_factory("does-not-exist")
+
+
+class SeedCredentialsTests(TestCase):
+    def test_seeded_users_can_authenticate_with_generated_passwords(self):
+        output = io.StringIO()
+        call_command("seed_library", stdout=output)
+        lines = output.getvalue().splitlines()
+        user_model = get_user_model()
+        for username in ("librarian", "reader"):
+            prefix = f"Generated {username} password: "
+            password = next(line.removeprefix(prefix) for line in lines if line.startswith(prefix))
+            self.assertNotEqual(password, username)
+            self.assertGreaterEqual(len(password), 24)
+            self.assertTrue(user_model.objects.get(username=username).check_password(password))

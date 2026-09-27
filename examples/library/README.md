@@ -19,8 +19,8 @@ python manage.py library_report
 python manage.py runserver
 ```
 
-Use a fresh database for `seed_library`. The command creates `librarian` /
-`librarian` and `reader` / `reader`, authors, tags, three books, and a loan.
+Use a fresh database for `seed_library`. The command creates `librarian` and `reader` with generated passwords printed
+once in the terminal, plus authors, tags, three books, and a loan.
 One bulk-create item intentionally duplicates an ISBN to demonstrate partial
 success: expect one saved item and one failed item.
 
@@ -36,7 +36,7 @@ Log in to get an access token; the response also sets the `access_token` cookie:
 ```sh
 curl -X POST http://127.0.0.1:8000/api/sync/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"username":"librarian","password":"librarian"}'
+  -d '{"username":"librarian","password":"YOUR_GENERATED_LIBRARIAN_PASSWORD"}'
 ```
 
 Copy `access_token` from that response:

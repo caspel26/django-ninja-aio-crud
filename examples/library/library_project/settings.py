@@ -8,8 +8,8 @@ from joserfc import jwk
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.environ.get("LIBRARY_SECRET_KEY", "library-example-not-a-secret")
-DEBUG = True
-ALLOWED_HOSTS = ["*"]
+DEBUG = os.environ.get("LIBRARY_DEBUG", "0") == "1"
+ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 
 INSTALLED_APPS = [
     "django.contrib.admin",
