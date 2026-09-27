@@ -101,6 +101,8 @@ def patch_config(worktree: pathlib.Path, version: str) -> None:
     start, end = top_level_block(current, "theme")
     config = worktree / "mkdocs.yml"
     text = replace_block(config.read_text(), "theme", current[start:end])
+    site_url = re.search(r"^site_url:\s*(\S+)", current, re.M).group(1).rstrip("/")
+    text = replace_block(text, "site_url", f"site_url: {site_url}/{version}/\n")
     text = re.sub(
         r"^extra:\n",
         f'extra:\n  nac_version: "{version}"\n  nac_install: "{install_command(version)}"\n',
@@ -143,7 +145,7 @@ def prepare(version: str, commit: str, root: pathlib.Path) -> pathlib.Path:
     shutil.copytree(REPO / "overrides", worktree / "overrides", ignore=shutil.ignore_patterns("home.html"))
     (worktree / "overrides/legacy_home.html").write_text(render_home(worktree))
     (worktree / "docs/extra.css").unlink(missing_ok=True)
-    for sub in ("stylesheets", "javascripts", "images/brand"):
+    for sub in ("stylesheets", "javascripts", "images/brand", "assets/fonts"):
         shutil.copytree(REPO / "docs" / sub, worktree / "docs" / sub, dirs_exist_ok=True)
     shutil.copy(HERE / "legacy.css", worktree / "docs/stylesheets/legacy.css")
     patch_config(worktree, version)
