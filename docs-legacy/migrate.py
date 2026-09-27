@@ -37,12 +37,12 @@ HERE = pathlib.Path(__file__).resolve().parent
 PAGES_BRANCH = "origin/gh-pages"
 THEME_CSS = ["tokens.css", "shell.css", "components.css", "pages.css", "legacy.css"]
 THEME_JS = ["theme.js", "a11y.js", "home.js"]
-VERSION_PATTERN = r"[12]\.[0-9]+(?:\.[0-9]+)?"
+VERSION_PATTERN = r"[12]\.\d+(?:\.\d+)?"
 COMMIT_PATTERN = r"[0-9a-fA-F]{7,64}"
 
 
 def validate_version(version: str) -> str:
-    if not re.fullmatch(VERSION_PATTERN, version):
+    if not re.fullmatch(VERSION_PATTERN, version, flags=re.ASCII):
         raise ValueError("Legacy versions must be numeric 1.x/2.x identifiers (for example 2.36 or 1.0.0)")
     return version
 
@@ -66,7 +66,7 @@ def source_commits() -> dict[str, str]:
     """Map each version to the commit of its most recent mike deploy."""
     commits: dict[str, str] = {}
     for subject in git("log", PAGES_BRANCH, "--format=%s").splitlines():
-        match = re.fullmatch(rf"Deployed ({COMMIT_PATTERN}) to ({VERSION_PATTERN})(?: with .*)?", subject)
+        match = re.fullmatch(rf"Deployed ({COMMIT_PATTERN}) to ({VERSION_PATTERN})(?: with .*)?", subject, flags=re.ASCII)
         if match and match.group(2) not in commits:
             commits[match.group(2)] = match.group(1)
     return commits
@@ -151,11 +151,59 @@ def prepare(version: str, commit: str, root: pathlib.Path) -> pathlib.Path:
     return worktree
 
 
+def preview_directory(value: str) -> pathlib.Path:
+    """Confine preview writes to the repository or the system temporary folder."""
+    supplied = pathlib.Path(value).expanduser()
+    if ".." in supplied.parts:
+        raise ValueError("Preview output must not contain parent-directory traversal")
+    resolved = supplied.resolve()
+    allowed_roots = (REPO.resolve(), pathlib.Path(tempfile.gettempdir()).resolve())
+    if not any(resolved != root and resolved.is_relative_to(root) for root in allowed_roots):
+        raise ValueError("Preview output must be a subdirectory of the repository or system temporary folder")
+    return resolved
+
+
+def preview_version_directory(output: pathlib.Path, version: str) -> pathlib.Path:
+    target = output / validate_version(version)
+    target.resolve().relative_to(output.resolve())
+    return target
+
+
+def selected_versions(requested, published, commits):
+    wanted = requested or [v["version"] for v in published if v["version"].split(".")[0] in {"1", "2"}]
+    wanted = [validate_version(version) for version in wanted]
+    for version in wanted:
+        if version in commits:
+            validate_commit(commits[version])
+    return wanted
+
+
+def rebuild_version(version: str, commit: str | None, args, root: pathlib.Path) -> bool:
+    if commit is None:
+        print(f"[skip] {version}: no deploy commit found on {PAGES_BRANCH}")
+        return False
+    print(f"[{version}] rebuilding from {commit}", flush=True)
+    worktree = prepare(version, commit, root)
+    try:
+        if args.mode == "build":
+            target = preview_version_directory(args.out, version)
+            command = [sys.executable, "-m", "mkdocs", "build", "-q", "-d", str(target)]
+        else:
+            command = [sys.executable, "-m", "mike", "deploy", "--ignore-remote-status", "--", version]
+        result = subprocess.run(command, cwd=worktree, capture_output=True, text=True)
+        if result.returncode != 0:
+            print(result.stderr[-2000:])
+        return result.returncode == 0
+    finally:
+        if not args.keep:
+            subprocess.run(["git", "worktree", "remove", "--force", "--", str(worktree)], cwd=REPO, check=False)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("mode", choices=["build", "deploy"])
     parser.add_argument("versions", nargs="*", type=validate_version, help="Versions to rebuild (default: all published 1.x/2.x)")
-    parser.add_argument("--out", type=pathlib.Path, help="Output folder for build mode")
+    parser.add_argument("--out", type=preview_directory, help="Preview directory within the repository or system temporary folder")
     parser.add_argument("--keep", action="store_true", help="Keep the worktrees after building")
     args = parser.parse_args()
     if args.mode == "build" and args.out is None:
@@ -163,35 +211,16 @@ def main() -> int:
 
     published = published_versions()
     commits = source_commits()
-    wanted = args.versions or [v["version"] for v in published if v["version"].split(".")[0] in {"1", "2"}]
     try:
-        wanted = [validate_version(version) for version in wanted]
-        for version in wanted:
-            if version in commits:
-                validate_commit(commits[version])
+        wanted = selected_versions(args.versions, published, commits)
     except ValueError as exc:
         parser.error(str(exc))
     root = pathlib.Path(tempfile.mkdtemp(prefix="nac-legacy-"))
     failed = []
 
     for version in wanted:
-        commit = commits.get(version)
-        if commit is None:
-            print(f"[skip] {version}: no deploy commit found on {PAGES_BRANCH}")
+        if not rebuild_version(version, commits.get(version), args, root):
             failed.append(version)
-            continue
-        print(f"[{version}] rebuilding from {commit}", flush=True)
-        worktree = prepare(version, commit, root)
-        if args.mode == "build":
-            command = [sys.executable, "-m", "mkdocs", "build", "-q", "-d", str((args.out / version).resolve())]
-        else:
-            command = [sys.executable, "-m", "mike", "deploy", "--ignore-remote-status", "--", version]
-        result = subprocess.run(command, cwd=worktree, capture_output=True, text=True)
-        if result.returncode != 0:
-            print(result.stderr[-2000:])
-            failed.append(version)
-        if not args.keep:
-            subprocess.run(["git", "worktree", "remove", "--force", "--", str(worktree)], cwd=REPO, check=False)
 
     if args.mode == "build":
         args.out.mkdir(parents=True, exist_ok=True)

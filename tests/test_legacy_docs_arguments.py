@@ -70,3 +70,28 @@ class LegacyDocsArgumentTests(SimpleTestCase):
                 migrate.main()
             self.assertEqual(exit_status.exception.code, 2)
             mkdtemp.assert_not_called()
+
+    def test_preview_output_is_confined_and_traversal_is_rejected(self):
+        import tempfile
+
+        allowed = Path(tempfile.gettempdir()).resolve() / "legacy-preview-test"
+        self.assertEqual(migrate.preview_directory(str(allowed)), allowed)
+        for path in ("/etc/legacy-preview", str(allowed / ".." / "escaped"), str(migrate.REPO)):
+            with self.subTest(path=path), self.assertRaises(ValueError):
+                migrate.preview_directory(path)
+
+    def test_preview_version_symlink_cannot_escape_output(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as root:
+            output = Path(root) / "output"
+            outside = Path(root) / "outside"
+            output.mkdir()
+            outside.mkdir()
+            (output / "2.36").symlink_to(outside, target_is_directory=True)
+            with self.assertRaises(ValueError):
+                migrate.preview_version_directory(output, "2.36")
+
+    def test_unicode_digits_are_not_accepted_as_versions(self):
+        with self.assertRaises(ValueError):
+            migrate.validate_version("2.٣٦")
