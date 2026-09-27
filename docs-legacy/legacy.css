@@ -17,6 +17,11 @@
   color: #d6bbff;
 }
 
+.md-banner--warning .md-typeset,
+.md-banner--warning .md-typeset strong {
+  color: inherit;
+}
+
 /* The feature grid mixes wide and narrow cards per version: pack them without holes. */
 .md-typeset .nac-bento {
   grid-auto-flow: dense;
