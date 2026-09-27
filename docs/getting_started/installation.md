@@ -32,7 +32,7 @@ Install the package from PyPI. Django Ninja comes with it.
 | --- | --- |
 | Python | 3.10 to 3.14 |
 | Django Ninja | 1.7.x |
-| Django | Any version supported by your Django Ninja release |
+| Django | 5.2 LTS and 6.0 |
 
 You don't need to add anything to `INSTALLED_APPS`. Add `"ninja_aio"` only if
 you want the [`mcp_server`](../guides/mcp.md) management command.

@@ -17,7 +17,7 @@ where something should be renamed. Follow these steps to upgrade.
 pip install --upgrade "django-ninja-aio-crud>=3,<4"
 ```
 
-Version 3 supports Python 3.10 to 3.14 and Django Ninja 1.3 to 1.7.
+Version 3 supports Python 3.10 to 3.14 and Django Ninja 1.7.x.
 
 ### Check the breaking changes
 

@@ -58,7 +58,7 @@ call from Python, in sync or async code.
 pip install django-ninja-aio-crud
 ```
 
-Requires Python 3.10-3.14 and Django Ninja 1.7.x.
+Requires Python 3.10-3.14, Django 5.2 or 6.0, and Django Ninja 1.7.x.
 
 ## Quick start
 
