@@ -143,8 +143,6 @@ extra:
     - icon: fontawesome/brands/python
       link: https://pypi.org/project/django-ninja-aio-crud/
       name: PyPI
-  analytics:
-    provider: google
   version:
     provider: mike
     alias: true
