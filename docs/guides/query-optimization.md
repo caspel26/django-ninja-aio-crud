@@ -178,10 +178,10 @@ data = Article.model_dumps(articles)
 ```
 
 `optimize_for` takes `"read"` or `"detail"` and applies the same loading as
-the endpoints. The sync `model_dump()` raises `ValueError` when a relation
-isn't loaded, and `model_dumps()` needs an evaluated queryset, like a list.
-The async `amodel_dump()` and `amodel_dumps()` load relations for you. See
-[Dumping](dumping.md).
+the endpoints. Without it, `model_dump()` and `model_dumps()` (and their
+async versions) load the missing relations with one query per relation.
+Pass `strict=True` to forbid any query during a sync dump. See
+[Serialize objects](dumping.md).
 
 ## Check query counts in tests
 

@@ -76,15 +76,16 @@ method.
 | `get_queryset(*, request=None, optimize_for=None)` | `aget_queryset(...)` | `QuerySet[Article]` |
 | `update(target, data, *, request=None)` | `aupdate(...)` | `Article` |
 | `destroy(target, *, request=None)` | `adestroy(...)` | `None` |
-| `model_dump(instance, *, schema=None)` | `amodel_dump(...)` | `dict` (default: detail schema) |
-| `model_dumps(instances, *, schema=None)` | `amodel_dumps(...)` | `list[dict]` (default: read schema) |
+| `model_dump(instance, *, schema=None, strict=False)` | `amodel_dump(instance, *, schema=None)` | `dict` (default: detail schema) |
+| `model_dumps(instances, *, schema=None, strict=False)` | `amodel_dumps(instances, *, schema=None)` | `list[dict]` (default: read schema) |
 | `bulk_create(items, *, request=None)` | `abulk_create(...)` | `BulkResult[Article]` |
 | `bulk_update(items, *, request=None)` | `abulk_update(...)` | `BulkResult[Article]` |
 | `bulk_destroy(targets, *, request=None)` | `abulk_destroy(...)` | `BulkResult` of primary keys |
 
 `target` is an instance or a primary key. `optimize_for` is `"read"` or
-`"detail"`. Sync `model_dump()` and `model_dumps()` never query the database:
-load relations first, or use the async versions.
+`"detail"`. The dump methods load missing relations with one query per
+relation. `strict=True` makes the sync dump raise `ValueError` instead of
+running any query.
 
 ::: ninja_aio.models.serializers.ModelSerializer.create
     options:

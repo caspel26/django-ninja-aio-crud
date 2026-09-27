@@ -105,11 +105,30 @@ class ArticleViewSet(GreaterEqualDateFilterViewSetMixin, APIViewSet):
 `GET /api/articles?created_at=2026-01-01` returns articles created on or after
 January 1st.
 
+### Filter a date range
+
+Name the parameters with the comparison at the end: `__gt`, `__gte`, `__lt`,
+`__lte` or `__exact`. They use that comparison with any date mixin:
+
+```python
+from ninja_aio.views.mixins import DateFilterViewSetMixin
+
+
+@api.viewset(model=Article)
+class ArticleViewSet(DateFilterViewSetMixin, APIViewSet):
+    query_params = {
+        "created_at__gte": (datetime.date, None),
+        "created_at__lte": (datetime.date, None),
+    }
+```
+
+`GET /api/articles?created_at__gte=2026-01-01&created_at__lte=2026-01-31`
+returns the articles created in January.
+
 !!! note
 
-    A date mixin applies to every date and datetime parameter of the viewset.
-    Use one date mixin per viewset. For a range, like "from" and "to", write
-    your own handler as shown in [Write your own filters](#write-your-own-filters).
+    Use one date mixin per viewset. Combining two date mixins with different
+    comparisons raises `ImproperlyConfigured`.
 
 ## Filter by a related model
 

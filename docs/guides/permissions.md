@@ -98,10 +98,12 @@ author of an article can change or delete it:
         return True
     ```
 
-The object check runs for `retrieve`, `update`, `delete` and `@on` actions,
-and for `restore` and `hard_delete` with the soft delete mixin.
-It does not run for `create`, `list`, bulk endpoints or `@action` endpoints:
-those only call `has_permission`.
+The object check runs for `retrieve`, `update`, `delete`, detail actions (`@on`
+and `@action(detail=True)`), and `restore` and `hard_delete` with the soft
+delete mixin. Bulk update and bulk delete check every object with the
+operation `update` or `delete`, and list the refused ones in `errors`. It
+does not run for `create`, `list`, bulk create or collection actions: those
+only call `has_permission`.
 
 ## Hide rows from the list
 

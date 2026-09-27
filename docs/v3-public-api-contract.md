@@ -175,21 +175,23 @@ BookSerializer.model_dump(
     instance: ModelT,
     *,
     schema: SchemaType | None = None,
+    strict: bool = False,
 ) -> dict[str, Any]
 
 BookSerializer.model_dumps(
     instances: Iterable[ModelT] | QuerySet[ModelT],
     *,
     schema: SchemaType | None = None,
+    strict: bool = False,
 ) -> list[dict[str, Any]]
 ```
 
-The synchronous dump methods do not perform implicit database queries. The
-caller must provide instances with the relations required by the selected
-schema already loaded. This includes relations represented as IDs by a Ninja
-schema, since schema validation still reads the related model attribute.
-Unevaluated querysets and instances with deferred fields or unloaded schema
-relations raise `ValueError` rather than issuing SQL during serialization.
+The synchronous dump methods load the schema relations missing on the
+instances in batch (one query per relation for the whole list, never one per
+instance), matching the async methods. Unevaluated querysets are evaluated
+with the schema relation plan. Instances with deferred fields raise
+`ValueError`. With `strict=True` no query is issued: unevaluated querysets,
+deferred fields and unloaded schema relations raise `ValueError`.
 
 ```python
 await BookSerializer.amodel_dump(

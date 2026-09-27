@@ -69,8 +69,9 @@ Add `optimize_for` to load the relations of a schema in the same query:
 article = Article.get(1, optimize_for="detail")
 ```
 
-`optimize_for` accepts `"read"` or `"detail"`. Use it when you want to
-serialize the object next, see [Serialize objects](dumping.md).
+`optimize_for` accepts `"read"` or `"detail"`. Use it when you serialize the
+object next, to load everything in one query. See
+[Serialize objects](dumping.md).
 
 ## Get many objects
 

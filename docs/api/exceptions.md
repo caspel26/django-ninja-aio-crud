@@ -15,6 +15,7 @@ from ninja_aio.exceptions import (
     SerializeError,
     AuthError,
     NotFoundError,
+    MultipleObjectsError,
     ForbiddenError,
     PydanticValidationError,
     OperationValidationError,
@@ -29,6 +30,7 @@ from ninja_aio.exceptions import (
 | `SerializeError` | `(error=None, status_code=None, details=None)` | `400` | `"serialization_error"` |
 | `AuthError` | `(error=None, status_code=None, details=None)` | `401` | `"authentication_error"` |
 | `NotFoundError` | `(model, details=None)` | `404` | `"not_found"` |
+| `MultipleObjectsError` | `(model, details=None)` | `400` | `"multiple_objects"` |
 | `ForbiddenError` | `(error=None, details=None)` | `403` | `"forbidden"` |
 | `PydanticValidationError` | `(details=None)` | `400` | `"validation_error"` |
 | `OperationValidationError` | `(exc)` | `400` | `"validation_error"` |
@@ -43,7 +45,7 @@ All classes subclass `BaseException`. `OperationValidationError` subclasses
 | `error` | `str \| dict \| None` | A string becomes `{"error": "..."}`. A dict is the body as it is. `None` uses the class `error` attribute |
 | `status_code` | `int \| None` | HTTP status. `None` uses the class default |
 | `details` | any | Added to the body under `"details"` when truthy |
-| `model` | model class | `NotFoundError` only. The model that was not found |
+| `model` | model class | `NotFoundError` and `MultipleObjectsError` only. The model of the lookup |
 | `exc` | `pydantic.ValidationError` | `OperationValidationError` only. The error to wrap |
 
 ## Attributes
@@ -67,6 +69,7 @@ All classes subclass `BaseException`. `OperationValidationError` subclasses
 | `SerializeError({"title": "taken"}, 409)` | `409` | `{"title": "taken"}` |
 | `AuthError("bad token", details="expired")` | `401` | `{"error": "bad token", "details": "expired"}` |
 | `NotFoundError(Article)` | `404` | `{"article": "not found"}` |
+| `MultipleObjectsError(Article)` | `400` | `{"article": "multiple objects match the lookup"}` |
 | `ForbiddenError()` | `403` | `{"error": "forbidden"}` |
 | `ForbiddenError(details="Only staff")` | `403` | `{"error": "forbidden", "details": "Only staff"}` |
 | `PydanticValidationError([...])` | `400` | `{"error": "Validation Error", "details": [...]}` |

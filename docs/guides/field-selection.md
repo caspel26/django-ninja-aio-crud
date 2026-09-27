@@ -107,8 +107,23 @@ GET /api/articles?title=django&ordering=-views&page=1&page_size=10&fields=id,tit
 Filters, ordering and pagination run first. Then each item is cut down to
 `id` and `title`. `count` is the number of articles that match the filters.
 
-If you write your own `query_params_handler`, `filters` also holds the
-`fields` value. The filter mixins don't use it as a filter.
+The `fields` value is never passed to `query_params_handler`.
+
+## Rename the parameter
+
+Set `fields_param` to use another name, for example when your model has a
+field called `fields`:
+
+```python
+@api.viewset(model=Article)
+class ArticleViewSet(FieldSelectionViewSetMixin, APIViewSet):
+    fields_param = "only"
+```
+
+```text
+GET /api/articles?only=id,title
+GET /api/articles/1?only=title
+```
 
 ## See also
 

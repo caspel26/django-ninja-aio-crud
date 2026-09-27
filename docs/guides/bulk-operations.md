@@ -109,6 +109,11 @@ Each item runs through the same code as the single endpoint. Your model
 hooks run once per item, and bulk update and delete only find objects
 returned by `queryset_request`. See [Hooks](hooks.md).
 
+When the viewset checks single objects, with `PermissionViewSetMixin` or your
+own `aon_before_object_operation`, bulk update and bulk delete check every
+object too, with the operation `update` or `delete`. An object that fails the
+check is listed in `errors` and left unchanged; the others are saved.
+
 ## Choose the returned fields
 
 Set `bulk_response_fields` to return other fields in `success.details`:

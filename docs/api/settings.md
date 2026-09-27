@@ -19,9 +19,10 @@ All of them are optional unless you use the feature that needs them.
 | `NINJA_AIO_ORJSON_RENDERER_OPTION` | `int \| None` | `None` | orjson option flags for the default renderer, like `orjson.OPT_INDENT_2`. See [ORJSONRenderer](renderers/orjson_renderer.md) |
 | `NINJA_AIO_MCP_API` | `str \| None` | `None` | Dotted path to your `NinjaAIO` instance, used by `manage.py mcp_server` when you pass none. See [MCP](../guides/mcp.md) |
 | `JWT_PRIVATE_KEY` | `RSAKey \| ECKey \| OctKey \| None` | `None` | Default signing key for `encode_jwt`. See [Authentication](../guides/authentication.md) |
-| `JWT_PUBLIC_KEY` | `RSAKey \| ECKey \| OctKey \| None` | `None` | Default verification key for `decode_jwt`. See [Authentication](../guides/authentication.md) |
+| `JWT_PUBLIC_KEY` | `RSAKey \| ECKey \| OctKey \| None` | `None` | Default verification key for `decode_jwt` and the JWT auth classes. See [Authentication](../guides/authentication.md) |
 | `JWT_ISSUER` | `str \| None` | `None` | Default `iss` claim for `encode_jwt`. See [Authentication](../guides/authentication.md) |
 | `JWT_AUDIENCE` | `str \| None` | `None` | Default `aud` claim for `encode_jwt`. See [Authentication](../guides/authentication.md) |
+| `JWT_ALGORITHM` | `str \| None` | `None` | Default signature algorithm for `encode_jwt`, `decode_jwt` and the JWT auth classes. `None` means `"RS256"` |
 
 `set_jwt_cookie` also reads Django's `DEBUG`: when you do not pass `secure`, the
 cookie is HTTPS only if `DEBUG` is `False`. See

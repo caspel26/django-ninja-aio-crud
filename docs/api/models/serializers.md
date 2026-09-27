@@ -58,8 +58,8 @@ instances of `Meta.model`:
 | `get_queryset(*, request=None, optimize_for=None)` | `aget_queryset(...)` | `QuerySet[Article]` |
 | `update(target, data, *, request=None)` | `aupdate(...)` | `Article` |
 | `destroy(target, *, request=None)` | `adestroy(...)` | `None` |
-| `model_dump(instance, *, schema=None)` | `amodel_dump(...)` | `dict` |
-| `model_dumps(instances, *, schema=None)` | `amodel_dumps(...)` | `list[dict]` |
+| `model_dump(instance, *, schema=None, strict=False)` | `amodel_dump(instance, *, schema=None)` | `dict` |
+| `model_dumps(instances, *, schema=None, strict=False)` | `amodel_dumps(instances, *, schema=None)` | `list[dict]` |
 | `bulk_create` / `bulk_update` / `bulk_destroy` | `abulk_create` / `abulk_update` / `abulk_destroy` | `BulkResult` |
 
 ## Instance helpers

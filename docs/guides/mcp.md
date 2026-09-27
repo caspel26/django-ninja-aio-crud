@@ -73,7 +73,7 @@ Tool names are the model class name in lower case, plus the operation:
 
 | Tool | Input |
 | --- | --- |
-| `article_list` | The viewset `query_params` filters. Returns the first page |
+| `article_list` | The viewset `query_params` filters, plus the pagination parameters (`page`, `page_size`) |
 | `article_create` | The `create` fields |
 | `article_retrieve` | `pk` |
 | `article_update` | `pk` and the `update` fields |
@@ -84,7 +84,13 @@ Tool names are the model class name in lower case, plus the operation:
 | `article_<method>` | Custom actions. `pk` for detail actions, plus the method parameters |
 
 A tool exists only when its endpoint exists. `disable`, missing schemas and
-`bulk_operations` apply to tools too. See [Viewsets](viewsets.md).
+`bulk_operations` apply to tools too. Actions with `include_in_schema=False`
+are skipped. See [Viewsets](viewsets.md).
+
+When two viewsets serve the same model, their tool names start with the URL
+prefix: viewsets on `sync/articles` and `async/articles` give
+`sync_articles_article_list` and `async_articles_article_list`. Two viewsets
+with the same model and the same prefix raise `ImproperlyConfigured`.
 
 ```python title="blog/api.py"
 @api.viewset(model=Article, prefix="articles")
@@ -106,8 +112,9 @@ This gives `article_list`, `article_create`, `article_retrieve`,
 The tool description of an action is its `description`, or its `summary`.
 See [Custom actions](custom-actions.md).
 
-Endpoints of an `APIView` become tools too. Endpoints with
-`include_in_schema=False` are skipped.
+Endpoints of an `APIView` become tools too, named after the view class, the
+function or action name, and the HTTP method: `reportsview_totals_get`.
+Endpoints with `include_in_schema=False` are skipped.
 
 `api.registered_viewsets()` and `api.registered_views()` return everything the
 server exposes, including what is registered on routers.

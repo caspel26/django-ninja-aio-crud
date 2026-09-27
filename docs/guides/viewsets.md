@@ -154,7 +154,7 @@ Raise an exception in the hook to stop the request.
 | Hook | Runs | Arguments |
 | --- | --- | --- |
 | `on_before_operation` / `aon_before_operation` | Before every endpoint | `request`, `operation` |
-| `on_before_object_operation` / `aon_before_object_operation` | After the object is loaded, before `@on` actions | `request`, `operation`, `obj` |
+| `on_before_object_operation` / `aon_before_object_operation` | After the object is loaded: retrieve, update, delete and detail actions | `request`, `operation`, `obj` |
 | `on_list_queryset` | On the list endpoint, before filters and pagination | `request`, `queryset` |
 
 `on_list_queryset` is a plain `def` in both modes. Return the filtered

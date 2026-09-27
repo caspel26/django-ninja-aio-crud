@@ -76,6 +76,11 @@ after the write, so an exception in `post_create` also removes the new row. See
 | Many-to-many endpoints use the viewset auth (`get_auth` for reads, `patch_auth` for changes) unless `m2m_auth` or the relation `auth` is set. In 2.x they fell back to the API auth. | Clients of relation endpoints on protected viewsets now need a token. |
 | `M2MRelationSchema(auth=None)` makes that relation public. In 2.x `None` meant "use the default". | Remove `auth=None` if you meant the default. |
 | `AuthError` returns `401` by default instead of `400`. | Client code that checks the status. |
+| Your own `aon_before_object_operation` / `on_before_object_operation` runs on retrieve, update and delete. In 2.x it only ran there with the permission or soft delete mixin. | Hooks that should only run for `@on` actions need to check `operation`. |
+| `@action(detail=True)` runs the object checks (`has_object_permission`, soft delete, your object hook) before the method when the viewset has them. A missing object returns `404`. | Detail actions that must work on objects the user can't see. |
+| Bulk update and bulk delete check every object with the operation `update` or `delete`. Refused objects are listed in `errors`. | Permission rules that should allow bulk changes. |
+| Many-to-many endpoints check the parent object: `GET` with the operation `retrieve`, add and remove with `update`. `has_object_permission`, soft delete and your object hook apply. In 2.x they were skipped. | Permission rules for relation endpoints. |
+| JWT auth classes without `claims` raise `ImproperlyConfigured` when created. In 2.x they failed on the first request. | Set `claims`, or `claims = {}` to check none. |
 
 ## Errors
 
@@ -87,6 +92,10 @@ A database constraint error, such as a duplicate unique value, returns `409`:
 
 In 2.x it was an unhandled `500`. Your own handler for `IntegrityError` still
 takes precedence.
+
+A lookup for one object that matches more than one row raises
+`MultipleObjectsError` (`400`). In 2.x it was an unhandled `500`. When a join
+in `queryset_request` only repeats the same row, you now get the object.
 
 ## Soft delete
 
@@ -101,6 +110,20 @@ With `SoftDeleteViewSetMixin`:
 The HTTP bulk delete endpoint deletes objects one by one, so `on_delete` and
 `@on_delete` hooks run for each object. The request and response bodies are the
 same as in 2.x.
+
+## Views and filters
+
+| Change | What to check |
+| --- | --- |
+| On viewsets, `tags=` passed to `@api.viewset` or the constructor wins over `router_tags`, like on `APIView`. In 2.x `router_tags` won. | Viewsets that set both. |
+| An `APIView` without any tag has no tag in OpenAPI. In 2.x it had an empty `""` tag. | Tools that group endpoints by tag. |
+| `FieldSelectionViewSetMixin._fields_param` is now `fields_param`, and it is never passed to `query_params_handler`. | Subclasses that renamed the parameter. |
+| Combining two date filter mixins with different comparisons raises `ImproperlyConfigured`. In 2.x only the first one applied. | Use one date mixin and parameters like `created_at__gte`. |
+| MCP tools of viewsets that share a model start with their URL prefix, like `sync_articles_article_list`. | MCP clients that call those tools by name. |
+| When the same view is mounted twice, the repeated OpenAPI `operationId`s get a `_2`, `_3`... suffix. In 2.x they were duplicated. | Generated clients that use those ids. |
+
+Foreign keys in request bodies are accepted as `category` or `category_id` in
+both create and update. Code that sent the 2.x names keeps working.
 
 ## Admin
 

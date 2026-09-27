@@ -27,9 +27,10 @@ JWT_AUDIENCE = "blog-clients"
 | Setting | What it does |
 | --- | --- |
 | `JWT_PRIVATE_KEY` | Key that `encode_jwt()` signs tokens with |
-| `JWT_PUBLIC_KEY` | Key that `decode_jwt()` verifies tokens with |
+| `JWT_PUBLIC_KEY` | Key that `decode_jwt()` and auth classes verify tokens with |
 | `JWT_ISSUER` | Added as `iss` to every token you encode |
 | `JWT_AUDIENCE` | Added as `aud` to every token you encode |
+| `JWT_ALGORITHM` | Signature algorithm used when you don't pass one. Default `"RS256"` |
 
 Keys are joserfc keys: `jwk.RSAKey`, `jwk.ECKey` or `jwk.OctKey`. Any other
 value raises `ValueError`.
@@ -63,9 +64,12 @@ class JWTAuth(AsyncJwtBearer):
 
 | Attribute | Default | What it does |
 | --- | --- | --- |
-| `jwt_public` | required | Key that verifies the token signature |
-| `claims` | required | Rules for the token claims |
-| `algorithms` | `["RS256"]` | Signature algorithms you accept |
+| `jwt_public` | `JWT_PUBLIC_KEY` | Key that verifies the token signature |
+| `claims` | required | Rules for the token claims. `{}` checks none |
+| `algorithms` | `[JWT_ALGORITHM]` | Signature algorithms you accept |
+
+An auth class without `claims` raises `ImproperlyConfigured` when you create
+it.
 
 Each entry of `claims` is a claim name with its rules:
 
@@ -97,11 +101,12 @@ token = encode_jwt({"sub": str(user.pk), "scope": "write"}, duration=3600)
 | `claims` | required | Claims to put in the token |
 | `duration` | required | Lifetime in seconds |
 | `private_key` | `JWT_PRIVATE_KEY` | Key to sign with |
-| `algorithm` | `"RS256"` | Signature algorithm |
+| `algorithm` | `JWT_ALGORITHM`, or `"RS256"` | Signature algorithm |
 
 The token also gets `iat`, `nbf` and `exp`. `iss` and `aud` come from
 `JWT_ISSUER` and `JWT_AUDIENCE` unless you pass them in `claims`. When neither
-is set, `encode_jwt()` raises `ValueError`.
+is set, `encode_jwt()` raises `ValueError`. The `claims` dict you pass is not
+changed.
 
 For a complete login endpoint, see [Add authentication](../tutorial/authentication.md).
 
@@ -119,15 +124,17 @@ user_id = token.claims["sub"]
 | --- | --- | --- |
 | `token` | required | The token string |
 | `public_key` | `JWT_PUBLIC_KEY` | Key to verify with |
-| `algorithms` | `["RS256"]` | Signature algorithms you accept |
+| `algorithms` | `[JWT_ALGORITHM]` | Signature algorithms you accept |
 
 It raises a joserfc `JoseError` when the token is not valid. `decode_jwt()`
 checks only the signature. Check the claims you need yourself.
 
 ## Use an EC or HMAC key
 
-The default algorithm is `RS256`. With another key type, pass the matching
-algorithm everywhere: to `encode_jwt()` and in `algorithms` on the auth class.
+The default algorithm is `RS256`. With another key type, set `JWT_ALGORITHM`
+in your settings, for example `JWT_ALGORITHM = "ES256"`. `encode_jwt()`,
+`decode_jwt()` and the auth classes then use it. You can still pass
+`algorithm` or `algorithms` to override it in one place.
 
 ### EC key
 
@@ -173,8 +180,8 @@ class JWTAuth(AsyncJwtBearer):
     claims = {"sub": {"essential": True}}
 ```
 
-Call `decode_jwt(token, algorithms=["HS256"])` too. With the default
-`["RS256"]` it rejects the token.
+Without `JWT_ALGORITHM = "HS256"`, call `decode_jwt(token, algorithms=["HS256"])`
+too, or it rejects the token.
 
 ## Choose which endpoints need a token
 

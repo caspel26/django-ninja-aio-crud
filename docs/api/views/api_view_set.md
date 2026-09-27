@@ -25,7 +25,7 @@ class ArticleViewSet(APIViewSet):
 | --- | --- | --- | --- |
 | `model` | model class | required | A `ModelSerializer`, or a Django model with `serializer_class` |
 | `prefix` | `str \| None` | `None` | URL path. Falls back to `api_route_path`, then to the plural verbose name with spaces as hyphens |
-| `tags` | `list[str] \| None` | `None` | OpenAPI tags, used when `router_tags` is not set. Falls back to `[router_tag]` |
+| `tags` | `list[str] \| None` | `None` | OpenAPI tags. Takes precedence over `router_tags` |
 
 `NinjaAIORouter` has the same `viewset()` decorator.
 
@@ -60,7 +60,7 @@ class ArticleViewSet(APIViewSet):
 | `model_verbose_name`, `model_verbose_name_plural` | `str` | `""` | Names in summaries. `""` uses `NinjaAIOMeta`, then the model `Meta` |
 | `api_route_path` | `str` | `""` | URL path, set in the class instead of `prefix` |
 | `router_tag` | `str` | `""` | Single tag. `""` uses `model_verbose_name` |
-| `router_tags` | `list[str]` | `[]` | OpenAPI tags. Takes precedence over `tags` |
+| `router_tags` | `list[str]` | `[]` | OpenAPI tags, used when `tags` is empty. Falls back to `[router_tag]` |
 | `error_schema` | `type[Schema]` | `GenericMessageSchema` | Schema documented for `400`, `401`, `403` and `404` |
 
 `disable = ["all"]` skips the five CRUD endpoints only.
@@ -112,7 +112,7 @@ Override the name that matches the mode. A mismatch raises
 | Hook | Arguments | Runs |
 | --- | --- | --- |
 | `on_before_operation` / `aon_before_operation` | `request`, `operation` | Before every endpoint, bulk endpoint and custom action |
-| `on_before_object_operation` / `aon_before_object_operation` | `request`, `operation`, `obj` | After the object is loaded in `@on` actions. On retrieve, update and delete only with `PermissionViewSetMixin` or `SoftDeleteViewSetMixin` |
+| `on_before_object_operation` / `aon_before_object_operation` | `request`, `operation`, `obj` | After the object is loaded, on retrieve, update, delete and detail actions. Defining it is enough; mixins that define it count too |
 | `on_list_queryset` | `request`, `queryset` | On list, before filters and pagination. Plain `def` in both modes. Returns the queryset |
 | `query_params_handler` / `aquery_params_handler` | `queryset`, `filters` | On list, with the filter values as a dict. Returns the queryset |
 | `views()` | none | At registration. Add Django Ninja routes to `self.router` |

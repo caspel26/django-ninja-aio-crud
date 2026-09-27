@@ -78,8 +78,11 @@ This adds `POST /api/articles/{id}/reject`. Annotate `pk` with the type of
 the primary key, like `pk: int`. Without an annotation it arrives as a
 string. A parameter annotated with a `Schema` is read from the request body.
 
-Unlike `@on`, `@action(detail=True)` doesn't load the object. Load it
-yourself, for example with `await Article.aget(pk=pk)`.
+Unlike `@on`, `@action(detail=True)` doesn't pass the object to your method.
+Load it yourself, for example with `await Article.aget(pk=pk)`. When the
+viewset has object checks, like `PermissionViewSetMixin` or your own
+`aon_before_object_operation`, the object is loaded and checked first, and a
+missing object returns `404`.
 
 ## Choose the path
 
@@ -113,6 +116,10 @@ async def archive(self, request, obj):
 
 Without `response`, only `200` responses are allowed and the response isn't
 validated.
+
+Like the CRUD endpoints, actions list `400`, `401`, `403` and, for detail
+actions, `404` in the OpenAPI schema, with the viewset `error_schema`. Codes
+you declare in `response` keep your schema.
 
 ## Pick the HTTP methods
 
@@ -186,15 +193,16 @@ The `operation` passed to hooks is the method name, like `publish` or
 
 | Decorator | Hooks that run |
 | --- | --- |
-| `@action` | `aon_before_operation` |
+| `@action(detail=False)` | `aon_before_operation` |
+| `@action(detail=True)` | `aon_before_operation`, then, when the viewset has object checks, the object lookup and `aon_before_object_operation` |
 | `@on` | `aon_before_operation`, then the object lookup, then `aon_before_object_operation` |
 
 The sync names (`on_before_operation`, `on_before_object_operation`) run for
 `def` handlers. See [Viewsets](viewsets.md#run-code-before-each-operation).
 
 With `PermissionViewSetMixin`, every action checks `has_permission(request,
-operation)`, and `@on` actions also check `has_object_permission(request,
-operation, obj)`:
+operation)`, and detail actions (`@on` and `@action(detail=True)`) also check
+`has_object_permission(request, operation, obj)`:
 
 ```python
 from ninja_aio.views.mixins import PermissionViewSetMixin

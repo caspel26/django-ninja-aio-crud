@@ -33,7 +33,7 @@ class ReportsView(APIView):
 | Attribute | Type | Default | Description |
 | --- | --- | --- | --- |
 | `api_route_path` | `str` | `""` | URL path, used when `prefix` is empty |
-| `router_tag` | `str` | `""` | Single tag, used when `tags` and `router_tags` are empty |
+| `router_tag` | `str` | `""` | Single tag, used when `tags` and `router_tags` are empty. With no tag at all, Swagger lists the endpoints under `default` |
 | `router_tags` | `list[str]` | `[]` | OpenAPI tags, used when `tags` is empty |
 | `auth` | `list \| None` | `NOT_SET` | Auth for `@action` endpoints. `NOT_SET` uses the API auth, `None` makes them public |
 | `error_schema` | `type[Schema]` | `GenericMessageSchema` | Schema documented for error responses |

@@ -19,7 +19,7 @@ in scripts, tasks, tests and custom endpoints.
 === "Sync"
 
     ```python
-    article = Article.get(1, optimize_for="detail")
+    article = Article.get(1)
     data = Article.model_dump(article)
     ```
 
@@ -43,8 +43,8 @@ print(data["category"])
 === "Sync"
 
     ```python
-    articles = list(Article.get_queryset(optimize_for="read"))
-    data = Article.model_dumps(articles)
+    queryset = Article.get_queryset()
+    data = Article.model_dumps(queryset.filter(is_published=True))
     ```
 
 === "Async"
@@ -80,49 +80,39 @@ data = Article.model_dumps(articles, schema=ArticleTitle)
 # [{'id': 1, 'title': 'Hello'}, ...]
 ```
 
-## Load relations before a sync dump
+## Know which queries run
 
-The sync methods never run database queries. Every relation and field in the
-schema must already be loaded on the objects.
-
-Load them with `optimize_for`, using the kind of schema you dump with:
-
-| You dump with | Load with |
-| --- | --- |
-| `model_dump(obj)` | `Article.get(pk, optimize_for="detail")` |
-| `model_dump(obj, schema=Article.read_schema)` | `Article.get(pk, optimize_for="read")` |
-| `model_dumps(objs)` | `list(Article.get_queryset(optimize_for="read"))` |
-
-`model_dumps` needs the objects themselves. Pass a list, or a queryset you
-already iterated. A queryset that has not run yet is rejected.
-
-When something is missing you get a `ValueError`:
-
-| Message | Cause |
-| --- | --- |
-| `Synchronous dump requires an evaluated queryset` | You passed a queryset to `model_dumps` before it ran |
-| `Synchronous dump requires preloaded fields and relations` | A relation in the schema is not loaded, or a field was skipped with `only()` or `defer()` |
-
-A plain `Article.get(1)` or `Article.objects.get(pk=1)` does not load
-relations. Dumping it with a schema that has `category` raises the second
-error.
-
-!!! tip
-
-    A foreign key that is `None` counts as loaded.
-
-## Let async dumps load relations
-
-`amodel_dump` and `amodel_dumps` load the relations the schema needs, so you
-can pass any instance:
+Both modes load the relations the schema needs and are missing on the
+objects, with one query per relation for the whole list, never one per
+object. Relations you already loaded, with `optimize_for`, `select_related`
+or `prefetch_related`, cost nothing:
 
 ```python
-article = await Article.objects.aget(pk=1)
-data = await Article.amodel_dump(article)
+article = Article.get(1, optimize_for="detail")
+data = Article.model_dump(article)  # no query
 ```
 
-`amodel_dumps` accepts a list of instances or a queryset. A queryset that has
-not run yet is loaded with its relations in one go.
+`model_dumps` and `amodel_dumps` accept a list of instances or a queryset. A
+queryset that has not run yet is loaded with its relations in one go.
+
+A foreign key that is `None` counts as loaded. Fields skipped with `only()` or
+`defer()` are not loaded for you: the dump raises
+`ValueError: Synchronous dump requires preloaded fields and relations`.
+
+## Forbid queries during a sync dump
+
+Pass `strict=True` to make sure a dump never touches the database, for
+example in a hot path or a test:
+
+```python
+Article.model_dump(article, strict=True)
+Article.model_dumps(articles, strict=True)
+```
+
+With `strict=True` a missing relation or deferred field raises
+`ValueError: Synchronous dump requires preloaded fields and relations`, and a
+queryset that has not run yet raises
+`ValueError: Synchronous dump requires an evaluated queryset`.
 
 ## Use a Serializer
 
@@ -131,7 +121,7 @@ A `Serializer` has the same methods. Pass instances of its model:
 ```python
 from blog.serializers import ArticleSerializer
 
-article = ArticleSerializer.get(1, optimize_for="detail")
+article = ArticleSerializer.get(1)
 data = ArticleSerializer.model_dump(article)
 ```
 

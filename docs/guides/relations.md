@@ -124,6 +124,10 @@ curl -X PATCH localhost:8000/api/articles/1/ \
   -d '{"category": 2}'
 ```
 
+Both spellings are accepted everywhere: `category` and `category_id` work in
+create and in update, over HTTP and from Python. The OpenAPI schema shows the
+names above.
+
 An id that doesn't exist returns `404` and nothing is saved:
 
 ```json
@@ -216,6 +220,11 @@ both set to `False` there is no `POST` endpoint.
     Many-to-many endpoints use the `auth` of the relation first, then the
     viewset `m2m_auth`, then the viewset auth for the method: `get_auth` for
     the list, `patch_auth` for add and remove, both falling back to `auth`.
+
+    The parent object goes through the viewset object checks, like
+    `has_object_permission` and soft delete: the list uses the operation
+    `retrieve`, add and remove use `update`. A parent the user can't see
+    returns `404`.
 
 ### Filter the related list
 

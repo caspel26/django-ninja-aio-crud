@@ -38,9 +38,9 @@ class JwtAuth(AsyncJwtBearer):
 
 | Attribute | Type | Default | Description |
 | --- | --- | --- | --- |
-| `jwt_public` | `RSAKey \| ECKey \| OctKey` | required | Key used to verify the signature |
-| `claims` | `dict[str, dict]` | required | Claim rules passed to joserfc `JWTClaimsRegistry`, like `{"iss": {"value": "blog"}}` |
-| `algorithms` | `list[str]` | `["RS256"]` | Allowed signing algorithms |
+| `jwt_public` | `RSAKey \| ECKey \| OctKey` | `JWT_PUBLIC_KEY` | Key used to verify the signature |
+| `claims` | `dict[str, dict]` | required | Claim rules passed to joserfc `JWTClaimsRegistry`, like `{"iss": {"value": "blog"}}`. Missing raises `ImproperlyConfigured` on creation; `{}` checks none |
+| `algorithms` | `list[str] \| None` | `None` | Allowed signing algorithms. `None` means `[JWT_ALGORITHM]`, or `["RS256"]` |
 
 ### Methods
 
@@ -76,11 +76,12 @@ token = encode_jwt({"sub": str(user.pk)}, duration=3600)
 | `claims` | `dict` | required | Claims to add. They override the generated ones |
 | `duration` | `int` | required | Lifetime in seconds |
 | `private_key` | `RSAKey \| ECKey \| OctKey \| None` | `None` | Signing key. `None` reads `JWT_PRIVATE_KEY` |
-| `algorithm` | `str \| None` | `None` | Signing algorithm. `None` uses `"RS256"` |
+| `algorithm` | `str \| None` | `None` | Signing algorithm. `None` uses `JWT_ALGORITHM`, or `"RS256"` |
 
 Returns the token as a string. It adds `iat`, `nbf` and `exp`. When `iss` or
 `aud` are not in `claims`, it reads `JWT_ISSUER` and `JWT_AUDIENCE`. The header
-gets the key `kid` when the key has one.
+gets the key `kid` when the key has one. The `claims` dict you pass is not
+changed.
 
 Raises `ValueError` when the key is missing or not a supported type, or when
 `iss` or `aud` is missing from both `claims` and settings.
@@ -96,7 +97,7 @@ user_id = token.claims["sub"]
 | --- | --- | --- | --- |
 | `token` | `str` | required | The token string |
 | `public_key` | `RSAKey \| ECKey \| OctKey \| None` | `None` | Verification key. `None` reads `JWT_PUBLIC_KEY` |
-| `algorithms` | `list[str] \| None` | `None` | Allowed algorithms. `None` uses `["RS256"]` |
+| `algorithms` | `list[str] \| None` | `None` | Allowed algorithms. `None` uses `[JWT_ALGORITHM]`, or `["RS256"]` |
 
 Returns a `joserfc.jwt.Token` with `header` and `claims`. It checks the
 signature only, not the claims. Raises `ValueError` for a missing or unsupported

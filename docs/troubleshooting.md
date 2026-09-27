@@ -46,25 +46,17 @@ relation, or declare a value that is not on the model in `customs`. Run
 
 ### `Synchronous dump requires preloaded fields and relations`
 
-The sync `model_dump()` never runs queries, so the relations in the schema
-must already be loaded. Load the object with the fields the schema needs:
+The object has fields skipped with `only()` or `defer()`, or you passed
+`strict=True` and a relation of the schema is not loaded. Load the object
+without `only()`/`defer()`, or with the relations the schema needs:
 
-=== "Sync"
+```python
+article = Article.get(pk=1, optimize_for="detail")
+data = Article.model_dump(article, strict=True)
+```
 
-    ```python
-    article = Article.get(pk=1, optimize_for="detail")
-    data = Article.model_dump(article)
-    ```
-
-=== "Async"
-
-    ```python
-    article = await Article.aget(pk=1)
-    data = await Article.amodel_dump(article)
-    ```
-
-The async `amodel_dump()` loads missing relations for you. See
-[Dumping](guides/dumping.md).
+Without `strict=True`, missing relations are loaded for you. See
+[Serialize objects](guides/dumping.md).
 
 ### `SynchronousOnlyOperation`
 

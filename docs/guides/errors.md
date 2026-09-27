@@ -137,6 +137,11 @@ All of them live in `ninja_aio.exceptions`. The body depends on `error`:
 
 `raise NotFoundError(Article)` returns `{"article": "not found"}` with `404`.
 
+A lookup for one object, like `Article.get(title="Hello")`, that matches
+more than one article raises `MultipleObjectsError`: `400` with
+`{"article": "multiple objects match the lookup"}`. When a `queryset_request`
+join only repeats the same row, you get the object.
+
 You can also raise Django Ninja's `HttpError`:
 
 ```python
