@@ -2,7 +2,7 @@ from django.db import models
 from django.test import TestCase, tag
 
 from ninja_aio import NinjaAIO, SchemaConfig
-from ninja_aio.models import ModelSerializer, ModelUtil, on_create, on_update, on_delete
+from ninja_aio.models import ModelSerializer, ModelUtil, hooks, on_create, on_update, on_delete
 from ninja_aio.models.serializers import Serializer, SchemaModelConfig
 from tests.generics.request import Request
 from tests.generics.views import GenericAPIViewSet
@@ -166,6 +166,39 @@ class HookPlainSerializer(Serializer):
     @on_delete
     async def on_deleted(self, instance):
         _hook_calls.append(("ser_delete", instance.pk))
+
+
+class ShadowedHookModel(ModelSerializer):
+    """Defines an ``on_delete`` lifecycle method before the reactive delete hook."""
+
+    name = models.CharField(max_length=255)
+
+    class Meta:
+        app_label = "test_app"
+
+    class CreateSerializer:
+        fields = ["name"]
+
+    def on_delete(self):
+        _hook_calls.append(("lifecycle_delete", self.name))
+
+    @hooks.on_delete
+    def reactive_delete(self):
+        _hook_calls.append(("reactive_delete", self.name))
+
+
+class ShadowedHookSerializer(Serializer):
+    class Meta:
+        model = HookPlainModel
+        schema_in = SchemaModelConfig(fields=["name", "status"])
+        schema_out = SchemaModelConfig(fields=["id", "name", "status"])
+
+    def on_delete(self, instance):
+        _hook_calls.append(("ser_lifecycle_delete", instance.name))
+
+    @hooks.on_delete
+    def reactive_delete(self, instance):
+        _hook_calls.append(("ser_reactive_delete", instance.name))
 
 
 # ─── ViewSets ────────────────────────────────────────────
@@ -981,3 +1014,24 @@ class LifecycleConsistencyTests(TestCase):
         obj.status = "published"
         await HookPlainSerializer().save(obj)
         self.assertEqual(self._events(), ["ser_update_status"])
+
+
+@tag("reactive_hooks")
+class ShadowedOnDeleteHookTestCase(TestCase):
+    """``@hooks.on_delete`` works on classes that also define an ``on_delete`` method."""
+
+    def setUp(self):
+        _reset()
+
+    def test_model_serializer_runs_both_delete_hooks(self):
+        obj = ShadowedHookModel.create({"name": "gone"})
+        ShadowedHookModel.destroy(obj)
+        self.assertIn(("lifecycle_delete", "gone"), _hook_calls)
+        self.assertIn(("reactive_delete", "gone"), _hook_calls)
+
+    async def test_serializer_runs_both_delete_hooks(self):
+        serializer = ShadowedHookSerializer()
+        obj = await serializer.acreate({"name": "gone", "status": "draft"})
+        await serializer.adestroy(obj)
+        self.assertIn(("ser_lifecycle_delete", "gone"), _hook_calls)
+        self.assertIn(("ser_reactive_delete", "gone"), _hook_calls)

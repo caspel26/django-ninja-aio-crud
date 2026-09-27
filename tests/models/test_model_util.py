@@ -3,6 +3,7 @@ from django.test import tag, TestCase
 from unittest import mock
 
 from ninja.errors import ConfigError
+from ninja_aio.exceptions import MultipleObjectsError
 from ninja_aio.models import ModelUtil
 from ninja_aio.schemas.helpers import ObjectQuerySchema, ObjectsQuerySchema
 from tests.test_app import models, schema, serializers
@@ -675,3 +676,40 @@ class AgetAttrTestCase(TestCase):
 
         result = await agetattr(models.TestModel, "nonexistent", "fallback")
         self.assertEqual(result, "fallback")
+
+
+@tag("model_util")
+class MultipleObjectsLookupTestCase(TestCase):
+    """Single-object lookups that match several rows."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.util = ModelUtil(models.TestModelSerializerManyToMany)
+        cls.parent = models.TestModelSerializerManyToMany.objects.create(name="parent", description="shared")
+        cls.other = models.TestModelSerializerManyToMany.objects.create(name="other", description="shared")
+        tags = [
+            models.TestModelSerializerReverseManyToMany.objects.create(name=f"tag-{i}", description="d")
+            for i in range(2)
+        ]
+        cls.parent.test_model_serializers.set(tags)
+
+    def _join_lookup(self):
+        # The join on the M2M repeats the parent row once per matching tag.
+        return ObjectQuerySchema(getters={"test_model_serializers__name__startswith": "tag"})
+
+    def test_sync_lookup_returns_the_object_when_a_join_repeats_it(self):
+        obj = self.util.get_object(None, query_data=self._join_lookup())
+        self.assertEqual(obj.pk, self.parent.pk)
+
+    async def test_async_lookup_returns_the_object_when_a_join_repeats_it(self):
+        obj = await self.util.aget_object(None, query_data=self._join_lookup())
+        self.assertEqual(obj.pk, self.parent.pk)
+
+    def test_sync_lookup_matching_two_objects_raises(self):
+        with self.assertRaises(MultipleObjectsError) as ctx:
+            self.util.get_object(None, query_data=ObjectQuerySchema(getters={"description": "shared"}))
+        self.assertEqual(ctx.exception.status_code, 400)
+
+    async def test_async_lookup_matching_two_objects_raises(self):
+        with self.assertRaises(MultipleObjectsError):
+            await self.util.aget_object(None, query_data=ObjectQuerySchema(getters={"description": "shared"}))

@@ -8,6 +8,7 @@ from typing import (
     Optional,
     TypeAlias,
     TypeVar,
+    TYPE_CHECKING,
     Union,
     cast,
     get_args,
@@ -31,7 +32,7 @@ from ninja import Schema
 from django.core.exceptions import FieldDoesNotExist, ImproperlyConfigured
 from ninja.orm import create_schema
 from django.db import connections, models
-from django.db.models import aprefetch_related_objects
+from django.db.models import aprefetch_related_objects, prefetch_related_objects
 from django.http import HttpRequest
 from django.db.models.fields.related_descriptors import (
     ReverseManyToOneDescriptor,
@@ -40,7 +41,8 @@ from django.db.models.fields.related_descriptors import (
     ForwardManyToOneDescriptor,
     ForwardOneToOneDescriptor,
 )
-from pydantic import BeforeValidator, Field, ValidationError
+from pydantic import AliasChoices, BeforeValidator, Field, ValidationError, create_model
+from copy import copy
 from pydantic._internal._decorators import PydanticDescriptorProxy
 
 from ninja_aio.types import (
@@ -1365,7 +1367,29 @@ class BaseSerializer:
             custom_fields=customs,
             exclude=excludes,
         )
+        schema = cls._accept_foreign_key_spellings(model, schema)
         return cls._apply_validators(schema, validators, model_config, schema_overrides)
+
+    @staticmethod
+    @lru_cache(maxsize=512)
+    def _accept_foreign_key_spellings(model: type[models.Model], schema: SchemaType) -> SchemaType:
+        """Let input foreign keys be sent as ``author`` or ``author_id``, whichever the schema uses."""
+        overrides = {}
+        for field in model._meta.concrete_fields:
+            if not field.is_relation or field.many_to_many:
+                continue
+            for name in (field.name, field.attname):
+                info = schema.model_fields.get(name)
+                if info is None:
+                    continue
+                key = info.alias or name
+                other = field.attname if key == field.name else field.name
+                info = copy(info)
+                info.validation_alias = AliasChoices(key, other)
+                overrides[name] = (info.annotation, info)
+        if not overrides:
+            return schema
+        return create_model(schema.__name__, __base__=schema, __module__=schema.__module__, **overrides)
 
     @classmethod
     def _generate_model_schema(
@@ -1605,10 +1629,22 @@ class BaseSerializer:
         instances: Iterable[models.Model],
         schema: SchemaType | None,
         kind: Literal["read", "detail"] = "read",
+        strict: bool = False,
     ) -> list[dict[str, Any]]:
-        if isinstance(instances, models.QuerySet) and instances._result_cache is None:
-            raise ValueError("Synchronous dump requires an evaluated queryset")
         selected_schema = cls._dump_schema(kind, schema)
+        unevaluated = isinstance(instances, models.QuerySet) and instances._result_cache is None
+        if strict and unevaluated:
+            raise ValueError("Synchronous dump requires an evaluated queryset")
+        if not strict:
+            plan = cls._dump_relation_plan(selected_schema)
+            if unevaluated:
+                instances = list(model_transformations.apply_relation_plan(instances, plan))
+            else:
+                instances = list(instances)
+                relations = (*plan.select_related, *plan.prefetch_related)
+                if relations and instances:
+                    # One query per missing relation for the whole batch; loaded ones are skipped.
+                    prefetch_related_objects(instances, *relations)
         with ExitStack() as stack:
             for connection in connections.all():
                 stack.enter_context(connection.execute_wrapper(cls._reject_dump_query))
@@ -2170,9 +2206,10 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
         instance: ModelSerializerT,
         *,
         schema: SchemaType | None = None,
+        strict: bool = False,
     ) -> dict[str, Any]:
-        """Serialize an already-loaded model instance without fetching relations."""
-        return cls._dump_models((instance,), schema, "detail")[0]
+        """Serialize one instance, loading missing schema relations; ``strict=True`` never queries."""
+        return cls._dump_models((instance,), schema, "detail", strict)[0]
 
     @classmethod
     def model_dumps(
@@ -2180,9 +2217,10 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
         instances: Iterable[ModelSerializerT] | models.QuerySet[ModelSerializerT],
         *,
         schema: SchemaType | None = None,
+        strict: bool = False,
     ) -> list[dict[str, Any]]:
-        """Serialize an already-evaluated collection with the read schema."""
-        return cls._dump_models(instances, schema)
+        """Serialize a collection with the read schema, one query per missing relation."""
+        return cls._dump_models(instances, schema, strict=strict)
 
     @classmethod
     async def amodel_dump(
@@ -2817,14 +2855,18 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         cls._reactive_hooks = collect_reactive_hooks(cls)
         register_serializer_for_model(cls.model, cls)
 
-    class Meta:
-        model: Optional[type[ModelT]] = None
-        schema_in: Optional[SchemaModelConfig] = None
-        schema_out: Optional[SchemaModelConfig] = None
-        schema_update: Optional[SchemaModelConfig] = None
-        schema_detail: Optional[SchemaModelConfig] = None
-        relations_serializers: dict[str, "Serializer"] = {}
-        relations_as_id: list[str] = []
+    if TYPE_CHECKING:
+        # Applications supply their own options class rather than inheriting it.
+        Meta: ClassVar[Any]
+    else:
+        class Meta:
+            model: Optional[type[ModelT]] = None
+            schema_in: Optional[SchemaModelConfig] = None
+            schema_out: Optional[SchemaModelConfig] = None
+            schema_update: Optional[SchemaModelConfig] = None
+            schema_detail: Optional[SchemaModelConfig] = None
+            relations_serializers: dict[str, "Serializer"] = {}
+            relations_as_id: list[str] = []
 
     def __init__(self, instance: Optional[ModelT] = None):
         """
@@ -2960,9 +3002,10 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         instance: ModelT,
         *,
         schema: SchemaType | None = None,
+        strict: bool = False,
     ) -> dict[str, Any]:
-        """Serialize an already-loaded model instance without querying."""
-        return cls._dump_models((instance,), schema, "detail")[0]
+        """Serialize one instance, loading missing schema relations; ``strict=True`` never queries."""
+        return cls._dump_models((instance,), schema, "detail", strict)[0]
 
     @classmethod
     def model_dumps(
@@ -2970,9 +3013,10 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         instances: Iterable[ModelT] | models.QuerySet[ModelT],
         *,
         schema: SchemaType | None = None,
+        strict: bool = False,
     ) -> list[dict[str, Any]]:
-        """Serialize an already-evaluated collection with the read schema."""
-        return cls._dump_models(instances, schema)
+        """Serialize a collection with the read schema, one query per missing relation."""
+        return cls._dump_models(instances, schema, strict=strict)
 
     @classmethod
     async def amodel_dump(

@@ -247,11 +247,14 @@ class ModelSerializerSyncCrudFacadeTests(SyncCrudFacadeContractMixin, TestCase):
         with self.assertRaisesRegex(ValueError, "preloaded fields and relations"):
             self.serializer_class.model_dump(instance, schema=QueryingSchema)
 
-    def test_model_dumps_requires_evaluated_queryset(self) -> None:
+    def test_model_dumps_evaluates_querysets_unless_strict(self) -> None:
         instance = self.serializer_class.create(self.create_data("list"))
 
         with self.assertRaisesRegex(ValueError, "evaluated queryset"):
-            self.serializer_class.model_dumps(self.model_class.objects.all())
+            self.serializer_class.model_dumps(self.model_class.objects.all(), strict=True)
+        with self.assertNumQueries(1):
+            dumped = self.serializer_class.model_dumps(self.model_class.objects.filter(pk=instance.pk))
+        self.assertEqual([item["name"] for item in dumped], [instance.name])
 
         queryset = self.model_class.objects.filter(pk=instance.pk)
         list(queryset)
@@ -270,7 +273,7 @@ class ModelSerializerSyncCrudFacadeTests(SyncCrudFacadeContractMixin, TestCase):
         ):
             self.serializer_class.model_dump(deferred)
 
-    def test_model_dump_rejects_unloaded_relation_without_querying(self) -> None:
+    def test_model_dump_loads_unloaded_relation_unless_strict(self) -> None:
         parent = TestModelSerializerReverseForeignKey.objects.create(
             **self.create_data("parent")
         )
@@ -283,7 +286,10 @@ class ModelSerializerSyncCrudFacadeTests(SyncCrudFacadeContractMixin, TestCase):
             self.assertNumQueries(0),
             self.assertRaisesRegex(ValueError, "preloaded fields and relations"),
         ):
-            TestModelSerializerForeignKey.model_dump(child)
+            TestModelSerializerForeignKey.model_dump(child, strict=True)
+        with self.assertNumQueries(1):
+            dumped = TestModelSerializerForeignKey.model_dump(child)
+        self.assertEqual(dumped["test_model_serializer"]["name"], parent.name)
 
         loaded = TestModelSerializerForeignKey.objects.select_related(
             "test_model_serializer"
@@ -293,7 +299,7 @@ class ModelSerializerSyncCrudFacadeTests(SyncCrudFacadeContractMixin, TestCase):
 
         self.assertEqual(result["test_model_serializer"]["name"], parent.name)
 
-    def test_model_dump_requires_prefetched_reverse_relation(self) -> None:
+    def test_model_dump_loads_reverse_relation_unless_strict(self) -> None:
         parent = TestModelSerializerReverseForeignKey.objects.create(
             **self.create_data("reverse")
         )
@@ -305,7 +311,10 @@ class ModelSerializerSyncCrudFacadeTests(SyncCrudFacadeContractMixin, TestCase):
             self.assertNumQueries(0),
             self.assertRaisesRegex(ValueError, "preloaded fields and relations"),
         ):
-            TestModelSerializerReverseForeignKey.model_dump(parent)
+            TestModelSerializerReverseForeignKey.model_dump(parent, strict=True)
+        fresh = TestModelSerializerReverseForeignKey.objects.get(pk=parent.pk)
+        dumped = TestModelSerializerReverseForeignKey.model_dump(fresh)
+        self.assertEqual(len(dumped["test_model_serializer_foreign_keys"]), 1)
 
         loaded = TestModelSerializerReverseForeignKey.objects.prefetch_related(
             "test_model_serializer_foreign_keys"
@@ -342,7 +351,7 @@ class StandaloneSerializerSyncCrudFacadeTests(SyncCrudFacadeContractMixin, TestC
         self.assertEqual(single["name"], instance.name)
         self.assertEqual(many, [single])
 
-    def test_relations_as_id_requires_loaded_fk(self) -> None:
+    def test_relations_as_id_loads_fk_unless_strict(self) -> None:
         parent = TestModelReverseForeignKey.objects.create(**self.create_data("parent"))
         child = TestModelForeignKey.objects.create(
             **self.create_data("child"), test_model=parent
@@ -353,7 +362,8 @@ class StandaloneSerializerSyncCrudFacadeTests(SyncCrudFacadeContractMixin, TestC
             self.assertNumQueries(0),
             self.assertRaisesRegex(ValueError, "preloaded fields and relations"),
         ):
-            BookAsIdMetaSerializer.model_dump(unloaded)
+            BookAsIdMetaSerializer.model_dump(unloaded, strict=True)
+        self.assertEqual(BookAsIdMetaSerializer.model_dump(unloaded)["test_model"], parent.pk)
 
         loaded = TestModelForeignKey.objects.select_related("test_model").get(
             pk=child.pk
@@ -362,3 +372,21 @@ class StandaloneSerializerSyncCrudFacadeTests(SyncCrudFacadeContractMixin, TestC
             result = BookAsIdMetaSerializer.model_dump(loaded)
 
         self.assertEqual(result["test_model"], parent.pk)
+
+
+class SyncDumpBatchLoadingTests(TestCase):
+    """The sync dump loads missing relations with one query per relation, not per object."""
+
+    def test_model_dumps_loads_relations_in_one_batch(self) -> None:
+        parents = [
+            TestModelSerializerReverseForeignKey.objects.create(name=f"p{i}", description="d")
+            for i in range(5)
+        ]
+        for parent in parents:
+            TestModelSerializerForeignKey.objects.create(
+                name=f"c-{parent.name}", description="d", test_model_serializer=parent
+            )
+        children = list(TestModelSerializerForeignKey.objects.all())
+        with self.assertNumQueries(1):
+            dumped = TestModelSerializerForeignKey.model_dumps(children)
+        self.assertEqual(len(dumped), 5)

@@ -14,10 +14,11 @@ from pydantic import ValidationError
 from django.db import models, router, transaction
 from django.db.models import Q, aprefetch_related_objects
 from django.http import HttpRequest
-from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist
+from django.core.exceptions import ImproperlyConfigured, MultipleObjectsReturned, ObjectDoesNotExist
 from asgiref.sync import sync_to_async
 from ninja_aio.exceptions import (
     BaseException as OperationError,
+    MultipleObjectsError,
     NotFoundError,
     OperationValidationError,
     SerializeError,
@@ -686,6 +687,13 @@ class ModelUtil(Generic[ModelT]):
         except ObjectDoesNotExist:
             logger.debug(f"{self.model.__name__} not found (pk={pk})")
             raise NotFoundError(self.model)
+        except MultipleObjectsReturned:
+            matches = obj_qs.filter(**lookup)
+            pks = [value async for value in matches.values_list("pk", flat=True).distinct()[:2]]
+            if len(pks) > 1:
+                raise MultipleObjectsError(self.model)
+            # Joins in queryset_request can repeat the same row.
+            return await matches.afirst()
 
     def get_object(
         self,
@@ -712,6 +720,12 @@ class ModelUtil(Generic[ModelT]):
             return queryset.get(**lookup)
         except ObjectDoesNotExist as exc:
             raise NotFoundError(self.model) from exc
+        except MultipleObjectsReturned as exc:
+            matches = queryset.filter(**lookup)
+            if len(matches.values_list("pk", flat=True).distinct()[:2]) > 1:
+                raise MultipleObjectsError(self.model) from exc
+            # Joins in queryset_request can repeat the same row.
+            return matches.first()
 
     def _build_lookup_query(
         self,
@@ -1531,9 +1545,11 @@ class ModelUtil(Generic[ModelT]):
                 if self._needs_atomic(hooks)
                 else nullcontext()
             )
+            # Like the sync path: resolve input and foreign keys before the transaction.
+            parsed = await self.aparse_input_data(request, data, fk_cache)
             async with atomic:
                 return await self._persist_instance(
-                    request, data, fk_cache, extra_fields
+                    request, data, fk_cache, extra_fields, parsed=parsed
                 )
         using = router.db_for_write(self.model)
         if any(
@@ -1567,6 +1583,7 @@ class ModelUtil(Generic[ModelT]):
         data: Schema,
         fk_cache: dict[tuple[type, Any], Any] | None = None,
         extra_fields: dict[str, Any] | None = None,
+        parsed: tuple[dict, dict] | None = None,
     ) -> ModelT:
         """
         Create a new instance and run hooks.
@@ -1597,7 +1614,7 @@ class ModelUtil(Generic[ModelT]):
         )
 
         logger.info(f"Creating {self.model.__name__}")
-        payload, customs = await self.aparse_input_data(request, data, fk_cache)
+        payload, customs = parsed or await self.aparse_input_data(request, data, fk_cache)
         if extra_fields:
             for name in extra_fields:
                 # The parent owns this FK, including its raw *_id alias.

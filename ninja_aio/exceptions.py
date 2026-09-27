@@ -99,6 +99,22 @@ class NotFoundError(BaseException):
         )
 
 
+class MultipleObjectsError(BaseException):
+    """Raised when a single-object lookup matches more than one row."""
+
+    status_code = 400
+    code = "multiple_objects"
+    error = "multiple objects match the lookup"
+
+    def __init__(self, model: Model, details=None):
+        model_name = model._meta.verbose_name.replace(" ", "_")
+        super().__init__(
+            error={model_name: self.error},
+            status_code=self.status_code,
+            details=details,
+        )
+
+
 class ForbiddenError(BaseException):
     """Raised when a user lacks permission for the requested operation (HTTP 403)."""
 
