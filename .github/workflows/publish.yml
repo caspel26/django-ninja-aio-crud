@@ -13,7 +13,9 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v7
       - name: Install Flit
-        run: pip install flit
+        # Flit 3.12 passes gen_setup_py to SdistBuilder.build; flit_core 4
+        # removed that argument. Keep the CLI and backend on a verified pair.
+        run: pip install --only-binary :all: --require-hashes -r .github/requirements/publish.txt
       - name: Install Dependencies
         run: flit install --symlink
       - name: Publish
