@@ -19,7 +19,12 @@ async function open(page: Page, path: string, scheme: string) {
   await page.evaluate((value) => document.body.setAttribute("data-md-color-scheme", value), scheme);
   await page.evaluate(() => document.fonts.ready);
   // Link and surface colors transition; measure the settled values.
-  await page.waitForTimeout(400);
+  await page.evaluate(async () => {
+    const animations = document.getAnimations().filter((animation) =>
+      animation.effect instanceof KeyframeEffect && animation.effect.target === document.body,
+    );
+    await Promise.all(animations.map((animation) => animation.finished.catch(() => undefined)));
+  });
 }
 
 for (const [name, path] of Object.entries(PAGES)) {

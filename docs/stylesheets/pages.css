@@ -533,7 +533,7 @@
   letter-spacing: 0.02em;
 }
 
-.md-typeset .nac-method--get { background: color-mix(in srgb, #22d3ee 16%, transparent); color: #22d3ee; }
+.md-typeset .nac-method--get { background: color-mix(in srgb, #22d3ee 16%, transparent); color: var(--nac-text); }
 .md-typeset .nac-method--post { background: color-mix(in srgb, var(--nac-green) 18%, transparent); color: var(--nac-green); }
 .md-typeset .nac-method--patch { background: color-mix(in srgb, var(--nac-amber) 18%, transparent); color: var(--nac-amber); }
 .md-typeset .nac-method--delete { background: color-mix(in srgb, var(--nac-red) 16%, transparent); color: var(--nac-red); }
@@ -838,6 +838,8 @@
 }
 
 .md-typeset .nac-bars {
+  margin: 0;
+  list-style: none;
   display: grid;
   gap: 14px;
   padding: 28px;
@@ -847,6 +849,7 @@
 }
 
 .md-typeset .nac-bar {
+  margin: 0;
   display: grid;
   grid-template-columns: 170px minmax(0, 1fr) 76px;
   align-items: center;

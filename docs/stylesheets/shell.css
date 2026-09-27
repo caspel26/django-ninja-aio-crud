@@ -104,6 +104,7 @@ body {
   font-size: 17px;
   font-weight: 750;
   letter-spacing: -0.03em;
+  white-space: nowrap;
 }
 
 .md-logo img.nac-mark.nac-mark--light,
@@ -954,9 +955,6 @@ a.nac-version__item:hover {
   flex: none;
 }
 
-.nac-brand__name {
-  white-space: nowrap;
-}
 
 /* Older versions have up to 7 top-level sections: tighten the header to fit. */
 .nac-nav:has(> .nac-nav__item:nth-child(7)) {

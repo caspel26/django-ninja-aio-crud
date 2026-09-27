@@ -63,7 +63,12 @@ for (const [name, path] of Object.entries(PAGES)) {
     const response = await page.goto(path);
     expect(response?.ok()).toBe(true);
     await page.evaluate(() => document.fonts.ready);
-    await page.waitForLoadState("networkidle");
+    await expect(page.locator(".nac-version__menu li").first()).toBeAttached();
+    await page.evaluate(async () => {
+      await Promise.all(Array.from(document.images).filter((image) => image.loading !== "lazy").map((image) =>
+        image.decode().catch(() => undefined),
+      ));
+    });
     const loaded = await Promise.all(resources);
     const bytesFor = (kind: string) => loaded
       .filter((resource) => resource.kind === kind)

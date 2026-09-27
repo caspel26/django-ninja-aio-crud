@@ -76,7 +76,7 @@
     });
 
     const data = await fetchVersions(widget.dataset.remote);
-    const scopeSegment = siteRoot().pathname.split("/").filter(Boolean).pop() || "";
+    const scopeSegment = siteRoot().pathname.split("/").findLast(Boolean) || "";
     const configured = widget.dataset.current;
     const match = data?.versions.find(
       (v) => v.version === scopeSegment || (v.aliases || []).includes(scopeSegment),
@@ -201,7 +201,8 @@
     const content = document.querySelector(".md-content__inner");
     if (!content) return;
     content.classList.remove("nac-enter");
-    void content.offsetWidth;
+    // Reading layout completes the removal before restarting the animation.
+    content.getBoundingClientRect();
     content.classList.add("nac-enter");
   }
 
