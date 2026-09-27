@@ -3,9 +3,11 @@ import inspect
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass, replace
+from math import inf
 from typing import Any, Generic, List, Literal, NamedTuple, TypeVar
 
 from ninja import NinjaAPI, Router, Schema, Path, Query, Status
+from ninja.conf import settings as ninja_settings
 from ninja.constants import NOT_SET
 from ninja.pagination import AsyncPaginationBase, PageNumberPagination
 from django.http import HttpRequest
@@ -516,6 +518,7 @@ class APIViewSet(API, Generic[ModelT]):
             else ManyToManyAPI(relations=self.m2m_relations, view_set=self)
         )
         self._validate_mode_hooks()
+        self._validate_pagination_class()
         logger.debug(
             f"APIViewSet initialized for {self.model.__name__} at /{self.api_route_path}"
         )
@@ -744,17 +747,34 @@ class APIViewSet(API, Generic[ModelT]):
         paginator: AsyncPaginationBase, pagination_input: Schema
     ) -> tuple[int, int]:
         """
-        Extract (offset, page_size) from any pagination class input.
+        Extract (offset, page_size) from a page-based or limit/offset input.
         """
         if hasattr(pagination_input, "page"):
-            page_size = paginator._get_page_size(
-                getattr(pagination_input, "page_size", None)
-            )
+            requested = getattr(pagination_input, "page_size", None)
+            if hasattr(paginator, "_get_page_size"):
+                page_size = paginator._get_page_size(requested)
+            else:
+                page_size = requested or getattr(
+                    paginator, "page_size", ninja_settings.PAGINATION_PER_PAGE
+                )
             offset = (pagination_input.page - 1) * page_size
         else:
-            page_size = getattr(pagination_input, "limit", 100)
+            page_size = pagination_input.limit
+            max_limit = getattr(paginator, "max_limit", None)
+            if max_limit is not None and max_limit != inf:
+                page_size = min(page_size, max_limit)
             offset = getattr(pagination_input, "offset", 0)
         return offset, page_size
+
+    def _validate_pagination_class(self) -> None:
+        fields = getattr(self.pagination_class, "Input", Schema).model_fields
+        if "page" not in fields and "limit" not in fields:
+            raise ImproperlyConfigured(
+                f"{type(self).__name__}.pagination_class "
+                f"{self.pagination_class.__name__} is not supported: its Input "
+                "must have 'page' (and optional 'page_size') or 'limit' "
+                "(and optional 'offset') fields."
+            )
 
     def _apply_ordering(self, queryset: QuerySet, ordering_value: str | None) -> QuerySet:
         """
