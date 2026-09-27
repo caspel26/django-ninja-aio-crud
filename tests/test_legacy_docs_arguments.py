@@ -207,6 +207,8 @@ class LegacyDocsIntegrationTests(SimpleTestCase):
             self.assertEqual(config["extra"]["old"], "kept")
             self.assertIn("stylesheets/legacy.css", config["extra_css"])
             self.assertTrue((worktree / "docs/images/brand/mark-dark-64.png").is_file())
+            self.assertTrue((worktree / "docs/assets/fonts/schibsted-grotesk-latin-wght.woff2").is_file())
+            self.assertEqual(config["site_url"], "https://django-ninja-aio.com/2.36/")
             self.assertFalse((worktree / "docs/extra.css").exists())
             self.assertFalse((worktree / "overrides/home.html").exists())
             self.assertIn("Legacy landing", (worktree / "docs/index.md").read_text())
