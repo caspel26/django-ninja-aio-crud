@@ -2,6 +2,17 @@
 
 import warnings
 from importlib import import_module
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .api import NinjaAIO as NinjaAIO
+    from .router import NinjaAIORouter as NinjaAIORouter
+    from .views import APIView as APIView, APIViewSet as APIViewSet
+    from .models import ModelSerializer as ModelSerializer
+    from .models.serializers import Serializer as Serializer
+    from .models.config import SchemaConfig as SchemaConfig
+    from .decorators import action as action, on as on
+    from .types import HttpMethod as HttpMethod
 
 __version__ = "2.36.0"
 
