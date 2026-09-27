@@ -689,7 +689,7 @@ class ModelUtil(Generic[ModelT]):
             raise NotFoundError(self.model)
         except MultipleObjectsReturned:
             matches = obj_qs.filter(**lookup)
-            pks = [value async for value in matches.values_list("pk", flat=True).distinct()[:2]]
+            pks = [value async for value in matches.order_by().values_list("pk", flat=True).distinct()[:2]]
             if len(pks) > 1:
                 raise MultipleObjectsError(self.model)
             # Joins in queryset_request can repeat the same row.
@@ -722,7 +722,7 @@ class ModelUtil(Generic[ModelT]):
             raise NotFoundError(self.model) from exc
         except MultipleObjectsReturned as exc:
             matches = queryset.filter(**lookup)
-            if len(matches.values_list("pk", flat=True).distinct()[:2]) > 1:
+            if len(matches.order_by().values_list("pk", flat=True).distinct()[:2]) > 1:
                 raise MultipleObjectsError(self.model) from exc
             # Joins in queryset_request can repeat the same row.
             return matches.first()

@@ -3,7 +3,6 @@ import inspect
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass, replace
-from http import HTTPStatus
 from math import inf
 from typing import Any, Generic, List, Literal, NamedTuple, TypeVar
 
@@ -231,18 +230,10 @@ class API:
         codes = set(ERROR_CODES) if config.detail else set(ERROR_CODES) - {404}
         response = config.response
         if response is NOT_SET or response is None:
-            # No success schema: document the errors without validating the response.
-            error_schema = self.error_schema.model_json_schema()
-            documented = {
-                code: {
-                    "description": HTTPStatus(code).phrase,
-                    "content": {"application/json": {"schema": error_schema}},
-                }
-                for code in sorted(codes)
-            }
-            extra = dict(config.openapi_extra or {})
-            extra["responses"] = {**documented, **extra.get("responses", {})}
-            return response, extra
+            # Any leaves an undeclared success body unrestricted. Let Ninja
+            # generate the error schemas and their nested component references.
+            success = Any if response is NOT_SET else None
+            return {200: success, Ellipsis: success, frozenset(codes): self.error_schema}, config.openapi_extra
         if not isinstance(response, dict):
             response = {200: response}
         declared = {

@@ -1382,10 +1382,13 @@ class BaseSerializer:
                 info = schema.model_fields.get(name)
                 if info is None:
                     continue
-                key = info.alias or name
-                other = field.attname if key == field.name else field.name
+                alias = info.validation_alias
+                choices = list(alias.choices) if isinstance(alias, AliasChoices) else ([alias] if alias else [])
+                for key in (info.alias, name, field.name, field.attname):
+                    if key is not None and key not in choices:
+                        choices.append(key)
                 info = copy(info)
-                info.validation_alias = AliasChoices(key, other)
+                info.validation_alias = AliasChoices(*choices)
                 overrides[name] = (info.annotation, info)
         if not overrides:
             return schema
@@ -1644,6 +1647,7 @@ class BaseSerializer:
                 relations = (*plan.select_related, *plan.prefetch_related)
                 if relations and instances:
                     # One query per missing relation for the whole batch; loaded ones are skipped.
+                    cls._cache_null_dump_relations(instances, relations)
                     prefetch_related_objects(instances, *relations)
         with ExitStack() as stack:
             for connection in connections.all():
@@ -1655,6 +1659,26 @@ class BaseSerializer:
                     model_transformations.dump_model(instance, selected_schema)
                 )
             return result
+
+    @staticmethod
+    def _cache_null_dump_relations(instances: Iterable[models.Model], relations: Iterable[str]) -> None:
+        # Django 5.2.0 can issue an unnecessary prefetch query for a null FK.
+        # A loaded null attname is sufficient to cache the relation as None.
+        roots = {name.split("__", 1)[0] for name in relations}
+        for instance in instances:
+            for name in roots:
+                try:
+                    field = instance._meta.get_field(name)
+                except FieldDoesNotExist:
+                    continue
+                if (
+                    field.is_relation
+                    and not field.auto_created
+                    and getattr(field, "attname", None) in instance.__dict__
+                    and instance.__dict__[field.attname] is None
+                    and not field.is_cached(instance)
+                ):
+                    field.set_cached_value(instance, None)
 
     @staticmethod
     def _require_preloaded_fields(instance: models.Model, schema: SchemaType) -> None:
@@ -1697,6 +1721,7 @@ class BaseSerializer:
         plan = cls._dump_relation_plan(selected)
         relations = (*plan.select_related, *plan.prefetch_related)
         if relations:
+            cls._cache_null_dump_relations([instance], relations)
             await aprefetch_related_objects([instance], *relations)
         return await sync_to_async(model_transformations.dump_model)(instance, selected)
 
@@ -1713,6 +1738,7 @@ class BaseSerializer:
             loaded = list(instances)
             relations = (*plan.select_related, *plan.prefetch_related)
             if relations and loaded:
+                cls._cache_null_dump_relations(loaded, relations)
                 await aprefetch_related_objects(loaded, *relations)
         return await sync_to_async(model_transformations.dump_models)(loaded, selected)
 

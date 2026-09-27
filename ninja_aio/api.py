@@ -80,6 +80,15 @@ class NinjaAIO(NinjaAPI):
             return ids[operation]
         base = super().get_openapi_operation_id(operation)
         taken = set(ids.values())
+        # Explicit IDs bypass this method in Ninja's schema generator. Reserve
+        # them regardless of registration order before allocating a generated ID.
+        taken.update(
+            op.operation_id
+            for router in self._get_bound_routers()
+            for path_view in router.path_operations.values()
+            for op in path_view.operations
+            if op.include_in_schema and op.operation_id
+        )
         candidate, count = base, 1
         while candidate in taken:
             count += 1
