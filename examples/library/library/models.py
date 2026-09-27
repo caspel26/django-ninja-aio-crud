@@ -59,13 +59,13 @@ class Book(ModelSerializer):
     class Schemas:
         create = SchemaConfig(
             fields=["title", "isbn", "author"],
-            optionals=[("pages", int), ("published", datetime.date)],
+            optionals=[("pages", int), ("published", datetime.date | None)],
         )
         update = SchemaConfig(
             optionals=[
                 ("title", str),
                 ("pages", int),
-                ("published", datetime.date),
+                ("published", datetime.date | None),
                 ("available", bool),
                 ("author", int),
             ],
@@ -101,10 +101,10 @@ class Author(ModelSerializer):
     class Schemas:
         create = SchemaConfig(
             fields=["name"],
-            optionals=[("bio", str), ("birth_date", datetime.date)],
+            optionals=[("bio", str), ("birth_date", datetime.date | None)],
             nested={"books": Book},
         )
-        update = SchemaConfig(optionals=[("name", str), ("bio", str), ("birth_date", datetime.date)])
+        update = SchemaConfig(optionals=[("name", str), ("bio", str), ("birth_date", datetime.date | None)])
         read = SchemaConfig(fields=["id", "name", "birth_date"])
         detail = SchemaConfig(fields=["id", "name", "bio", "birth_date", "books"])
 
