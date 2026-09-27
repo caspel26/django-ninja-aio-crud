@@ -1,13 +1,11 @@
 from django.test import TestCase, tag
-from ninja import Status
 
 from ninja_aio import NinjaAIO
 from ninja_aio.decorators import on
 from ninja_aio.decorators.actions import ActionConfig
 from ninja_aio.models import ModelUtil
-from ninja_aio.views import APIViewSet
 from tests.generics.request import Request
-from tests.test_app import models, schema, views
+from tests.test_app import models, views
 
 
 @tag("on_action")
