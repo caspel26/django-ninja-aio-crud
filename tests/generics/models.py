@@ -189,9 +189,11 @@ class Tests:
                 self.request.post(), self.data_in, self.schema_out
             )
             self.assertEqual(
-                self.read_data | {self.pk_att: self.read_data[self.pk_att] + 1},
+                self.read_data | {self.pk_att: response[self.pk_att]},
                 response,
             )
+            self.assertNotEqual(response[self.pk_att], self.obj.pk)
+            self.assertTrue(await self.model.objects.filter(pk=response[self.pk_att], **self.create_data).aexists())
             if isinstance(self.model, ModelSerializerMeta):
                 mock_post_create.assert_awaited_once()
                 mock_custom_actions.assert_awaited_once()

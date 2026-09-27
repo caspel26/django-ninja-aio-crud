@@ -232,13 +232,13 @@ class Tests:
             count = content["count"]
             obj_count = await self.model.objects.select_related().acount()
             self.assertEqual(obj_count, count)
-            item = items[0]
+            item = next(item for item in items if item[self.pk_att] == self.obj_content[self.pk_att])
             item.pop(self.pk_att)
             self.assertEqual(await self._parse_output_data(self.response_data), item)
 
         async def test_retrieve(self):
             view = self.viewset.aretrieve_view()
-            result = await view(self.get_request, self._path_schema(1))
+            result = await view(self.get_request, self._path_schema(self.obj_content[self.pk_att]))
             self.assertEqual(result.status_code, 200)
             content = result.value
             content.pop(self.pk_att)
@@ -248,7 +248,7 @@ class Tests:
             with self.assertRaises(NotFoundError) as exc:
                 await self.model.objects.select_related().all().adelete()
                 view = self.viewset.aretrieve_view()
-                await view(self.get_request, self._path_schema(1))
+                await view(self.get_request, self._path_schema(self.obj_content[self.pk_att]))
             self.assertEqual(exc.exception.status_code, 404)
             self.assertEqual(
                 exc.exception.error,
@@ -258,7 +258,7 @@ class Tests:
         async def test_update(self):
             view = self.viewset.aupdate_view()
             result = await view(
-                self.patch_request, self.update_data, self._path_schema(1)
+                self.patch_request, self.update_data, self._path_schema(self.obj_content[self.pk_att])
             )
             self.assertEqual(result.status_code, 200)
             content = result.value
@@ -325,6 +325,12 @@ class Tests:
         @classmethod
         def setUpTestData(cls):
             super().setUpTestData()
+            # The fixture creates a second child for obj_content. Compare with
+            # that child's actual PK, rather than the first parent's child.
+            child = cls.relation_model.objects.get(**{f"{cls.foreign_key_field}_id": cls.obj_content[cls.pk_att]})
+            cls.relation_schema_data = async_to_sync(cls.relation_util.read_s)(
+                cls.relation_viewset.schema_out, cls.relation_request, child
+            )
             cls.relation_schema_data.pop(cls.foreign_key_field)
 
         @classmethod

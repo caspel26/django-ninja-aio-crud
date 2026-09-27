@@ -39,6 +39,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+postgres = [
+    "psycopg[binary]>=3.2,<4",
+]
 dev = [
     "coverage",
     "pre-commit",

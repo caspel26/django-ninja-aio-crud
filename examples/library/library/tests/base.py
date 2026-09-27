@@ -5,6 +5,7 @@ import json
 import re
 
 from django.contrib.auth import get_user_model
+from django.core.management.color import no_style
 from django.db import connection, transaction
 from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
@@ -115,6 +116,11 @@ class ParityTestCase(LibraryTestCase):
                     raise _Rollback
             except _Rollback:
                 pass
+            # PostgreSQL does not roll sequences back. Recreate the same initial
+            # allocation state so response IDs and database snapshots can match.
+            with connection.cursor() as cursor:
+                for sql in connection.ops.sequence_reset_sql(no_style(), _SNAPSHOT_MODELS):
+                    cursor.execute(sql)
         sync, async_ = outcomes["sync"], outcomes["async"]
         label = f"{method.upper()} {path}"
         self.assertEqual(sync["status"], async_["status"], f"{label}: status differs")

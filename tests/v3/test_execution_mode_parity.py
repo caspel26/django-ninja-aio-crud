@@ -1077,8 +1077,16 @@ class TransactionParityTests(TestCase):
         ]
 
     def test_hook_failures_roll_back_identically(self):
+        from django.core.management.color import no_style
+        from django.db import connection
+
         results = []
         for mode in MODES:
+            # PostgreSQL sequences survive rollback. Start both scenarios from
+            # the same allocation state before comparing raw returned IDs.
+            with connection.cursor() as cursor:
+                for sql in connection.ops.sequence_reset_sql(no_style(), [FailingHooksSerializer.Meta.model]):
+                    cursor.execute(sql)
             with transaction.atomic():
                 results.append(self._scenario(mode))
                 transaction.set_rollback(True)

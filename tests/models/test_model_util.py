@@ -22,7 +22,7 @@ class BaseTests:
 
         @property
         def read_data(self):
-            return {"id": 1, "name": "test", "description": "test"}
+            return {"id": self.obj.pk, "name": "test", "description": "test"}
 
         @property
         def additional_getters(self):
