@@ -6,13 +6,18 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      update_snapshots:
+        description: Generate Linux baselines for review as an artifact
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -34,7 +39,14 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Validate visuals, accessibility, and performance budgets
         working-directory: docs-tests
-        run: npm test
+        env:
+          UPDATE_SNAPSHOTS: ${{ inputs.update_snapshots }}
+        run: |
+          if [ "$UPDATE_SNAPSHOTS" = "true" ]; then
+            npm run update
+          else
+            npm test
+          fi
       - name: Save browser reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -43,4 +55,11 @@ jobs:
           path: |
             docs-tests/playwright-report/
             docs-tests/test-results/
+          retention-days: 7
+      - name: Save regenerated Linux baselines
+        if: inputs.update_snapshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: docs-linux-baselines
+          path: docs-tests/baselines/linux/
           retention-days: 7

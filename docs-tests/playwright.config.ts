@@ -3,7 +3,7 @@ import { defineConfig, devices } from "@playwright/test";
 // Serves the already-built site/ directory; run `zensical build` first.
 export default defineConfig({
   testDir: ".",
-  snapshotPathTemplate: "{testDir}/baselines/{arg}-{projectName}{ext}",
+  snapshotPathTemplate: "{testDir}/baselines/{platform}/{arg}-{projectName}{ext}",
   fullyParallel: true,
   reporter: [["list"], ["html", { open: "never" }]],
   workers: process.env.CI ? 2 : undefined,

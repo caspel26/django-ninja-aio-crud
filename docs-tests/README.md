@@ -26,6 +26,13 @@ styles, and scripts must be self-hosted. Each test uses a fresh browser context.
 These size and complexity limits catch growth without depending on CI machine
 speed or production compression; they do not measure production Core Web Vitals.
 
+Baselines are stored separately under `baselines/linux` and `baselines/darwin`.
+CI uses Ubuntu 24.04 with the Chromium version pinned by `package-lock.json`.
+Generate macOS baselines locally. For Linux, dispatch `Validate Docs` with
+`update_snapshots=true`, download the `docs-linux-baselines` artifact, review
+the images, and commit them under `baselines/linux`. This workflow only uploads
+artifacts; it does not commit changes or deploy the site.
+
 Review screenshot differences before deliberately updating baselines with
 `npm run update`. The validation workflow uploads browser reports for inspection
 and has read-only repository permissions.
