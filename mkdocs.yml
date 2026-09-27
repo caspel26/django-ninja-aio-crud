@@ -81,6 +81,7 @@ nav:
     - Breaking changes: migration/breaking-changes.md
     - Deprecations: migration/deprecations.md
     - Recipes: migration/recipes.md
+    - A tested blog migration: migration/validated-example.md
   - Project:
     - Release notes: release_notes.md
     - Deployment: deployment.md

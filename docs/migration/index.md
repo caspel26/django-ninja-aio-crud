@@ -71,4 +71,5 @@ See [sync and async](../concepts/sync-and-async.md).
 - [Breaking changes](breaking-changes.md)
 - [Deprecations](deprecations.md)
 - [Recipes](recipes.md)
+- [A tested blog migration](validated-example.md)
 - [Release notes](../release_notes.md)
