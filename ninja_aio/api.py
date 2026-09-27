@@ -73,9 +73,24 @@ class NinjaAIO(NinjaAPI):
         set_api_exception_handlers(self)
         super().set_default_exception_handlers()
 
+    def get_openapi_operation_id(self, operation) -> str:
+        """Unique ids even when the same viewset is mounted twice: repeats get ``_2``, ``_3``..."""
+        ids = self.__dict__.setdefault("_openapi_operation_ids", {})
+        if operation in ids:
+            return ids[operation]
+        base = super().get_openapi_operation_id(operation)
+        taken = set(ids.values())
+        candidate, count = base, 1
+        while candidate in taken:
+            count += 1
+            candidate = f"{base}_{count}"
+        ids[operation] = candidate
+        return candidate
+
     def add_router(self, prefix: str, router: Router | str, *args: Any, **kwargs: Any) -> None:
         super().add_router(prefix, router, *args, **kwargs)
         if isinstance(router, NinjaAIORouter):
+            router._mount = (prefix, self)
             self._aio_routers.append(router)
 
     def registered_viewsets(self) -> list[APIViewSet]:

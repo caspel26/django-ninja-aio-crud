@@ -2,6 +2,7 @@ from django.test import TestCase, tag
 from ninja import Path
 
 from ninja_aio import NinjaAIO
+from ninja_aio.decorators import action
 from ninja_aio.mcp import (
     NinjaAIOMCPServer,
     ToolInvocationError,
@@ -107,6 +108,22 @@ class DescribeApiViewAnnotatedAndHiddenTests(TestCase):
 
     def test_endpoint_excluded_from_schema_is_not_exposed_as_a_tool(self):
         self.assertNotIn("miscview_hidden_get", self.by_name)
+
+
+@tag("mcp")
+class DescribeApiViewActionNameTests(TestCase):
+    def test_action_tool_uses_the_method_name(self):
+        class ReportsView(APIView):
+            @action(detail=False)
+            async def totals(self, request):
+                return {"total": 1}
+
+        api = NinjaAIO(urls_namespace="mcp_describe_apiview_action_name")
+        view = ReportsView(api=api, prefix="mcp-reports")
+        view.add_views_to_route()
+        names = [spec.name for spec in describe_api_view(view)]
+
+        self.assertEqual(names, ["reportsview_totals_get"])
 
 
 @tag("mcp")

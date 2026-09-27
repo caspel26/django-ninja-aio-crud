@@ -45,6 +45,16 @@ class InvokeCrudTests(TestCase):
         self.assertGreaterEqual(result["count"], 1)
         self.assertTrue(all(item["name"] == "listed" for item in result["items"]))
 
+    async def test_list_honors_pagination_arguments(self):
+        create_spec = self.by_name["testmodelserializer_create"]
+        for index in range(3):
+            await invoke_tool(create_spec, {"name": "paged", "description": str(index)})
+
+        list_spec = self.by_name["testmodelserializer_list"]
+        result = await invoke_tool(list_spec, {"name": "paged", "page": 2, "page_size": 2})
+        self.assertEqual(result["count"], 3)
+        self.assertEqual(len(result["items"]), 1)
+
     async def test_update_changes_object(self):
         create_spec = self.by_name["testmodelserializer_create"]
         created = await invoke_tool(

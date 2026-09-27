@@ -1,5 +1,6 @@
 from unittest.mock import AsyncMock, patch
 
+from django.core.exceptions import ImproperlyConfigured
 from django.test import TestCase, tag
 from mcp.shared.memory import create_connected_server_and_client_session
 
@@ -61,6 +62,51 @@ class NinjaAIOMCPServerTests(TestCase):
 
         self.assertEqual(server.viewsets, [viewset])
         self.assertIn("testmodelserializer_create", server._tools)
+
+    def test_viewsets_on_the_same_model_get_prefixed_tool_names(self):
+        api = NinjaAIO(urls_namespace="mcp_server_collision")
+
+        @api.viewset(models.TestModelSerializer, prefix="sync/items")
+        class SyncItemsAPI(APIViewSet):
+            pass
+
+        @api.viewset(models.TestModelSerializer, prefix="async/items")
+        class AsyncItemsAPI(APIViewSet):
+            pass
+
+        server = NinjaAIOMCPServer(api, name="test-server")
+
+        self.assertNotIn("testmodelserializer_list", server._tools)
+        self.assertIs(server._tools["sync_items_testmodelserializer_list"].owner, SyncItemsAPI)
+        self.assertIs(server._tools["async_items_testmodelserializer_list"].owner, AsyncItemsAPI)
+
+    def test_routers_mounted_under_different_prefixes_get_distinct_tool_names(self):
+        api = NinjaAIO(urls_namespace="mcp_server_collision_routers")
+        routers = {}
+        for version in ("v1", "v2"):
+            router = NinjaAIORouter()
+
+            @router.viewset(models.TestModelSerializer, prefix="items")
+            class ItemsAPI(APIViewSet):
+                pass
+
+            api.add_router(f"/{version}", router)
+            routers[version] = ItemsAPI
+
+        server = NinjaAIOMCPServer(api, name="test-server")
+
+        self.assertIs(server._tools["v1_items_testmodelserializer_list"].owner, routers["v1"])
+        self.assertIs(server._tools["v2_items_testmodelserializer_list"].owner, routers["v2"])
+
+    def test_unresolvable_tool_name_collision_raises(self):
+        api = NinjaAIO(urls_namespace="mcp_server_collision_same_prefix")
+        first = APIViewSet(api=api, model=models.TestModelSerializer, prefix="same")
+        second = APIViewSet(api=api, model=models.TestModelSerializer, prefix="same")
+        first._add_views()
+        second._add_views()
+
+        with self.assertRaises(ImproperlyConfigured):
+            NinjaAIOMCPServer(api, viewsets=[first, second], name="test-server")
 
 
 @tag("mcp")

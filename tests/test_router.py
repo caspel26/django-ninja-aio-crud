@@ -143,6 +143,28 @@ class NinjaAIORouterAddRouterTest(TestCase):
         prefixes = _all_prefixes(self.router)
         self.assertTrue(any("items" in p for p in prefixes))
 
+    def test_operation_ids_remain_unique_and_stable_across_schema_generation(self):
+        api = NinjaAIO(urls_namespace="router_operation_ids_test")
+        for prefix in ("/sync", "/async", "/third"):
+            router = NinjaAIORouter()
+            router.view(prefix="/custom")(PingView)
+            api.add_router(prefix, router)
+
+        def operation_ids():
+            schema = api.get_openapi_schema(path_prefix="/api")
+            return [
+                operation["operationId"]
+                for path in schema["paths"].values()
+                for operation in path.values()
+            ]
+
+        first = operation_ids()
+        self.assertEqual(len(first), 3)
+        self.assertEqual(len(set(first)), 3)
+        self.assertEqual(first[1], f"{first[0]}_2")
+        self.assertEqual(first[2], f"{first[0]}_3")
+        self.assertEqual(operation_ids(), first)
+
 
 # ---------------------------------------------------------------------------
 # Tests: attach via @api.router() decorator

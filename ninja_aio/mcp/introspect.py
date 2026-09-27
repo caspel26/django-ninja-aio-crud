@@ -138,7 +138,11 @@ def _create_schema(viewset: APIViewSet) -> tuple[dict, list[str]]:
 
 
 def _list_schema(viewset: APIViewSet) -> tuple[dict, list[str]]:
-    return _schema_properties(viewset.filters_schema), []
+    properties = {
+        **_schema_properties(viewset.filters_schema),
+        **_schema_properties(viewset.pagination_class.Input),
+    }
+    return properties, []
 
 
 def _retrieve_or_delete_schema(viewset: APIViewSet) -> tuple[dict, list[str]]:
@@ -262,6 +266,8 @@ def _action_tool_specs(viewset: APIViewSet) -> list[ToolSpec]:
             continue
         method = getattr(type(viewset), name)
         config = method._action_config
+        if not config.include_in_schema:
+            continue
         properties, required, action_params = _action_schema(viewset, method, config, reserved)
         specs.append(
             ToolSpec(
@@ -299,7 +305,9 @@ def _router_tool_spec(view: APIView, view_name: str, operation: Operation) -> Op
         operation.view_func, reserved={"self", "request"}
     )
     method_verb = operation.methods[0].lower() if operation.methods else "get"
-    op_name = getattr(operation.view_func, "__name__", "operation")
+    op_name = getattr(operation.view_func, "_nac_action_name", None) or getattr(
+        operation.view_func, "__name__", "operation"
+    )
     return ToolSpec(
         name=f"{view_name}_{op_name}_{method_verb}",
         description=operation.description

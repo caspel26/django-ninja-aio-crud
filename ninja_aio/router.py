@@ -37,7 +37,14 @@ class NinjaAIORouter(Router):
     def add_router(self, prefix: str, router: Router, *args: Any, **kwargs: Any) -> None:
         super().add_router(prefix, router, *args, **kwargs)
         if isinstance(router, NinjaAIORouter):
+            router._mount = (prefix, self)
             self._aio_routers.append(router)
+
+    def mount_path(self) -> str:
+        """The URL prefix this router is mounted under, including its parents."""
+        prefix, parent = getattr(self, "_mount", ("", None))
+        parent_path = parent.mount_path() if isinstance(parent, NinjaAIORouter) else ""
+        return "/".join(part.strip("/") for part in (parent_path, prefix) if part.strip("/"))
 
     def registered_viewsets(self) -> list[APIViewSet]:
         """Viewsets registered on this router and its nested NinjaAIORouters."""

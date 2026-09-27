@@ -73,9 +73,10 @@ def _create_args(viewset: APIViewSet, arguments: dict) -> tuple:
 
 
 def _list_args(viewset: APIViewSet, arguments: dict) -> tuple:
+    input_class = viewset.pagination_class.Input
+    page_args = {k: arguments.pop(k) for k in list(arguments) if k in input_class.model_fields}
     filters = viewset.filters_schema(**arguments)
-    pagination_input = viewset.pagination_class.Input()
-    return filters, pagination_input
+    return filters, input_class(**page_args)
 
 
 def _retrieve_or_delete_args(viewset: APIViewSet, arguments: dict) -> tuple:
