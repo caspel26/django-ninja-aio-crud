@@ -1,6 +1,12 @@
 /* Styles for components used by the 2.x docs, drawn in the v3 style.
    Loaded only by builds made with docs-legacy/migrate.py. */
 
+/* Keep longer legacy version labels on one line in the mobile notice. */
+.md-typeset .nac-pill__tag {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 /* The feature grid mixes wide and narrow cards per version: pack them without holes. */
 .md-typeset .nac-bento {
   grid-auto-flow: dense;
