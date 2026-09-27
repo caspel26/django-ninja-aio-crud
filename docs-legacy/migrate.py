@@ -218,7 +218,7 @@ def main() -> int:
     parser.add_argument("versions", nargs="*", type=validate_version, help="Versions to rebuild (default: all published 1.x/2.x)")
     parser.add_argument("--out", type=pathlib.Path, help="Preview directory within the repository or system temporary folder")
     parser.add_argument("--keep", action="store_true", help="Keep the worktrees after building")
-    args = parser.parse_args()
+    args = parser.parse_intermixed_args()
     if args.out is not None:
         try:
             args.out = preview_directory(str(args.out))
