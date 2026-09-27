@@ -81,14 +81,13 @@ nav:
     - Breaking changes: migration/breaking-changes.md
     - Deprecations: migration/deprecations.md
     - Recipes: migration/recipes.md
-  - Benchmarks:
-      - Framework Comparison: comparison.md
-      - Performance: performance.md
-  - Resources:
-      - Deployment: deployment.md
-      - Troubleshooting: troubleshooting.md
-      - Contributing: contributing.md
-      - Release Notes: release_notes.md
+  - Project:
+    - Release notes: release_notes.md
+    - Deployment: deployment.md
+    - Troubleshooting: troubleshooting.md
+    - Framework comparison: comparison.md
+    - Performance: performance.md
+    - Contributing: contributing.md
 
 theme:
   custom_dir: overrides
@@ -159,6 +158,20 @@ plugins:
       separator: '[\\s\\-]+'
   - autorefs
   - section-index
+  - redirects:
+      redirect_maps:
+        getting_started/quick_start_serializer.md: getting_started/choosing-a-serializer.md
+        tutorial/serializer.md: tutorial/model.md
+        tutorial/soft_delete.md: guides/soft-delete.md
+        api/type_hints.md: guides/type-hints.md
+        api/models/model_util.md: migration/deprecations.md#modelutil
+        api/models/validators.md: guides/validation.md
+        api/admin.md: guides/admin.md
+        api/branding.md: guides/swagger-ui.md
+        auth.md: guides/authentication.md
+        auth_cookie.md: guides/cookie-authentication.md
+        mcp.md: guides/mcp.md
+        logging.md: guides/logging.md
   - mkdocstrings:
       handlers:
         python:

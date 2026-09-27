@@ -5,7 +5,10 @@ const PAGES = {
   home: "/",
   installation: "/getting_started/installation/",
   tutorial: "/tutorial/crud/",
+  guide: "/guides/relations/",
+  concept: "/concepts/lifecycle/",
   reference: "/api/models/model_serializer/",
+  migration: "/migration/breaking-changes/",
   releases: "/release_notes/",
   patterns: "/v3-components/",
 };

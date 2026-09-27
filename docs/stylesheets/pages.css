@@ -1,5 +1,4 @@
-/* Page styles. The homepage section is final; the sections below it restyle
-   classes the current content still uses and go away with Steps 18-19. */
+/* Page styles: homepage, release notes (main.py macros) and question callouts. */
 
 /* ---------- Homepage (overrides/home.html) ---------- */
 
@@ -690,80 +689,6 @@
   .md-typeset .nac-bar {
     grid-template-columns: 6.5rem minmax(0, 1fr) 3rem;
   }
-}
-
-/* ---------- Tutorial pages ---------- */
-
-.md-typeset .tutorial-hero {
-  margin-bottom: 1rem;
-  padding: 1.5rem 0 1.25rem;
-  border-bottom: 1px solid var(--nac-edge);
-}
-
-.md-typeset .tutorial-hero h1 {
-  margin-bottom: 0.4rem;
-}
-
-.md-typeset .tutorial-hero .tutorial-subtitle {
-  margin-bottom: 0;
-  color: var(--nac-text-2);
-  font-family: var(--nac-font-serif);
-  font-size: 1.05rem;
-}
-
-.md-typeset .step-indicator {
-  display: inline-block;
-  margin-bottom: 0.8rem;
-  color: var(--nac-brand);
-  font-family: var(--nac-font-mono);
-  font-size: 0.6rem;
-  font-weight: 500;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.md-typeset .learning-objectives,
-.md-typeset .prerequisites,
-.md-typeset .next-step,
-.md-typeset .summary-checklist {
-  margin: 1.5rem 0;
-  padding: 1rem 1.25rem;
-  border: 1px solid var(--nac-edge);
-  border-radius: var(--nac-radius-m);
-  background: var(--nac-surface-1);
-  box-shadow: inset 0 1px 0 var(--nac-edge-light), var(--nac-shadow-1);
-}
-
-.md-typeset .learning-objectives h3,
-.md-typeset .summary-checklist h3 {
-  margin-top: 0;
-  color: var(--nac-text-3);
-  font-family: var(--nac-font-mono);
-  font-size: 0.6rem;
-  font-weight: 500;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.md-typeset .learning-objectives ul,
-.md-typeset .summary-checklist ul {
-  margin-bottom: 0;
-}
-
-.md-typeset .prerequisites p {
-  margin: 0.25rem 0;
-}
-
-.md-typeset .next-step {
-  text-align: center;
-}
-
-.md-typeset .next-step a.md-button {
-  margin-top: 0.8rem;
-}
-
-.md-typeset .summary-checklist {
-  border-color: color-mix(in srgb, var(--nac-green) 40%, var(--nac-edge));
 }
 
 /* ---------- Release notes (main.py macros) ---------- */

@@ -1,133 +1,157 @@
-# :material-rocket-launch: Deployment
-
-How to deploy Django Ninja AIO to production.
-
+---
+type: guide
+title: Deployment
+description: Run your API in production with the right server, settings and database setup.
 ---
 
-## :material-server: ASGI Server
+# Deployment
 
-Django Ninja AIO is async-first, so you need an ASGI server. Django's built-in `runserver` is for development only.
+This page shows how to run your API on a production server, what to check
+before you go live, and how to keep it fast.
 
-=== "Uvicorn (Recommended)"
+## Choose the server and the mode
+
+Pick the execution mode that matches your server:
+
+| Server | Examples | Use |
+| --- | --- | --- |
+| ASGI | Uvicorn, Daphne, Granian | `execution_mode = "async"` (default) |
+| WSGI | Gunicorn, uWSGI | `execution_mode = "sync"` |
+
+For a WSGI server, set the mode on each viewset:
+
+```python title="blog/api.py"
+@api.viewset(model=Article)
+class ArticleViewSet(APIViewSet):
+    execution_mode = "sync"
+```
+
+Both modes work on both servers. Matching them avoids switching between sync
+and async code on every request. See [Sync and async](concepts/sync-and-async.md).
+
+## Run the server
+
+Django's `runserver` is for development only. In production, start one of
+these servers:
+
+=== "Uvicorn (ASGI)"
 
     ```bash
     pip install uvicorn
-    uvicorn myproject.asgi:application --host 0.0.0.0 --port 8000 --workers 4
+    uvicorn project.asgi:application --host 0.0.0.0 --port 8000 --workers 4
     ```
 
-    !!! tip
-        Uvicorn is the most popular ASGI server with excellent performance. Use `--workers` to match your CPU cores.
-
-=== "Daphne"
+=== "Daphne (ASGI)"
 
     ```bash
     pip install daphne
-    daphne -b 0.0.0.0 -p 8000 myproject.asgi:application
+    daphne -b 0.0.0.0 -p 8000 project.asgi:application
     ```
 
-=== "Hypercorn"
+=== "Granian (ASGI)"
 
     ```bash
-    pip install hypercorn
-    hypercorn myproject.asgi:application --bind 0.0.0.0:8000 --workers 4
+    pip install granian
+    granian --interface asgi --host 0.0.0.0 --port 8000 --workers 4 project.asgi:application
     ```
 
-### ASGI Configuration
+=== "Gunicorn (WSGI)"
 
-Make sure your `asgi.py` is set up correctly:
+    ```bash
+    pip install gunicorn
+    gunicorn project.wsgi:application --bind 0.0.0.0:8000 --workers 4
+    ```
 
-```python
-# myproject/asgi.py
-import os
-from django.core.asgi import get_asgi_application
+=== "uWSGI (WSGI)"
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "myproject.settings")
-application = get_asgi_application()
-```
+    ```bash
+    pip install uwsgi
+    uwsgi --http :8000 --module project.wsgi:application --processes 4
+    ```
 
----
+Replace `project` with the name of your Django project. A good starting point
+for `--workers` is the number of CPU cores.
 
-## :material-docker: Docker
+## Build a Docker image
 
-A production-ready Dockerfile:
-
-```dockerfile
+```dockerfile title="Dockerfile"
 FROM python:3.12-slim
 
 WORKDIR /app
 
-# Install dependencies
-COPY pyproject.toml .
-RUN pip install --no-cache-dir .
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
 COPY . .
-
-# Collect static files
 RUN python manage.py collectstatic --noinput
 
-# Run with Uvicorn
 EXPOSE 8000
-CMD ["uvicorn", "myproject.asgi:application", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+CMD ["uvicorn", "project.asgi:application", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
 ```
 
-With Docker Compose:
+Pass secrets and database settings as environment variables when you start
+the container, not in the image.
 
-```yaml
-# docker-compose.yml
-services:
-  web:
-    build: .
-    ports:
-      - "8000:8000"
-    environment:
-      - DJANGO_SETTINGS_MODULE=myproject.settings
-      - DATABASE_URL=postgres://user:pass@db:5432/mydb
-    depends_on:
-      - db
+## Production checklist
 
-  db:
-    image: postgres:16
-    environment:
-      POSTGRES_DB: mydb
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: pass
-    volumes:
-      - pgdata:/var/lib/postgresql/data
+Set the basic Django settings:
 
-volumes:
-  pgdata:
-```
-
----
-
-## :material-shield-check: Production Checklist
-
-Before deploying, make sure you've addressed these items:
-
-### Django settings
-
-```python
-# settings.py
+```python title="project/settings.py"
+import os
 
 DEBUG = False
-ALLOWED_HOSTS = ["yourdomain.com"]
-SECRET_KEY = os.environ["SECRET_KEY"]  # Never hardcode!
+ALLOWED_HOSTS = ["api.example.com"]
+SECRET_KEY = os.environ["SECRET_KEY"]
 
-# Security headers
-SECURE_BROWSER_XSS_FILTER = True
-SECURE_CONTENT_TYPE_NOSNIFF = True
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 SECURE_SSL_REDIRECT = True
 ```
 
-### Database
+Load the JWT keys from the environment instead of files in the repository:
 
-!!! warning "Don't use SQLite in production"
-    SQLite is great for development but not suitable for production workloads. Use PostgreSQL for best async Django performance.
+```python title="project/settings.py"
+from joserfc import jwk
 
-```python
+JWT_PRIVATE_KEY = jwk.RSAKey.import_key(os.environ["JWT_PRIVATE_KEY"])
+JWT_PUBLIC_KEY = jwk.RSAKey.import_key(os.environ["JWT_PUBLIC_KEY"])
+JWT_ISSUER = "blog-api"
+JWT_AUDIENCE = "blog-clients"
+```
+
+Hide the interactive docs, or allow only staff users:
+
+```python title="blog/api.py"
+from django.contrib.admin.views.decorators import staff_member_required
+
+api = NinjaAIO(title="Blog API", docs_url=None)  # no docs
+api = NinjaAIO(title="Blog API", docs_decorator=staff_member_required)  # staff only
+```
+
+`docs_url=None` removes the docs page. Add `openapi_url=None` to hide the
+OpenAPI schema too.
+
+Then run the checks:
+
+```bash
+python manage.py check --deploy
+```
+
+The check also validates every `Schemas` class, so a misspelled field fails
+here with a code like `ninja_aio.E003`.
+
+- [ ] `DEBUG = False` and `ALLOWED_HOSTS` is set
+- [ ] `SECRET_KEY` and JWT keys come from the environment
+- [ ] `python manage.py check --deploy` passes
+- [ ] The docs are hidden or protected
+- [ ] The execution mode matches your server
+- [ ] Static files are served by a proxy or a CDN
+
+## Set up the database
+
+Use PostgreSQL in production. SQLite is fine for development only.
+
+```python title="project/settings.py"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
@@ -140,147 +164,57 @@ DATABASES = {
 }
 ```
 
-### Static files
+With a WSGI server, reuse connections with `CONN_MAX_AGE`, for example
+`"CONN_MAX_AGE": 60`.
 
-```bash
-python manage.py collectstatic --noinput
+With an ASGI server, keep `CONN_MAX_AGE = 0` (the default) and use a
+connection pool instead. On Django 5.1 or later with `psycopg[pool]`
+installed, turn on the built-in pool:
+
+```python title="project/settings.py"
+DATABASES["default"]["OPTIONS"] = {"pool": True}
 ```
 
-Serve static files via a CDN or reverse proxy (Nginx, Caddy), not through Django.
+A pooler like PgBouncer in front of the database works too.
 
----
+## Keep it fast
 
-## :material-speedometer: Performance Tips
+- Load relations in the same query as the list. See
+  [Query optimization](guides/query-optimization.md).
+- Keep the list paginated and set a sensible page size. See
+  [Pagination](guides/pagination.md).
+- Add `db_index=True` to fields you filter or sort by often.
+- JSON is rendered with orjson by default. See
+  [ORJSONRenderer](api/renderers/orjson_renderer.md) for its options.
 
-<div class="grid cards" markdown>
+## Run behind a reverse proxy
 
--   :material-database:{ .lg .middle } **Query Optimization**
+Put Nginx, Caddy or a load balancer in front of the server for TLS and static
+files. Make the proxy forward the original host and scheme:
 
-    ---
-
-    Use `QuerySet` config on models for automatic `select_related` / `prefetch_related`
-
--   :material-page-next:{ .lg .middle } **Pagination**
-
-    ---
-
-    Always keep pagination enabled — never return unbounded querysets
-
--   :material-magnify:{ .lg .middle } **Database Indexes**
-
-    ---
-
-    Add `db_index=True` to frequently filtered fields
-
--   :material-code-json:{ .lg .middle } **ORJSON**
-
-    ---
-
-    Already enabled via `NinjaAIO` — fast JSON serialization out of the box
-
-</div>
-
-### Connection pooling
-
-For high-traffic applications, use a connection pooler:
-
-```bash
-pip install django-pgpool
-```
-
-```python
-DATABASES = {
-    "default": {
-        "ENGINE": "django_pgpool.backends.postgresql",
-        # ... other settings
-        "POOL_OPTIONS": {
-            "max_size": 20,
-            "min_size": 5,
-        },
-    }
+```nginx title="nginx.conf"
+location / {
+    proxy_pass http://127.0.0.1:8000;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
 }
 ```
 
----
+Then tell Django to trust the forwarded scheme, so `request.is_secure()` is
+correct and `SECURE_SSL_REDIRECT` does not loop:
 
-## :material-swap-horizontal: Reverse Proxy
+```python title="project/settings.py"
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+```
 
-Run behind Nginx or Caddy for TLS termination, static file serving, and load balancing:
+!!! warning
 
-=== "Nginx"
+    Set `SECURE_PROXY_SSL_HEADER` only when a proxy always sets or strips
+    this header. Otherwise clients can fake it.
 
-    ```nginx
-    upstream django {
-        server 127.0.0.1:8000;
-    }
+## See also
 
-    server {
-        listen 443 ssl http2;
-        server_name yourdomain.com;
-
-        ssl_certificate /path/to/cert.pem;
-        ssl_certificate_key /path/to/key.pem;
-
-        location /static/ {
-            alias /app/staticfiles/;
-        }
-
-        location / {
-            proxy_pass http://django;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-        }
-    }
-    ```
-
-=== "Caddy"
-
-    ```caddyfile
-    yourdomain.com {
-        handle /static/* {
-            root * /app/staticfiles
-            file_server
-        }
-
-        handle {
-            reverse_proxy localhost:8000
-        }
-    }
-    ```
-
-    !!! tip
-        Caddy handles TLS certificates automatically via Let's Encrypt.
-
----
-
-## :material-arrow-right-circle: See Also
-
-<div class="grid cards" markdown>
-
--   :material-speedometer:{ .lg .middle } **Performance Benchmarks**
-
-    ---
-
-    See how Django Ninja AIO performs under load
-
-    [:octicons-arrow-right-24: View Benchmarks](performance.md)
-
--   :material-code-json:{ .lg .middle } **ORJSON Renderer**
-
-    ---
-
-    Configure JSON serialization options
-
-    [:octicons-arrow-right-24: Learn more](api/renderers/orjson_renderer.md)
-
--   :material-frequently-asked-questions:{ .lg .middle } **Troubleshooting**
-
-    ---
-
-    Common issues and solutions
-
-    [:octicons-arrow-right-24: FAQ](troubleshooting.md)
-
-</div>
+- [Go to production](tutorial/production.md)
+- [Sync and async](concepts/sync-and-async.md)
+- [Troubleshooting](troubleshooting.md)

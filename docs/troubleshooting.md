@@ -1,262 +1,174 @@
-# :material-frequently-asked-questions: Troubleshooting & FAQ
-
-Common questions and issues when working with Django Ninja AIO.
-
+---
+type: guide
+title: Troubleshooting
+description: Fix the most common problems with schemas, sync and async code, authentication and errors.
 ---
 
-## :material-link-variant: Relations & Serialization
+# Troubleshooting
 
-??? question "My reverse FK / M2M fields return empty lists"
+Find the problem you see below and apply the fix.
 
-    Django Ninja AIO uses `prefetch_related` automatically for reverse relations, but it requires:
+## Schemas and relations
 
-    1. The related field name must be in your `ReadSerializer.fields`
-    2. The related model must also be a `ModelSerializer` (or have a schema defined)
+### A related object is missing from the response
+
+Add the relation to the `read` (or `detail`) fields:
+
+```python title="blog/models.py"
+class Schemas:
+    read = SchemaConfig(fields=["id", "title", "category"])
+```
+
+The related model must have a `read` schema of its own, which gives the
+nested fields. To return only the primary key, add the relation to
+`relations_as_id`:
+
+```python
+read = SchemaConfig(fields=["id", "title", "category"], relations_as_id=["category"])
+```
+
+With a Meta-driven `Serializer`, list the related serializer in
+`Meta.relations_serializers`. See [Relations](guides/relations.md).
+
+### `ninja_aio.E003` unknown field
+
+```text
+Article.Schemas.read references unknown field 'titel' on Article.
+```
+
+Django checks every `Schemas` class at startup. The name is not a model field
+or a relation accessor. Fix the spelling, use the `related_name` of a reverse
+relation, or declare a value that is not on the model in `customs`. Run
+`python manage.py check` to see every problem at once. See
+[Schemas](guides/schemas.md).
+
+## Sync and async
+
+### `Synchronous dump requires preloaded fields and relations`
+
+The sync `model_dump()` never runs queries, so the relations in the schema
+must already be loaded. Load the object with the fields the schema needs:
+
+=== "Sync"
 
     ```python
-    class Author(ModelSerializer):
-        name = models.CharField(max_length=200)
-
-        class ReadSerializer:
-            fields = ["id", "name", "books"]  # "books" = related_name on Book.author
+    article = Article.get(pk=1, optimize_for="detail")
+    data = Article.model_dump(article)
     ```
 
-    If `books` is not the correct `related_name`, check your ForeignKey definition:
+=== "Async"
 
     ```python
-    class Book(ModelSerializer):
-        author = models.ForeignKey(Author, on_delete=models.CASCADE, related_name="books")
+    article = await Article.aget(pk=1)
+    data = await Article.amodel_dump(article)
     ```
 
-??? question "I get 'SynchronousOnlyOperation' errors with relations"
+The async `amodel_dump()` loads missing relations for you. See
+[Dumping](guides/dumping.md).
 
-    This happens when Django's ORM is accessed synchronously inside an async context. Django Ninja AIO handles this automatically through `prefetch_related` and async iteration, but if you're writing custom code:
+### `SynchronousOnlyOperation`
 
-    ```python
-    # Wrong - synchronous access in async view
-    async def my_view(request):
-        author = await Author.objects.aget(pk=1)
-        books = author.books.all()  # SynchronousOnlyOperation!
+You ran an ORM query from async code without `await`, often by reading a
+relation like `article.category` that is not loaded. Use the async methods,
+like `await Article.aget()` and `await Article.amodel_dump()`, or move the code
+into a sync viewset with `execution_mode = "sync"`.
 
-    # Correct - use async iteration
-    async def my_view(request):
-        author = await Author.objects.prefetch_related("books").aget(pk=1)
-        books = [book async for book in author.books.all()]
-    ```
+### `ImproperlyConfigured: ... is async; rename it to a...`
 
-    !!! tip
-        Let Django Ninja AIO handle relation serialization through `ReadSerializer` — it manages the async complexity for you.
+```text
+Article.post_create is async; rename it to apost_create (sync hooks use the plain name).
+```
 
-??? question "Nested relations only show IDs, not full objects"
+Sync hooks use the plain name and `def`. Async hooks start with `a` and use
+`async def`:
 
-    Make sure the related model is also a `ModelSerializer` with its own `ReadSerializer`:
+```python
+async def apost_create(self):
+    await notify_editors(self.pk)
+```
 
-    ```python
-    # This will serialize books as full objects
-    class Book(ModelSerializer):
-        title = models.CharField(max_length=200)
+The same rule applies to viewset hooks like `has_permission` and
+`ahas_permission`. See [Sync and async](concepts/sync-and-async.md).
 
-        class ReadSerializer:
-            fields = ["id", "title"]  # This is required!
+### `ImproperlyConfigured: ... overrides has_permission() but not ahas_permission()`
 
-    class Author(ModelSerializer):
-        name = models.CharField(max_length=200)
+The viewset mode calls the other version of the hook. Override the hook that
+matches `execution_mode`: `ahas_permission` for async viewsets (the default),
+`has_permission` for `execution_mode = "sync"`.
 
-        class ReadSerializer:
-            fields = ["id", "name", "books"]
-    ```
+## Authentication
 
-    If `Book` doesn't have a `ReadSerializer`, the framework can't know how to serialize it.
+### 401 on every request
 
----
+Check these causes in order:
 
-## :material-cog: Configuration & Setup
+- The header is `Authorization: Bearer <token>`.
+- `auth_handler` returns a truthy value, like the user. `None` or `False`
+  means the request is rejected.
+- The `iss` and `aud` claims in the token match `claims` on your auth class.
+  Tokens made with `encode_jwt()` use `JWT_ISSUER` and `JWT_AUDIENCE`.
+- `jwt_public` is the public key of the private key that signed the token, and
+  `algorithms` includes its algorithm (default `["RS256"]`).
 
-??? question "How do I disable specific CRUD operations?"
+See [Authentication](guides/authentication.md).
 
-    Use the `disable` attribute on your ViewSet:
+## Errors
 
-    ```python
-    @api.viewset(Book)
-    class BookViewSet(APIViewSet):
-        disable = ["update", "delete"]  # Read-only API
-    ```
+### `GET /api/articles/` returns 405
 
-    Available operations: `"create"`, `"list"`, `"retrieve"`, `"update"`, `"delete"`
+The list path has no trailing slash, while create does:
 
-??? question "How do I use a different primary key type (UUID, etc.)?"
+| Request | Path |
+| --- | --- |
+| List | `GET /api/articles` |
+| Create | `POST /api/articles/` |
+| Retrieve | `GET /api/articles/{id}` |
+| Update, delete | `PATCH`, `DELETE /api/articles/{id}/` |
 
-    Django Ninja AIO automatically infers the PK type from your model:
+Set `NINJA_AIO_APPEND_SLASH = False` in your settings to remove the trailing
+slash from every path.
 
-    ```python
-    import uuid
-    from django.db import models
+### 422 on PATCH
 
-    class Article(ModelSerializer):
-        id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-        title = models.CharField(max_length=200)
+The body does not match the `update` schema. Check the field types in the
+error `loc`. An explicit `null` is only accepted when the type allows it:
 
-        class ReadSerializer:
-            fields = ["id", "title"]
-    ```
+```python
+update = SchemaConfig(optionals=[("title", str), ("note", str | None)])
+```
 
-    The generated endpoints will use `UUID` in the path schema automatically.
+To clear a field, the model field must be nullable and the type must be
+`str | None` (or `int | None`, and so on).
 
-??? question "How do I change the pagination page size?"
+### 409 conflict
 
-    Override the pagination class on your ViewSet:
+```json
+{"error": "conflict", "details": "The request violates a database constraint."}
+```
 
-    ```python
-    from ninja.pagination import PageNumberPagination
+The data breaks a database constraint, most often a unique field, like a
+`Category` name that already exists. Send a different value, or check it in a
+validator to return a clearer `422`. See [Errors](guides/errors.md).
 
-    class LargePagination(PageNumberPagination):
-        page_size = 50
-        max_page_size = 200
+### My `@on_update` hook doesn't fire
 
-    @api.viewset(Book)
-    class BookViewSet(APIViewSet):
-        pagination_class = LargePagination
-    ```
+A field hook runs only when the client sends that field and its value changes:
 
----
+```python
+from ninja_aio.models.hooks import on_update
 
-## :material-shield-lock: Authentication
 
-??? question "How do I make some endpoints public and others protected?"
-
-    Use per-method auth attributes:
-
-    ```python
-    @api.viewset(Book)
-    class BookViewSet(APIViewSet):
-        auth = [JWTAuth()]      # Default: all endpoints require auth
-        get_auth = None          # GET endpoints (list, retrieve) are public
-    ```
-
-    Available per-method attributes: `get_auth`, `post_auth`, `put_auth`, `patch_auth`, `delete_auth`
-
-??? question "I get 401 errors even with a valid token"
-
-    Check these common causes:
-
-    1. **Token format** — Ensure the header is `Authorization: Bearer <token>` (not `Token` or `JWT`)
-    2. **Key mismatch** — Verify your public key matches the key used to sign tokens
-    3. **Algorithm** — Make sure `jwt_alg` matches the signing algorithm (e.g., `RS256`, `HS256`)
-    4. **Claims** — Check required claims are present in the token payload
-
----
-
-## :material-database: Database & Queries
-
-??? question "How do I optimize queries for large datasets?"
-
-    Use `QuerySet` configuration on your model:
-
-    ```python
-    class Article(ModelSerializer):
-        title = models.CharField(max_length=200)
-        author = models.ForeignKey(Author, on_delete=models.CASCADE)
-
-        class ReadSerializer:
-            fields = ["id", "title", "author"]
-
-        class QuerySet:
-            read = {
-                "select_related": ["author"],
-                "prefetch_related": ["tags"],
-            }
-    ```
-
-    This ensures `select_related` and `prefetch_related` are applied automatically.
-
-??? question "Filtering is slow on large tables"
-
-    1. **Add database indexes** to frequently filtered fields:
-
-        ```python
-        class Article(ModelSerializer):
-            title = models.CharField(max_length=200, db_index=True)
-            is_published = models.BooleanField(default=False, db_index=True)
-        ```
-
-    2. **Keep pagination enabled** — never return unbounded querysets
-    3. **Limit slices** for search-heavy endpoints: `queryset = queryset[:1000]`
-
----
-
-## :material-bug: Common Errors
-
-??? question "`ImportError: cannot import name 'ModelSerializer'`"
-
-    Make sure you're importing from the correct module:
-
-    ```python
-    # Correct
-    from ninja_aio.models import ModelSerializer
-
-    # Wrong
-    from ninja_aio import ModelSerializer
-    ```
-
-??? question "`AttributeError: type object 'MyModel' has no attribute 'generate_read_s'`"
-
-    Your model must inherit from `ModelSerializer`, not Django's `models.Model`:
-
-    ```python
-    # Correct
-    from ninja_aio.models import ModelSerializer
-
-    class MyModel(ModelSerializer):
+class Article(ModelSerializer):
+    @on_update("is_published")
+    def notify_on_publish(self):
         ...
+```
 
-    # Wrong
-    from django.db import models
+`PATCH {"is_published": true}` on an article that is already published does
+not fire it. Use `@on_update` without arguments to run on every update. See
+[Hooks](guides/hooks.md).
 
-    class MyModel(models.Model):
-        ...
-    ```
+## Still stuck?
 
-    If you can't change the base class, use the [Meta-driven Serializer](api/models/serializers.md) instead.
-
-??? question "Circular import errors between models"
-
-    Use string references for ForeignKey relations to models in other files:
-
-    ```python
-    class Book(ModelSerializer):
-        author = models.ForeignKey("myapp.Author", on_delete=models.CASCADE)
-    ```
-
-    For serializer references, Django Ninja AIO supports string-based relation resolution.
-
----
-
-## :material-help-circle: Still Stuck?
-
-<div class="grid cards" markdown>
-
--   :material-github:{ .lg .middle } **Open an Issue**
-
-    ---
-
-    Search existing issues or create a new one
-
-    [:octicons-arrow-right-24: GitHub Issues](https://github.com/caspel26/django-ninja-aio-crud/issues)
-
--   :material-book-open-variant:{ .lg .middle } **Browse the Docs**
-
-    ---
-
-    Full API reference and tutorials
-
-    [:octicons-arrow-right-24: Documentation](index.md)
-
--   :material-rocket-launch:{ .lg .middle } **Quick Start**
-
-    ---
-
-    Step-by-step getting started guide
-
-    [:octicons-arrow-right-24: Get Started](getting_started/installation.md)
-
-</div>
+Search the [GitHub issues](https://github.com/caspel26/django-ninja-aio-crud/issues)
+or open a new one with your code and the full error message.
