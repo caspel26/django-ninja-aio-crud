@@ -1,0 +1,165 @@
+{% extends "main.html" %}
+
+{#- Home for rebuilt 1.x/2.x docs. docs-legacy/migrate.py fills the @@...@@ slots per version. -#}
+
+{% macro first_url(item) -%}
+  {%- if item.url -%}{{ item.url | url }}{%- elif item.children -%}{{ first_url(item.children | first) }}{%- endif -%}
+{%- endmacro %}
+
+{% block container %}
+{% set sections = nav.items | selectattr("children") | list %}
+<div class="md-content nac-home" data-md-component="content">
+  <article class="md-content__inner md-typeset">
+
+    <div class="nac-home__bg" aria-hidden="true">
+      <span class="nac-orb nac-orb--a"></span>
+      <span class="nac-orb nac-orb--b"></span>
+      <span class="nac-orb nac-orb--c"></span>
+    </div>
+
+    <section class="nac-hero" aria-labelledby="nac-hero-title">
+      <a class="nac-pill" href="{{ base_url }}/../latest/" data-reveal>
+        <span class="nac-pill__tag">v{{ config.extra.nac_version }}</span>
+        <span>You're reading an older version. See the latest</span>
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+      <h1 class="nac-hero__title" id="nac-hero-title" data-reveal>
+        Your Django models,<br><span class="nac-gradient-text">served as REST APIs.</span>
+      </h1>
+      <p class="nac-hero__sub" data-reveal>
+        Say which fields each operation reads and writes. django-ninja-aio-crud builds
+        the async Django Ninja endpoints, validation and OpenAPI schema for you.
+      </p>
+      <div class="nac-hero__actions" data-reveal>
+        <a class="nac-btn nac-btn--primary" href="{{ first_url(sections | first) }}">
+          Get started
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
+        {% for section in sections if section.title | lower == "tutorial" %}
+        <a class="nac-btn nac-btn--ghost" href="{{ first_url(section) }}">Take the tutorial</a>
+        {% endfor %}
+        <button class="nac-install" type="button" data-nac-copy="{{ config.extra.nac_install }}" aria-label="Copy install command">
+          <span class="nac-install__prompt" aria-hidden="true">$</span>
+          <code>{{ config.extra.nac_install }}</code>
+          <span class="nac-install__state" aria-live="polite">Copy</span>
+        </button>
+      </div>
+      <ul class="nac-hero__facts" aria-label="Version" data-reveal>
+        <li>Version <b>{{ config.extra.nac_version }}</b></li>
+        <li>Fully <b>async</b></li>
+        <li>MIT license</li>
+      </ul>
+    </section>
+
+    <section class="nac-showcase" aria-label="Example" data-reveal>
+      <div class="nac-window">
+        <div class="nac-window__bar">
+          <span class="nac-window__dots" aria-hidden="true"><i></i><i></i><i></i></span>
+          <div class="nac-window__tabs" role="tablist" aria-label="Example files">
+            <button type="button" role="tab" aria-selected="true" aria-controls="nac-file-models" id="nac-tab-models" data-file="models">models.py</button>
+            <button type="button" role="tab" aria-selected="false" aria-controls="nac-file-api" id="nac-tab-api" data-file="api" tabindex="-1">api.py</button>
+          </div>
+        </div>
+        <div class="nac-window__body">
+          <div class="nac-code" role="tabpanel" id="nac-file-models" aria-labelledby="nac-tab-models" data-file-panel="models">
+<pre><code><span class="k">from</span> django.db <span class="k">import</span> models
+<span class="k">from</span> ninja_aio.models <span class="k">import</span> ModelSerializer
+
+
+<span class="k">class</span> <span class="f">Article</span>(ModelSerializer):
+    title <span class="o">=</span> models.<span class="f">CharField</span>(max_length<span class="o">=</span><span class="m">200</span>)
+    body <span class="o">=</span> models.<span class="f">TextField</span>()
+
+    <span class="hl" data-op="read"><span class="k">class</span> <span class="f">ReadSerializer</span>:
+        fields <span class="o">=</span> [<span class="s">"id"</span>, <span class="s">"title"</span>, <span class="s">"body"</span>]</span>
+
+    <span class="hl" data-op="create"><span class="k">class</span> <span class="f">CreateSerializer</span>:
+        fields <span class="o">=</span> [<span class="s">"title"</span>, <span class="s">"body"</span>]</span>
+
+    <span class="hl" data-op="update"><span class="k">class</span> <span class="f">UpdateSerializer</span>:
+        optionals <span class="o">=</span> [(<span class="s">"title"</span>, <span class="b">str</span>), (<span class="s">"body"</span>, <span class="b">str</span>)]</span></code></pre>
+          </div>
+          <div class="nac-code" role="tabpanel" id="nac-file-api" aria-labelledby="nac-tab-api" data-file-panel="api" hidden>
+<pre><code>@@API_CODE@@</code></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="nac-routes" aria-label="Generated endpoints">
+        <p class="nac-routes__label">Generated endpoints</p>
+        <ul>
+          <li data-route="read" style="--i: 0"><span class="nac-method nac-method--get">GET</span><code>/api/articles</code><span class="nac-routes__what">List, paginated</span></li>
+          <li data-route="create" style="--i: 1"><span class="nac-method nac-method--post">POST</span><code>/api/articles/</code><span class="nac-routes__what">Create</span></li>
+          <li data-route="read" style="--i: 2"><span class="nac-method nac-method--get">GET</span><code>/api/articles/{id}</code><span class="nac-routes__what">Retrieve</span></li>
+          <li data-route="update" style="--i: 3"><span class="nac-method nac-method--patch">PATCH</span><code>/api/articles/{id}/</code><span class="nac-routes__what">Partial update</span></li>
+          <li data-route="delete" style="--i: 4"><span class="nac-method nac-method--delete">DELETE</span><code>/api/articles/{id}/</code><span class="nac-routes__what">Delete</span></li>
+        </ul>
+        <div class="nac-routes__response" aria-label="Example response">
+          <span class="nac-routes__status">200 OK</span>
+<pre><code>{
+  <span class="s">"items"</span>: [{ <span class="s">"id"</span>: <span class="m">1</span>, <span class="s">"title"</span>: <span class="s">"Hello"</span>, <span class="s">"body"</span>: <span class="s">"..."</span> }],
+  <span class="s">"count"</span>: <span class="m">1</span>
+}</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="nac-section" aria-labelledby="nac-steps-title">
+      <header class="nac-section__head" data-reveal>
+        <p class="nac-eyebrow">How it works</p>
+        <h2 id="nac-steps-title">Three steps from model to API</h2>
+      </header>
+      <ol class="nac-flow">
+        <li data-reveal style="--d: 0">
+          <span class="nac-flow__num">1</span>
+          <h3>Describe the fields</h3>
+          <p>Inner serializer classes list what each operation reads and writes.</p>
+        </li>
+        <li data-reveal style="--d: 1">
+          <span class="nac-flow__num">2</span>
+          <h3>Register a viewset</h3>
+          <p>@@REGISTER_TEXT@@</p>
+        </li>
+        <li data-reveal style="--d: 2">
+          <span class="nac-flow__num">3</span>
+          <h3>Ship the endpoints</h3>
+          <p>Five validated async routes and an OpenAPI schema.</p>
+        </li>
+      </ol>
+    </section>
+
+    <section class="nac-section" aria-labelledby="nac-features-title">
+      <header class="nac-section__head" data-reveal>
+        <p class="nac-eyebrow">Features</p>
+        <h2 id="nac-features-title">What's in {{ config.extra.nac_version }}</h2>
+        <p>Start with a few lines. Add the rest when you need it.</p>
+      </header>
+      <div class="nac-bento">
+@@CARDS@@
+      </div>
+    </section>
+@@PERF@@
+    <section class="nac-section" aria-labelledby="nac-paths-title">
+      <header class="nac-section__head" data-reveal>
+        <p class="nac-eyebrow">Where to go next</p>
+        <h2 id="nac-paths-title">Pick your path</h2>
+      </header>
+      <div class="nac-paths">
+@@PATHS@@
+      </div>
+    </section>
+
+    <section class="nac-cta" aria-labelledby="nac-cta-title" data-reveal>
+      <img class="nac-cta__mark nac-art--dark" src="{{ 'images/brand/mark-dark-256.png' | url }}" alt="" width="128" height="128">
+      <img class="nac-cta__mark nac-art--light" src="{{ 'images/brand/mark-light-256.png' | url }}" alt="" width="128" height="128">
+      <h2 id="nac-cta-title">Build your first endpoint now</h2>
+      <p>Install the package and follow the docs for {{ config.extra.nac_version }}.</p>
+      <div class="nac-hero__actions">
+        <a class="nac-btn nac-btn--primary" href="{{ first_url(sections | first) }}">Get started</a>
+        <a class="nac-btn nac-btn--ghost" href="https://github.com/caspel26/django-ninja-aio-crud">Star on GitHub</a>
+      </div>
+    </section>
+
+  </article>
+</div>
+{% endblock %}
