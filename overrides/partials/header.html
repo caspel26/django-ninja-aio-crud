@@ -18,6 +18,13 @@
       {% include "partials/logo.html" %}
       <span class="nac-brand__name">django-ninja-aio-crud</span>
     </a>
+    {#- Material's header script looks these up; they stay hidden. -#}
+    <div class="md-header__title nac-hidden" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic"><span class="md-ellipsis">{{ config.site_name }}</span></div>
+        <div class="md-header__topic" data-md-component="header-topic"><span class="md-ellipsis">{% if page.meta and page.meta.title %}{{ page.meta.title }}{% else %}{{ page.title }}{% endif %}</span></div>
+      </div>
+    </div>
     <div class="nac-version" data-nac-version data-current="{{ config.extra.nac_version | d('dev') }}" data-remote="{{ config.site_url }}">
       <button type="button" class="nac-version__button" aria-haspopup="true" aria-expanded="false" aria-label="Documentation version">
         <span class="nac-version__label">v{{ config.extra.nac_version | d('dev') }}</span>
@@ -29,7 +36,8 @@
       </div>
     </div>
     <ul class="nac-nav">
-      {% for item in nav.items if item.children %}
+      {% for item in nav.items %}
+        {% if item.children %}
         {% set grouped = item.children | selectattr("children") | list %}
         <li class="nac-nav__item{% if item.active %} is-active{% endif %}">
           <a class="nac-nav__link" href="{{ first_url(item) }}" aria-haspopup="true">{{ item.title }}</a>
@@ -54,12 +62,23 @@
             </div>
           </div>
         </li>
+        {% elif item.url and item.url not in ["", "./", "index.html"] and not item.is_homepage %}
+        <li class="nac-nav__item{% if item.active %} is-active{% endif %}">
+          <a class="nac-nav__link" href="{{ item.url | url }}">{{ item.title }}</a>
+        </li>
+        {% endif %}
       {% endfor %}
     </ul>
     <div class="nac-header__actions">
-      {% if "search" in config.plugins %}
-        {% set search = config.plugins["search"] | attr("config") %}
+      {% set search_key = "material/search" if "material/search" in config.plugins else "search" %}
+      {% if search_key in config.plugins %}
+        {% set search = config.plugins[search_key] | attr("config") %}
         {% if search.enabled %}
+          {% if search_key == "material/search" %}
+            <label class="md-header__button md-icon nac-search-toggle" for="__search" aria-label="{{ lang.t('search') }}">
+              {% include ".icons/material/magnify.svg" %}
+            </label>
+          {% endif %}
           {% include "partials/search.html" %}
         {% endif %}
       {% endif %}

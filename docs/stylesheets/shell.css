@@ -890,3 +890,95 @@ a.nac-version__item:hover {
     animation: none !important;
   }
 }
+
+.nac-hidden {
+  display: none !important;
+}
+
+/* Material search (legacy builds): header pill that opens as a centered dialog. */
+@media screen and (min-width: 60em) {
+  .nac-header .md-search__inner {
+    width: 230px;
+    padding: 0;
+    float: none;
+  }
+
+  .nac-header .md-search__form {
+    height: 36px;
+    border: 1px solid var(--nac-edge-strong);
+    border-radius: 10px;
+    background: var(--nac-surface-1);
+    box-shadow: none;
+  }
+
+  .nac-header .md-search__input {
+    height: 34px;
+    font-size: 14px;
+  }
+
+  .nac-header .md-search__input::placeholder {
+    color: var(--nac-text-3);
+  }
+
+  [data-md-toggle="search"]:checked ~ .md-header .md-search__inner {
+    position: fixed;
+    top: 12vh;
+    left: 50%;
+    z-index: 5;
+    width: min(720px, 92vw);
+    transform: translateX(-50%);
+  }
+
+  [data-md-toggle="search"]:checked ~ .md-header .md-search__form {
+    height: 48px;
+    border-color: var(--nac-brand);
+    border-radius: 14px 14px 0 0;
+    background: var(--nac-surface-2);
+  }
+
+  [data-md-toggle="search"]:checked ~ .md-header .md-search__input {
+    height: 46px;
+    font-size: 16px;
+  }
+
+  .nac-header .md-search__output {
+    border: 1px solid var(--nac-edge-strong);
+    border-top: 0;
+    border-radius: 0 0 14px 14px;
+    background: var(--nac-surface-1);
+    box-shadow: var(--nac-shadow-3);
+  }
+}
+
+.nac-brand {
+  flex: none;
+}
+
+.nac-brand__name {
+  white-space: nowrap;
+}
+
+/* Older versions have up to 7 top-level sections: tighten the header to fit. */
+.nac-nav:has(> .nac-nav__item:nth-child(7)) {
+  margin-left: 8px;
+}
+
+.nac-nav:has(> .nac-nav__item:nth-child(7)) .nac-nav__link {
+  padding-inline: 7px;
+}
+
+@media screen and (max-width: 89.9375em) {
+  .nac-header__inner:has(.nac-nav__item:nth-child(7)) .nac-brand__name {
+    display: none;
+  }
+}
+
+.nac-header .md-search__icon[for="__search"] {
+  color: var(--nac-text-3);
+}
+
+@media screen and (min-width: 60em) {
+  .nac-header__inner:has(.nac-nav__item:nth-child(7)) .md-search__inner {
+    width: 200px;
+  }
+}
