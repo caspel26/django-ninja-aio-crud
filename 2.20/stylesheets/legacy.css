@@ -1,0 +1,231 @@
+/* Styles for components used by the 2.x docs, drawn in the v3 style.
+   Loaded only by builds made with docs-legacy/migrate.py. */
+
+/* Keep longer legacy version labels on one line in the mobile notice. */
+.md-typeset .nac-pill__tag {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* Material's version notice can sit outside the element carrying theme tokens. */
+.md-banner--warning {
+  background: #302719;
+  color: #faf7f0;
+}
+
+.md-banner--warning a {
+  color: #d6bbff;
+}
+
+.md-banner--warning .md-typeset,
+.md-banner--warning .md-typeset strong {
+  color: inherit;
+}
+
+/* The feature grid mixes wide and narrow cards per version: pack them without holes. */
+.md-typeset .nac-bento {
+  grid-auto-flow: dense;
+}
+
+/* ---------- Cards (Material grid cards) ---------- */
+
+.md-typeset .grid.cards > ul {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: 16px;
+}
+
+.md-typeset .grid.cards > ul > li {
+  --x: 50%;
+  --y: 50%;
+  position: relative;
+  padding: 24px;
+  border: 1px solid var(--nac-edge);
+  border-radius: 18px;
+  background:
+    radial-gradient(420px circle at var(--x) var(--y), color-mix(in srgb, var(--nac-brand) 0%, transparent), transparent 45%),
+    var(--nac-surface-1);
+  color: var(--nac-text-2);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: 15px;
+  line-height: 1.6;
+  transition: border-color 0.3s var(--nac-ease), transform 0.3s var(--nac-ease), box-shadow 0.3s var(--nac-ease);
+}
+
+.md-typeset .grid.cards > ul > li:hover {
+  border-color: color-mix(in srgb, var(--nac-brand) 45%, var(--nac-edge));
+  background:
+    radial-gradient(420px circle at var(--x) var(--y), color-mix(in srgb, var(--nac-brand) 16%, transparent), transparent 45%),
+    var(--nac-surface-1);
+  transform: translateY(-3px);
+  box-shadow: var(--nac-shadow-2);
+}
+
+.md-typeset .grid.cards > ul > li > hr {
+  margin: 12px 0;
+  border: 0;
+  border-top: 1px solid var(--nac-edge);
+}
+
+.md-typeset .grid.cards > ul > li > p:first-child {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+  margin: 0;
+}
+
+.md-typeset .grid.cards > ul > li strong {
+  color: var(--nac-text);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.md-typeset .grid.cards .twemoji.lg {
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid color-mix(in srgb, var(--nac-brand) 35%, var(--nac-edge));
+  border-radius: 12px;
+  background: var(--nac-brand-tint);
+  color: var(--nac-link);
+}
+
+.md-typeset .grid.cards .twemoji.lg svg {
+  width: 22px;
+  max-height: 22px;
+}
+
+.md-typeset .grid.cards > ul > li a {
+  font-weight: 600;
+}
+
+/* Code windows inside a card row share the same height. */
+.md-typeset .grid.cards > ul > li > .highlight:last-child {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  margin-bottom: 0;
+}
+
+.md-typeset .grid.cards > ul > li > .highlight:last-child > pre {
+  flex: 1;
+}
+
+/* ---------- Tutorial pages ---------- */
+
+.md-typeset .tutorial-hero {
+  margin-bottom: 32px;
+}
+
+.md-typeset .tutorial-hero h1 {
+  margin-top: 12px;
+}
+
+.md-typeset .step-indicator {
+  display: inline-block;
+  padding: 3px 10px;
+  border: 1px solid color-mix(in srgb, var(--nac-brand) 40%, var(--nac-edge));
+  border-radius: 999px;
+  background: var(--nac-brand-tint);
+  color: var(--nac-link);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.md-typeset .tutorial-subtitle {
+  margin-top: 0;
+  color: var(--nac-text-2);
+  font-size: 19px;
+  line-height: 1.6;
+}
+
+.md-typeset :is(.learning-objectives, .prerequisites, .summary-checklist) {
+  margin: 24px 0;
+  padding: 20px 24px;
+  border: 1px solid var(--nac-edge);
+  border-radius: 14px;
+  background: var(--nac-surface-1);
+}
+
+.md-typeset :is(.learning-objectives, .summary-checklist) h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  color: var(--nac-text);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.md-typeset :is(.learning-objectives, .summary-checklist) h3 .twemoji {
+  color: var(--nac-link);
+}
+
+.md-typeset :is(.learning-objectives, .summary-checklist) ul {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 6px 24px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.md-typeset :is(.learning-objectives, .summary-checklist) li {
+  margin: 0;
+  color: var(--nac-text-2);
+  font-size: 15px;
+}
+
+.md-typeset .summary-checklist li .twemoji {
+  color: var(--nac-green);
+}
+
+.md-typeset .prerequisites {
+  border-left: 3px solid var(--nac-amber);
+}
+
+.md-typeset .prerequisites p {
+  margin: 0;
+  color: var(--nac-text-2);
+}
+
+.md-typeset .next-step {
+  margin: 48px 0 16px;
+  padding: 32px 24px;
+  border: 1px solid var(--nac-edge);
+  border-radius: 20px;
+  background:
+    radial-gradient(500px circle at 50% 0%, color-mix(in srgb, var(--nac-brand) 22%, transparent), transparent 65%),
+    var(--nac-surface-1);
+  text-align: center;
+}
+
+.md-typeset .next-step p {
+  margin: 0 0 12px;
+  color: var(--nac-text-2);
+}
+
+.md-typeset .next-step p:first-child strong {
+  color: var(--nac-text);
+  font-size: 20px;
+}
+
+.md-typeset .next-step .md-button {
+  margin-top: 8px;
+}
+
+/* ---------- Mermaid diagrams ---------- */
+
+.md-typeset .mermaid {
+  padding: 16px;
+  border: 1px solid var(--nac-edge);
+  border-radius: 14px;
+  background: var(--nac-surface-1);
+}
