@@ -2,10 +2,10 @@
 {% macro first_url(item) -%}
   {%- if item.url -%}{{ item.url | url }}{%- elif item.children -%}{{ first_url(item.children | first) }}{%- endif -%}
 {%- endmacro %}
-{% macro menu_link(page, compact=false) -%}
-  {%- set description = page.meta.description if not compact and page.meta and page.meta.description else none -%}
-  <a class="nac-menu__link{% if page.active %} is-active{% endif %}" href="{{ page.url | url }}">
-    <span class="nac-menu__title">{{ page.title }}</span>
+{% macro menu_link(entry, compact=false) -%}
+  {%- set description = entry.meta.description if not compact and entry.meta and entry.meta.description else none -%}
+  <a class="nac-menu__link{% if entry.active %} is-active{% endif %}" href="{{ entry.url | url }}">
+    <span class="nac-menu__title">{{ entry.title }}</span>
     {%- if description %}<span class="nac-menu__desc">{{ description }}</span>{% endif %}
   </a>
 {%- endmacro %}
@@ -16,7 +16,7 @@
     </label>
     <a href="{{ config.extra.homepage | d(nav.homepage.url, true) | url }}" class="nac-brand md-logo" aria-label="{{ config.site_name }} home" data-md-component="logo">
       {% include "partials/logo.html" %}
-      <span class="nac-brand__name">django-ninja-<span class="nac-brand__accent">aio</span></span>
+      <span class="nac-brand__name">django-ninja-aio-crud</span>
     </a>
     <div class="nac-version" data-nac-version data-current="{{ config.extra.nac_version | d('dev') }}" data-remote="{{ config.site_url }}">
       <button type="button" class="nac-version__button" aria-haspopup="true" aria-expanded="false" aria-label="Documentation version">
@@ -40,7 +40,7 @@
                   <div class="nac-menu__group">
                     {% if group.children %}
                       <p class="nac-menu__heading">{{ group.title }}</p>
-                      {% for page in group.children if page.url %}{{ menu_link(page, true) }}{% endfor %}
+                      {% for entry in group.children if entry.url %}{{ menu_link(entry, true) }}{% endfor %}
                     {% elif group.url %}
                       {{ menu_link(group, true) }}
                     {% endif %}
@@ -48,7 +48,7 @@
                 {% endfor %}
               {% else %}
                 <div class="nac-menu__group">
-                  {% for page in item.children if page.url %}{{ menu_link(page) }}{% endfor %}
+                  {% for entry in item.children if entry.url %}{{ menu_link(entry) }}{% endfor %}
                 </div>
               {% endif %}
             </div>

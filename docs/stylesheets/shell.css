@@ -100,17 +100,10 @@ body {
 }
 
 .nac-brand__name {
+  color: var(--nac-text);
   font-size: 17px;
   font-weight: 750;
   letter-spacing: -0.03em;
-}
-
-.nac-brand__accent {
-  margin-left: 1px;
-  background: var(--nac-wordmark);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
 }
 
 .md-logo img.nac-mark.nac-mark--light,

@@ -205,11 +205,39 @@
     content.classList.add("nac-enter");
   }
 
+  // The search dialog lives in a shadow root with minified class names, so match by structure.
+  const EMPTY_SEARCH_CSS = `
+    div:has(> div > div > div > input:placeholder-shown) { height: auto !important; align-self: flex-start !important; margin-top: 15vh !important; }
+    div:has(> div > div > div > input:placeholder-shown) > :not(:first-child),
+    div:has(> div > div > input:placeholder-shown) > :not(:first-child) { display: none !important; }
+    div:has(> div > div > input:placeholder-shown) { height: auto !important; }
+    div:has(> div > input:placeholder-shown) { border-bottom-color: transparent !important; }
+  `;
+
+  function styleSearchDialog() {
+    for (const host of document.body.children) {
+      const root = host.shadowRoot;
+      if (!root || root.querySelector("style[data-nac]") || !root.querySelector("input")) continue;
+      const style = document.createElement("style");
+      style.dataset.nac = "";
+      style.textContent = EMPTY_SEARCH_CSS;
+      root.append(style);
+    }
+  }
+
+  function initSearchDialog() {
+    styleSearchDialog();
+    if (window.__nacSearchObserver) return;
+    window.__nacSearchObserver = new MutationObserver(styleSearchDialog);
+    window.__nacSearchObserver.observe(document.body, { childList: true });
+  }
+
   function init() {
     initVersion(document);
     initMenus(document);
     initScrollState();
     initSearchHint(document);
+    initSearchDialog();
     initTocMarker();
     animateEntry();
   }

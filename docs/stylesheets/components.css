@@ -356,15 +356,34 @@
   padding: 0 0.9rem;
 }
 
-.md-typeset .tabbed-block > .highlight:first-child,
-.md-typeset .tabbed-block > pre:first-child {
+.md-typeset .tabbed-block > .highlight,
+.md-typeset .tabbed-block > pre {
   margin: 0 -0.9rem;
   border: 0;
   border-radius: 0;
   box-shadow: none;
 }
 
-.md-typeset .tabbed-block > .highlight:only-child {
+.md-typeset .tabbed-block > .highlight:hover {
+  box-shadow: none;
+}
+
+/* Every block after the first is separated by a rule, never drawn as a nested card. */
+.md-typeset .tabbed-block > :is(.highlight, pre):not(:first-child) {
+  margin-top: 0.9rem;
+  border-top: 1px solid var(--nac-edge);
+}
+
+.md-typeset .tabbed-block > :is(.highlight, pre) + :is(.highlight, pre) {
+  margin-top: 0;
+}
+
+.md-typeset .tabbed-block > :is(.highlight, pre):not(:last-child):not(:has(+ :is(.highlight, pre))) {
+  margin-bottom: 0.9rem;
+  border-bottom: 1px solid var(--nac-edge);
+}
+
+.md-typeset .tabbed-block > :is(.highlight, pre):last-child {
   margin-bottom: 0;
 }
 
