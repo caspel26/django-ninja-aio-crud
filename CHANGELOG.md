@@ -7,7 +7,7 @@
 ### ✨ New Features
 
 #### 🔄 Explicit Sync and Async APIs
-> `ninja_aio/models/serializers.py`, `ninja_aio/views/api.py`, `ninja_aio/views/api_view.py`
+> `ninja_aio/models/serializers.py`, `ninja_aio/views/api.py`
 
 Version 3 gives `ModelSerializer` and standalone `Serializer` the same class-based CRUD facade. Plain method names run synchronously; methods prefixed with `a` run asynchronously. Viewsets can serve either execution mode while retaining the same response contracts and hooks:
 
