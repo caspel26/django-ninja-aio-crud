@@ -7,6 +7,16 @@
   white-space: nowrap;
 }
 
+/* Material's version notice can sit outside the element carrying theme tokens. */
+.md-banner--warning {
+  background: #302719;
+  color: #faf7f0;
+}
+
+.md-banner--warning a {
+  color: #d6bbff;
+}
+
 /* The feature grid mixes wide and narrow cards per version: pack them without holes. */
 .md-typeset .nac-bento {
   grid-auto-flow: dense;
