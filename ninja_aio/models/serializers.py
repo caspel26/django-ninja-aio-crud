@@ -1373,7 +1373,20 @@ class BaseSerializer:
         return cls._apply_validators(schema, validators, model_config, schema_overrides)
 
     @staticmethod
+    def _foreign_key_alias_info(info: FieldInfo, name: str, field: models.Field) -> FieldInfo:
+        alias = info.validation_alias
+        if isinstance(alias, AliasChoices):
+            choices = list(alias.choices)
+        else:
+            choices = [alias] if alias else []
+        for key in (info.alias, name, field.name, field.attname):
+            if key is not None and key not in choices:
+                choices.append(key)
+        return FieldInfo.merge_field_infos(info, validation_alias=AliasChoices(*choices))
+
+    @classmethod
     def _foreign_key_input_fields(
+        cls,
         model: type[models.Model],
         fields: list[str],
         excludes: list[str],
@@ -1382,24 +1395,22 @@ class BaseSerializer:
         """Apply FK input aliases before Ninja builds the Pydantic class."""
         definitions = {name: (annotation, default) for name, annotation, default in customs}
         for field in model._meta.concrete_fields:
-            if not field.is_relation or field.many_to_many:
-                continue
-            for name in (field.name, field.attname):
-                if name in definitions:
-                    annotation, default = definitions[name]
-                    info = copy(default) if isinstance(default, FieldInfo) else Field(default)
-                elif name == field.name and (name in fields if fields else name not in excludes):
-                    annotation, info = get_schema_field(field)
-                else:
-                    continue
-                alias = info.validation_alias
-                choices = list(alias.choices) if isinstance(alias, AliasChoices) else ([alias] if alias else [])
-                for key in (info.alias, name, field.name, field.attname):
-                    if key is not None and key not in choices:
-                        choices.append(key)
-                info = FieldInfo.merge_field_infos(info, validation_alias=AliasChoices(*choices))
-                definitions[name] = (annotation, info)
+            if field.is_relation and not field.many_to_many:
+                cls._add_foreign_key_input_fields(field, fields, excludes, definitions)
         return [(name, annotation, default) for name, (annotation, default) in definitions.items()]
+
+    @classmethod
+    def _add_foreign_key_input_fields(cls, field, fields, excludes, definitions) -> None:
+        selected = field.name in fields if fields else field.name not in excludes
+        for name in (field.name, field.attname):
+            if name in definitions:
+                annotation, default = definitions[name]
+                info = copy(default) if isinstance(default, FieldInfo) else Field(default)
+            elif name == field.name and selected:
+                annotation, info = get_schema_field(field)
+            else:
+                continue
+            definitions[name] = (annotation, cls._foreign_key_alias_info(info, name, field))
 
     @classmethod
     def _generate_model_schema(

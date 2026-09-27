@@ -145,7 +145,7 @@ class API:
             if config is not None:
                 yield name, method, config
 
-    def _auth_view(self, view_type: str) -> list | None:
+    def _auth_view(self, _view_type: str) -> list | None:
         """Auth applied to actions for an HTTP verb."""
         return self.auth
 
@@ -179,7 +179,7 @@ class API:
         return hooked_handler
 
     def _action_core_handler(
-        self, name: str, method: Callable, config: ActionConfig, http_method: HttpMethod
+        self, name: str, method: Callable, _config: ActionConfig, http_method: HttpMethod
     ) -> Callable:
         factory = ApiMethodFactory(http_method.value)
         handler = factory._build_handler(self, method)

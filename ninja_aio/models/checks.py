@@ -112,7 +112,9 @@ def check_serializer_schemas(app_configs=None, **kwargs) -> list[checks.CheckMes
     from ninja_aio.models.serializers import SERIALIZER_CLASSES
 
     errors = []
-    for serializer in list(SERIALIZER_CLASSES):
+    # A snapshot prevents weak-reference cleanup from changing the iteration.
+    serializers = tuple(SERIALIZER_CLASSES)
+    for serializer in serializers:
         schemas = getattr(serializer, "Schemas", None)
         model = serializer._get_model()
         if schemas is None or model._meta.abstract:

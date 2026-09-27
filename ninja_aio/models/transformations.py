@@ -226,33 +226,27 @@ def schema_relation_plan(
     return discover_relation_plan(model, relation_names)
 
 
+def _relation_is_loaded(instance: models.Model, name: str) -> bool:
+    cache = getattr(instance, "_prefetched_objects_cache", {})
+    if name in cache:
+        cached = cache[name]
+        return not isinstance(cached, models.QuerySet) or cached._result_cache is not None
+    try:
+        field = instance._meta.get_field(name)
+    except FieldDoesNotExist:
+        return False
+    if not field.is_relation:
+        return False
+    if field.is_cached(instance):
+        return True
+    attname = getattr(field, "attname", None)
+    return attname in instance.__dict__ and instance.__dict__[attname] is None
+
+
 def relations_are_loaded(instances: Sequence[models.Model], relations: Sequence[str]) -> bool:
     """Check relation caches without reading a descriptor or issuing a query."""
-    for name in relations:
-        # Nested paths need Django's own traversal; do not infer their state
-        # from the cache of the root relation alone.
-        if "__" in name:
-            return False
-        for instance in instances:
-            cache = getattr(instance, "_prefetched_objects_cache", {})
-            if name in cache:
-                cached = cache[name]
-                if isinstance(cached, models.QuerySet) and cached._result_cache is None:
-                    return False
-                continue
-            try:
-                field = instance._meta.get_field(name)
-            except FieldDoesNotExist:
-                return False
-            if not field.is_relation:
-                return False
-            if field.is_cached(instance):
-                continue
-            attname = getattr(field, "attname", None)
-            if attname in instance.__dict__ and instance.__dict__[attname] is None:
-                continue
-            return False
-    return True
+    # Nested paths need Django's traversal, not just the root relation's cache.
+    return all("__" not in name and all(_relation_is_loaded(instance, name) for instance in instances) for name in relations)
 
 
 def combine_relation_plans(
