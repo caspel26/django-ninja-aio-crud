@@ -1,0 +1,98 @@
+{#- Custom header: brand, version selector, section menus, search, theme, source. -#}
+{% macro first_url(item) -%}
+  {%- if item.url -%}{{ item.url | url }}{%- elif item.children -%}{{ first_url(item.children | first) }}{%- endif -%}
+{%- endmacro %}
+{% macro menu_link(entry, compact=false) -%}
+  {%- set description = entry.meta.description if not compact and entry.meta and entry.meta.description else none -%}
+  <a class="nac-menu__link{% if entry.active %} is-active{% endif %}" href="{{ entry.url | url }}">
+    <span class="nac-menu__title">{{ entry.title }}</span>
+    {%- if description %}<span class="nac-menu__desc">{{ description }}</span>{% endif %}
+  </a>
+{%- endmacro %}
+<header class="md-header nac-header" data-md-component="header">
+  <nav class="nac-header__inner" aria-label="{{ lang.t('header') }}">
+    <label class="md-header__button md-icon nac-header__drawer" for="__drawer" aria-label="{{ lang.t('nav') }}">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </label>
+    <a href="{{ config.extra.homepage | d(nav.homepage.url, true) | url }}" class="nac-brand md-logo" aria-labelledby="nac-brand-name" data-md-component="logo">
+      {% include "partials/logo.html" %}
+      <span id="nac-brand-name" class="nac-brand__name">django-ninja-aio-crud</span>
+    </a>
+    {#- Material's header script looks these up; they stay hidden. -#}
+    <div class="md-header__title nac-hidden" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic"><span class="md-ellipsis">{{ config.site_name }}</span></div>
+        <div class="md-header__topic" data-md-component="header-topic"><span class="md-ellipsis">{% if page.meta and page.meta.title %}{{ page.meta.title }}{% else %}{{ page.title }}{% endif %}</span></div>
+      </div>
+    </div>
+    <div class="nac-version" data-nac-version data-current="{{ config.extra.nac_version | d('dev') }}" data-remote="{{ config.site_url }}">
+      <button type="button" class="nac-version__button" aria-haspopup="true" aria-expanded="false" aria-label="Documentation version">
+        <span class="nac-version__label">v{{ config.extra.nac_version | d('dev') }}</span>
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="nac-version__menu" hidden>
+        <p class="nac-version__heading">Documentation versions</p>
+        <ul class="nac-version__list"></ul>
+      </div>
+    </div>
+    <ul class="nac-nav">
+      {% for item in nav.items %}
+        {% if item.children %}
+        {% set grouped = item.children | selectattr("children") | list %}
+        <li class="nac-nav__item{% if item.active %} is-active{% endif %}">
+          <a class="nac-nav__link" href="{{ first_url(item) }}" aria-haspopup="true">{{ item.title }}</a>
+          <div class="nac-menu{% if grouped %} nac-menu--wide{% endif %}">
+            <div class="nac-menu__panel">
+              {% if grouped %}
+                {% for group in item.children %}
+                  <div class="nac-menu__group">
+                    {% if group.children %}
+                      <p class="nac-menu__heading">{{ group.title }}</p>
+                      {% for entry in group.children if entry.url %}{{ menu_link(entry, true) }}{% endfor %}
+                    {% elif group.url %}
+                      {{ menu_link(group, true) }}
+                    {% endif %}
+                  </div>
+                {% endfor %}
+              {% else %}
+                <div class="nac-menu__group">
+                  {% for entry in item.children if entry.url %}{{ menu_link(entry) }}{% endfor %}
+                </div>
+              {% endif %}
+            </div>
+          </div>
+        </li>
+        {% elif item.url and item.url not in ["", "./", "index.html"] and not item.is_homepage %}
+        <li class="nac-nav__item{% if item.active %} is-active{% endif %}">
+          <a class="nac-nav__link" href="{{ item.url | url }}">{{ item.title }}</a>
+        </li>
+        {% endif %}
+      {% endfor %}
+    </ul>
+    <div class="nac-header__actions">
+      {% set search_key = "material/search" if "material/search" in config.plugins else "search" %}
+      {% if search_key in config.plugins %}
+        {% set search = config.plugins[search_key] | attr("config") %}
+        {% if search.enabled %}
+          {% if search_key == "material/search" %}
+            <label class="md-header__button md-icon nac-search-toggle" for="__search" aria-label="{{ lang.t('search') }}">
+              {% include ".icons/material/magnify.svg" %}
+            </label>
+          {% endif %}
+          {% include "partials/search.html" %}
+        {% endif %}
+      {% endif %}
+      {% if config.theme.palette and not config.theme.palette is mapping %}
+        {% include "partials/palette.html" %}
+      {% endif %}
+      {% if not config.theme.palette is mapping %}
+        {% include "partials/javascripts/palette.html" %}
+      {% endif %}
+      {% if config.repo_url %}
+        <a class="nac-header__icon" href="{{ config.repo_url }}" aria-label="GitHub repository" title="GitHub">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.56-1.11-4.56-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2Z"/></svg>
+        </a>
+      {% endif %}
+    </div>
+  </nav>
+</header>

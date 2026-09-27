@@ -1,0 +1,1493 @@
+{
+  "baseline_ref": "v2.36.0 (5a07d014)",
+  "previous_v3_ref": "70fbb48",
+  "candidate": "FK aliases in the initial schema class; protected bulk creates via one thread bridge when eligible",
+  "runs": {
+    "sqlite": {
+      "2.36": [
+        {
+          "implementation": "2.36",
+          "python": "3.14.0",
+          "backend": "sqlite",
+          "dependencies": {
+            "Django": "6.0.8",
+            "django-ninja": "1.7.0",
+            "pydantic": "2.13.4",
+            "asgiref": "3.12.1",
+            "orjson": "3.11.9"
+          },
+          "results": {
+            "warm_create_schema": {
+              "iterations": 10000,
+              "median_ms": 8.3e-05,
+              "queries": 0
+            },
+            "cold_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.124708,
+              "queries": 0
+            },
+            "cold_fk_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.1638125,
+              "queries": 0
+            },
+            "single_read_with_relations": {
+              "iterations": 30,
+              "median_ms": 0.8313539999999999,
+              "queries": 2
+            },
+            "batch_read_100": {
+              "iterations": 15,
+              "median_ms": 4.200792,
+              "queries": 2
+            },
+            "batch_read_500": {
+              "iterations": 10,
+              "median_ms": 17.076708500000002,
+              "queries": 2
+            },
+            "bulk_create_100": {
+              "iterations": 5,
+              "median_ms": 30.218542,
+              "queries": 100
+            }
+          }
+        },
+        {
+          "implementation": "2.36",
+          "python": "3.14.0",
+          "backend": "sqlite",
+          "dependencies": {
+            "Django": "6.0.8",
+            "django-ninja": "1.7.0",
+            "pydantic": "2.13.4",
+            "asgiref": "3.12.1",
+            "orjson": "3.11.9"
+          },
+          "results": {
+            "warm_create_schema": {
+              "iterations": 10000,
+              "median_ms": 8.3e-05,
+              "queries": 0
+            },
+            "cold_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.1225,
+              "queries": 0
+            },
+            "cold_fk_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.1496045,
+              "queries": 0
+            },
+            "single_read_with_relations": {
+              "iterations": 30,
+              "median_ms": 0.695041,
+              "queries": 2
+            },
+            "batch_read_100": {
+              "iterations": 15,
+              "median_ms": 3.567125,
+              "queries": 2
+            },
+            "batch_read_500": {
+              "iterations": 10,
+              "median_ms": 15.6164165,
+              "queries": 2
+            },
+            "bulk_create_100": {
+              "iterations": 5,
+              "median_ms": 25.624083,
+              "queries": 100
+            }
+          }
+        },
+        {
+          "implementation": "2.36",
+          "python": "3.14.0",
+          "backend": "sqlite",
+          "dependencies": {
+            "Django": "6.0.8",
+            "django-ninja": "1.7.0",
+            "pydantic": "2.13.4",
+            "asgiref": "3.12.1",
+            "orjson": "3.11.9"
+          },
+          "results": {
+            "warm_create_schema": {
+              "iterations": 10000,
+              "median_ms": 8.4e-05,
+              "queries": 0
+            },
+            "cold_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.1272915,
+              "queries": 0
+            },
+            "cold_fk_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.153229,
+              "queries": 0
+            },
+            "single_read_with_relations": {
+              "iterations": 30,
+              "median_ms": 0.683354,
+              "queries": 2
+            },
+            "batch_read_100": {
+              "iterations": 15,
+              "median_ms": 3.520792,
+              "queries": 2
+            },
+            "batch_read_500": {
+              "iterations": 10,
+              "median_ms": 15.968479,
+              "queries": 2
+            },
+            "bulk_create_100": {
+              "iterations": 5,
+              "median_ms": 25.367375,
+              "queries": 100
+            }
+          }
+        },
+        {
+          "implementation": "2.36",
+          "python": "3.14.0",
+          "backend": "sqlite",
+          "dependencies": {
+            "Django": "6.0.8",
+            "django-ninja": "1.7.0",
+            "pydantic": "2.13.4",
+            "asgiref": "3.12.1",
+            "orjson": "3.11.9"
+          },
+          "results": {
+            "warm_create_schema": {
+              "iterations": 10000,
+              "median_ms": 8.3e-05,
+              "queries": 0
+            },
+            "cold_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.124375,
+              "queries": 0
+            },
+            "cold_fk_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.14910400000000001,
+              "queries": 0
+            },
+            "single_read_with_relations": {
+              "iterations": 30,
+              "median_ms": 0.675729,
+              "queries": 2
+            },
+            "batch_read_100": {
+              "iterations": 15,
+              "median_ms": 3.515375,
+              "queries": 2
+            },
+            "batch_read_500": {
+              "iterations": 10,
+              "median_ms": 16.097708,
+              "queries": 2
+            },
+            "bulk_create_100": {
+              "iterations": 5,
+              "median_ms": 24.843792,
+              "queries": 100
+            }
+          }
+        },
+        {
+          "implementation": "2.36",
+          "python": "3.14.0",
+          "backend": "sqlite",
+          "dependencies": {
+            "Django": "6.0.8",
+            "django-ninja": "1.7.0",
+            "pydantic": "2.13.4",
+            "asgiref": "3.12.1",
+            "orjson": "3.11.9"
+          },
+          "results": {
+            "warm_create_schema": {
+              "iterations": 10000,
+              "median_ms": 8.3e-05,
+              "queries": 0
+            },
+            "cold_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.1286875,
+              "queries": 0
+            },
+            "cold_fk_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.1503335,
+              "queries": 0
+            },
+            "single_read_with_relations": {
+              "iterations": 30,
+              "median_ms": 0.7227295,
+              "queries": 2
+            },
+            "batch_read_100": {
+              "iterations": 15,
+              "median_ms": 3.827667,
+              "queries": 2
+            },
+            "batch_read_500": {
+              "iterations": 10,
+              "median_ms": 16.859291,
+              "queries": 2
+            },
+            "bulk_create_100": {
+              "iterations": 5,
+              "median_ms": 24.89175,
+              "queries": 100
+            }
+          }
+        }
+      ],
+      "v3_previous": [
+        {
+          "implementation": "v3",
+          "python": "3.14.0",
+          "backend": "sqlite",
+          "dependencies": {
+            "Django": "6.0.8",
+            "django-ninja": "1.7.0",
+            "pydantic": "2.13.4",
+            "asgiref": "3.12.1",
+            "orjson": "3.11.9"
+          },
+          "results": {
+            "warm_create_schema": {
+              "iterations": 10000,
+              "median_ms": 0.000709,
+              "queries": 0
+            },
+            "cold_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.146021,
+              "queries": 0
+            },
+            "cold_fk_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.302813,
+              "queries": 0
+            },
+            "single_read_with_relations": {
+              "iterations": 30,
+              "median_ms": 0.8264585,
+              "queries": 2
+            },
+            "batch_read_100": {
+              "iterations": 15,
+              "median_ms": 3.739542,
+              "queries": 2
+            },
+            "batch_read_500": {
+              "iterations": 10,
+              "median_ms": 16.001771,
+              "queries": 2
+            },
+            "bulk_create_100": {
+              "iterations": 5,
+              "median_ms": 29.153958,
+              "queries": 300
+            }
+          }
+        },
+        {
+          "implementation": "v3",
+          "python": "3.14.0",
+          "backend": "sqlite",
+          "dependencies": {
+            "Django": "6.0.8",
+            "django-ninja": "1.7.0",
+            "pydantic": "2.13.4",
+            "asgiref": "3.12.1",
+            "orjson": "3.11.9"
+          },
+          "results": {
+            "warm_create_schema": {
+              "iterations": 10000,
+              "median_ms": 0.000709,
+              "queries": 0
+            },
+            "cold_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.141521,
+              "queries": 0
+            },
+            "cold_fk_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.302021,
+              "queries": 0
+            },
+            "single_read_with_relations": {
+              "iterations": 30,
+              "median_ms": 0.7237295,
+              "queries": 2
+            },
+            "batch_read_100": {
+              "iterations": 15,
+              "median_ms": 3.726666,
+              "queries": 2
+            },
+            "batch_read_500": {
+              "iterations": 10,
+              "median_ms": 15.4930205,
+              "queries": 2
+            },
+            "bulk_create_100": {
+              "iterations": 5,
+              "median_ms": 28.842208,
+              "queries": 300
+            }
+          }
+        },
+        {
+          "implementation": "v3",
+          "python": "3.14.0",
+          "backend": "sqlite",
+          "dependencies": {
+            "Django": "6.0.8",
+            "django-ninja": "1.7.0",
+            "pydantic": "2.13.4",
+            "asgiref": "3.12.1",
+            "orjson": "3.11.9"
+          },
+          "results": {
+            "warm_create_schema": {
+              "iterations": 10000,
+              "median_ms": 0.000667,
+              "queries": 0
+            },
+            "cold_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.14464549999999998,
+              "queries": 0
+            },
+            "cold_fk_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.2921455,
+              "queries": 0
+            },
+            "single_read_with_relations": {
+              "iterations": 30,
+              "median_ms": 0.7934585000000001,
+              "queries": 2
+            },
+            "batch_read_100": {
+              "iterations": 15,
+              "median_ms": 4.083417,
+              "queries": 2
+            },
+            "batch_read_500": {
+              "iterations": 10,
+              "median_ms": 15.902021000000001,
+              "queries": 2
+            },
+            "bulk_create_100": {
+              "iterations": 5,
+              "median_ms": 29.655208,
+              "queries": 300
+            }
+          }
+        },
+        {
+          "implementation": "v3",
+          "python": "3.14.0",
+          "backend": "sqlite",
+          "dependencies": {
+            "Django": "6.0.8",
+            "django-ninja": "1.7.0",
+            "pydantic": "2.13.4",
+            "asgiref": "3.12.1",
+            "orjson": "3.11.9"
+          },
+          "results": {
+            "warm_create_schema": {
+              "iterations": 10000,
+              "median_ms": 0.000708,
+              "queries": 0
+            },
+            "cold_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.141,
+              "queries": 0
+            },
+            "cold_fk_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.3046455,
+              "queries": 0
+            },
+            "single_read_with_relations": {
+              "iterations": 30,
+              "median_ms": 0.7127085,
+              "queries": 2
+            },
+            "batch_read_100": {
+              "iterations": 15,
+              "median_ms": 3.589959,
+              "queries": 2
+            },
+            "batch_read_500": {
+              "iterations": 10,
+              "median_ms": 15.742021,
+              "queries": 2
+            },
+            "bulk_create_100": {
+              "iterations": 5,
+              "median_ms": 30.650791,
+              "queries": 300
+            }
+          }
+        },
+        {
+          "implementation": "v3",
+          "python": "3.14.0",
+          "backend": "sqlite",
+          "dependencies": {
+            "Django": "6.0.8",
+            "django-ninja": "1.7.0",
+            "pydantic": "2.13.4",
+            "asgiref": "3.12.1",
+            "orjson": "3.11.9"
+          },
+          "results": {
+            "warm_create_schema": {
+              "iterations": 10000,
+              "median_ms": 0.000708,
+              "queries": 0
+            },
+            "cold_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.13847900000000002,
+              "queries": 0
+            },
+            "cold_fk_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.31343750000000004,
+              "queries": 0
+            },
+            "single_read_with_relations": {
+              "iterations": 30,
+              "median_ms": 0.698042,
+              "queries": 2
+            },
+            "batch_read_100": {
+              "iterations": 15,
+              "median_ms": 3.648042,
+              "queries": 2
+            },
+            "batch_read_500": {
+              "iterations": 10,
+              "median_ms": 15.675813000000002,
+              "queries": 2
+            },
+            "bulk_create_100": {
+              "iterations": 5,
+              "median_ms": 29.208875,
+              "queries": 300
+            }
+          }
+        }
+      ],
+      "v3_optimized": [
+        {
+          "implementation": "v3",
+          "python": "3.14.0",
+          "backend": "sqlite",
+          "dependencies": {
+            "Django": "6.0.8",
+            "django-ninja": "1.7.0",
+            "pydantic": "2.13.4",
+            "asgiref": "3.12.1",
+            "orjson": "3.11.9"
+          },
+          "results": {
+            "warm_create_schema": {
+              "iterations": 10000,
+              "median_ms": 0.000708,
+              "queries": 0
+            },
+            "cold_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.136021,
+              "queries": 0
+            },
+            "cold_fk_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.17472949999999998,
+              "queries": 0
+            },
+            "single_read_with_relations": {
+              "iterations": 30,
+              "median_ms": 0.7040839999999999,
+              "queries": 2
+            },
+            "batch_read_100": {
+              "iterations": 15,
+              "median_ms": 3.738666,
+              "queries": 2
+            },
+            "batch_read_500": {
+              "iterations": 10,
+              "median_ms": 15.846375,
+              "queries": 2
+            },
+            "bulk_create_100": {
+              "iterations": 5,
+              "median_ms": 6.681083,
+              "queries": 300
+            }
+          }
+        },
+        {
+          "implementation": "v3",
+          "python": "3.14.0",
+          "backend": "sqlite",
+          "dependencies": {
+            "Django": "6.0.8",
+            "django-ninja": "1.7.0",
+            "pydantic": "2.13.4",
+            "asgiref": "3.12.1",
+            "orjson": "3.11.9"
+          },
+          "results": {
+            "warm_create_schema": {
+              "iterations": 10000,
+              "median_ms": 0.000708,
+              "queries": 0
+            },
+            "cold_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.1294585,
+              "queries": 0
+            },
+            "cold_fk_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.18291649999999998,
+              "queries": 0
+            },
+            "single_read_with_relations": {
+              "iterations": 30,
+              "median_ms": 0.7647705,
+              "queries": 2
+            },
+            "batch_read_100": {
+              "iterations": 15,
+              "median_ms": 3.697208,
+              "queries": 2
+            },
+            "batch_read_500": {
+              "iterations": 10,
+              "median_ms": 15.742729,
+              "queries": 2
+            },
+            "bulk_create_100": {
+              "iterations": 5,
+              "median_ms": 6.53525,
+              "queries": 300
+            }
+          }
+        },
+        {
+          "implementation": "v3",
+          "python": "3.14.0",
+          "backend": "sqlite",
+          "dependencies": {
+            "Django": "6.0.8",
+            "django-ninja": "1.7.0",
+            "pydantic": "2.13.4",
+            "asgiref": "3.12.1",
+            "orjson": "3.11.9"
+          },
+          "results": {
+            "warm_create_schema": {
+              "iterations": 10000,
+              "median_ms": 0.000708,
+              "queries": 0
+            },
+            "cold_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.1359795,
+              "queries": 0
+            },
+            "cold_fk_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.183229,
+              "queries": 0
+            },
+            "single_read_with_relations": {
+              "iterations": 30,
+              "median_ms": 0.7729999999999999,
+              "queries": 2
+            },
+            "batch_read_100": {
+              "iterations": 15,
+              "median_ms": 3.817875,
+              "queries": 2
+            },
+            "batch_read_500": {
+              "iterations": 10,
+              "median_ms": 16.049896,
+              "queries": 2
+            },
+            "bulk_create_100": {
+              "iterations": 5,
+              "median_ms": 6.5545,
+              "queries": 300
+            }
+          }
+        },
+        {
+          "implementation": "v3",
+          "python": "3.14.0",
+          "backend": "sqlite",
+          "dependencies": {
+            "Django": "6.0.8",
+            "django-ninja": "1.7.0",
+            "pydantic": "2.13.4",
+            "asgiref": "3.12.1",
+            "orjson": "3.11.9"
+          },
+          "results": {
+            "warm_create_schema": {
+              "iterations": 10000,
+              "median_ms": 0.000708,
+              "queries": 0
+            },
+            "cold_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.1375625,
+              "queries": 0
+            },
+            "cold_fk_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.177042,
+              "queries": 0
+            },
+            "single_read_with_relations": {
+              "iterations": 30,
+              "median_ms": 0.701937,
+              "queries": 2
+            },
+            "batch_read_100": {
+              "iterations": 15,
+              "median_ms": 3.662167,
+              "queries": 2
+            },
+            "batch_read_500": {
+              "iterations": 10,
+              "median_ms": 15.563854,
+              "queries": 2
+            },
+            "bulk_create_100": {
+              "iterations": 5,
+              "median_ms": 6.668375,
+              "queries": 300
+            }
+          }
+        },
+        {
+          "implementation": "v3",
+          "python": "3.14.0",
+          "backend": "sqlite",
+          "dependencies": {
+            "Django": "6.0.8",
+            "django-ninja": "1.7.0",
+            "pydantic": "2.13.4",
+            "asgiref": "3.12.1",
+            "orjson": "3.11.9"
+          },
+          "results": {
+            "warm_create_schema": {
+              "iterations": 10000,
+              "median_ms": 0.000708,
+              "queries": 0
+            },
+            "cold_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.1316875,
+              "queries": 0
+            },
+            "cold_fk_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.1721045,
+              "queries": 0
+            },
+            "single_read_with_relations": {
+              "iterations": 30,
+              "median_ms": 0.722479,
+              "queries": 2
+            },
+            "batch_read_100": {
+              "iterations": 15,
+              "median_ms": 3.677583,
+              "queries": 2
+            },
+            "batch_read_500": {
+              "iterations": 10,
+              "median_ms": 16.004854,
+              "queries": 2
+            },
+            "bulk_create_100": {
+              "iterations": 5,
+              "median_ms": 7.10575,
+              "queries": 300
+            }
+          }
+        }
+      ]
+    },
+    "postgresql": {
+      "2.36": [
+        {
+          "implementation": "2.36",
+          "python": "3.14.0",
+          "backend": "postgresql",
+          "dependencies": {
+            "Django": "6.0.8",
+            "django-ninja": "1.7.0",
+            "pydantic": "2.13.4",
+            "asgiref": "3.12.1",
+            "orjson": "3.11.9"
+          },
+          "results": {
+            "warm_create_schema": {
+              "iterations": 10000,
+              "median_ms": 8.3e-05,
+              "queries": 0
+            },
+            "cold_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.12289549999999999,
+              "queries": 0
+            },
+            "cold_fk_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.1502505,
+              "queries": 0
+            },
+            "single_read_with_relations": {
+              "iterations": 30,
+              "median_ms": 0.9514585,
+              "queries": 2
+            },
+            "batch_read_100": {
+              "iterations": 15,
+              "median_ms": 4.055709,
+              "queries": 2
+            },
+            "batch_read_500": {
+              "iterations": 10,
+              "median_ms": 17.052854,
+              "queries": 2
+            },
+            "bulk_create_100": {
+              "iterations": 5,
+              "median_ms": 31.443958,
+              "queries": 100
+            }
+          }
+        },
+        {
+          "implementation": "2.36",
+          "python": "3.14.0",
+          "backend": "postgresql",
+          "dependencies": {
+            "Django": "6.0.8",
+            "django-ninja": "1.7.0",
+            "pydantic": "2.13.4",
+            "asgiref": "3.12.1",
+            "orjson": "3.11.9"
+          },
+          "results": {
+            "warm_create_schema": {
+              "iterations": 10000,
+              "median_ms": 8.4e-05,
+              "queries": 0
+            },
+            "cold_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.1202085,
+              "queries": 0
+            },
+            "cold_fk_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.151271,
+              "queries": 0
+            },
+            "single_read_with_relations": {
+              "iterations": 30,
+              "median_ms": 1.1947290000000002,
+              "queries": 2
+            },
+            "batch_read_100": {
+              "iterations": 15,
+              "median_ms": 4.09425,
+              "queries": 2
+            },
+            "batch_read_500": {
+              "iterations": 10,
+              "median_ms": 17.035146,
+              "queries": 2
+            },
+            "bulk_create_100": {
+              "iterations": 5,
+              "median_ms": 31.568917,
+              "queries": 100
+            }
+          }
+        },
+        {
+          "implementation": "2.36",
+          "python": "3.14.0",
+          "backend": "postgresql",
+          "dependencies": {
+            "Django": "6.0.8",
+            "django-ninja": "1.7.0",
+            "pydantic": "2.13.4",
+            "asgiref": "3.12.1",
+            "orjson": "3.11.9"
+          },
+          "results": {
+            "warm_create_schema": {
+              "iterations": 10000,
+              "median_ms": 8.4e-05,
+              "queries": 0
+            },
+            "cold_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.1232705,
+              "queries": 0
+            },
+            "cold_fk_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.15079150000000002,
+              "queries": 0
+            },
+            "single_read_with_relations": {
+              "iterations": 30,
+              "median_ms": 0.905104,
+              "queries": 2
+            },
+            "batch_read_100": {
+              "iterations": 15,
+              "median_ms": 3.946959,
+              "queries": 2
+            },
+            "batch_read_500": {
+              "iterations": 10,
+              "median_ms": 16.113041,
+              "queries": 2
+            },
+            "bulk_create_100": {
+              "iterations": 5,
+              "median_ms": 31.978208,
+              "queries": 100
+            }
+          }
+        },
+        {
+          "implementation": "2.36",
+          "python": "3.14.0",
+          "backend": "postgresql",
+          "dependencies": {
+            "Django": "6.0.8",
+            "django-ninja": "1.7.0",
+            "pydantic": "2.13.4",
+            "asgiref": "3.12.1",
+            "orjson": "3.11.9"
+          },
+          "results": {
+            "warm_create_schema": {
+              "iterations": 10000,
+              "median_ms": 8.3e-05,
+              "queries": 0
+            },
+            "cold_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.1313125,
+              "queries": 0
+            },
+            "cold_fk_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.1539585,
+              "queries": 0
+            },
+            "single_read_with_relations": {
+              "iterations": 30,
+              "median_ms": 1.0474375,
+              "queries": 2
+            },
+            "batch_read_100": {
+              "iterations": 15,
+              "median_ms": 4.209208,
+              "queries": 2
+            },
+            "batch_read_500": {
+              "iterations": 10,
+              "median_ms": 16.3176665,
+              "queries": 2
+            },
+            "bulk_create_100": {
+              "iterations": 5,
+              "median_ms": 32.005792,
+              "queries": 100
+            }
+          }
+        },
+        {
+          "implementation": "2.36",
+          "python": "3.14.0",
+          "backend": "postgresql",
+          "dependencies": {
+            "Django": "6.0.8",
+            "django-ninja": "1.7.0",
+            "pydantic": "2.13.4",
+            "asgiref": "3.12.1",
+            "orjson": "3.11.9"
+          },
+          "results": {
+            "warm_create_schema": {
+              "iterations": 10000,
+              "median_ms": 8.3e-05,
+              "queries": 0
+            },
+            "cold_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.124458,
+              "queries": 0
+            },
+            "cold_fk_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.1480835,
+              "queries": 0
+            },
+            "single_read_with_relations": {
+              "iterations": 30,
+              "median_ms": 0.9430625,
+              "queries": 2
+            },
+            "batch_read_100": {
+              "iterations": 15,
+              "median_ms": 3.977625,
+              "queries": 2
+            },
+            "batch_read_500": {
+              "iterations": 10,
+              "median_ms": 16.9682085,
+              "queries": 2
+            },
+            "bulk_create_100": {
+              "iterations": 5,
+              "median_ms": 31.700291,
+              "queries": 100
+            }
+          }
+        }
+      ],
+      "v3_previous": [
+        {
+          "implementation": "v3",
+          "python": "3.14.0",
+          "backend": "postgresql",
+          "dependencies": {
+            "Django": "6.0.8",
+            "django-ninja": "1.7.0",
+            "pydantic": "2.13.4",
+            "asgiref": "3.12.1",
+            "orjson": "3.11.9"
+          },
+          "results": {
+            "warm_create_schema": {
+              "iterations": 10000,
+              "median_ms": 0.000709,
+              "queries": 0
+            },
+            "cold_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.13639600000000002,
+              "queries": 0
+            },
+            "cold_fk_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.306604,
+              "queries": 0
+            },
+            "single_read_with_relations": {
+              "iterations": 30,
+              "median_ms": 0.941604,
+              "queries": 2
+            },
+            "batch_read_100": {
+              "iterations": 15,
+              "median_ms": 4.272375,
+              "queries": 2
+            },
+            "batch_read_500": {
+              "iterations": 10,
+              "median_ms": 16.6129165,
+              "queries": 2
+            },
+            "bulk_create_100": {
+              "iterations": 5,
+              "median_ms": 46.328166,
+              "queries": 300
+            }
+          }
+        },
+        {
+          "implementation": "v3",
+          "python": "3.14.0",
+          "backend": "postgresql",
+          "dependencies": {
+            "Django": "6.0.8",
+            "django-ninja": "1.7.0",
+            "pydantic": "2.13.4",
+            "asgiref": "3.12.1",
+            "orjson": "3.11.9"
+          },
+          "results": {
+            "warm_create_schema": {
+              "iterations": 10000,
+              "median_ms": 0.000708,
+              "queries": 0
+            },
+            "cold_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.132437,
+              "queries": 0
+            },
+            "cold_fk_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.3002915,
+              "queries": 0
+            },
+            "single_read_with_relations": {
+              "iterations": 30,
+              "median_ms": 1.002437,
+              "queries": 2
+            },
+            "batch_read_100": {
+              "iterations": 15,
+              "median_ms": 4.309375,
+              "queries": 2
+            },
+            "batch_read_500": {
+              "iterations": 10,
+              "median_ms": 16.383271,
+              "queries": 2
+            },
+            "bulk_create_100": {
+              "iterations": 5,
+              "median_ms": 45.375583,
+              "queries": 300
+            }
+          }
+        },
+        {
+          "implementation": "v3",
+          "python": "3.14.0",
+          "backend": "postgresql",
+          "dependencies": {
+            "Django": "6.0.8",
+            "django-ninja": "1.7.0",
+            "pydantic": "2.13.4",
+            "asgiref": "3.12.1",
+            "orjson": "3.11.9"
+          },
+          "results": {
+            "warm_create_schema": {
+              "iterations": 10000,
+              "median_ms": 0.000708,
+              "queries": 0
+            },
+            "cold_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.13668750000000002,
+              "queries": 0
+            },
+            "cold_fk_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.295875,
+              "queries": 0
+            },
+            "single_read_with_relations": {
+              "iterations": 30,
+              "median_ms": 0.9250415000000001,
+              "queries": 2
+            },
+            "batch_read_100": {
+              "iterations": 15,
+              "median_ms": 4.474416,
+              "queries": 2
+            },
+            "batch_read_500": {
+              "iterations": 10,
+              "median_ms": 16.9262705,
+              "queries": 2
+            },
+            "bulk_create_100": {
+              "iterations": 5,
+              "median_ms": 45.51725,
+              "queries": 300
+            }
+          }
+        },
+        {
+          "implementation": "v3",
+          "python": "3.14.0",
+          "backend": "postgresql",
+          "dependencies": {
+            "Django": "6.0.8",
+            "django-ninja": "1.7.0",
+            "pydantic": "2.13.4",
+            "asgiref": "3.12.1",
+            "orjson": "3.11.9"
+          },
+          "results": {
+            "warm_create_schema": {
+              "iterations": 10000,
+              "median_ms": 0.000791,
+              "queries": 0
+            },
+            "cold_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.12974999999999998,
+              "queries": 0
+            },
+            "cold_fk_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.30525,
+              "queries": 0
+            },
+            "single_read_with_relations": {
+              "iterations": 30,
+              "median_ms": 0.9305209999999999,
+              "queries": 2
+            },
+            "batch_read_100": {
+              "iterations": 15,
+              "median_ms": 4.039917,
+              "queries": 2
+            },
+            "batch_read_500": {
+              "iterations": 10,
+              "median_ms": 16.3231045,
+              "queries": 2
+            },
+            "bulk_create_100": {
+              "iterations": 5,
+              "median_ms": 45.660167,
+              "queries": 300
+            }
+          }
+        },
+        {
+          "implementation": "v3",
+          "python": "3.14.0",
+          "backend": "postgresql",
+          "dependencies": {
+            "Django": "6.0.8",
+            "django-ninja": "1.7.0",
+            "pydantic": "2.13.4",
+            "asgiref": "3.12.1",
+            "orjson": "3.11.9"
+          },
+          "results": {
+            "warm_create_schema": {
+              "iterations": 10000,
+              "median_ms": 0.000709,
+              "queries": 0
+            },
+            "cold_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.1383125,
+              "queries": 0
+            },
+            "cold_fk_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.295959,
+              "queries": 0
+            },
+            "single_read_with_relations": {
+              "iterations": 30,
+              "median_ms": 0.9475835,
+              "queries": 2
+            },
+            "batch_read_100": {
+              "iterations": 15,
+              "median_ms": 4.062333,
+              "queries": 2
+            },
+            "batch_read_500": {
+              "iterations": 10,
+              "median_ms": 16.2519375,
+              "queries": 2
+            },
+            "bulk_create_100": {
+              "iterations": 5,
+              "median_ms": 46.239125,
+              "queries": 300
+            }
+          }
+        }
+      ],
+      "v3_optimized": [
+        {
+          "implementation": "v3",
+          "python": "3.14.0",
+          "backend": "postgresql",
+          "dependencies": {
+            "Django": "6.0.8",
+            "django-ninja": "1.7.0",
+            "pydantic": "2.13.4",
+            "asgiref": "3.12.1",
+            "orjson": "3.11.9"
+          },
+          "results": {
+            "warm_create_schema": {
+              "iterations": 10000,
+              "median_ms": 0.000708,
+              "queries": 0
+            },
+            "cold_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.1405625,
+              "queries": 0
+            },
+            "cold_fk_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.1852295,
+              "queries": 0
+            },
+            "single_read_with_relations": {
+              "iterations": 30,
+              "median_ms": 1.0472085,
+              "queries": 2
+            },
+            "batch_read_100": {
+              "iterations": 15,
+              "median_ms": 4.278041,
+              "queries": 2
+            },
+            "batch_read_500": {
+              "iterations": 10,
+              "median_ms": 16.2775,
+              "queries": 2
+            },
+            "bulk_create_100": {
+              "iterations": 5,
+              "median_ms": 16.548542,
+              "queries": 300
+            }
+          }
+        },
+        {
+          "implementation": "v3",
+          "python": "3.14.0",
+          "backend": "postgresql",
+          "dependencies": {
+            "Django": "6.0.8",
+            "django-ninja": "1.7.0",
+            "pydantic": "2.13.4",
+            "asgiref": "3.12.1",
+            "orjson": "3.11.9"
+          },
+          "results": {
+            "warm_create_schema": {
+              "iterations": 10000,
+              "median_ms": 0.000708,
+              "queries": 0
+            },
+            "cold_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.1316045,
+              "queries": 0
+            },
+            "cold_fk_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.174875,
+              "queries": 0
+            },
+            "single_read_with_relations": {
+              "iterations": 30,
+              "median_ms": 0.996271,
+              "queries": 2
+            },
+            "batch_read_100": {
+              "iterations": 15,
+              "median_ms": 3.990792,
+              "queries": 2
+            },
+            "batch_read_500": {
+              "iterations": 10,
+              "median_ms": 17.271771,
+              "queries": 2
+            },
+            "bulk_create_100": {
+              "iterations": 5,
+              "median_ms": 16.535958,
+              "queries": 300
+            }
+          }
+        },
+        {
+          "implementation": "v3",
+          "python": "3.14.0",
+          "backend": "postgresql",
+          "dependencies": {
+            "Django": "6.0.8",
+            "django-ninja": "1.7.0",
+            "pydantic": "2.13.4",
+            "asgiref": "3.12.1",
+            "orjson": "3.11.9"
+          },
+          "results": {
+            "warm_create_schema": {
+              "iterations": 10000,
+              "median_ms": 0.000667,
+              "queries": 0
+            },
+            "cold_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.1294165,
+              "queries": 0
+            },
+            "cold_fk_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.17185450000000002,
+              "queries": 0
+            },
+            "single_read_with_relations": {
+              "iterations": 30,
+              "median_ms": 0.9528125000000001,
+              "queries": 2
+            },
+            "batch_read_100": {
+              "iterations": 15,
+              "median_ms": 4.094417,
+              "queries": 2
+            },
+            "batch_read_500": {
+              "iterations": 10,
+              "median_ms": 17.484666500000003,
+              "queries": 2
+            },
+            "bulk_create_100": {
+              "iterations": 5,
+              "median_ms": 16.533875,
+              "queries": 300
+            }
+          }
+        },
+        {
+          "implementation": "v3",
+          "python": "3.14.0",
+          "backend": "postgresql",
+          "dependencies": {
+            "Django": "6.0.8",
+            "django-ninja": "1.7.0",
+            "pydantic": "2.13.4",
+            "asgiref": "3.12.1",
+            "orjson": "3.11.9"
+          },
+          "results": {
+            "warm_create_schema": {
+              "iterations": 10000,
+              "median_ms": 0.000708,
+              "queries": 0
+            },
+            "cold_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.144229,
+              "queries": 0
+            },
+            "cold_fk_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.184417,
+              "queries": 0
+            },
+            "single_read_with_relations": {
+              "iterations": 30,
+              "median_ms": 0.975604,
+              "queries": 2
+            },
+            "batch_read_100": {
+              "iterations": 15,
+              "median_ms": 4.382292,
+              "queries": 2
+            },
+            "batch_read_500": {
+              "iterations": 10,
+              "median_ms": 16.299667,
+              "queries": 2
+            },
+            "bulk_create_100": {
+              "iterations": 5,
+              "median_ms": 16.456375,
+              "queries": 300
+            }
+          }
+        },
+        {
+          "implementation": "v3",
+          "python": "3.14.0",
+          "backend": "postgresql",
+          "dependencies": {
+            "Django": "6.0.8",
+            "django-ninja": "1.7.0",
+            "pydantic": "2.13.4",
+            "asgiref": "3.12.1",
+            "orjson": "3.11.9"
+          },
+          "results": {
+            "warm_create_schema": {
+              "iterations": 10000,
+              "median_ms": 0.000708,
+              "queries": 0
+            },
+            "cold_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.137354,
+              "queries": 0
+            },
+            "cold_fk_create_schema": {
+              "iterations": 100,
+              "median_ms": 0.183604,
+              "queries": 0
+            },
+            "single_read_with_relations": {
+              "iterations": 30,
+              "median_ms": 0.983563,
+              "queries": 2
+            },
+            "batch_read_100": {
+              "iterations": 15,
+              "median_ms": 4.404125,
+              "queries": 2
+            },
+            "batch_read_500": {
+              "iterations": 10,
+              "median_ms": 17.7478545,
+              "queries": 2
+            },
+            "bulk_create_100": {
+              "iterations": 5,
+              "median_ms": 16.281583,
+              "queries": 300
+            }
+          }
+        }
+      ]
+    }
+  }
+}
