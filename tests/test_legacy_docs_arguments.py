@@ -16,7 +16,8 @@ def load_module(name, path):
     return module
 
 
-with mock.patch.dict(sys.modules, {"home": load_module("legacy_docs_home", ROOT / "docs-legacy/home.py")}):
+home = load_module("legacy_docs_home", ROOT / "docs-legacy/home.py")
+with mock.patch.dict(sys.modules, {"home": home}):
     migrate = load_module("legacy_docs_migrate", ROOT / "docs-legacy/migrate.py")
 
 
@@ -95,3 +96,92 @@ class LegacyDocsArgumentTests(SimpleTestCase):
     def test_unicode_digits_are_not_accepted_as_versions(self):
         with self.assertRaises(ValueError):
             migrate.validate_version("2.٣٦")
+
+
+class LegacyHomeRenderingTests(SimpleTestCase):
+    def test_old_releases_only_advertise_features_they_contain(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as root:
+            output = home.render_home(Path(root))
+        self.assertIn("Fully async", output)
+        self.assertNotIn("MCP server", output)
+        self.assertNotIn("Bulk operations", output)
+        self.assertIn("add its routes to the API", output)
+        self.assertNotRegex(output, r"@@[A-Z_]+@@")
+
+    def test_feature_detection_and_benchmark_names_are_safe_in_generated_html(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as root:
+            worktree = Path(root)
+            files = {
+                "ninja_aio/api.py": "def viewset(self): pass\n",
+                "ninja_aio/models.py": "class Serializer(): pass\ndef action(): pass\ndef on(): pass\nclass SoftDelete: pass\n",
+                "ninja_aio/views/api.py": "def bulk_create(): pass\n",
+                "ninja_aio/admin.py": "def register_admin(): pass\n",
+                "ninja_aio/mcp/__init__.py": "# MCP support\n",
+                "docs/comparison.md": "| Operation | ninja-aio | <unsafe> |\n| List | 0.24 | 1.2 |\n",
+                "docs/getting_started/quick_start.md": "# Quick start\n",
+            }
+            for name, content in files.items():
+                path = worktree / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content)
+            output = home.render_home(worktree)
+        self.assertIn("MCP server", output)
+        self.assertIn("Bulk operations", output)
+        self.assertIn("Plain Django models", output)
+        self.assertIn("One decorator", output)
+        self.assertIn("&lt;unsafe&gt;", output)
+        self.assertNotIn("<unsafe>", output)
+        self.assertIn('<ul class="nac-bars"', output)
+        self.assertIn("0.24 ms", output)
+        self.assertNotIn('role="table"', output)
+        self.assertNotRegex(output, r"@@[A-Z_]+@@")
+
+
+class LegacyMigrationCommandTests(SimpleTestCase):
+    def test_build_deploy_failure_and_keep_use_the_expected_arguments(self):
+        import json
+        import tempfile
+
+        for mode, returncode, keep in (("build", 0, False), ("deploy", 0, True), ("build", 1, False)):
+            with self.subTest(mode=mode, returncode=returncode), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                output = root / "preview"
+                worktree = root / "worktree"
+                argv = ["migrate.py", mode, "--out", str(output), "2.36"]
+                if keep:
+                    argv.append("--keep")
+                published = [{"version": "2.36"}]
+                response = mock.Mock(returncode=returncode, stderr="build failed")
+                with mock.patch.object(sys, "argv", argv), mock.patch.object(migrate, "published_versions", return_value=published), mock.patch.object(migrate, "source_commits", return_value={"2.36": "5a07d01"}), mock.patch.object(migrate.tempfile, "mkdtemp", return_value=str(root)), mock.patch.object(migrate, "prepare", return_value=worktree), mock.patch.object(migrate.subprocess, "run", return_value=response) as run, mock.patch("sys.stdout"):
+                    self.assertEqual(migrate.main(), returncode)
+                command = run.call_args_list[0].args[0]
+                if mode == "build":
+                    self.assertEqual(command[-1], str(output.resolve() / "2.36"))
+                    self.assertEqual(json.loads((output / "versions.json").read_text()), published)
+                else:
+                    self.assertEqual(command[-2:], ["--", "2.36"])
+                self.assertEqual(run.call_count, 1 if keep else 2)
+
+    def test_unknown_version_is_reported_without_preparing_a_worktree(self):
+        from types import SimpleNamespace
+
+        with mock.patch.object(migrate, "prepare") as prepare, mock.patch("sys.stdout"):
+            self.assertFalse(migrate.rebuild_version("2.36", None, SimpleNamespace(), Path("/tmp/unused")))
+        prepare.assert_not_called()
+
+    def test_existing_metadata_symlink_cannot_overwrite_an_outside_file(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as root:
+            output = Path(root) / "output"
+            outside = Path(root) / "outside.json"
+            output.mkdir()
+            outside.write_text("original")
+            (output / "versions.json").symlink_to(outside)
+            with self.assertRaises(ValueError):
+                migrate.export_preview_versions(output, [{"version": "2.36"}])
+            self.assertEqual(outside.read_text(), "original")

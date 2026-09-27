@@ -153,9 +153,9 @@ def _benchmarks(worktree: pathlib.Path) -> str:
         label = "django-ninja-aio-crud" if own else escape(name)
         width = max(value / top * 100, 1)
         bars.append(
-            f'        <div class="nac-bar{" is-self" if own else ""}" role="row"><span role="cell">{label}</span>'
+            f'        <li class="nac-bar{" is-self" if own else ""}" ><span>{label}</span>'
             f'<span class="nac-bar__track" aria-hidden="true"><span style="--w: {width:.1f}%"></span></span>'
-            f'<span role="cell">{value:.2f} ms</span></div>'
+            f'<span>{value:.2f} ms</span></li>'
         )
     return f"""
     <section class="nac-section nac-perf" aria-labelledby="nac-perf-title">
@@ -165,9 +165,9 @@ def _benchmarks(worktree: pathlib.Path) -> str:
         <p>Median time for the list endpoint, same models and database for every framework.</p>
         <a class="nac-link-arrow" href="{{{{ 'comparison/' | url }}}}">See all benchmarks</a>
       </div>
-      <div class="nac-bars" role="table" aria-label="List endpoint, median milliseconds" data-reveal>
+      <ul class="nac-bars" aria-label="List endpoint, median milliseconds" data-reveal>
 {chr(10).join(bars)}
-      </div>
+      </ul>
     </section>
 """
 

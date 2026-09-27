@@ -158,15 +158,28 @@ def preview_directory(value: str) -> pathlib.Path:
         raise ValueError("Preview output must not contain parent-directory traversal")
     resolved = supplied.resolve()
     allowed_roots = (REPO.resolve(), pathlib.Path(tempfile.gettempdir()).resolve())
-    if not any(resolved != root and resolved.is_relative_to(root) for root in allowed_roots):
-        raise ValueError("Preview output must be a subdirectory of the repository or system temporary folder")
-    return resolved
+    for root in allowed_roots:
+        try:
+            relative = resolved.relative_to(root)
+        except ValueError:
+            continue
+        if relative.parts:
+            return root / relative
+    raise ValueError("Preview output must be a subdirectory of the repository or system temporary folder")
 
 
 def preview_version_directory(output: pathlib.Path, version: str) -> pathlib.Path:
     target = output / validate_version(version)
     target.resolve().relative_to(output.resolve())
     return target
+
+
+def export_preview_versions(output: pathlib.Path, published: list[dict]) -> None:
+    output = preview_directory(str(output))
+    metadata = (output / "versions.json").resolve()
+    metadata.relative_to(output)
+    output.mkdir(parents=True, exist_ok=True)
+    metadata.write_text(json.dumps(published))
 
 
 def selected_versions(requested, published, commits):
@@ -206,6 +219,11 @@ def main() -> int:
     parser.add_argument("--out", type=preview_directory, help="Preview directory within the repository or system temporary folder")
     parser.add_argument("--keep", action="store_true", help="Keep the worktrees after building")
     args = parser.parse_args()
+    if args.out is not None:
+        try:
+            args.out = preview_directory(str(args.out))
+        except ValueError as exc:
+            parser.error(str(exc))
     if args.mode == "build" and args.out is None:
         parser.error("build needs --out")
 
@@ -223,8 +241,7 @@ def main() -> int:
             failed.append(version)
 
     if args.mode == "build":
-        args.out.mkdir(parents=True, exist_ok=True)
-        (args.out / "versions.json").write_text(json.dumps(published))
+        export_preview_versions(args.out, published)
     if failed:
         print("Failed:", ", ".join(failed))
     return 1 if failed else 0
