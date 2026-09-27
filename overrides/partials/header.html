@@ -14,7 +14,7 @@
     <label class="md-header__button md-icon nac-header__drawer" for="__drawer" aria-label="{{ lang.t('nav') }}">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
     </label>
-    <a href="{{ config.extra.homepage | d(nav.homepage.url, true) | url }}" class="nac-brand md-logo" data-md-component="logo">
+    <a href="{{ config.extra.homepage | d(nav.homepage.url, true) | url }}" class="nac-brand md-logo" aria-label="django-ninja-aio-crud" data-md-component="logo">
       {% include "partials/logo.html" %}
       <span class="nac-brand__name">django-ninja-aio-crud</span>
     </a>

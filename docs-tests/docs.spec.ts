@@ -66,6 +66,7 @@ for (const [name, path] of Object.entries(PAGES)) {
 
 test("header exposes a labelled theme toggle and search", async ({ page }) => {
   await page.goto(PAGES.installation);
+  await expect(page.locator(".nac-brand")).toHaveAccessibleName("django-ninja-aio-crud");
   const search = page.locator('.md-header .md-search__button, .md-header label[for="__search"]');
   await expect(search.filter({ visible: true }).first()).toBeVisible();
   await expect(page.locator('.md-header__option label[for^="__palette"]').first()).toHaveAttribute("title", /Switch to/);
