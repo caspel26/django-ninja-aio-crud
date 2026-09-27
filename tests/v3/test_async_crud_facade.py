@@ -287,3 +287,65 @@ class AsyncDumpRelationCacheTests(TestCase):
     def test_nested_paths_are_not_assumed_loaded_from_the_root_cache(self):
         from ninja_aio.models.transformations import relations_are_loaded
         self.assertFalse(relations_are_loaded([self.loaded], ["test_model_serializer_foreign_keys__test_model_serializer"]))
+
+
+class AsyncBulkCreateBridgeTests(TestCase):
+    def serializer(self):
+        from ninja_aio import SchemaConfig, Serializer
+
+        class SimpleSerializer(Serializer[TestModel]):
+            class Meta:
+                model = TestModel
+
+            class Schemas:
+                create = SchemaConfig(fields=["name", "description"])
+
+        return SimpleSerializer
+
+    async def test_sync_hook_failures_roll_back_one_item_on_the_single_bridge_path(self):
+        class HookSerializer(self.serializer()):
+            def post_create(self, instance):
+                if instance.name == "fail":
+                    instance.description = "changed"
+                    instance.save()
+                    raise ValueError("hook failed")
+
+        self.assertTrue(HookSerializer._util._can_sync_bulk_create)
+        with mock.patch.object(HookSerializer, "_bulk_create_operation", wraps=HookSerializer._bulk_create_operation) as operation:
+            result = await HookSerializer.abulk_create([
+                {"name": "fail", "description": "d"},
+                {"name": "kept", "description": "d"},
+            ])
+        operation.assert_called_once()
+        self.assertEqual([obj.name for obj in result.succeeded], ["kept"])
+        self.assertEqual([failure.index for failure in result.failed], [0])
+        self.assertEqual(await TestModel.objects.acount(), 1)
+
+    async def test_async_hooks_keep_the_async_path_and_per_item_rollback(self):
+        called = []
+
+        class HookSerializer(self.serializer()):
+            async def apost_create(self, instance):
+                called.append(instance.name)
+                if instance.name == "fail":
+                    instance.description = "changed"
+                    await instance.asave()
+                    raise ValueError("hook failed")
+
+        self.assertFalse(HookSerializer._util._can_sync_bulk_create)
+        with mock.patch.object(HookSerializer, "_bulk_create_operation", side_effect=AssertionError("sync dispatch")):
+            result = await HookSerializer.abulk_create([
+                {"name": "fail", "description": "d"},
+                {"name": "kept", "description": "d"},
+            ])
+        self.assertEqual(called, ["fail", "kept"])
+        self.assertEqual([obj.name for obj in result.succeeded], ["kept"])
+        self.assertEqual([failure.index for failure in result.failed], [0])
+        self.assertEqual(await TestModel.objects.acount(), 1)
+
+    def test_custom_async_save_and_foreign_keys_prevent_sync_dispatch(self):
+        from ninja_aio.models import ModelUtil
+
+        with mock.patch.object(TestModel, "asave", new=mock.AsyncMock()):
+            self.assertFalse(ModelUtil(TestModel)._can_sync_bulk_create)
+        self.assertFalse(ModelUtil(TestModelForeignKey)._can_sync_bulk_create)

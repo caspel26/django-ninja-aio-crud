@@ -4,6 +4,7 @@ import argparse
 import gc
 import importlib.metadata
 import json
+import os
 import platform
 import statistics
 import time
@@ -12,8 +13,13 @@ import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 from django.conf import settings
 
+database = {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:"}
+if os.environ.get("BENCHMARK_PGDATABASE"):
+    database = {"ENGINE": "django.db.backends.postgresql", "NAME": os.environ["BENCHMARK_PGDATABASE"],
+                "USER": os.environ.get("PGUSER", "postgres"), "PASSWORD": os.environ.get("PGPASSWORD", ""),
+                "HOST": os.environ.get("PGHOST", "127.0.0.1"), "PORT": os.environ.get("PGPORT", "5432")}
 settings.configure(SECRET_KEY="benchmark", INSTALLED_APPS=["django.contrib.auth", "django.contrib.contenttypes", "ninja_aio", "v3_benchmark_app"],
-                   DATABASES={"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:"}},
+                   DATABASES={"default": database},
                    DEFAULT_AUTO_FIELD="django.db.models.BigAutoField")
 import django
 
@@ -119,7 +125,7 @@ def main():
         "batch_read_500": measure(async_to_sync(batch_read(500)), 10),
         "bulk_create_100": measure(async_to_sync(bulk_write), 5, lambda: Simple.objects.all().delete()),
     }
-    result = {"implementation": "v3" if V3 else "2.36", "module": ninja_aio.__file__, "python": platform.python_version(),
+    result = {"implementation": "v3" if V3 else "2.36", "module": ninja_aio.__file__, "python": platform.python_version(), "backend": connection.vendor,
               "dependencies": {name: importlib.metadata.version(name) for name in ("Django", "django-ninja", "pydantic", "asgiref", "orjson")}, "results": cases}
     with open(args.output, "w") as file:
         json.dump(result, file, indent=2)

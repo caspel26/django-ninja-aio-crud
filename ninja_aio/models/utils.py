@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 import logging
 import warnings
 from collections import OrderedDict
@@ -2133,6 +2134,27 @@ class ModelUtil(Generic[ModelT]):
 
     def _bulk_update_target(self, item: tuple) -> tuple[PrimaryKey, tuple]:
         return self._split_target(item[0])[0], item
+
+    @cached_property
+    def _can_sync_bulk_create(self) -> bool:
+        """Use one thread bridge only when creation has no async customization."""
+        from ninja_aio.models.hooks import _is_overridden, get_hooks
+
+        target = self.serializer_class or self.model
+        if self.nested_fields or self.model._meta.many_to_many or any(field.is_relation for field in self.model._meta.concrete_fields):
+            return False
+        if any(_is_overridden(target, name) for name in ("apost_create", "acustom_actions")):
+            return False
+        hooks = get_hooks(target)
+        if hooks and any(inspect.iscoroutinefunction(getattr(target, name)) for name in hooks["create"]):
+            return False
+        # Respect custom async saves, managers, and queryset implementations.
+        return (
+            self.model.asave is models.Model.asave
+            and type(self.model._default_manager) is models.Manager
+            and self.model.objects is self.model._default_manager
+            and type(self.model.objects.get_queryset()) is models.QuerySet
+        )
 
     @property
     def _item_transaction(self) -> bool:

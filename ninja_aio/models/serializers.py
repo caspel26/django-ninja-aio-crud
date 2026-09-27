@@ -31,6 +31,7 @@ from django.conf import settings
 from ninja import Schema
 from django.core.exceptions import FieldDoesNotExist, ImproperlyConfigured
 from ninja.orm import create_schema
+from ninja.orm.fields import get_schema_field
 from django.db import connections, models
 from django.db.models import aprefetch_related_objects, prefetch_related_objects
 from django.http import HttpRequest
@@ -41,9 +42,10 @@ from django.db.models.fields.related_descriptors import (
     ForwardManyToOneDescriptor,
     ForwardOneToOneDescriptor,
 )
-from pydantic import AliasChoices, BeforeValidator, Field, ValidationError, create_model
+from pydantic import AliasChoices, BeforeValidator, Field, ValidationError
 from copy import copy
 from pydantic._internal._decorators import PydanticDescriptorProxy
+from pydantic.fields import FieldInfo
 
 from ninja_aio.types import (
     BulkResult,
@@ -1360,6 +1362,7 @@ class BaseSerializer:
         if not any([fields, customs, excludes]):
             return None
 
+        customs = cls._foreign_key_input_fields(model, fields, excludes, customs)
         schema = create_schema(
             model=model,
             name=f"{model._meta.model_name}Schema{schema_type}",
@@ -1367,32 +1370,36 @@ class BaseSerializer:
             custom_fields=customs,
             exclude=excludes,
         )
-        schema = cls._accept_foreign_key_spellings(model, schema)
         return cls._apply_validators(schema, validators, model_config, schema_overrides)
 
     @staticmethod
-    @lru_cache(maxsize=512)
-    def _accept_foreign_key_spellings(model: type[models.Model], schema: SchemaType) -> SchemaType:
-        """Let input foreign keys be sent as ``author`` or ``author_id``, whichever the schema uses."""
-        overrides = {}
+    def _foreign_key_input_fields(
+        model: type[models.Model],
+        fields: list[str],
+        excludes: list[str],
+        customs: list[tuple[str, Any, Any]],
+    ) -> list[tuple[str, Any, Any]]:
+        """Apply FK input aliases before Ninja builds the Pydantic class."""
+        definitions = {name: (annotation, default) for name, annotation, default in customs}
         for field in model._meta.concrete_fields:
             if not field.is_relation or field.many_to_many:
                 continue
             for name in (field.name, field.attname):
-                info = schema.model_fields.get(name)
-                if info is None:
+                if name in definitions:
+                    annotation, default = definitions[name]
+                    info = copy(default) if isinstance(default, FieldInfo) else Field(default)
+                elif name == field.name and (name in fields if fields else name not in excludes):
+                    annotation, info = get_schema_field(field)
+                else:
                     continue
                 alias = info.validation_alias
                 choices = list(alias.choices) if isinstance(alias, AliasChoices) else ([alias] if alias else [])
                 for key in (info.alias, name, field.name, field.attname):
                     if key is not None and key not in choices:
                         choices.append(key)
-                info = copy(info)
-                info.validation_alias = AliasChoices(*choices)
-                overrides[name] = (info.annotation, info)
-        if not overrides:
-            return schema
-        return create_model(schema.__name__, __base__=schema, __module__=schema.__module__, **overrides)
+                info = FieldInfo.merge_field_infos(info, validation_alias=AliasChoices(*choices))
+                definitions[name] = (annotation, info)
+        return [(name, annotation, default) for name, (annotation, default) in definitions.items()]
 
     @classmethod
     def _generate_model_schema(
@@ -1916,6 +1923,8 @@ class BaseSerializer:
         *,
         request: HttpRequest | None = None,
     ) -> BulkResult[models.Model]:
+        if cls._util._can_sync_bulk_create:
+            return await sync_to_async(cls._bulk_create_operation)(items, request=request)
         fk_cache: dict[tuple[type, Any], Any] = {}
         return await arun_bulk(
             cls._get_model(),
