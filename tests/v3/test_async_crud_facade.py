@@ -258,3 +258,32 @@ class StandaloneSerializerAsyncCrudFacadeTests(
         result = await TestModelForeignKeySerializer.amodel_dump(unloaded)
 
         self.assertEqual(result["test_model"]["name"], parent.name)
+
+
+class AsyncDumpRelationCacheTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.parent = TestModelSerializerReverseForeignKey.objects.create(name="parent", description="p")
+        cls.child = TestModelSerializerForeignKey.objects.create(name="child", description="c", test_model_serializer=cls.parent)
+        cls.loaded = TestModelSerializerReverseForeignKey.objects.prefetch_related("test_model_serializer_foreign_keys").get(pk=cls.parent.pk)
+
+    async def test_preloaded_dump_and_batch_do_not_enter_the_prefetch_adapter(self):
+        loaded = await TestModelSerializerReverseForeignKey.objects.prefetch_related("test_model_serializer_foreign_keys").aget(pk=self.parent.pk)
+        with mock.patch("ninja_aio.models.serializers.aprefetch_related_objects", new_callable=mock.AsyncMock) as prefetch:
+            single = await TestModelSerializerReverseForeignKey.amodel_dump(loaded)
+            batch = await TestModelSerializerReverseForeignKey.amodel_dumps([loaded])
+        prefetch.assert_not_awaited()
+        self.assertEqual(single["test_model_serializer_foreign_keys"][0]["id"], self.child.pk)
+        self.assertEqual(batch[0]["test_model_serializer_foreign_keys"][0]["id"], self.child.pk)
+
+    async def test_unloaded_relation_still_uses_the_prefetch_adapter(self):
+        instance = await TestModelSerializerReverseForeignKey.objects.aget(pk=self.parent.pk)
+        from django.db.models import aprefetch_related_objects
+        with mock.patch("ninja_aio.models.serializers.aprefetch_related_objects", wraps=aprefetch_related_objects) as prefetch:
+            data = await TestModelSerializerReverseForeignKey.amodel_dump(instance)
+        prefetch.assert_awaited_once()
+        self.assertEqual(data["test_model_serializer_foreign_keys"][0]["id"], self.child.pk)
+
+    def test_nested_paths_are_not_assumed_loaded_from_the_root_cache(self):
+        from ninja_aio.models.transformations import relations_are_loaded
+        self.assertFalse(relations_are_loaded([self.loaded], ["test_model_serializer_foreign_keys__test_model_serializer"]))

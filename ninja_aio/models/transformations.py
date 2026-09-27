@@ -226,6 +226,35 @@ def schema_relation_plan(
     return discover_relation_plan(model, relation_names)
 
 
+def relations_are_loaded(instances: Sequence[models.Model], relations: Sequence[str]) -> bool:
+    """Check relation caches without reading a descriptor or issuing a query."""
+    for name in relations:
+        # Nested paths need Django's own traversal; do not infer their state
+        # from the cache of the root relation alone.
+        if "__" in name:
+            return False
+        for instance in instances:
+            cache = getattr(instance, "_prefetched_objects_cache", {})
+            if name in cache:
+                cached = cache[name]
+                if isinstance(cached, models.QuerySet) and cached._result_cache is None:
+                    return False
+                continue
+            try:
+                field = instance._meta.get_field(name)
+            except FieldDoesNotExist:
+                return False
+            if not field.is_relation:
+                return False
+            if field.is_cached(instance):
+                continue
+            attname = getattr(field, "attname", None)
+            if attname in instance.__dict__ and instance.__dict__[attname] is None:
+                continue
+            return False
+    return True
+
+
 def combine_relation_plans(
     explicit: RelationPlan,
     discovered: RelationPlan | None = None,

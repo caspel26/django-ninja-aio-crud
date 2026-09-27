@@ -1720,7 +1720,7 @@ class BaseSerializer:
         selected = cls._dump_schema("detail", schema)
         plan = cls._dump_relation_plan(selected)
         relations = (*plan.select_related, *plan.prefetch_related)
-        if relations:
+        if relations and not model_transformations.relations_are_loaded([instance], relations):
             cls._cache_null_dump_relations([instance], relations)
             await aprefetch_related_objects([instance], *relations)
         return await sync_to_async(model_transformations.dump_model)(instance, selected)
@@ -1737,7 +1737,7 @@ class BaseSerializer:
         else:
             loaded = list(instances)
             relations = (*plan.select_related, *plan.prefetch_related)
-            if relations and loaded:
+            if relations and loaded and not model_transformations.relations_are_loaded(loaded, relations):
                 cls._cache_null_dump_relations(loaded, relations)
                 await aprefetch_related_objects(loaded, *relations)
         return await sync_to_async(model_transformations.dump_models)(loaded, selected)
