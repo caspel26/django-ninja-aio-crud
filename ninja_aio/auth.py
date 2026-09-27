@@ -1,9 +1,13 @@
 import datetime
 import logging
+import inspect
+import asyncio
 from contextvars import ContextVar
 from typing import Optional
+from asgiref.sync import async_to_sync
 
 from joserfc import jwt, jwk, errors
+from django.core.exceptions import ImproperlyConfigured
 from django.http.request import HttpRequest
 from django.utils import timezone
 from django.conf import settings
@@ -50,7 +54,30 @@ class JwtAuthMixin:
 
     jwt_public: JwtKeys
     claims: dict[str, dict]
-    algorithms: list[str] = ["RS256"]
+    algorithms: list[str] | None = None
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        if not isinstance(getattr(self, "claims", None), dict):
+            raise ImproperlyConfigured(
+                f"{type(self).__name__}.claims is required: a dict of claim rules, "
+                'like {"iss": {"value": "https://auth.example"}}. Use {} to skip checks.'
+            )
+
+    def __call__(self, request: HttpRequest):
+        result = super().__call__(request)
+        if inspect.isawaitable(result):
+            try:
+                asyncio.get_running_loop()
+            except RuntimeError:
+                # Ninja's sync dispatcher otherwise calls auth twice and leaks
+                # the coroutine returned by the first call.
+                return async_to_sync(self._await_auth_result)(result)
+        return result
+
+    @staticmethod
+    async def _await_auth_result(result):
+        return await result
 
     @property
     def dcd(self) -> Optional[jwt.Token]:
@@ -68,6 +95,12 @@ class JwtAuthMixin:
         jwt_claims = self.get_claims()
         jwt_claims.validate(claims)
 
+    def _verification_key(self) -> JwtKeys:
+        return validate_key(getattr(self, "jwt_public", None), "JWT_PUBLIC_KEY")
+
+    def _algorithms(self) -> list[str]:
+        return self.algorithms or [default_algorithm()]
+
     async def auth_handler(self, request: HttpRequest):
         """
         Override this method to make your own authentication
@@ -84,7 +117,7 @@ class JwtAuthMixin:
             logger.debug("No JWT token provided")
             return False
         try:
-            self.dcd = jwt.decode(token, self.jwt_public, algorithms=self.algorithms)
+            self.dcd = jwt.decode(token, self._verification_key(), algorithms=self._algorithms())
             self.validate_claims(self.dcd.claims)
         except errors.JoseError as exc:
             logger.debug(f"JWT authentication failed: {exc}")
@@ -159,6 +192,11 @@ class AsyncJwtCookie(JwtAuthMixin, APIKeyCookie):
         return key
 
 
+def default_algorithm() -> str:
+    """The JWS algorithm used when none is given: ``settings.JWT_ALGORITHM``, or RS256."""
+    return getattr(settings, "JWT_ALGORITHM", None) or "RS256"
+
+
 def validate_key(key: Optional[JwtKeys], setting_name: str) -> JwtKeys:
     if key is None:
         key = getattr(settings, setting_name, None)
@@ -214,8 +252,8 @@ def encode_jwt(
     now = timezone.now()
     nbf = now
     pkey = validate_key(private_key, "JWT_PRIVATE_KEY")
-    algorithm = algorithm or "RS256"
-    claims = validate_mandatory_claims(claims)
+    algorithm = algorithm or default_algorithm()
+    claims = validate_mandatory_claims(dict(claims))
     kid_h = {"kid": pkey.kid} if pkey.kid else {}
     logger.debug(f"Encoding JWT (algorithm={algorithm}, duration={duration}s)")
     return jwt.encode(
@@ -263,7 +301,7 @@ def decode_jwt(
     return jwt.decode(
         token,
         validate_key(public_key, "JWT_PUBLIC_KEY"),
-        algorithms=algorithms or ["RS256"],
+        algorithms=algorithms or [default_algorithm()],
     )
 
 

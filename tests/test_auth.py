@@ -1,6 +1,7 @@
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
+from django.core.exceptions import ImproperlyConfigured
 from django.test import TestCase, override_settings
 from django.http import HttpRequest
 from asgiref.sync import async_to_sync
@@ -638,3 +639,90 @@ class SyncEndpointAsyncAuthTests(JwtTestBase):
 
     def test_missing_token_is_rejected(self):
         self.assertEqual(self.client.get("/sync-auth").status_code, 401)
+
+    def test_bearer_and_cookie_authenticate_once_without_warnings(self):
+        import warnings
+        from unittest.mock import AsyncMock, patch
+
+        pub = self.public_jwk
+        token = encode_jwt({"sub": "42"}, duration=60)
+        for base in (AsyncJwtBearer, AsyncJwtCookie):
+            class Auth(base):
+                jwt_public = pub
+                claims = {"iss": {"value": "test-issuer"}, "aud": {"value": "test-audience"}}
+
+                async def auth_handler(self, request):
+                    return self.dcd.claims.get("sub")
+
+            auth = Auth(csrf=False) if base is AsyncJwtCookie else Auth()
+            self.assertTrue(auth.is_async)
+            api = NinjaAIO(urls_namespace=f"sync_auth_once_{base.__name__}")
+
+            @api.get("/whoami", auth=auth, response=dict)
+            def whoami(request):
+                return {"sub": request.auth}
+
+            client = TestClient(api)
+            for value, status in ((token, 200), ("not-a-jwt", 401)):
+                with self.subTest(auth=base.__name__, status=status):
+                    credentials = (
+                        {"COOKIES": {"access_token": value}}
+                        if base is AsyncJwtCookie
+                        else {"headers": {"Authorization": f"Bearer {value}"}}
+                    )
+                    with patch.object(auth, "authenticate", new=AsyncMock(wraps=auth.authenticate)) as authenticate:
+                        with warnings.catch_warnings():
+                            warnings.simplefilter("error")
+                            response = client.get("/whoami", **credentials)
+                        self.assertEqual(response.status_code, status)
+                        authenticate.assert_awaited_once()
+                        self.assertEqual(authenticate.call_count, 1)
+
+
+class JwtConfigurationTests(JwtTestBase):
+    """Configuration errors surface early and helpers don't touch caller data."""
+
+    def test_bearer_without_claims_fails_on_creation(self):
+        class NoClaims(AsyncJwtBearer):
+            jwt_public = None
+
+        with self.assertRaises(ImproperlyConfigured):
+            NoClaims()
+
+    def test_empty_claims_are_allowed(self):
+        class NoChecks(AsyncJwtBearer):
+            claims = {}
+
+        self.assertEqual(NoChecks().claims, {})
+
+    def test_encode_jwt_does_not_change_the_given_claims(self):
+        claims = {"sub": "u1"}
+        encode_jwt(claims, duration=60)
+        self.assertEqual(claims, {"sub": "u1"})
+
+    def test_bearer_uses_the_public_key_setting_by_default(self):
+        class FromSettings(AsyncJwtBearer):
+            claims = {"iss": {"value": "test-issuer"}}
+
+            async def auth_handler(self, request):
+                return self.dcd.claims["sub"]
+
+        token = encode_jwt({"sub": "u1"}, duration=60)
+        result = async_to_sync(FromSettings().authenticate)(HttpRequest(), token)
+        self.assertEqual(result, "u1")
+
+    def test_algorithm_setting_is_the_default(self):
+        secret = jwk.OctKey.generate_key(256)
+
+        class HmacBearer(AsyncJwtBearer):
+            jwt_public = secret
+            claims = {}
+
+            async def auth_handler(self, request):
+                return self.dcd.header["alg"]
+
+        with override_settings(JWT_ALGORITHM="HS256"):
+            token = encode_jwt({"sub": "u1"}, duration=60, private_key=secret)
+            self.assertEqual(decode_jwt(token, public_key=secret).header["alg"], "HS256")
+            result = async_to_sync(HmacBearer().authenticate)(HttpRequest(), token)
+        self.assertEqual(result, "HS256")
