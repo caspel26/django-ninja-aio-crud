@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from typing import TypeVar
+from typing import Annotated, TypeVar
 
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Model, QuerySet, Q
@@ -14,6 +14,8 @@ from ninja_aio.types import HttpMethod
 
 # TypeVar for generic model typing in mixins
 ModelT = TypeVar("ModelT", bound=Model)
+
+_DATE_COMPARISONS = frozenset({"exact", "gt", "gte", "lt", "lte"})
 
 
 class IcontainsFilterViewSetMixin(APIViewSet[ModelT]):
@@ -208,6 +210,23 @@ class DateFilterViewSetMixin(APIViewSet[ModelT]):
 
     _compare_attr: str = ""
 
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        if "_compare_attr" in cls.__dict__:
+            return
+        comparisons = {
+            klass.__dict__["_compare_attr"]
+            for klass in cls.__mro__
+            if issubclass(klass, DateFilterViewSetMixin) and klass.__dict__.get("_compare_attr")
+        }
+        if len(comparisons) > 1:
+            raise ImproperlyConfigured(
+                f"{cls.__name__} combines date filter mixins with different comparisons "
+                f"({', '.join(sorted(comparisons))}); only one would apply. Use one date "
+                "mixin and name range parameters with a lookup, like "
+                '"created_at__gte" and "created_at__lte".'
+            )
+
     async def aquery_params_handler(self, queryset, filters):
         """
         Apply date/datetime filters using `_compare_attr`.
@@ -228,13 +247,19 @@ class DateFilterViewSetMixin(APIViewSet[ModelT]):
     def _date_filter(self, queryset, filters):
         return queryset.filter(
             **{
-                f"{key}{self._compare_attr}": value
+                self._date_lookup(key): value
                 for key, value in filters.items()
                 if hasattr(value, "isoformat")
                 and not self._is_special_filter(key)
                 and self._validate_filter_field(key)
             }
         )
+
+    def _date_lookup(self, key: str) -> str:
+        """Parameters that already end with a comparison (``created_at__gte``) keep it."""
+        if key.rpartition("__")[2] in _DATE_COMPARISONS and "__" in key:
+            return key
+        return f"{key}{self._compare_attr}"
 
 
 class GreaterDateFilterViewSetMixin(DateFilterViewSetMixin):
@@ -499,7 +524,8 @@ class PermissionViewSetMixin(APIViewSet[ModelT]):
       before any DB query. Return ``False`` to deny (raises 403).
     - ``ahas_object_permission(request, operation, obj)`` — object-level
       check executed after fetching the instance but before mutation.
-      Only called for retrieve / update / delete. Return ``False`` to deny.
+      Called for retrieve / update / delete, detail actions, and each object
+      of bulk update / delete. Return ``False`` to deny.
     - ``get_permission_queryset(request, queryset)`` — row-level filtering
       for list views. Return a filtered queryset to restrict visible rows.
 
@@ -816,29 +842,64 @@ class SoftDeleteViewSetMixin(APIViewSet[ModelT]):
             return queryset
         return queryset.filter(**{self.soft_delete_field: False})
 
+    def _has_other_object_hooks(self) -> bool:
+        names = ("aon_before_object_operation", "on_before_object_operation")
+        return any(
+            name in klass.__dict__
+            for klass in type(self).__mro__
+            if klass not in (SoftDeleteViewSetMixin, APIViewSet)
+            for name in names
+        )
+
     def bulk_delete(self, request: HttpRequest, data: Schema) -> Status:
         """Soft-delete all matching records synchronously."""
         self.on_before_operation(request, "bulk_delete")
         queryset = self._live_rows(
             self._get_serializer().get_queryset(request=request, optimize_for="read")
         ).filter(pk__in=data.ids)
-        existing = set(queryset.values_list("pk", flat=True))
+        denied = []
+        if self._has_other_object_hooks():
+            objects = {obj.pk: obj for obj in queryset}
+            items, denied = self._check_bulk_objects(
+                request, "delete", self._soft_bulk_items(data.ids, objects), objects,
+                self.on_before_object_operation,
+            )
+            existing = {pk for _, pk in items}
+        else:
+            existing = set(queryset.values_list("pk", flat=True))
         if existing:
-            queryset.update(**{self.soft_delete_field: True})
-        return self._soft_bulk_response(data.ids, existing)
+            queryset.filter(pk__in=existing).update(**{self.soft_delete_field: True})
+        return self._soft_bulk_response(data.ids, existing, denied)
 
     async def abulk_delete(self, request: HttpRequest, data: Schema) -> Status:
         """Soft-delete all matching records asynchronously."""
         await self.aon_before_operation(request, "bulk_delete")
         queryset = await self._get_serializer().aget_queryset(request=request, optimize_for="read")
         queryset = self._live_rows(queryset).filter(pk__in=data.ids)
-        existing = {pk async for pk in queryset.values_list("pk", flat=True)}
+        denied = []
+        if self._has_other_object_hooks():
+            objects = {obj.pk: obj async for obj in queryset}
+            items, denied = await self._acheck_bulk_objects(
+                request, "delete", self._soft_bulk_items(data.ids, objects), objects
+            )
+            existing = {pk for _, pk in items}
+        else:
+            existing = {pk async for pk in queryset.values_list("pk", flat=True)}
         if existing:
-            await queryset.aupdate(**{self.soft_delete_field: True})
-        return self._soft_bulk_response(data.ids, existing)
+            await queryset.filter(pk__in=existing).aupdate(**{self.soft_delete_field: True})
+        return self._soft_bulk_response(data.ids, existing, denied)
 
-    def _soft_bulk_response(self, pks: list, existing: set) -> Status:
-        errors = [NotFoundError(self.model).error for pk in pks if pk not in existing]
+    @staticmethod
+    def _soft_bulk_items(pks: list, objects: dict) -> list:
+        return [(index, pk) for index, pk in enumerate(pks) if pk in objects]
+
+    def _soft_bulk_response(self, pks: list, existing: set, denied: list | None = None) -> Status:
+        denied_errors = {failure.index: failure.error for failure in denied or []}
+        errors = [
+            denied_errors.get(index, NotFoundError(self.model).error)
+            for index, pk in enumerate(pks)
+            if pk not in existing
+        ]
         return Status(200, self._bulk_result([pk for pk in pks if pk in existing], errors))
 
     def views(self):
@@ -946,9 +1007,11 @@ class FieldSelectionViewSetMixin(APIViewSet[ModelT]):
 
         GET /articles/?fields=id,title,author
         GET /articles/5?fields=id,title
+
+    Set ``fields_param`` to use another query parameter name.
     """
 
-    _fields_param: str = "fields"
+    fields_param: str = "fields"
 
     def _generate_filters_schema(self) -> Schema:
         """Extend the filters schema with the ``fields`` query parameter."""
@@ -956,8 +1019,13 @@ class FieldSelectionViewSetMixin(APIViewSet[ModelT]):
         return create_model(
             f"{self.model_util.model_name}FiltersSchema",
             __base__=schema,
-            **{self._fields_param: (str | None, None)},
+            **{self.fields_param: (str | None, None)},
         )
+
+    def _list_filter_data(self, filters: Schema | None) -> tuple[dict, str | None]:
+        values, ordering = super()._list_filter_data(filters)
+        values.pop(self.fields_param, None)
+        return values, ordering
 
     def _parse_requested_fields(self, raw: str | None, schema: type) -> set[str] | None:
         """Return a validated set of field names from the raw query value, or None."""
@@ -976,7 +1044,7 @@ class FieldSelectionViewSetMixin(APIViewSet[ModelT]):
 
     def _select_list_fields(self, result: Status, filters: Schema | None):
         requested = self._parse_requested_fields(
-            getattr(filters, self._fields_param, None), self.schema_out
+            getattr(filters, self.fields_param, None), self.schema_out
         )
         if requested is None:
             return result
@@ -1004,7 +1072,7 @@ class FieldSelectionViewSetMixin(APIViewSet[ModelT]):
         def retrieve(
             request: HttpRequest,
             pk: Path[self.path_schema],  # type: ignore
-            fields: Query[str] = None,  # type: ignore
+            fields: Annotated[str | None, Query(alias=self.fields_param)] = None,
         ):
             return self._select_fields(
                 self.retrieve(request, pk), fields, self._get_retrieve_schema()
@@ -1018,7 +1086,7 @@ class FieldSelectionViewSetMixin(APIViewSet[ModelT]):
         async def retrieve(
             request: HttpRequest,
             pk: Path[self.path_schema],  # type: ignore
-            fields: Query[str] = None,  # type: ignore
+            fields: Annotated[str | None, Query(alias=self.fields_param)] = None,
         ):
             return self._select_fields(
                 await self.aretrieve(request, pk), fields, self._get_retrieve_schema()

@@ -3,7 +3,6 @@ import inspect
 from unittest import mock
 
 from django.core.exceptions import ImproperlyConfigured
-from django.db.models import Q
 from django.test import tag, TestCase
 from django.utils import timezone
 from ninja import Schema
@@ -17,6 +16,11 @@ from ninja_aio.schemas import (
     BooleanMatchFilterSchema,
 )
 from ninja_aio.views import mixins
+from ninja_aio.views.mixins import (
+    DateFilterViewSetMixin,
+    GreaterDateFilterViewSetMixin,
+    LessDateFilterViewSetMixin,
+)
 from tests.generics.views import Tests
 from tests.test_app import schema, models, views, serializers
 from ninja_aio import NinjaAIO
@@ -666,6 +670,65 @@ class ApiViewSetModelSerializerLessEqualDateTestCase(
         )
         self.assertEqual(await res_less_equal_now.acount(), 1)
         self.assertEqual((await res_less_equal_now.afirst()), obj_past)
+
+
+@tag("model_serializer_date_range_viewset")
+class DateFilterRangeTestCase(TestCase):
+    """Range parameters carry their own lookup; ambiguous mixin combinations are rejected."""
+
+    @classmethod
+    def setUpTestData(cls):
+        now = timezone.now()
+        cls.now = now
+        cls.past = models.TestModelSerializer.objects.create(name="past", description="d")
+        cls.middle = models.TestModelSerializer.objects.create(name="middle", description="d")
+        cls.future = models.TestModelSerializer.objects.create(name="future", description="d")
+        for obj, delta in ((cls.past, -3), (cls.middle, 0), (cls.future, 3)):
+            models.TestModelSerializer.objects.filter(pk=obj.pk).update(
+                active_from=now + datetime.timedelta(days=delta)
+            )
+
+    def _viewset(self, *bases):
+        class RangeAPI(*bases, APIViewSet):
+            model = models.TestModelSerializer
+            query_params = {
+                "active_from__gte": (datetime.datetime, None),
+                "active_from__lte": (datetime.datetime, None),
+            }
+
+        return RangeAPI(api=NinjaAIO(urls_namespace=f"date_range_{len(bases)}"))
+
+    async def test_lookup_suffixed_parameters_build_a_range(self):
+        viewset = self._viewset(DateFilterViewSetMixin)
+        qs = await viewset.aquery_params_handler(
+            models.TestModelSerializer.objects.all(),
+            {
+                "active_from__gte": self.now - datetime.timedelta(days=1),
+                "active_from__lte": self.now + datetime.timedelta(days=1),
+            },
+        )
+        self.assertEqual([obj.name async for obj in qs], ["middle"])
+
+    def test_lookup_suffix_wins_over_the_mixin_comparison(self):
+        viewset = self._viewset(GreaterDateFilterViewSetMixin)
+        qs = viewset.query_params_handler(
+            models.TestModelSerializer.objects.all(),
+            {"active_from__lte": self.now + datetime.timedelta(days=1)},
+        )
+        self.assertEqual(sorted(qs.values_list("name", flat=True)), ["middle", "past"])
+
+    def test_combining_date_mixins_with_different_comparisons_raises(self):
+        with self.assertRaises(ImproperlyConfigured):
+
+            class _Ambiguous(GreaterDateFilterViewSetMixin, LessDateFilterViewSetMixin, APIViewSet):
+                model = models.TestModelSerializer
+
+    def test_subclass_may_set_its_own_comparison(self):
+        class Custom(GreaterDateFilterViewSetMixin, LessDateFilterViewSetMixin, APIViewSet):
+            model = models.TestModelSerializer
+            _compare_attr = "__gte"
+
+        self.assertEqual(Custom._compare_attr, "__gte")
 
 
 @tag("model_serializer_foreign_key_viewset")

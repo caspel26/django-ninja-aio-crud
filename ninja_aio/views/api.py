@@ -3,6 +3,7 @@ import inspect
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass, replace
+from http import HTTPStatus
 from math import inf
 from typing import Any, Generic, List, Literal, NamedTuple, TypeVar
 
@@ -25,7 +26,7 @@ from ninja_aio.schemas import (
     M2MRelationSchema,
     BulkResultSchema,
 )
-from ninja_aio.exceptions import SerializeError
+from ninja_aio.exceptions import BaseException as NinjaAIOError, SerializeError
 from ninja_aio.helpers.api import ManyToManyAPI
 from ninja_aio.types import (
     BulkFailure,
@@ -191,6 +192,8 @@ class API:
     ) -> Callable:
         handler = self._action_core_handler(name, method, config, http_method)
         handler.__name__ = f"{name}_{http_method.value}_{self._action_name_suffix()}"
+        # Read by the MCP introspection; functools.wraps in decorators keeps it.
+        handler._nac_action_name = name
         for decorator in reversed(config.decorators or []):
             handler = decorator(handler)
         return handler
@@ -200,6 +203,7 @@ class API:
     ) -> None:
         """Register an @action/@on method on the router once per configured HTTP method."""
         path = self._resolve_action_path(name, config)
+        response, openapi_extra = self._action_responses(config)
         for http_method in config.methods:
             summary = config.summary or (
                 f"{http_method.value.upper()} {name.replace('_', ' ').title()}"
@@ -211,16 +215,42 @@ class API:
                 path,
                 auth=config.auth if config.auth is not NOT_SET else self._auth_view(http_method.value),
                 throttle=config.throttle,
-                response=config.response,
+                response=response,
                 summary=summary,
                 description=config.description,
                 tags=config.tags,
                 deprecated=config.deprecated,
                 url_name=config.url_name,
                 include_in_schema=config.include_in_schema,
-                openapi_extra=config.openapi_extra,
+                openapi_extra=openapi_extra,
             )(self._build_action_handler(name, method, config, http_method))
             logger.debug(f"Registered action {http_method.value.upper()} {path} on {type(self).__name__}")
+
+    def _action_responses(self, config: ActionConfig) -> tuple[Any, dict | None]:
+        """Add the error responses to an action, like the generated CRUD endpoints."""
+        codes = set(ERROR_CODES) if config.detail else set(ERROR_CODES) - {404}
+        response = config.response
+        if response is NOT_SET or response is None:
+            # No success schema: document the errors without validating the response.
+            error_schema = self.error_schema.model_json_schema()
+            documented = {
+                code: {
+                    "description": HTTPStatus(code).phrase,
+                    "content": {"application/json": {"schema": error_schema}},
+                }
+                for code in sorted(codes)
+            }
+            extra = dict(config.openapi_extra or {})
+            extra["responses"] = {**documented, **extra.get("responses", {})}
+            return response, extra
+        if not isinstance(response, dict):
+            response = {200: response}
+        declared = {
+            code for key in response for code in (key if isinstance(key, (tuple, set, frozenset)) else (key,))
+        }
+        remaining = frozenset(codes - declared)
+        merged = {remaining: self.error_schema, **response} if remaining else dict(response)
+        return merged, config.openapi_extra
 
     def _register_actions(self) -> None:
         """Discover and register @action-decorated methods on the router."""
@@ -279,7 +309,7 @@ class APIView(API):
     ) -> None:
         self.api = api or self.api
         self.api_route_path = prefix or self.api_route_path
-        self.router_tags = tags or self.router_tags or [self.router_tag]
+        self.router_tags = tags or self.router_tags or ([self.router_tag] if self.router_tag else None)
         self.router = Router(tags=self.router_tags)
         self.error_codes = ERROR_CODES
         self._operations: dict[str, Callable] = {}
@@ -493,7 +523,7 @@ class APIViewSet(API, Generic[ModelT]):
             or self.model._meta.verbose_name_plural.capitalize()
         )
         self.router_tag = self.router_tag or self.model_verbose_name
-        self.router_tags = self.router_tags or tags or [self.router_tag]
+        self.router_tags = tags or self.router_tags or [self.router_tag]
         self.router = Router(tags=self.router_tags)
         self.append_slash = getattr(settings, "NINJA_AIO_APPEND_SLASH", True)
         self.path = "/" if self.append_slash else ""
@@ -872,7 +902,15 @@ class APIViewSet(API, Generic[ModelT]):
         return queryset
 
     _has_object_hooks: bool = False
-    """Set to True by mixins that override aon_before_object_operation."""
+    """True when the viewset (or a mixin) overrides an object hook; set automatically."""
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        if any(
+            getattr(cls, name) is not getattr(APIViewSet, name)
+            for name in ("aon_before_object_operation", "on_before_object_operation")
+        ):
+            cls._has_object_hooks = True
 
     _mode_hooks: tuple[tuple[str, str], ...] = (
         ("aon_before_operation", "on_before_operation"),
@@ -1299,7 +1337,7 @@ class APIViewSet(API, Generic[ModelT]):
             return lambda obj: getattr(obj, fields)
         return lambda obj: {f: getattr(obj, f) for f in fields}
 
-    def _get_bulk_detail_fields(self) -> list[str] | None:
+    def _get_bulk_detail_fields(self) -> List[str] | None:
         """
         Return the list of field names for bulk delete detail extraction.
 
@@ -1384,6 +1422,12 @@ class APIViewSet(API, Generic[ModelT]):
         """Execute a synchronous bulk update. Override to customize the operation."""
         self.on_before_operation(request, "bulk_update")
         items, rejected = self._prepare_bulk_update(data)
+        if self._has_object_hooks:
+            objects = self._bulk_objects(request, [pk for _, (pk, _) in items])
+            items, denied = self._check_bulk_objects(
+                request, "update", items, objects, self.on_before_object_operation
+            )
+            rejected += denied
         result = self._get_serializer().bulk_update(
             [item for _, item in items], request=request
         )
@@ -1393,10 +1437,59 @@ class APIViewSet(API, Generic[ModelT]):
         """Execute an asynchronous bulk update. Override to customize the operation."""
         await self.aon_before_operation(request, "bulk_update")
         items, rejected = self._prepare_bulk_update(data)
+        if self._has_object_hooks:
+            objects = await self._abulk_objects(request, [pk for _, (pk, _) in items])
+            items, denied = await self._acheck_bulk_objects(request, "update", items, objects)
+            rejected += denied
         result = await self._get_serializer().abulk_update(
             [item for _, item in items], request=request
         )
         return self._bulk_response(self._merge_bulk_rejections(result, items, rejected))
+
+    def _bulk_objects(self, request: HttpRequest, pks: list) -> dict:
+        queryset = self._get_serializer().get_queryset(request=request)
+        return {obj.pk: obj for obj in queryset.filter(pk__in=pks)}
+
+    async def _abulk_objects(self, request: HttpRequest, pks: list) -> dict:
+        queryset = await self._get_serializer().aget_queryset(request=request)
+        return {obj.pk: obj async for obj in queryset.filter(pk__in=pks)}
+
+    @staticmethod
+    def _bulk_item_pk(payload: Any) -> Any:
+        return payload[0] if isinstance(payload, tuple) else payload
+
+    def _check_bulk_objects(
+        self, request: HttpRequest, operation: str, items: List, objects: dict, hook: Callable
+    ) -> tuple[List, List[BulkFailure]]:
+        """Run the object hook on each existing item; missing ones are left to the bulk operation."""
+        allowed, denied = [], []
+        for index, payload in items:
+            pk = self._bulk_item_pk(payload)
+            obj = objects.get(pk)
+            try:
+                if obj is not None:
+                    hook(request, operation, obj)
+            except NinjaAIOError as exc:
+                denied.append(bulk_failure(index, exc, pk))
+            else:
+                allowed.append((index, payload))
+        return allowed, denied
+
+    async def _acheck_bulk_objects(
+        self, request: HttpRequest, operation: str, items: List, objects: dict
+    ) -> tuple[List, List[BulkFailure]]:
+        allowed, denied = [], []
+        for index, payload in items:
+            pk = self._bulk_item_pk(payload)
+            obj = objects.get(pk)
+            try:
+                if obj is not None:
+                    await self.aon_before_object_operation(request, operation, obj)
+            except NinjaAIOError as exc:
+                denied.append(bulk_failure(index, exc, pk))
+            else:
+                allowed.append((index, payload))
+        return allowed, denied
 
     def _prepare_bulk_update(self, data: List[Schema]) -> tuple[List, List[BulkFailure]]:
         """Split items into ``(index, (pk, update_data))`` pairs and rejected empty payloads."""
@@ -1446,24 +1539,32 @@ class APIViewSet(API, Generic[ModelT]):
     def bulk_delete(self, request: HttpRequest, data: Schema) -> Status:
         """Execute a synchronous bulk delete. Override to customize the operation."""
         self.on_before_operation(request, "bulk_delete")
-        found = {
-            obj.pk: obj
-            for obj in self._get_serializer().get_queryset(request=request).filter(pk__in=data.ids)
-        }
+        found = self._bulk_objects(request, data.ids)
+        items, denied = list(enumerate(data.ids)), []
+        if self._has_object_hooks:
+            items, denied = self._check_bulk_objects(
+                request, "delete", items, found, self.on_before_object_operation
+            )
         result = self._get_serializer().bulk_destroy(
-            [found.get(pk, pk) for pk in data.ids], request=request
+            [found.get(pk, pk) for _, pk in items], request=request
         )
-        return self._bulk_delete_response(result, found)
+        return self._bulk_delete_response(
+            self._merge_bulk_rejections(result, items, denied), found
+        )
 
     async def abulk_delete(self, request: HttpRequest, data: Schema) -> Status:
         """Execute an asynchronous bulk delete. Override to customize the operation."""
         await self.aon_before_operation(request, "bulk_delete")
-        queryset = await self._get_serializer().aget_queryset(request=request)
-        found = {obj.pk: obj async for obj in queryset.filter(pk__in=data.ids)}
+        found = await self._abulk_objects(request, data.ids)
+        items, denied = list(enumerate(data.ids)), []
+        if self._has_object_hooks:
+            items, denied = await self._acheck_bulk_objects(request, "delete", items, found)
         result = await self._get_serializer().abulk_destroy(
-            [found.get(pk, pk) for pk in data.ids], request=request
+            [found.get(pk, pk) for _, pk in items], request=request
         )
-        return self._bulk_delete_response(result, found)
+        return self._bulk_delete_response(
+            self._merge_bulk_rejections(result, items, denied), found
+        )
 
     def _bulk_delete_response(self, result: BulkResult, found: dict) -> Status:
         fields = self._get_bulk_detail_fields()
@@ -1603,10 +1704,36 @@ class APIViewSet(API, Generic[ModelT]):
     ) -> Callable:
         if config.prefetch_object and config.detail:
             return self._build_on_handler(name, method)
-        handler = super()._action_core_handler(name, method, config, http_method)
-        if config.detail:
-            handler = self._rename_pk_param(handler)
-        return handler
+        if not config.detail:
+            return super()._action_core_handler(name, method, config, http_method)
+        factory = ApiMethodFactory(http_method.value)
+        handler = factory._build_handler(self, method)
+        factory._apply_metadata(handler, method)
+        if self._has_object_hooks:
+            handler = self._with_object_check(handler, name)
+        return self._rename_pk_param(self._with_operation_hook(handler, name))
+
+    def _with_object_check(self, handler: Callable, name: str) -> Callable:
+        """Load the object of a detail @action and run the object hooks before the handler."""
+        if inspect.iscoroutinefunction(handler):
+
+            @functools.wraps(handler)
+            async def checked(*args, **kwargs):
+                request = args[0] if args else kwargs.get("request")
+                obj = await self._get_serializer().aget(kwargs.get("pk"), request=request)
+                await self.aon_before_object_operation(request, name, obj)
+                return await handler(*args, **kwargs)
+
+        else:
+
+            @functools.wraps(handler)
+            def checked(*args, **kwargs):
+                request = args[0] if args else kwargs.get("request")
+                obj = self._get_serializer().get(kwargs.get("pk"), request=request)
+                self.on_before_object_operation(request, name, obj)
+                return handler(*args, **kwargs)
+
+        return checked
 
     def _set_additional_views(self) -> Router:
         self.views()

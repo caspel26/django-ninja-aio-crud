@@ -3,8 +3,9 @@ import uuid
 from django.test import TestCase, tag
 from asgiref.sync import async_to_sync
 from ninja.constants import NOT_SET
-from ninja.testing import TestClient
+from ninja.testing import TestAsyncClient, TestClient
 from ninja_aio import NinjaAIO
+from ninja_aio.exceptions import ForbiddenError
 from ninja_aio.helpers.api import ManyToManyAPI
 from ninja_aio.models import ModelUtil, serializers
 from ninja_aio.schemas import M2MRelationSchema
@@ -874,3 +875,76 @@ class M2MAuthInheritanceTests(TestCase):
             "m2m_auth_public", relation_auth=None, auth=[_deny], m2m_auth=[_deny]
         )
         self.assertEqual(self._statuses(client), (200, 200))
+
+
+def _object_checked_m2m_api():
+    """The same guarded relation in both execution modes."""
+
+    class Guarded:
+        seen = []
+
+        def on_before_object_operation(self, request, operation, obj):
+            Guarded.seen.append(operation)
+            if obj.name == "locked":
+                raise ForbiddenError()
+
+        async def aon_before_object_operation(self, request, operation, obj):
+            self.on_before_object_operation(request, operation, obj)
+
+    relation = {
+        "model": models.TestModelSerializerReverseManyToMany,
+        "related_name": "test_model_serializers",
+        "path": "links",
+    }
+
+    class SyncGuarded(Guarded, APIViewSet):
+        model = models.TestModelSerializerManyToMany
+        execution_mode = "sync"
+        m2m_relations = [M2MRelationSchema(**relation)]
+
+    class AsyncGuarded(Guarded, APIViewSet):
+        model = models.TestModelSerializerManyToMany
+        m2m_relations = [M2MRelationSchema(**relation)]
+
+    api = NinjaAIO(urls_namespace="m2m_object_checks")
+    SyncGuarded(api=api, prefix="sync").add_views_to_route()
+    AsyncGuarded(api=api, prefix="async").add_views_to_route()
+    return api, Guarded
+
+
+@tag("m2m_auth", "regression")
+class M2MObjectChecksTests(TestCase):
+    """Relation endpoints load the parent through the viewset object hooks."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.api, cls.guard = _object_checked_m2m_api()
+        cls.open = models.TestModelSerializerManyToMany.objects.create(name="open", description="d")
+        cls.locked = models.TestModelSerializerManyToMany.objects.create(name="locked", description="d")
+
+    def setUp(self):
+        self.seen = self.guard.seen
+        self.seen.clear()
+        self.sync_client = TestClient(self.api)
+        self.async_client = TestAsyncClient(self.api)
+
+    def test_sync_relation_endpoints_run_object_hooks(self):
+        body = {"add": [], "remove": []}
+        self.assertEqual(self.sync_client.get(f"/sync/{self.open.pk}/links").status_code, 200)
+        self.assertEqual(self.sync_client.post(f"/sync/{self.open.pk}/links/", json=body).status_code, 200)
+        self.assertEqual(self.seen, ["retrieve", "update"])
+        self.assertEqual(self.sync_client.get(f"/sync/{self.locked.pk}/links").status_code, 403)
+        self.assertEqual(self.sync_client.post(f"/sync/{self.locked.pk}/links/", json=body).status_code, 403)
+        self.assertEqual(self.sync_client.get("/sync/999999/links").status_code, 404)
+
+    async def test_async_relation_endpoints_run_object_hooks(self):
+        body = {"add": [], "remove": []}
+        statuses = [
+            (await self.async_client.get(f"/async/{self.open.pk}/links")).status_code,
+            (await self.async_client.post(f"/async/{self.open.pk}/links/", json=body)).status_code,
+            (await self.async_client.get(f"/async/{self.locked.pk}/links")).status_code,
+            (await self.async_client.post(f"/async/{self.locked.pk}/links/", json=body)).status_code,
+            (await self.async_client.get("/async/999999/links")).status_code,
+        ]
+        self.assertEqual(statuses, [200, 200, 403, 403, 404])
+        self.assertEqual(self.seen, ["retrieve", "update", "retrieve", "update"])

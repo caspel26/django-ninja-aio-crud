@@ -539,7 +539,7 @@ class ManyToManyAPI:
         related_schema: type[Schema],
     ) -> Status:
         """List related objects synchronously."""
-        obj = self.view_set._get_serializer().get(self.view_set._get_pk(pk), request=request)
+        obj = self._relation_owner(request, pk, "retrieve")
         related_qs = getattr(obj, related_name).all()
         query_handler = self._get_query_params_handler(related_name)
         if filters is not None and query_handler:
@@ -565,7 +565,7 @@ class ManyToManyAPI:
         related_schema: type[Schema],
     ) -> Status:
         """List related objects asynchronously."""
-        obj = await self.view_set._get_serializer().aget(self.view_set._get_pk(pk), request=request)
+        obj = await self._arelation_owner(request, pk, "retrieve")
         related_qs = getattr(obj, related_name).all()
         query_handler = self._get_query_params_handler(related_name)
         if filters is not None and query_handler:
@@ -581,6 +581,19 @@ class ManyToManyAPI:
 
     def _resolve_action_schema(self, add: bool, remove: bool):
         return self.views_action_map[(add, remove)]
+
+    def _relation_owner(self, request: HttpRequest, pk: Schema, operation: str):
+        """Load the parent object through the viewset hooks, like retrieve and update do."""
+        pk_value = self.view_set._get_pk(pk)
+        obj = self.view_set._run_object_hooks(request, operation, pk_value)
+        return obj if obj is not None else self.view_set._get_serializer().get(pk_value, request=request)
+
+    async def _arelation_owner(self, request: HttpRequest, pk: Schema, operation: str):
+        pk_value = self.view_set._get_pk(pk)
+        obj = await self.view_set._arun_object_hooks(request, operation, pk_value)
+        if obj is not None:
+            return obj
+        return await self.view_set._get_serializer().aget(pk_value, request=request)
 
     def _register_manage_relation_view(
         self,
@@ -670,7 +683,7 @@ class ManyToManyAPI:
         m2m_remove: bool,
     ) -> Status:
         """Add and/or remove related objects synchronously."""
-        obj = self.view_set._get_serializer().get(self.view_set._get_pk(pk), request=request)
+        obj = self._relation_owner(request, pk, "update")
         related_manager = getattr(obj, related_name)
         add_pks, remove_pks = self._requested_pks(data, m2m_add, m2m_remove)
         added = self._collect_m2m(
@@ -698,7 +711,7 @@ class ManyToManyAPI:
         m2m_remove: bool,
     ) -> Status:
         """Add and/or remove related objects asynchronously."""
-        obj = await self.view_set._get_serializer().aget(self.view_set._get_pk(pk), request=request)
+        obj = await self._arelation_owner(request, pk, "update")
         related_manager = getattr(obj, related_name)
         add_pks, remove_pks = self._requested_pks(data, m2m_add, m2m_remove)
         added = await self._acollect_m2m(

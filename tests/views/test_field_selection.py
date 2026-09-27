@@ -3,9 +3,12 @@ import json
 from django.http import JsonResponse
 from django.test import TestCase, tag
 from ninja import Status
+from ninja.testing import TestClient
 
 from ninja_aio import NinjaAIO
 from ninja_aio.models import ModelUtil
+from ninja_aio.views import APIViewSet
+from ninja_aio.views.mixins import FieldSelectionViewSetMixin
 from tests.generics.request import Request
 from tests.test_app import models, views
 
@@ -143,7 +146,7 @@ class FieldSelectionRetrieveTestCase(TestCase):
 
     async def test_retrieve_without_fields_returns_status(self):
         """Retrieve without ?fields returns Status(200, ...) as usual."""
-        pk_schema = cls.viewset.path_schema if hasattr(self, "cls") else self.viewset.path_schema
+        pk_schema = self.viewset.path_schema
         pk_name = self.viewset.model_util.model_pk_name
         view = self.viewset.aretrieve_view()
         pk_schema = self.viewset.path_schema(**{pk_name: self.obj.pk})
@@ -205,7 +208,6 @@ class FieldSelectionRetrieveWithObjectHooksTestCase(TestCase):
         pk_name = self.viewset.model_util.model_pk_name
         view = self.viewset.aretrieve_view()
         pk_schema = self.viewset.path_schema(**{pk_name: self.obj.pk})
-        request = views.FieldSelectionWithPermissionsTestAPI.__bases__[0].__bases__[0]  # just need the request
 
         from tests.generics.request import Request
         req = Request(self.viewset.model_util.verbose_name_path_resolver()).get()
@@ -266,3 +268,50 @@ class FieldSelectionWithFiltersTestCase(TestCase):
         self.assertIn("id", item)
         self.assertIn("name", item)
         self.assertNotIn("description", item)
+
+
+@tag("field_selection")
+class FieldSelectionCustomParamHTTPTestCase(TestCase):
+    """A custom ``fields_param`` is honored by list and retrieve, over HTTP."""
+
+    @classmethod
+    def setUpTestData(cls):
+        class OnlyAPI(FieldSelectionViewSetMixin, APIViewSet):
+            model = models.TestModelSerializer
+            execution_mode = "sync"
+            fields_param = "only"
+            query_params = {"name": (str, None)}
+            seen_filters: list = []
+
+            def query_params_handler(self, queryset, filters):
+                self.seen_filters.append(dict(filters))
+                if filters.get("name"):
+                    queryset = queryset.filter(name=filters["name"])
+                return queryset
+
+        cls.view_class = OnlyAPI
+        api = NinjaAIO(urls_namespace="field_selection_custom_param")
+        OnlyAPI(api=api, prefix="items").add_views_to_route()
+        cls.api_client = TestClient(api)
+        cls.obj = models.TestModelSerializer.objects.create(name="Alpha", description="first")
+
+    def setUp(self):
+        self.view_class.seen_filters.clear()
+
+    def test_list_uses_the_custom_parameter(self):
+        response = self.api_client.get("/items?only=id,name&name=Alpha")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["items"], [{"id": self.obj.pk, "name": "Alpha"}])
+
+    def test_custom_parameter_is_not_passed_to_the_query_handler(self):
+        self.api_client.get("/items?only=id&name=Alpha")
+        self.assertEqual(self.view_class.seen_filters, [{"name": "Alpha"}])
+
+    def test_retrieve_uses_the_custom_parameter(self):
+        response = self.api_client.get(f"/items/{self.obj.pk}?only=name")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"name": "Alpha"})
+
+    def test_default_parameter_name_is_not_used(self):
+        response = self.api_client.get(f"/items/{self.obj.pk}?fields=name")
+        self.assertIn("description", response.json())
