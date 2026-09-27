@@ -59,20 +59,20 @@ class ModelUtilParseInputTestCase(TestCase):
         cls.fk_rev = app_models.TestModelSerializerReverseForeignKey.objects.create(
             name="rev", description="rev"
         )
-        cls.schema_create = CustomOptionalSerializer.generate_create_s()
-        cls.schema_update = CustomOptionalSerializer.generate_update_s()
-        cls.fk_schema_in = app_models.TestModelSerializerForeignKey.generate_create_s()
+        cls.schema_create = CustomOptionalSerializer.create_schema
+        cls.schema_update = CustomOptionalSerializer.update_schema
+        cls.fk_schema_in = app_models.TestModelSerializerForeignKey.create_schema
         cls.util_custom = ModelUtil(CustomOptionalSerializer)
         cls.util_fk = ModelUtil(app_models.TestModelSerializerForeignKey)
 
     async def test_parse_input_custom_and_optional(self):
         data = self.schema_create(name="n", description="d", extra="Z")
-        payload, customs = await self.util_custom.parse_input_data(None, data)
+        payload, customs = await self.util_custom.aparse_input_data(None, data)
         self.assertNotIn("extra", payload)
         self.assertEqual(customs["extra"], "Z")
         # optional exclusion when None on update
         upd = self.schema_update()
-        payload_u, customs_u = await self.util_custom.parse_input_data(None, upd)
+        payload_u, customs_u = await self.util_custom.aparse_input_data(None, upd)
         self.assertNotIn("description", payload_u)
         self.assertEqual(customs_u, {})
 
@@ -80,7 +80,7 @@ class ModelUtilParseInputTestCase(TestCase):
         data = self.fk_schema_in(
             name="fk", description="fk", test_model_serializer_id=self.fk_rev.pk
         )
-        payload, _ = await self.util_fk.parse_input_data(None, data)
+        payload, _ = await self.util_fk.aparse_input_data(None, data)
         self.assertIsInstance(
             payload["test_model_serializer"],
             app_models.TestModelSerializerReverseForeignKey,
@@ -99,17 +99,17 @@ class ModelUtilParseInputTestCase(TestCase):
             class Meta:
                 app_label = app_models.TestModelSerializer._meta.app_label
 
-        schema_in = BinSerializer.generate_create_s()
+        schema_in = BinSerializer.create_schema
         util = ModelUtil(BinSerializer)
         good_bytes = b"hello"
         b64 = base64.b64encode(good_bytes).decode()
         data_good = schema_in(data=b64)
-        payload, _ = await util.parse_input_data(None, data_good)
+        payload, _ = await util.aparse_input_data(None, data_good)
         self.assertEqual(payload["data"], good_bytes)
         # bad base64
         data_bad = schema_in(data="$$invalid$$")
         with self.assertRaises(SerializeError):
-            await util.parse_input_data(None, data_bad)
+            await util.aparse_input_data(None, data_bad)
 
 
 @tag("model_serializer_get_custom_fields", "model_serializer")
@@ -187,7 +187,7 @@ class ModelUtilReadSQuerysetErrorTestCase(TestCase):
         cls.obj = app_models.TestModelSerializer.objects.create(
             name="a", description="b"
         )
-        cls.schema_out = app_models.TestModelSerializer.generate_read_s()
+        cls.schema_out = app_models.TestModelSerializer.read_schema
         cls.util = ModelUtil(app_models.TestModelSerializer)
 
     async def test_read_s_without_lookup_raises(self):
@@ -214,10 +214,15 @@ class ModelSerializerUpdateHooksTestCase(TestCase):
 
             return _fn
 
-        app_models.TestModelSerializer.before_save = mk("before")
-        app_models.TestModelSerializer.after_save = mk("after")
-        app_models.TestModelSerializer.on_create_before_save = mk("on_create_before")
-        app_models.TestModelSerializer.on_create_after_save = mk("on_create_after")
+        model = app_models.TestModelSerializer
+        for attr, name in (
+            ("before_save", "before"),
+            ("after_save", "after"),
+            ("on_create_before_save", "on_create_before"),
+            ("on_create_after_save", "on_create_after"),
+        ):
+            setattr(model, attr, mk(name))
+            cls.addClassCleanup(delattr, model, attr)
         cls.obj = app_models.TestModelSerializer.objects.create(
             name="x", description="y"
         )

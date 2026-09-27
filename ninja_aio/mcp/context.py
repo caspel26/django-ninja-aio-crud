@@ -2,7 +2,7 @@
 
 MCP tool calls happen outside Django's HTTP request/response cycle, so a
 plain ``HttpRequest`` has to be built for each invocation. django-ninja-aio-crud's
-view hooks (``on_before_operation``, ``query_params_handler``, ...) all expect a
+view hooks (``aon_before_operation``, ``aquery_params_handler``, ...) all expect a
 real ``HttpRequest``-like object, so one is built here with Django's own
 ``AsyncRequestFactory`` — the same helper the test suite uses for the same
 reason (see ``tests/generics/request.py``).
@@ -11,7 +11,7 @@ Tool calls bypass django-ninja's ``auth=`` wiring entirely: that check happens
 in django-ninja's ``Operation.run``, not inside the view handler itself, and
 MCP tool invocation calls the handler directly. Pass a ``request_factory`` to
 :class:`~ninja_aio.mcp.server.NinjaAIOMCPServer` to attach ``request.user`` (or
-any other attribute your ``on_before_operation``/``on_before_object_operation``
+any other attribute your ``aon_before_operation``/``aon_before_object_operation``
 hooks rely on) so authorization can still be enforced from within the viewset.
 """
 

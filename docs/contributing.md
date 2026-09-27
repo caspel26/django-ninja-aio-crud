@@ -1,210 +1,182 @@
-# :material-handshake: Contributing
-
-We welcome contributions! Here's how you can help:
-
-<div class="grid cards" markdown>
-
--   :material-bug:{ .lg .middle } **Report Bugs**
-
-    ---
-
-    Open an issue on [GitHub](https://github.com/caspel26/django-ninja-aio-crud/issues)
-
--   :material-lightbulb:{ .lg .middle } **Suggest Features**
-
-    ---
-
-    Share ideas in issues or discussions
-
--   :material-source-pull:{ .lg .middle } **Submit PRs**
-
-    ---
-
-    Improve code, tests, or docs
-
--   :material-file-document-edit:{ .lg .middle } **Improve Docs**
-
-    ---
-
-    Clarify, expand, or add examples
-
--   :material-test-tube:{ .lg .middle } **Add Tests**
-
-    ---
-
-    Increase coverage and reliability
-
--   :material-comment-check:{ .lg .middle } **Review PRs**
-
-    ---
-
-    Provide constructive feedback
-
-</div>
-
+---
+type: guide
+title: Contributing
+description: Set up the project locally, run the tests and send your first pull request.
 ---
 
-## :material-wrench: Development Setup
+# Contributing
 
-### 1. Clone and install
+This page shows how to set up the project, run the tests and benchmarks,
+build the docs and open a pull request.
+
+You can help by reporting bugs, suggesting features, improving the docs,
+adding tests or reviewing pull requests.
+
+## Set up the project
+
+<div class="nac-steps" markdown>
+
+### Clone and install
 
 ```bash
 git clone https://github.com/caspel26/django-ninja-aio-crud.git
 cd django-ninja-aio-crud
 python -m venv .venv
-source .venv/bin/activate  # or .venv\Scripts\activate on Windows
-pip install -e ".[dev]"
+source .venv/bin/activate  # on Windows: .venv\Scripts\activate
+pip install -e ".[dev,test]"
 ```
 
-This installs the package in editable mode with dev extras (`coverage`, `pre-commit`, `ruff`).
+This installs the package in editable mode with `coverage`, `pre-commit` and
+`ruff`.
 
-### 2. Install pre-commit hooks
+### Install the pre-commit hooks
 
 ```bash
 pre-commit install
 ```
 
-This ensures Ruff linting, AST validation, and formatting run automatically on every commit.
+Ruff and the other checks now run on every commit.
 
-### 3. Verify your setup
+### Check that the tests pass
 
 ```bash
-python -m django test --settings=tests.test_settings
+./run-tests.sh
 ```
 
-All tests should pass before you start making changes.
+Start from a green test run before you change anything.
 
----
+</div>
 
-## :material-test-tube: Running Tests
+## Run the tests
 
-=== "All tests"
+| Command | What it does |
+| --- | --- |
+| `./run-tests.sh` | Runs the test suite without the benchmarks. Use it while you work. |
+| `./run-local-coverage.sh` | Runs every test with coverage and writes an HTML report to `.html/`. |
+| `python -m django test tests.views --settings=tests.test_settings` | Runs a single test module. |
 
-    ```bash
-    python -m django test --settings=tests.test_settings
-    ```
+After the full run, print the coverage summary:
 
-=== "With coverage"
+```bash
+coverage report
+```
 
-    ```bash
-    ./run-local-coverage.sh
-    ```
+!!! note
 
-    This generates an HTML report in `.html/`.
+    All tests must pass, new code needs tests, and coverage must not go down.
 
-=== "Specific module"
+## Run the performance benchmarks
 
-    ```bash
-    python -m django test tests.views --settings=tests.test_settings
-    ```
+Run the benchmarks and build the HTML report:
 
-=== "Performance benchmarks"
+```bash
+./run-performance.sh
+```
 
-    ```bash
-    python -m django test tests.performance --settings=tests.test_settings --tag=performance -v2
-    ```
+To check for regressions, run the benchmarks a few times, then compare the
+latest runs with the previous ones:
 
-!!! important "Test requirements"
-    - All tests must pass before submitting a PR
-    - New features must include tests
-    - Coverage should not decrease — check with `coverage report`
+```bash
+for i in 1 2 3 4 5; do
+  python -m django test tests.performance --settings=tests.test_settings --tag=performance -v0
+done
+python tests/performance/tools/detect_regression.py
+```
 
----
+The script exits with `0` when there are no regressions and `1` when it finds
+some. See [Performance](performance.md) for the full list of benchmarks.
 
-## :material-format-paint: Code Style
+## Build the docs
 
-Django Ninja AIO uses **Ruff** for linting and formatting, enforced via pre-commit hooks.
+```bash
+pip install -r docs/requirements.txt
+mkdocs serve
+```
 
-| Tool | Purpose |
-|---|---|
-| **Ruff** | Linting and formatting |
-| **pre-commit** | AST checks, merge conflicts, TOML/YAML syntax, trailing whitespace, EOF newlines |
+Open `http://127.0.0.1:8000` to preview your changes. The pages live in
+`docs/`.
 
-### Key rules
+## Follow the code style
 
-- **Imports at the top** — Always place imports at the beginning of each file (PEP 8). The only exception is avoiding circular imports, in which case place the import inside the function with a comment explaining why.
-- **Async first** — All view methods should be `async def`. Sync methods are wrapped with `sync_to_async` automatically, but native async is preferred.
-- **Type hints** — Use type annotations for function signatures and class attributes.
+The project uses Ruff for linting and formatting. The pre-commit hooks also
+check Python syntax, merge conflict markers, TOML and YAML files, trailing
+whitespace and end-of-file newlines.
 
-### Format before committing
+To format by hand before you commit:
 
 ```bash
 ruff check . --fix
 ruff format .
 ```
 
-Or let pre-commit handle it automatically.
+- Put imports at the top of the file. Import inside a function only to avoid
+  a circular import, and add a short comment that says so.
+- Add type hints to function signatures and class attributes.
 
----
+## Open a pull request
 
-## :material-source-pull: Pull Request Guidelines
+- [ ] One feature or fix per pull request
+- [ ] Tests added or updated for every code change
+- [ ] Docs updated for user-facing changes
+- [ ] Related issue linked in the description
+- [ ] All tests pass locally
 
-!!! info "PR Checklist"
-    - [ ] Keep PRs focused and small — one feature or fix per PR
-    - [ ] Follow existing code style (Ruff will enforce this)
-    - [ ] Add or update tests for any code changes
-    - [ ] Update docs for user-facing changes
-    - [ ] Link related issue in the PR description
-    - [ ] All tests pass locally before pushing
+Name your branch after the change:
 
-### Branch naming
+| Prefix | Use for | Example |
+| --- | --- | --- |
+| `feature/` | New features | `feature/add-bulk-create` |
+| `fix/` | Bug fixes | `fix/pagination-offset-bug` |
+| `docs/` | Documentation | `docs/improve-auth-examples` |
 
-Use descriptive branch names:
+## Report an issue
 
-- `feature/add-bulk-create` — New features
-- `fix/pagination-offset-bug` — Bug fixes
-- `docs/improve-auth-examples` — Documentation improvements
+Open an issue on [GitHub](https://github.com/caspel26/django-ninja-aio-crud/issues)
+and include:
 
----
+- Python and Django versions
+- The `django-ninja-aio-crud` version (`pip show django-ninja-aio-crud`)
+- Steps to reproduce
+- Expected and actual behavior
+- The full traceback or logs
+- A minimal code example that reproduces the problem
 
-## :material-bug: Issue Reports
+## Project structure
 
-!!! warning "Please include"
-    - Python and Django versions
-    - `django-ninja-aio-crud` version (`pip show django-ninja-aio-crud`)
-    - Steps to reproduce
-    - Expected vs actual behavior
-    - Full traceback or logs (if any)
-    - Minimal code example that reproduces the issue
+```text
+ninja_aio/            # Main package
+├── api.py            # NinjaAIO
+├── auth.py           # JWT authentication
+├── admin.py          # Django admin integration
+├── docs.py           # Docs branding
+├── views/            # APIView, APIViewSet, mixins
+├── models/           # ModelSerializer, Serializer, SchemaConfig
+├── schemas/          # Schema generation and filter schemas
+├── decorators/       # View and operation decorators
+├── factory/          # Operation factory
+├── helpers/          # Query and API helpers
+└── mcp/              # MCP server
 
----
+tests/                # Test suite
+├── test_settings.py  # Django settings (SQLite in-memory)
+├── test_app/         # Test app with models, serializers and views
+├── core/             # Core tests
+├── views/            # View tests
+├── models/           # Model tests
+├── v3/               # Sync and async API tests
+├── performance/      # Performance benchmarks
+└── comparison/       # Framework comparison benchmarks
 
-## :material-file-tree: Project Structure
-
+docs/                 # Documentation
 ```
-ninja_aio/           # Main source package
-├── api.py           # NinjaAIO class
-├── auth.py          # JWT authentication
-├── views/           # APIView, APIViewSet, mixins
-├── models/          # ModelSerializer, Serializer, ModelUtil
-├── schemas/         # Pydantic schema generation, filters
-├── decorators/      # View and operation decorators
-├── factory/         # Operation factory
-└── helpers/         # Query and API helpers
 
-tests/               # Test suite
-├── test_settings.py # Django settings (SQLite in-memory)
-├── test_app/        # Test Django app with models
-├── core/            # Core tests
-├── generics/        # Generic test utilities
-├── views/           # View tests
-├── models/          # Model tests
-├── performance/     # Performance benchmarks
-└── comparison/      # Framework comparison benchmarks
+## Support the project
 
-docs/                # MkDocs documentation
-```
+- Star the project on [GitHub](https://github.com/caspel26/django-ninja-aio-crud).
+- Leave a tip on [Buy Me a Coffee](https://buymeacoffee.com/caspel26).
 
----
+## See also
 
-## :material-star: Support the Project
-
-If this project helps you, please give it a GitHub star to show support.
-
-### :material-coffee: Buy Me a Coffee
-
-Optional tip: [Buy Me a Coffee](https://buymeacoffee.com/caspel26).
-
----
-
-Thank you for helping improve Django Ninja AIO.
+- [Performance](performance.md)
+- [Framework comparison](comparison.md)
+- [Troubleshooting](troubleshooting.md)

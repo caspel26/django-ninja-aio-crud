@@ -40,7 +40,7 @@ class SearchViewSetMixinTestCase(TestCase):
 
     async def test_search_by_name(self):
         """Search matches records by name field."""
-        view = self.viewset.list_view()
+        view = self.viewset.alist_view()
         filters = self.viewset.filters_schema(search="Flask")
         result = await view(self.request.get(), filters=filters)
 
@@ -49,7 +49,7 @@ class SearchViewSetMixinTestCase(TestCase):
 
     async def test_search_by_description(self):
         """Search matches records by description field."""
-        view = self.viewset.list_view()
+        view = self.viewset.alist_view()
         filters = self.viewset.filters_schema(search="async")
         result = await view(self.request.get(), filters=filters)
 
@@ -58,7 +58,7 @@ class SearchViewSetMixinTestCase(TestCase):
 
     async def test_search_across_fields(self):
         """Search matches across both name and description with OR."""
-        view = self.viewset.list_view()
+        view = self.viewset.alist_view()
         # "Django" in name: "Django Tutorial", "REST API Design" has "Django" in desc
         # Plus "Async Programming" has "Django" in desc
         filters = self.viewset.filters_schema(search="Django")
@@ -71,7 +71,7 @@ class SearchViewSetMixinTestCase(TestCase):
 
     async def test_search_case_insensitive(self):
         """Search is case-insensitive."""
-        view = self.viewset.list_view()
+        view = self.viewset.alist_view()
         filters = self.viewset.filters_schema(search="django")
         result = await view(self.request.get(), filters=filters)
 
@@ -80,7 +80,7 @@ class SearchViewSetMixinTestCase(TestCase):
 
     async def test_search_no_match(self):
         """Search with no matches returns empty list."""
-        view = self.viewset.list_view()
+        view = self.viewset.alist_view()
         filters = self.viewset.filters_schema(search="nonexistent_xyz")
         result = await view(self.request.get(), filters=filters)
 
@@ -89,7 +89,7 @@ class SearchViewSetMixinTestCase(TestCase):
 
     async def test_search_empty_string(self):
         """Search with empty string returns all records (no filtering)."""
-        view = self.viewset.list_view()
+        view = self.viewset.alist_view()
         filters = self.viewset.filters_schema(search="")
         result = await view(self.request.get(), filters=filters)
 
@@ -98,7 +98,7 @@ class SearchViewSetMixinTestCase(TestCase):
 
     async def test_search_none(self):
         """Search with None returns all records (no filtering)."""
-        view = self.viewset.list_view()
+        view = self.viewset.alist_view()
         filters = self.viewset.filters_schema(search=None)
         result = await view(self.request.get(), filters=filters)
 
@@ -107,7 +107,7 @@ class SearchViewSetMixinTestCase(TestCase):
 
     async def test_no_search_returns_all(self):
         """List without search param returns all records."""
-        view = self.viewset.list_view()
+        view = self.viewset.alist_view()
         result = await view(self.request.get())
 
         self.assertEqual(result.status_code, 200)
@@ -140,7 +140,7 @@ class SearchWithFiltersTestCase(TestCase):
 
     async def test_search_and_filter_combined(self):
         """Search and icontains filter work together."""
-        view = self.viewset.list_view()
+        view = self.viewset.alist_view()
         # search="REST" matches 1st and 3rd, name filter "Django" narrows to 1st
         filters = self.viewset.filters_schema(search="REST", name="Django")
         result = await view(self.request.get(), filters=filters)

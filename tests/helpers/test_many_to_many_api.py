@@ -2,7 +2,10 @@ import uuid
 
 from django.test import TestCase, tag
 from asgiref.sync import async_to_sync
+from ninja.constants import NOT_SET
+from ninja.testing import TestAsyncClient, TestClient
 from ninja_aio import NinjaAIO
+from ninja_aio.exceptions import ForbiddenError
 from ninja_aio.helpers.api import ManyToManyAPI
 from ninja_aio.models import ModelUtil, serializers
 from ninja_aio.schemas import M2MRelationSchema
@@ -96,7 +99,7 @@ class Tests:
         @classmethod
         def _create_base_object(cls):
             """Create base object. Override for different creation methods."""
-            create_view = cls.viewset.create_view()
+            create_view = cls.viewset.acreate_view()
             result = async_to_sync(create_view)(
                 cls.request.post(),
                 cls.viewset.schema_in(name="base", description="base"),
@@ -494,7 +497,7 @@ class TestM2MWithQueryHandlerViewSet(GenericAPIViewSet):
 
 
 class TestM2MWithAsyncQueryParamsHandlerViewSet(GenericAPIViewSet):
-    """ViewSet with an async query_params_handler for M2M relations."""
+    """ViewSet with an async aquery_params_handler for M2M relations."""
 
     model = models.TestModelSerializerManyToMany
     m2m_relations = [
@@ -507,7 +510,7 @@ class TestM2MWithAsyncQueryParamsHandlerViewSet(GenericAPIViewSet):
     ]
 
     async def test_model_serializers_query_params_handler(self, queryset, filters):
-        """Async version of query_params_handler."""
+        """Async version of aquery_params_handler."""
         name_filter = filters.get("name")
         if name_filter:
             queryset = queryset.filter(name=name_filter)
@@ -516,7 +519,7 @@ class TestM2MWithAsyncQueryParamsHandlerViewSet(GenericAPIViewSet):
 
 @tag("m2m", "coverage", "query_handler")
 class M2MQueryHandlerTestCase(TestCase):
-    """Cover helpers/api.py:295 — _check_m2m_objs with query_handler."""
+    """Cover helpers/api.py:295 — _acheck_m2m_objs with query_handler."""
 
     @classmethod
     def setUpTestData(cls):
@@ -527,7 +530,7 @@ class M2MQueryHandlerTestCase(TestCase):
         cls.pk_att = cls.viewset.model_util.model_pk_name
 
         # Create base object
-        create_view = cls.viewset.create_view()
+        create_view = cls.viewset.acreate_view()
         result = async_to_sync(create_view)(
             cls.request.post(),
             cls.viewset.schema_in(name="base", description="base"),
@@ -578,7 +581,7 @@ class M2MNotFoundTestCase(TestCase):
         cls.request = Request(cls.viewset.path)
         cls.pk_att = cls.viewset.model_util.model_pk_name
 
-        create_view = cls.viewset.create_view()
+        create_view = cls.viewset.acreate_view()
         result = async_to_sync(create_view)(
             cls.request.post(),
             cls.viewset.schema_in(name="base", description="base"),
@@ -610,7 +613,7 @@ class M2MNotFoundTestCase(TestCase):
 
 @tag("m2m", "coverage", "async_query_params")
 class M2MAsyncQueryParamsHandlerTestCase(TestCase):
-    """Cover helpers/api.py:402 — async query_params_handler in get_related."""
+    """Cover helpers/api.py:402 — async aquery_params_handler in get_related."""
 
     @classmethod
     def setUpTestData(cls):
@@ -620,7 +623,7 @@ class M2MAsyncQueryParamsHandlerTestCase(TestCase):
         cls.request = Request(cls.viewset.path)
         cls.pk_att = cls.viewset.model_util.model_pk_name
 
-        create_view = cls.viewset.create_view()
+        create_view = cls.viewset.acreate_view()
         result = async_to_sync(create_view)(
             cls.request.post(),
             cls.viewset.schema_in(name="base", description="base"),
@@ -647,7 +650,7 @@ class M2MAsyncQueryParamsHandlerTestCase(TestCase):
         return action_schema(add=add or [], remove=remove or [])
 
     async def test_get_related_with_async_filter(self):
-        """get_related should use async query_params_handler when available."""
+        """get_related should use async aquery_params_handler when available."""
         # Add related objects first
         data = self._manage_data(add=self.related_pks)
         await self.manage_view(self.request.post(), self.path_schema, data)
@@ -720,7 +723,7 @@ class NormalizePkTestCase(TestCase):
 @tag("m2m", "uuid", "regression")
 class M2MUUIDPkRegressionTestCase(TestCase):
     """
-    Regression: _check_m2m_objs must match dict keys built from obj.pk (UUID)
+    Regression: _acheck_m2m_objs must match dict keys built from obj.pk (UUID)
     against request payload pks (str), which JSON always delivers as strings.
     """
 
@@ -737,7 +740,7 @@ class M2MUUIDPkRegressionTestCase(TestCase):
     async def test_add_with_string_uuid_pks_resolves(self):
         """Batched path: string UUIDs from JSON must resolve to objects."""
         str_pks = [str(t.pk) for t in self.tags[:2]]
-        errors, details, objs = await self.viewset.m2m_api._check_m2m_objs(
+        errors, details, objs = await self.viewset.m2m_api._acheck_m2m_objs(
             self.request.post(),
             str_pks,
             models.TagUUID,
@@ -753,7 +756,7 @@ class M2MUUIDPkRegressionTestCase(TestCase):
         """Remove path: already-related UUIDs passed as strings must match."""
         await self.article.tags_uuid.aadd(*self.tags[:2])
         str_pks = [str(self.tags[0].pk)]
-        errors, details, objs = await self.viewset.m2m_api._check_m2m_objs(
+        errors, details, objs = await self.viewset.m2m_api._acheck_m2m_objs(
             self.request.post(),
             str_pks,
             models.TagUUID,
@@ -767,7 +770,7 @@ class M2MUUIDPkRegressionTestCase(TestCase):
 
     async def test_nonexistent_uuid_string_yields_not_found(self):
         bogus = str(uuid.uuid4())
-        errors, details, objs = await self.viewset.m2m_api._check_m2m_objs(
+        errors, details, objs = await self.viewset.m2m_api._acheck_m2m_objs(
             self.request.post(),
             [bogus],
             models.TagUUID,
@@ -796,7 +799,7 @@ class M2MUUIDPkQueryHandlerRegressionTestCase(TestCase):
 
     async def test_add_with_string_uuid_pks_resolves_via_handler(self):
         str_pks = [str(t.pk) for t in self.tags]
-        errors, details, objs = await self.viewset.m2m_api._check_m2m_objs(
+        errors, details, objs = await self.viewset.m2m_api._acheck_m2m_objs(
             self.request.post(),
             str_pks,
             models.TagUUID,
@@ -806,3 +809,142 @@ class M2MUUIDPkQueryHandlerRegressionTestCase(TestCase):
         )
         self.assertEqual(errors, [])
         self.assertEqual({o.pk for o in objs}, {t.pk for t in self.tags})
+
+
+def _deny(request):
+    return None
+
+
+def _allow(request):
+    return "user"
+
+
+@tag("m2m_auth")
+class M2MAuthInheritanceTests(TestCase):
+    """M2M endpoints follow the viewset auth unless configured otherwise."""
+
+    def _client(self, namespace, relation_auth=NOT_SET, **attrs):
+        relation_options = {} if relation_auth is NOT_SET else {"auth": relation_auth}
+
+        class ProtectedM2MAPI(APIViewSet):
+            model = models.TestModelSerializerManyToMany
+            execution_mode = "sync"
+            m2m_relations = [
+                M2MRelationSchema(
+                    model=models.TestModelSerializerReverseManyToMany,
+                    related_name="test_model_serializers",
+                    path="links",
+                    **relation_options,
+                )
+            ]
+
+        for name, value in attrs.items():
+            setattr(ProtectedM2MAPI, name, value)
+        api = NinjaAIO(urls_namespace=namespace)
+        ProtectedM2MAPI(api=api, prefix="protected").add_views_to_route()
+        return TestClient(api)
+
+    def setUp(self):
+        self.obj = models.TestModelSerializerManyToMany.objects.create(
+            name="n", description="d"
+        )
+
+    def _statuses(self, client):
+        get = client.get(f"/protected/{self.obj.pk}/links").status_code
+        post = client.post(
+            f"/protected/{self.obj.pk}/links/", json={"add": [], "remove": []}
+        ).status_code
+        return get, post
+
+    def test_viewset_auth_protects_m2m_endpoints(self):
+        client = self._client("m2m_auth_viewset", auth=[_deny])
+        self.assertEqual(self._statuses(client), (401, 401))
+
+    def test_m2m_endpoints_follow_the_verb_auth(self):
+        client = self._client(
+            "m2m_auth_verbs", auth=[_deny], get_auth=None, patch_auth=[_allow]
+        )
+        self.assertEqual(self._statuses(client), (200, 200))
+
+    def test_m2m_auth_overrides_the_viewset_auth(self):
+        client = self._client("m2m_auth_setting", auth=[_deny], m2m_auth=[_allow])
+        self.assertEqual(self._statuses(client), (200, 200))
+
+    def test_relation_auth_none_makes_the_relation_public(self):
+        client = self._client(
+            "m2m_auth_public", relation_auth=None, auth=[_deny], m2m_auth=[_deny]
+        )
+        self.assertEqual(self._statuses(client), (200, 200))
+
+
+def _object_checked_m2m_api():
+    """The same guarded relation in both execution modes."""
+
+    class Guarded:
+        seen = []
+
+        def on_before_object_operation(self, request, operation, obj):
+            Guarded.seen.append(operation)
+            if obj.name == "locked":
+                raise ForbiddenError()
+
+        async def aon_before_object_operation(self, request, operation, obj):
+            self.on_before_object_operation(request, operation, obj)
+
+    relation = {
+        "model": models.TestModelSerializerReverseManyToMany,
+        "related_name": "test_model_serializers",
+        "path": "links",
+    }
+
+    class SyncGuarded(Guarded, APIViewSet):
+        model = models.TestModelSerializerManyToMany
+        execution_mode = "sync"
+        m2m_relations = [M2MRelationSchema(**relation)]
+
+    class AsyncGuarded(Guarded, APIViewSet):
+        model = models.TestModelSerializerManyToMany
+        m2m_relations = [M2MRelationSchema(**relation)]
+
+    api = NinjaAIO(urls_namespace="m2m_object_checks")
+    SyncGuarded(api=api, prefix="sync").add_views_to_route()
+    AsyncGuarded(api=api, prefix="async").add_views_to_route()
+    return api, Guarded
+
+
+@tag("m2m_auth", "regression")
+class M2MObjectChecksTests(TestCase):
+    """Relation endpoints load the parent through the viewset object hooks."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.api, cls.guard = _object_checked_m2m_api()
+        cls.open = models.TestModelSerializerManyToMany.objects.create(name="open", description="d")
+        cls.locked = models.TestModelSerializerManyToMany.objects.create(name="locked", description="d")
+
+    def setUp(self):
+        self.seen = self.guard.seen
+        self.seen.clear()
+        self.sync_client = TestClient(self.api)
+        self.async_client = TestAsyncClient(self.api)
+
+    def test_sync_relation_endpoints_run_object_hooks(self):
+        body = {"add": [], "remove": []}
+        self.assertEqual(self.sync_client.get(f"/sync/{self.open.pk}/links").status_code, 200)
+        self.assertEqual(self.sync_client.post(f"/sync/{self.open.pk}/links/", json=body).status_code, 200)
+        self.assertEqual(self.seen, ["retrieve", "update"])
+        self.assertEqual(self.sync_client.get(f"/sync/{self.locked.pk}/links").status_code, 403)
+        self.assertEqual(self.sync_client.post(f"/sync/{self.locked.pk}/links/", json=body).status_code, 403)
+        self.assertEqual(self.sync_client.get("/sync/999999/links").status_code, 404)
+
+    async def test_async_relation_endpoints_run_object_hooks(self):
+        body = {"add": [], "remove": []}
+        statuses = [
+            (await self.async_client.get(f"/async/{self.open.pk}/links")).status_code,
+            (await self.async_client.post(f"/async/{self.open.pk}/links/", json=body)).status_code,
+            (await self.async_client.get(f"/async/{self.locked.pk}/links")).status_code,
+            (await self.async_client.post(f"/async/{self.locked.pk}/links/", json=body)).status_code,
+            (await self.async_client.get("/async/999999/links")).status_code,
+        ]
+        self.assertEqual(statuses, [200, 200, 403, 403, 404])
+        self.assertEqual(self.seen, ["retrieve", "update", "retrieve", "update"])

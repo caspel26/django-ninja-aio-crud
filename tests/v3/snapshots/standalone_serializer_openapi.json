@@ -1,0 +1,52 @@
+{
+  "paths": {
+    "/api/items": {
+      "get": {
+        "operationId": "ninja_aio_views_api_list_testmodelforeignkeys",
+        "responses": ["200", "400", "401", "403", "404"]
+      }
+    },
+    "/api/items/": {
+      "post": {
+        "operationId": "ninja_aio_views_api_create_testmodelforeignkey",
+        "responses": ["201", "400", "401", "403", "404"]
+      }
+    },
+    "/api/items/sum": {
+      "post": {
+        "operationId": "tests_generics_views_sum",
+        "responses": ["200"]
+      }
+    },
+    "/api/items/{id}": {
+      "get": {
+        "operationId": "ninja_aio_views_api_retrieve_testmodelforeignkey",
+        "responses": ["200", "400", "401", "403", "404"]
+      }
+    },
+    "/api/items/{id}/": {
+      "delete": {
+        "operationId": "ninja_aio_views_api_delete_testmodelforeignkey",
+        "responses": ["204", "400", "401", "403", "404"]
+      },
+      "patch": {
+        "operationId": "ninja_aio_views_api_update_testmodelforeignkey",
+        "responses": ["200", "400", "401", "403", "404"]
+      }
+    }
+  },
+  "schemas": [
+    "GenericMessageSchema",
+    "Input",
+    "PaginatedtestmodelforeignkeySchemaOut",
+    "SumSchemaIn",
+    "SumSchemaOut",
+    "TestModelReverseForeignKey",
+    "testmodelforeignkeyDetailSchemaOut",
+    "testmodelforeignkeyFiltersSchema",
+    "testmodelforeignkeyPathSchema",
+    "testmodelforeignkeySchemaIn",
+    "testmodelforeignkeySchemaOut",
+    "testmodelforeignkeySchemaPatch"
+  ]
+}

@@ -1,6 +1,7 @@
 from django.test import TestCase, tag
 
-from ninja_aio import NinjaAIO, Branding
+from ninja_aio import NinjaAIO
+from ninja_aio.docs import Branding
 from ninja_aio.docs import BrandedSwagger
 
 
@@ -128,7 +129,7 @@ class BrandedSwaggerRenderTestCase(TestCase):
 
     def test_render_page_with_django_template_engine(self):
         """render_page uses Django template engine when template is found."""
-        from django.test import RequestFactory, override_settings
+        from django.test import RequestFactory
         from unittest.mock import patch, MagicMock
 
         api = NinjaAIO(

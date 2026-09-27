@@ -42,7 +42,7 @@ class OrderingTestCase(TestCase):
         """List view applies default_ordering when called without any query params."""
         obj_a, obj_b, obj_c = await self._create_objects()
 
-        view = self.viewset.list_view()
+        view = self.viewset.alist_view()
         result = await view(self.get_request)
 
         # default_ordering is "-id", so highest id first
@@ -209,7 +209,7 @@ class OrderingWithFiltersTestCase(TestCase):
 
         # Filter by "test" then order by -name
         qs = self.model.objects.all()
-        qs = await self.viewset.query_params_handler(qs, {"name": "test"})
+        qs = await self.viewset.aquery_params_handler(qs, {"name": "test"})
         result = self.viewset._apply_ordering(qs, "-name")
 
         items = [obj async for obj in result]

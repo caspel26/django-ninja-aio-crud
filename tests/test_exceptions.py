@@ -1,11 +1,16 @@
 from django.test import TestCase, tag
+from django.db import IntegrityError
 from django.http import HttpRequest
-from pydantic import BaseModel, Field, ValidationError
+import json
+
+from pydantic import BaseModel, Field, ValidationError, field_validator
 from ninja_aio.api import NinjaAIO
 from ninja_aio.exceptions import (
+    AuthError,
     BaseException,
     SerializeError,
     NotFoundError,
+    OperationValidationError,
     PydanticValidationError,
     parse_jose_error,
     set_api_exception_handlers,
@@ -18,8 +23,40 @@ class DummyModel(BaseModel):
     a: int = Field(gt=0)
 
 
+class DummyNestedModel(BaseModel):
+    items: list[DummyModel]
+
+
 @tag("exceptions_base")
 class BaseExceptionTestCase(TestCase):
+    def test_subclass_error_default_is_used_without_arguments(self):
+        class PaymentRequired(BaseException):
+            error = "payment required"
+            status_code = 402
+
+        exc = PaymentRequired()
+        self.assertEqual(exc.error, {"error": "payment required"})
+        self.assertEqual(exc.status_code, 402)
+
+    def test_auth_error_defaults_to_401(self):
+        self.assertEqual(AuthError("bad token").status_code, 401)
+
+    def test_operation_validation_error_details_are_json_serializable(self):
+        class Validated(BaseModel):
+            name: str
+
+            @field_validator("name")
+            @classmethod
+            def reject(cls, value):
+                raise ValueError("Name is not allowed")
+
+        try:
+            Validated(name="x")
+        except ValidationError as exc:
+            error = OperationValidationError(exc)
+        json.dumps(error.error)
+        self.assertEqual(error.field_errors["name"], ["Value error, Name is not allowed"])
+
     def test_string_error_conversion(self):
         exc = BaseException("bad", 418, details="info")
         self.assertEqual(exc.error["error"], "bad")
@@ -27,10 +64,12 @@ class BaseExceptionTestCase(TestCase):
         self.assertEqual(exc.status_code, 418)
 
     def test_dict_error_preserved_and_details_merge(self):
-        exc = BaseException({"foo": "bar"}, details="more")
+        payload = {"foo": "bar"}
+        exc = BaseException(payload, details="more")
         self.assertEqual(exc.error["foo"], "bar")
         self.assertEqual(exc.error["details"], "more")
         self.assertEqual(exc.status_code, 400)
+        self.assertEqual(payload, {"foo": "bar"})
 
     def test_get_error(self):
         exc = BaseException("x")
@@ -108,6 +147,18 @@ class SubclassesTestCase(TestCase):
             self.assertEqual(p_exc.error["error"], "Validation Error")
             self.assertTrue(p_exc.error["details"])  # details list present
 
+    def test_operation_validation_error_retains_nested_paths_and_http_body(self):
+        with self.assertRaises(ValidationError) as raised:
+            DummyNestedModel.model_validate({"items": [{"a": 0}]})
+
+        exc = OperationValidationError(raised.exception)
+        self.assertEqual(exc.code, "validation_error")
+        self.assertEqual(exc.status, 400)
+        self.assertEqual(exc.message, "Validation Error")
+        self.assertIn("items.0.a", exc.field_errors)
+        self.assertEqual(exc.error["error"], "Validation Error")
+        self.assertEqual(exc.error["details"], raised.exception.errors(include_input=False))
+
 
 @tag("exceptions_parse_jose")
 class JoseParseTestCase(TestCase):
@@ -145,6 +196,15 @@ class ExceptionHandlersTestCase(TestCase):
         response = api._exception_handlers[BaseException](request, exc)
         self.assertEqual(response.status_code, 499)
         self.assertIn(b"boom", response.content)
+
+    def test_integrity_error_returns_409_without_database_details(self):
+        api = NinjaAIO()
+        set_api_exception_handlers(api)
+        exc = IntegrityError("UNIQUE constraint failed: secret_table.secret_column")
+        response = api._exception_handlers[IntegrityError](HttpRequest(), exc)
+        self.assertEqual(response.status_code, 409)
+        self.assertIn(b"conflict", response.content)
+        self.assertNotIn(b"secret", response.content)
 
     def test_pydantic_error_handler(self):
         api = NinjaAIO()

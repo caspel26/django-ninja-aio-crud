@@ -20,7 +20,7 @@ Usage::
 """
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -28,7 +28,7 @@ from django.http import HttpRequest, HttpResponse
 from django.template import Template, Context
 from django.template.loader import get_template
 from django.template.exceptions import TemplateDoesNotExist
-from ninja.openapi.docs import DocsBase, Swagger, _csrf_needed
+from ninja.openapi.docs import Swagger, _csrf_needed
 
 TEMPLATE_PATH = str(Path(__file__).parent / "templates" / "ninja_aio")
 

@@ -1,11 +1,14 @@
 import datetime
+import inspect
 from unittest import mock
 
-from django.db.models import Q
+from django.core.exceptions import ImproperlyConfigured
 from django.test import tag, TestCase
 from django.utils import timezone
+from ninja import Schema
 
 from ninja_aio.models import ModelUtil
+from ninja_aio.exceptions import SerializeError
 from ninja_aio.models import serializers as ninja_serializers
 from ninja_aio.schemas import (
     MatchCaseFilterSchema,
@@ -13,11 +16,362 @@ from ninja_aio.schemas import (
     BooleanMatchFilterSchema,
 )
 from ninja_aio.views import mixins
+from ninja_aio.views.mixins import (
+    DateFilterViewSetMixin,
+    GreaterDateFilterViewSetMixin,
+    LessDateFilterViewSetMixin,
+)
 from tests.generics.views import Tests
 from tests.test_app import schema, models, views, serializers
 from ninja_aio import NinjaAIO
 from ninja_aio.views import APIViewSet
 from ninja_aio.decorators import api_get, api_post
+from tests.generics.request import Request
+
+
+class OptionalUpdateSchema(Schema):
+    description: str | None = None
+
+
+class ExecutionModeTests(TestCase):
+    def test_sync_create_registers_a_native_sync_handler(self):
+        class SyncViewSet(views.TestModelSerializerAPI):
+            execution_mode = "sync"
+
+        viewset = SyncViewSet()
+        handler = viewset.create_view()
+        self.assertFalse(inspect.iscoroutinefunction(handler))
+
+    def test_default_async_route_uses_separate_factory(self):
+        class AsyncViewSet(views.TestModelSerializerAPI):
+            def acreate_view(self):
+                self.async_factory_called = True
+                return super().acreate_view()
+
+        viewset = AsyncViewSet()
+        viewset._add_views()
+        self.assertTrue(viewset.async_factory_called)
+        for operation in ("create", "list", "retrieve", "update", "delete"):
+            with self.subTest(operation=operation):
+                self.assertTrue(inspect.iscoroutinefunction(viewset._operations[operation]))
+
+    async def test_async_create_uses_serializer_facade(self):
+        viewset = views.TestModelSerializerAPI()
+        with mock.patch.object(
+            viewset.model_util,
+            "create_s",
+            side_effect=AssertionError("legacy create_s must not run"),
+        ):
+            result = await viewset.acreate_view()(
+                Request("test-model-serializers").post(),
+                viewset.schema_in(name="facade", description="async"),
+            )
+        self.assertEqual(result.status_code, 201)
+        self.assertEqual(result.value["name"], "facade")
+
+    def test_sync_create_handler_can_be_overridden(self):
+        class SyncViewSet(views.TestModelSerializerAPI):
+            execution_mode = "sync"
+
+            def create(self, request, data):
+                self.create_called = True
+                return super().create(request, data)
+
+        viewset = SyncViewSet()
+        result = viewset.create_view()(
+            Request("test-model-serializers").post(),
+            viewset.schema_in(name="override", description="sync"),
+        )
+        self.assertTrue(viewset.create_called)
+        self.assertEqual(result.status_code, 201)
+
+    async def test_async_create_handler_can_be_overridden(self):
+        class AsyncViewSet(views.TestModelSerializerAPI):
+            async def acreate(self, request, data):
+                self.create_called = True
+                return await super().acreate(request, data)
+
+        viewset = AsyncViewSet()
+        result = await viewset.acreate_view()(
+            Request("test-model-serializers").post(),
+            viewset.schema_in(name="override", description="async"),
+        )
+        self.assertTrue(viewset.create_called)
+        self.assertEqual(result.status_code, 201)
+
+    def test_sync_retrieve_handler_can_be_overridden(self):
+        class SyncViewSet(views.TestModelSerializerAPI):
+            execution_mode = "sync"
+
+            def retrieve(self, request, pk):
+                self.retrieve_called = True
+                return super().retrieve(request, pk)
+
+        viewset = SyncViewSet()
+        obj = models.TestModelSerializer.objects.create(name="sync", description="before")
+        result = viewset.retrieve_view()(
+            Request("test-model-serializers").get(), viewset.path_schema(id=obj.pk)
+        )
+        self.assertTrue(viewset.retrieve_called)
+        self.assertEqual(result.value["name"], "sync")
+
+    async def test_async_retrieve_handler_can_be_overridden(self):
+        class AsyncViewSet(views.TestModelSerializerAPI):
+            async def aretrieve(self, request, pk):
+                self.retrieve_called = True
+                return await super().aretrieve(request, pk)
+
+        viewset = AsyncViewSet()
+        obj = await models.TestModelSerializer.objects.acreate(name="async", description="before")
+        result = await viewset.aretrieve_view()(
+            Request("test-model-serializers").get(), viewset.path_schema(id=obj.pk)
+        )
+        self.assertTrue(viewset.retrieve_called)
+        self.assertEqual(result.value["name"], "async")
+
+    def test_sync_create_persists_and_serializes(self):
+        class SyncViewSet(views.TestModelSerializerAPI):
+            execution_mode = "sync"
+
+        viewset = SyncViewSet()
+        result = viewset.create_view()(
+            Request("test-model-serializers").post(),
+            viewset.schema_in(name="sync-created", description="created"),
+        )
+        self.assertEqual(result.status_code, 201)
+        self.assertEqual(result.value["name"], "sync-created")
+        self.assertTrue(models.TestModelSerializer.objects.filter(name="sync-created").exists())
+
+    def test_async_only_hook_is_rejected_for_sync_mode_at_startup(self):
+        class SyncViewSet(views.TestModelSerializerAPI):
+            execution_mode = "sync"
+
+            async def aon_before_operation(self, request, operation):
+                raise AssertionError("async hook must not run in sync mode")
+
+        with self.assertRaisesRegex(ImproperlyConfigured, "on_before_operation"):
+            SyncViewSet()
+
+    def test_sync_crud_endpoints_preserve_http_results(self):
+        class SyncViewSet(views.TestModelSerializerAPI):
+            execution_mode = "sync"
+
+        viewset = SyncViewSet()
+        viewset._add_views()
+        for operation in ("create", "list", "retrieve", "update", "delete"):
+            with self.subTest(operation=operation):
+                self.assertFalse(inspect.iscoroutinefunction(viewset._operations[operation]))
+        obj = models.TestModelSerializer.objects.create(name="sync", description="before")
+        request = Request("test-model-serializers")
+        path = viewset.path_schema(id=obj.pk)
+
+        retrieve = viewset.retrieve_view()
+        update = viewset.update_view()
+        delete = viewset.delete_view()
+        for handler in (retrieve, update, delete):
+            self.assertFalse(inspect.iscoroutinefunction(handler))
+
+        self.assertEqual(retrieve(request.get(), path).value["name"], "sync")
+        updated = update(
+            request.patch(), viewset.schema_update(description="after"), path
+        )
+        self.assertEqual(updated.value["description"], "after")
+        self.assertEqual(delete(request.delete(), path).status_code, 204)
+        self.assertFalse(models.TestModelSerializer.objects.filter(pk=obj.pk).exists())
+
+    def test_sync_plain_model_update(self):
+        class SyncViewSet(views.TestModelAPI):
+            execution_mode = "sync"
+
+        viewset = SyncViewSet()
+        obj = models.TestModel.objects.create(name="plain", description="before")
+        result = viewset.update_view()(
+            Request("test-models").patch(),
+            viewset.schema_update(description="after"),
+            viewset.path_schema(id=obj.pk),
+        )
+        self.assertEqual(result.value["description"], "after")
+        obj.refresh_from_db()
+        self.assertEqual(obj.description, "after")
+
+    def test_sync_plain_model_create_list_delete(self):
+        class SyncViewSet(views.TestModelAPI):
+            execution_mode = "sync"
+
+        viewset = SyncViewSet()
+        request = Request("test-models")
+        created = viewset.create_view()(
+            request.post(), viewset.schema_in(name="plain", description="sync")
+        )
+        self.assertEqual(created.status_code, 201)
+        pk = created.value["id"]
+        listed = viewset.list_view()(request.get())
+        self.assertIn(pk, [item["id"] for item in listed.value["items"]])
+        deleted = viewset.delete_view()(request.delete(), viewset.path_schema(id=pk))
+        self.assertEqual(deleted.status_code, 204)
+        self.assertFalse(models.TestModel.objects.filter(pk=pk).exists())
+
+    def test_sync_delete_returns_deleted_object_with_schema_delete_out(self):
+        class SyncViewSet(views.TestModelDeleteOutAPI):
+            execution_mode = "sync"
+
+        viewset = SyncViewSet()
+        obj = models.TestModel.objects.create(name="gone", description="d")
+        result = viewset.delete_view()(
+            Request("test-models").delete(), viewset.path_schema(id=obj.pk)
+        )
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(result.value, {"id": obj.pk, "name": "gone"})
+        self.assertFalse(models.TestModel.objects.filter(pk=obj.pk).exists())
+
+    def test_sync_retrieve_preloads_schema_relations(self):
+        class SyncViewSet(views.TestModelForeignKeyAPI):
+            execution_mode = "sync"
+
+        viewset = SyncViewSet()
+        parent = models.TestModelReverseForeignKey.objects.create(
+            name="parent", description="p"
+        )
+        child = models.TestModelForeignKey.objects.create(
+            name="child", description="c", test_model=parent
+        )
+        result = viewset.retrieve_view()(
+            Request("test-model-foreign-keys").get(), viewset.path_schema(id=child.pk)
+        )
+        self.assertEqual(result.value["test_model"]["name"], "parent")
+
+    def test_sync_plain_model_update_rejects_empty_payload(self):
+        class SyncViewSet(views.TestModelAPI):
+            execution_mode = "sync"
+            require_update_fields = True
+            schema_update = OptionalUpdateSchema
+
+        viewset = SyncViewSet()
+        obj = models.TestModel.objects.create(name="plain", description="before")
+        with self.assertRaisesRegex(SerializeError, "No fields provided for update"):
+            viewset.update_view()(
+                Request("test-models").patch(),
+                viewset.schema_update(),
+                viewset.path_schema(id=obj.pk),
+            )
+
+    async def test_async_plain_model_update_rejects_empty_payload(self):
+        class AsyncViewSet(views.TestModelAPI):
+            require_update_fields = True
+            schema_update = OptionalUpdateSchema
+
+        viewset = AsyncViewSet()
+        obj = await models.TestModel.objects.acreate(name="plain", description="before")
+        with self.assertRaisesRegex(SerializeError, "No fields provided for update"):
+            await viewset.aupdate_view()(
+                Request("test-models").patch(),
+                viewset.schema_update(),
+                viewset.path_schema(id=obj.pk),
+            )
+
+    def test_sync_update_handler_can_be_overridden(self):
+        class SyncViewSet(views.TestModelSerializerAPI):
+            execution_mode = "sync"
+
+            def update(self, request, data, pk):
+                self.update_called = True
+                return super().update(request, data, pk)
+
+        viewset = SyncViewSet()
+        obj = models.TestModelSerializer.objects.create(name="sync", description="before")
+        result = viewset.update_view()(
+            Request("test-model-serializers").patch(),
+            viewset.schema_update(description="after"),
+            viewset.path_schema(id=obj.pk),
+        )
+        self.assertTrue(viewset.update_called)
+        self.assertEqual(result.value["description"], "after")
+
+    async def test_async_update_handler_can_be_overridden(self):
+        class AsyncViewSet(views.TestModelSerializerAPI):
+            async def aupdate(self, request, data, pk):
+                self.update_called = True
+                return await super().aupdate(request, data, pk)
+
+        viewset = AsyncViewSet()
+        obj = await models.TestModelSerializer.objects.acreate(name="async", description="before")
+        result = await viewset.aupdate_view()(
+            Request("test-model-serializers").patch(),
+            viewset.schema_update(description="after"),
+            viewset.path_schema(id=obj.pk),
+        )
+        self.assertTrue(viewset.update_called)
+        self.assertEqual(result.value["description"], "after")
+
+    def test_sync_delete_handler_can_be_overridden(self):
+        class SyncViewSet(views.TestModelSerializerAPI):
+            execution_mode = "sync"
+
+            def delete(self, request, pk):
+                self.delete_called = True
+                return super().delete(request, pk)
+
+        viewset = SyncViewSet()
+        obj = models.TestModelSerializer.objects.create(name="sync", description="before")
+        result = viewset.delete_view()(
+            Request("test-model-serializers").delete(), viewset.path_schema(id=obj.pk)
+        )
+        self.assertTrue(viewset.delete_called)
+        self.assertEqual(result.status_code, 204)
+
+    async def test_async_delete_handler_can_be_overridden(self):
+        class AsyncViewSet(views.TestModelSerializerAPI):
+            async def adelete(self, request, pk):
+                self.delete_called = True
+                return await super().adelete(request, pk)
+
+        viewset = AsyncViewSet()
+        obj = await models.TestModelSerializer.objects.acreate(name="async", description="before")
+        result = await viewset.adelete_view()(
+            Request("test-model-serializers").delete(), viewset.path_schema(id=obj.pk)
+        )
+        self.assertTrue(viewset.delete_called)
+        self.assertEqual(result.status_code, 204)
+
+    def test_sync_list_paginates_and_serializes(self):
+        class SyncViewSet(views.TestModelSerializerAPI):
+            execution_mode = "sync"
+
+        viewset = SyncViewSet()
+        models.TestModelSerializer.objects.create(name="first", description="one")
+        models.TestModelSerializer.objects.create(name="second", description="two")
+        handler = viewset.list_view()
+        self.assertFalse(inspect.iscoroutinefunction(handler))
+        result = handler(
+            Request("test-model-serializers").get(),
+            ninja_pagination=viewset.pagination_class.Input(page=1, page_size=1),
+        )
+        self.assertEqual(result.value["count"], 2)
+        self.assertEqual(len(result.value["items"]), 1)
+
+    def test_sync_list_handler_can_be_overridden(self):
+        class SyncViewSet(views.TestModelSerializerAPI):
+            execution_mode = "sync"
+
+            def list(self, request, filters, ninja_pagination):
+                self.list_called = True
+                return super().list(request, filters, ninja_pagination)
+
+        viewset = SyncViewSet()
+        result = viewset.list_view()(Request("test-model-serializers").get())
+        self.assertTrue(viewset.list_called)
+        self.assertEqual(result.status_code, 200)
+
+    async def test_async_list_handler_can_be_overridden(self):
+        class AsyncViewSet(views.TestModelSerializerAPI):
+            async def alist(self, request, filters, ninja_pagination):
+                self.list_called = True
+                return await super().alist(request, filters, ninja_pagination)
+
+        viewset = AsyncViewSet()
+        result = await viewset.alist_view()(Request("test-model-serializers").get())
+        self.assertTrue(viewset.list_called)
+        self.assertEqual(result.status_code, 200)
 
 
 class BaseTests:
@@ -50,12 +404,12 @@ class BaseTests:
     class ModelSerializerViewSetTestCaseBase(SetUpViewSetTestCase):
         @property
         def schemas(self):
-            read_s = self.model.generate_read_s()
+            read_s = self.model.read_schema
             return (
                 read_s,
-                self.model.generate_detail_s(),
-                self.model.generate_create_s(),
-                self.model.generate_update_s(),
+                self.model.detail_schema,
+                self.model.create_schema,
+                self.model.update_schema,
                 read_s,
                 read_s,
                 None,
@@ -149,7 +503,7 @@ class ApiViewSetModelSerializerTestCase(
     async def test_query_params_icontains_mixin(self):
         await self._drop_all_objects()
         obj = await self.model.objects.acreate(**self.payload_create)
-        res = await self.viewset.query_params_handler(
+        res = await self.viewset.aquery_params_handler(
             self.model.objects.all(), {"name": f"{self.model._meta.model_name}"}
         )
         self.assertEqual(await res.acount(), 1)
@@ -161,12 +515,12 @@ class ApiViewSetModelSerializerTestCase(
         obj_inactive = await self.model.objects.acreate(
             **{**self.payload_create, "active": False}
         )
-        res_active = await self.viewset.query_params_handler(
+        res_active = await self.viewset.aquery_params_handler(
             self.model.objects.all(), {"active": True}
         )
         self.assertEqual(await res_active.acount(), 1)
         self.assertEqual((await res_active.afirst()), obj_active)
-        res_inactive = await self.viewset.query_params_handler(
+        res_inactive = await self.viewset.aquery_params_handler(
             self.model.objects.all(), {"active": False}
         )
         self.assertEqual(await res_inactive.acount(), 1)
@@ -180,12 +534,12 @@ class ApiViewSetModelSerializerTestCase(
         obj_age_30 = await self.model.objects.acreate(
             **{**self.payload_create, "age": 30}
         )
-        res_age_25 = await self.viewset.query_params_handler(
+        res_age_25 = await self.viewset.aquery_params_handler(
             self.model.objects.all(), {"age": 25}
         )
         self.assertEqual(await res_age_25.acount(), 1)
         self.assertEqual((await res_age_25.afirst()), obj_age_25)
-        res_age_30 = await self.viewset.query_params_handler(
+        res_age_30 = await self.viewset.aquery_params_handler(
             self.model.objects.all(), {"age": 30}
         )
         self.assertEqual(await res_age_30.acount(), 1)
@@ -194,7 +548,7 @@ class ApiViewSetModelSerializerTestCase(
     async def test_query_params_date_mixin(self):
         await self._drop_all_objects()
         obj_today = await self.model.objects.acreate(**self.payload_create)
-        res_today = await self.viewset.query_params_handler(
+        res_today = await self.viewset.aquery_params_handler(
             self.model.objects.all(),
             {"active_from": obj_today.active_from},
         )
@@ -224,7 +578,7 @@ class ApiViewSetModelSerializerGreaterThanDateTestCase(
         obj_future = await self.model.objects.acreate(**self.payload_create)
         obj_future.active_from = future_date
         await obj_future.asave()
-        res_greater_than_now = await self.viewset.query_params_handler(
+        res_greater_than_now = await self.viewset.aquery_params_handler(
             self.model.objects.all(), {"active_from": timezone.now()}
         )
         self.assertEqual(await res_greater_than_now.acount(), 1)
@@ -253,7 +607,7 @@ class ApiViewSetModelSerializerLessThanDateTestCase(
         obj_future = await self.model.objects.acreate(**self.payload_create)
         obj_future.active_from = future_date
         await obj_future.asave()
-        res_less_than_now = await self.viewset.query_params_handler(
+        res_less_than_now = await self.viewset.aquery_params_handler(
             self.model.objects.all(), {"active_from": timezone.now()}
         )
         self.assertEqual(await res_less_than_now.acount(), 1)
@@ -282,7 +636,7 @@ class ApiViewSetModelSerializerGreaterEqualDateTestCase(
         obj_future = await self.model.objects.acreate(**self.payload_create)
         obj_future.active_from = future_date
         await obj_future.asave()
-        res_greater_equal_now = await self.viewset.query_params_handler(
+        res_greater_equal_now = await self.viewset.aquery_params_handler(
             self.model.objects.all(), {"active_from": timezone.now()}
         )
         self.assertEqual(await res_greater_equal_now.acount(), 1)
@@ -311,11 +665,70 @@ class ApiViewSetModelSerializerLessEqualDateTestCase(
         obj_future = await self.model.objects.acreate(**self.payload_create)
         obj_future.active_from = future_date
         await obj_future.asave()
-        res_less_equal_now = await self.viewset.query_params_handler(
+        res_less_equal_now = await self.viewset.aquery_params_handler(
             self.model.objects.all(), {"active_from": timezone.now()}
         )
         self.assertEqual(await res_less_equal_now.acount(), 1)
         self.assertEqual((await res_less_equal_now.afirst()), obj_past)
+
+
+@tag("model_serializer_date_range_viewset")
+class DateFilterRangeTestCase(TestCase):
+    """Range parameters carry their own lookup; ambiguous mixin combinations are rejected."""
+
+    @classmethod
+    def setUpTestData(cls):
+        now = timezone.now()
+        cls.now = now
+        cls.past = models.TestModelSerializer.objects.create(name="past", description="d")
+        cls.middle = models.TestModelSerializer.objects.create(name="middle", description="d")
+        cls.future = models.TestModelSerializer.objects.create(name="future", description="d")
+        for obj, delta in ((cls.past, -3), (cls.middle, 0), (cls.future, 3)):
+            models.TestModelSerializer.objects.filter(pk=obj.pk).update(
+                active_from=now + datetime.timedelta(days=delta)
+            )
+
+    def _viewset(self, *bases):
+        class RangeAPI(*bases, APIViewSet):
+            model = models.TestModelSerializer
+            query_params = {
+                "active_from__gte": (datetime.datetime, None),
+                "active_from__lte": (datetime.datetime, None),
+            }
+
+        return RangeAPI(api=NinjaAIO(urls_namespace=f"date_range_{len(bases)}"))
+
+    async def test_lookup_suffixed_parameters_build_a_range(self):
+        viewset = self._viewset(DateFilterViewSetMixin)
+        qs = await viewset.aquery_params_handler(
+            models.TestModelSerializer.objects.all(),
+            {
+                "active_from__gte": self.now - datetime.timedelta(days=1),
+                "active_from__lte": self.now + datetime.timedelta(days=1),
+            },
+        )
+        self.assertEqual([obj.name async for obj in qs], ["middle"])
+
+    def test_lookup_suffix_wins_over_the_mixin_comparison(self):
+        viewset = self._viewset(GreaterDateFilterViewSetMixin)
+        qs = viewset.query_params_handler(
+            models.TestModelSerializer.objects.all(),
+            {"active_from__lte": self.now + datetime.timedelta(days=1)},
+        )
+        self.assertEqual(sorted(qs.values_list("name", flat=True)), ["middle", "past"])
+
+    def test_combining_date_mixins_with_different_comparisons_raises(self):
+        with self.assertRaises(ImproperlyConfigured):
+
+            class _Ambiguous(GreaterDateFilterViewSetMixin, LessDateFilterViewSetMixin, APIViewSet):
+                model = models.TestModelSerializer
+
+    def test_subclass_may_set_its_own_comparison(self):
+        class Custom(GreaterDateFilterViewSetMixin, LessDateFilterViewSetMixin, APIViewSet):
+            model = models.TestModelSerializer
+            _compare_attr = "__gte"
+
+        self.assertEqual(Custom._compare_attr, "__gte")
 
 
 @tag("model_serializer_foreign_key_viewset")
@@ -588,12 +1001,12 @@ class ApiViewSetModelForeignKeySerializerTestCase(
 
     @property
     def schemas(self):
-        read_s = serializers.TestModelForeignKeySerializer.generate_read_s()
+        read_s = serializers.TestModelForeignKeySerializer.read_schema
         return (
             read_s,
-            serializers.TestModelForeignKeySerializer.generate_detail_s(),
-            serializers.TestModelForeignKeySerializer.generate_create_s(),
-            serializers.TestModelForeignKeySerializer.generate_update_s(),
+            serializers.TestModelForeignKeySerializer.detail_schema,
+            serializers.TestModelForeignKeySerializer.create_schema,
+            serializers.TestModelForeignKeySerializer.update_schema,
             read_s,
             read_s,
             None,
@@ -624,7 +1037,7 @@ class ViewSetDecoratorModelSerializerTestCase(TestCase):
             pass
 
         # base path inferred from verbose_name plural
-        cls.base = f"{models.TestModelSerializer.util.verbose_name_path_resolver()}"
+        cls.base = f"{models.TestModelSerializer._util.verbose_name_path_resolver()}"
 
     def test_crud_routes_mounted(self):
         # default router + our viewset router
@@ -768,7 +1181,7 @@ class RelationFilterViewSetMixinTestCase(
             name="obj2", description="desc2", test_model_serializer=self.related_obj_2
         )
         # Filter by related_obj_1's ID
-        res = await self.viewset.query_params_handler(
+        res = await self.viewset.aquery_params_handler(
             self.model.objects.all(),
             {"test_model_serializer": self.related_obj_1.pk},
         )
@@ -776,7 +1189,7 @@ class RelationFilterViewSetMixinTestCase(
         self.assertEqual(await res.afirst(), obj_1)
 
         # Filter by related_obj_2's ID
-        res = await self.viewset.query_params_handler(
+        res = await self.viewset.aquery_params_handler(
             self.model.objects.all(),
             {"test_model_serializer": self.related_obj_2.pk},
         )
@@ -793,7 +1206,7 @@ class RelationFilterViewSetMixinTestCase(
             name="obj2", description="desc2", test_model_serializer=self.related_obj_2
         )
         # Filter by partial name "alpha" (matches related_obj_1)
-        res = await self.viewset.query_params_handler(
+        res = await self.viewset.aquery_params_handler(
             self.model.objects.all(),
             {"test_model_serializer_name": "alpha"},
         )
@@ -801,7 +1214,7 @@ class RelationFilterViewSetMixinTestCase(
         self.assertEqual(await res.afirst(), obj_1)
 
         # Filter by partial name "beta" (matches related_obj_2)
-        res = await self.viewset.query_params_handler(
+        res = await self.viewset.aquery_params_handler(
             self.model.objects.all(),
             {"test_model_serializer_name": "beta"},
         )
@@ -818,7 +1231,7 @@ class RelationFilterViewSetMixinTestCase(
             name="obj2", description="desc2", test_model_serializer=self.related_obj_2
         )
         # Filter with None should return all objects
-        res = await self.viewset.query_params_handler(
+        res = await self.viewset.aquery_params_handler(
             self.model.objects.all(),
             {"test_model_serializer": None, "test_model_serializer_name": None},
         )
@@ -834,7 +1247,7 @@ class RelationFilterViewSetMixinTestCase(
             name="obj2", description="desc2", test_model_serializer=self.related_obj_2
         )
         # Filter by both ID and name (both matching related_obj_1)
-        res = await self.viewset.query_params_handler(
+        res = await self.viewset.aquery_params_handler(
             self.model.objects.all(),
             {
                 "test_model_serializer": self.related_obj_1.pk,
@@ -851,7 +1264,7 @@ class RelationFilterViewSetMixinTestCase(
             name="obj1", description="desc1", test_model_serializer=self.related_obj_1
         )
         # Filter by non-existent ID
-        res = await self.viewset.query_params_handler(
+        res = await self.viewset.aquery_params_handler(
             self.model.objects.all(),
             {"test_model_serializer": 99999},
         )
@@ -866,7 +1279,7 @@ class RelationFilterViewSetMixinTestCase(
         await self.model.objects.acreate(
             name="obj2", description="desc2", test_model_serializer=self.related_obj_2
         )
-        res = await self.viewset.query_params_handler(
+        res = await self.viewset.aquery_params_handler(
             self.model.objects.all(),
             {},
         )
@@ -968,7 +1381,7 @@ class DetailSchemaSerializerTestCase(TestCase):
 
     def test_serializer_generates_detail_schema(self):
         """Test that Serializer generates detail schema from Meta.schema_detail."""
-        schema_detail = self.serializer_class.generate_detail_s()
+        schema_detail = self.serializer_class.detail_schema
         self.assertIsNotNone(schema_detail)
         self.assertIn("id", schema_detail.model_fields)
         self.assertIn("name", schema_detail.model_fields)
@@ -1045,7 +1458,7 @@ class MatchCaseFilterViewSetMixinTestCase(
             name="rejected_item", description="desc", status="rejected"
         )
         # Filter with is_approved=True should return only approved items
-        res = await self.viewset.query_params_handler(
+        res = await self.viewset.aquery_params_handler(
             self.model.objects.all(),
             {"is_approved": True},
         )
@@ -1065,7 +1478,7 @@ class MatchCaseFilterViewSetMixinTestCase(
             name="rejected_item", description="desc", status="rejected"
         )
         # Filter with is_approved=False should exclude approved items
-        res = await self.viewset.query_params_handler(
+        res = await self.viewset.aquery_params_handler(
             self.model.objects.all(),
             {"is_approved": False},
         )
@@ -1088,7 +1501,7 @@ class MatchCaseFilterViewSetMixinTestCase(
             name="rejected_item", description="desc", status="rejected"
         )
         # Filter with None should return all objects
-        res = await self.viewset.query_params_handler(
+        res = await self.viewset.aquery_params_handler(
             self.model.objects.all(),
             {"is_approved": None},
         )
@@ -1103,7 +1516,7 @@ class MatchCaseFilterViewSetMixinTestCase(
         await self.model.objects.acreate(
             name="pending_item", description="desc", status="pending"
         )
-        res = await self.viewset.query_params_handler(
+        res = await self.viewset.aquery_params_handler(
             self.model.objects.all(),
             {},
         )
@@ -1142,7 +1555,7 @@ class MatchCaseFilterViewSetMixinExcludeTestCase(TestCase):
             name="rejected_item", description="desc", status="rejected"
         )
         # Filter with hide_pending=True should exclude pending items
-        res = await self.viewset.query_params_handler(
+        res = await self.viewset.aquery_params_handler(
             self.model.objects.all(),
             {"hide_pending": True},
         )
@@ -1165,7 +1578,7 @@ class MatchCaseFilterViewSetMixinExcludeTestCase(TestCase):
             name="rejected_item", description="desc", status="rejected"
         )
         # Filter with hide_pending=False should include only pending items
-        res = await self.viewset.query_params_handler(
+        res = await self.viewset.aquery_params_handler(
             self.model.objects.all(),
             {"hide_pending": False},
         )
@@ -1201,7 +1614,7 @@ class MatchCaseQFilterViewSetMixinTestCase(
         await self.model.objects.acreate(
             name="pending_item", description="desc", status="pending"
         )
-        res = await self.viewset.query_params_handler(
+        res = await self.viewset.aquery_params_handler(
             self.model.objects.all(),
             {"is_approved": True},
         )
@@ -1220,7 +1633,7 @@ class MatchCaseQFilterViewSetMixinTestCase(
         obj_rejected = await self.model.objects.acreate(
             name="rejected_item", description="desc", status="rejected"
         )
-        res = await self.viewset.query_params_handler(
+        res = await self.viewset.aquery_params_handler(
             self.model.objects.all(),
             {"is_approved": False},
         )
@@ -1238,7 +1651,7 @@ class MatchCaseQFilterViewSetMixinTestCase(
         await self.model.objects.acreate(
             name="item2", description="desc", status="pending"
         )
-        res = await self.viewset.query_params_handler(
+        res = await self.viewset.aquery_params_handler(
             self.model.objects.all(),
             {},
         )
@@ -1267,7 +1680,7 @@ class MatchCaseQExcludeFilterViewSetMixinTestCase(TestCase):
         obj_rejected = await self.model.objects.acreate(
             name="rejected_item", description="desc", status="rejected"
         )
-        res = await self.viewset.query_params_handler(
+        res = await self.viewset.aquery_params_handler(
             self.model.objects.all(),
             {"hide_pending": True},
         )
@@ -1288,7 +1701,7 @@ class MatchCaseQExcludeFilterViewSetMixinTestCase(TestCase):
         await self.model.objects.acreate(
             name="rejected_item", description="desc", status="rejected"
         )
-        res = await self.viewset.query_params_handler(
+        res = await self.viewset.aquery_params_handler(
             self.model.objects.all(),
             {"hide_pending": False},
         )
@@ -1338,7 +1751,7 @@ class MatchCaseFilterInvalidFieldTestCase(TestCase):
         await self.model.objects.acreate(
             name="item2", description="desc", status="inactive"
         )
-        res = await self.viewset.query_params_handler(
+        res = await self.viewset.aquery_params_handler(
             self.model.objects.all(),
             {"has_invalid": True},
         )
@@ -1378,7 +1791,7 @@ class LimitOffsetPaginationTestCase(TestCase):
         for i in range(5):
             await self.model.objects.acreate(name=f"item_{i}", description="d")
 
-        view = self.viewset.list_view()
+        view = self.viewset.alist_view()
         result = await view(self.request.get())
         self.assertEqual(result.status_code, 200)
         self.assertEqual(result.value["count"], 5)
@@ -1408,7 +1821,7 @@ class BatchFKResolutionTestCase(TestCase):
         """Create with a nonexistent FK PK raises NotFoundError."""
         from ninja_aio.exceptions import NotFoundError
 
-        view = self.viewset.create_view()
+        view = self.viewset.acreate_view()
         data = schema.PerfArticleSchemaIn(
             title="test",
             author=self.author.pk,
@@ -1492,7 +1905,7 @@ class PerOperationOutSchemaTestCase(TestCase):
 
     async def test_create_returns_schema_create_out(self):
         await self.model.objects.all().adelete()
-        view = self.create_out_viewset.create_view()
+        view = self.create_out_viewset.acreate_view()
         data = schema.TestModelSchemaIn(**self.payload)
         result = await view(self.request.post(), data)
         self.assertEqual(result.status_code, 201)
@@ -1502,7 +1915,7 @@ class PerOperationOutSchemaTestCase(TestCase):
         self.assertNotIn("description", content)
 
     async def test_update_returns_schema_update_out(self):
-        view = self.update_out_viewset.update_view()
+        view = self.update_out_viewset.aupdate_view()
         path_schema = self.update_out_viewset.path_schema(**{self.pk_att: self.obj.pk})
         update_data = schema.TestModelSchemaPatch(description="updated_desc")
         result = await view(self.request.patch(), update_data, path_schema)
@@ -1514,7 +1927,7 @@ class PerOperationOutSchemaTestCase(TestCase):
 
     async def test_delete_returns_204_without_schema_delete_out(self):
         obj = await self.model.objects.acreate(name="to_delete_default", description="d")
-        view = self.create_out_viewset.delete_view()
+        view = self.create_out_viewset.adelete_view()
         path_schema = self.create_out_viewset.path_schema(**{self.pk_att: obj.pk})
         result = await view(self.request.delete(), path_schema)
         self.assertEqual(result.status_code, 204)
@@ -1523,7 +1936,7 @@ class PerOperationOutSchemaTestCase(TestCase):
     async def test_delete_returns_200_with_schema_delete_out(self):
         obj = await self.model.objects.acreate(name="to_delete_out", description="d")
         pk = obj.pk
-        view = self.delete_out_viewset.delete_view()
+        view = self.delete_out_viewset.adelete_view()
         path_schema = self.delete_out_viewset.path_schema(**{self.pk_att: pk})
         result = await view(self.request.delete(), path_schema)
         self.assertEqual(result.status_code, 200)
@@ -1535,15 +1948,15 @@ class PerOperationOutSchemaTestCase(TestCase):
         self.assertFalse(await self.model.objects.filter(pk=pk).aexists())
 
     async def test_delete_with_schema_out_fetches_object_only_once(self):
-        """Regression test: delete_view with schema_delete_out must fetch the
+        """Regression test: adelete_view with schema_delete_out must fetch the
         object once (to serialize it), not once for serialization and again
         inside delete_s to perform the delete."""
         obj = await self.model.objects.acreate(name="fetch_once", description="d")
         pk = obj.pk
-        view = self.delete_out_viewset.delete_view()
+        view = self.delete_out_viewset.adelete_view()
         path_schema = self.delete_out_viewset.path_schema(**{self.pk_att: pk})
 
-        original_get_object = ModelUtil.get_object
+        original_get_object = ModelUtil.aget_object
         call_count = 0
 
         async def counting_get_object(self, *args, **kwargs):
@@ -1551,7 +1964,7 @@ class PerOperationOutSchemaTestCase(TestCase):
             call_count += 1
             return await original_get_object(self, *args, **kwargs)
 
-        with mock.patch.object(ModelUtil, "get_object", counting_get_object):
+        with mock.patch.object(ModelUtil, "aget_object", counting_get_object):
             result = await view(self.request.delete(), path_schema)
 
         self.assertEqual(result.status_code, 200)

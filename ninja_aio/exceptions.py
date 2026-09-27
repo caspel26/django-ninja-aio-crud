@@ -1,10 +1,12 @@
 import logging
 import re
 from functools import partial
+from typing import Any
 from joserfc.errors import JoseError
 from ninja import NinjaAPI
 from django.http import HttpRequest, HttpResponse
 from pydantic import ValidationError
+from django.db import IntegrityError
 from django.db.models import Model
 from django.conf import settings
 
@@ -18,24 +20,37 @@ class BaseException(Exception):
 
     error: str | dict = ""
     status_code: int = 400
+    code: str = "operation_error"
 
     def __init__(
         self,
         error: str | dict = None,
         status_code: int | None = None,
-        details: str | None = None,
+        details: Any | None = None,
     ) -> None:
         """Initialize the exception with error content, optional HTTP status, and details.
 
         If `error` is a string, it is wrapped into a dict under the `error` key.
         If `error` is a dict, it is used directly. Optional `details` are merged.
         """
-        if isinstance(error, str):
-            self.error = {"error": error}
-        if isinstance(error, dict):
-            self.error = error
-        self.error |= {"details": details} if details else {}
+        if error is None:
+            error = type(self).error or None
+        self.error = (
+            {"error": error} if isinstance(error, str) else dict(error or {})
+        )
+        if details:
+            self.error["details"] = details
         self.status_code = status_code or self.status_code
+        self.message = str(self.error.get("error", next(iter(self.error.values()), "")))
+        self.field_errors: dict[str, list[str]] = {}
+        for key, value in self.error.items():
+            if key not in ("error", "details"):
+                self.field_errors[key] = [str(value)]
+        super().__init__(self.message)
+
+    @property
+    def status(self) -> int:
+        return self.status_code
 
     def get_error(self):
         """Return the error body and HTTP status code tuple for response creation."""
@@ -45,19 +60,21 @@ class BaseException(Exception):
 class SerializeError(BaseException):
     """Raised when serialization to or from request/response payloads fails."""
 
-    pass
+    code = "serialization_error"
 
 
 class AuthError(BaseException):
-    """Raised when authentication or authorization fails."""
+    """Raised when authentication fails (HTTP 401)."""
 
-    pass
+    status_code = 401
+    code = "authentication_error"
 
 
 class NotFoundError(BaseException):
     """Raised when a requested model instance cannot be found."""
 
     status_code = 404
+    code = "not_found"
     error = "not found"
     use_verbose_name = getattr(
         settings, "NINJA_AIO_NOT_FOUND_ERROR_USE_VERBOSE_NAMES", True
@@ -82,10 +99,27 @@ class NotFoundError(BaseException):
         )
 
 
+class MultipleObjectsError(BaseException):
+    """Raised when a single-object lookup matches more than one row."""
+
+    status_code = 400
+    code = "multiple_objects"
+    error = "multiple objects match the lookup"
+
+    def __init__(self, model: Model, details=None):
+        model_name = model._meta.verbose_name.replace(" ", "_")
+        super().__init__(
+            error={model_name: self.error},
+            status_code=self.status_code,
+            details=details,
+        )
+
+
 class ForbiddenError(BaseException):
     """Raised when a user lacks permission for the requested operation (HTTP 403)."""
 
     status_code = 403
+    code = "forbidden"
     error = "forbidden"
 
     def __init__(
@@ -104,9 +138,37 @@ class ForbiddenError(BaseException):
 class PydanticValidationError(BaseException):
     """Wrapper for pydantic ValidationError to normalize the API error response."""
 
+    code = "validation_error"
+
     def __init__(self, details=None):
         """Create a validation error with 400 status and provided details list."""
         super().__init__("Validation Error", 400, details)
+
+
+_JSON_SCALARS = (str, int, float, bool, type(None))
+
+
+def _json_safe_errors(exc: ValidationError) -> list[dict]:
+    """Pydantic error details with non-JSON context values (e.g. ValueError) as strings."""
+    details = exc.errors(include_input=False)
+    for detail in details:
+        if ctx := detail.get("ctx"):
+            detail["ctx"] = {
+                key: value if isinstance(value, _JSON_SCALARS) else str(value)
+                for key, value in ctx.items()
+            }
+    return details
+
+
+class OperationValidationError(PydanticValidationError):
+    """Structured validation error from a direct serializer operation."""
+
+    def __init__(self, exc: ValidationError):
+        details = _json_safe_errors(exc)
+        super().__init__(details)
+        for detail in details:
+            path = ".".join(str(part) for part in detail["loc"])
+            self.field_errors.setdefault(path, []).append(detail["msg"])
 
 
 def _default_error(
@@ -118,11 +180,12 @@ def _default_error(
 
 
 def _pydantic_validation_error(
-    request: HttpRequest, exc: PydanticValidationError, api: type[NinjaAPI]
+    request: HttpRequest, exc: ValidationError, api: type[NinjaAPI]
 ) -> HttpResponse:
     """Translate a pydantic ValidationError into a normalized API error response."""
-    logger.debug(f"Handling PydanticValidationError: {exc.errors(include_input=False)}")
-    error = PydanticValidationError(exc.errors(include_input=False))
+    details = _json_safe_errors(exc)
+    logger.debug(f"Handling pydantic ValidationError: {details}")
+    error = PydanticValidationError(details)
     return api.create_response(request, error.error, status=error.status_code)
 
 
@@ -135,6 +198,15 @@ def _jose_error(
     return api.create_response(request, error.error, status=error.status_code)
 
 
+def _integrity_error(
+    request: HttpRequest, exc: IntegrityError, api: type[NinjaAPI]
+) -> HttpResponse:
+    """Translate a database constraint violation into a 409 without exposing SQL details."""
+    logger.warning(f"Integrity error: {exc}")
+    body = {"error": "conflict", "details": "The request violates a database constraint."}
+    return api.create_response(request, body, status=409)
+
+
 def set_api_exception_handlers(api: type[NinjaAPI]) -> None:
     """Register exception handlers for common error types on the NinjaAPI instance."""
     api.add_exception_handler(BaseException, partial(_default_error, api=api))
@@ -142,6 +214,7 @@ def set_api_exception_handlers(api: type[NinjaAPI]) -> None:
     api.add_exception_handler(
         ValidationError, partial(_pydantic_validation_error, api=api)
     )
+    api.add_exception_handler(IntegrityError, partial(_integrity_error, api=api))
 
 
 def parse_jose_error(jose_exc: JoseError) -> dict:

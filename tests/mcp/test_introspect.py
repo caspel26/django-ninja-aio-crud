@@ -52,6 +52,34 @@ class DescribeViewsetCrudTests(TestCase):
         for field in ("name", "description", "active", "age", "active_from"):
             self.assertIn(field, spec.input_schema["properties"])
 
+    def test_list_tool_exposes_pagination_parameters(self):
+        properties = self.by_name["testmodelserializer_list"].input_schema["properties"]
+        self.assertIn("page", properties)
+        self.assertIn("page_size", properties)
+
+
+@tag("mcp")
+class DescribeViewsetHiddenActionTests(TestCase):
+    def test_action_excluded_from_schema_is_not_a_tool(self):
+        class HiddenActionAPI(APIViewSet):
+            model = models.TestModel
+
+            @action(detail=False, include_in_schema=False)
+            async def internal(self, request):
+                return {}
+
+            @action(detail=False)
+            async def public(self, request):
+                return {}
+
+        api = NinjaAIO(urls_namespace="mcp_introspect_hidden_action")
+        viewset = HiddenActionAPI(api=api, prefix="mcp-hidden-action")
+        viewset.add_views_to_route()
+        names = {s.name for s in describe_viewset(viewset)}
+
+        self.assertIn("testmodel_public", names)
+        self.assertNotIn("testmodel_internal", names)
+
 
 @tag("mcp")
 class DescribeViewsetBulkTests(TestCase):

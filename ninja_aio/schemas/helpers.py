@@ -1,6 +1,7 @@
-from typing import Callable, List, Optional, Type
+from typing import Any, Callable, List, Optional, Type
 
 from ninja import Schema
+from ninja.constants import NOT_SET
 from ninja_aio.types import ModelSerializerMeta, SerializerMeta
 from django.db.models import Model, Q
 from pydantic import BaseModel, ConfigDict, model_validator
@@ -36,7 +37,7 @@ class M2MRelationSchema(BaseModel):
             field_name -> (type, default). Example: {"country": ("str", "")}.
         related_schema (Type[Schema] | None):
             Optional explicit schema to represent related objects in responses.
-            If `model` is a ModelSerializerMeta, this is auto-derived via `model.generate_related_s()`.
+            If `model` is a ModelSerializerMeta, this is auto-derived via `model.related_schema`.
             If `model` is a plain Django model, this must be provided.
             If `model` is a plain DJango model and this is not provided but serializer_class is provided this last one would be used to generate it.
         serializer_class (Serializer | None):
@@ -70,7 +71,7 @@ class M2MRelationSchema(BaseModel):
     remove: bool = True
     get: bool = True
     path: Optional[str] = ""
-    auth: Optional[list] = None
+    auth: Any = NOT_SET
     filters: Optional[dict[str, tuple]] = None
     related_schema: Optional[Type[Schema]] = None
     serializer_class: Optional[SerializerMeta] = None
@@ -100,9 +101,9 @@ class M2MRelationSchema(BaseModel):
 
         # Generate related_schema based on available information
         if is_model_serializer:
-            data["related_schema"] = model.generate_related_s()
+            data["related_schema"] = model.get_schema("related")
         elif serializer_class:
-            data["related_schema"] = serializer_class.generate_related_s()
+            data["related_schema"] = serializer_class.get_schema("related")
         else:
             raise ValueError(
                 "related_schema must be provided if model is not a ModelSerializer"

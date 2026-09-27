@@ -21,8 +21,8 @@ class NestedWritesTestCase(TestCase):
     def setUpTestData(cls):
         cls.request = Request("nested-orders/")
         cls.util = ModelUtil(app_models.NestedOrder)
-        cls.schema_in = app_models.NestedOrder.generate_create_s()
-        cls.schema_out = app_models.NestedOrder.generate_read_s()
+        cls.schema_in = app_models.NestedOrder.create_schema
+        cls.schema_out = app_models.NestedOrder.read_schema
 
     async def test_create_with_nested_children(self):
         data = self.schema_in(
@@ -48,6 +48,50 @@ class NestedWritesTestCase(TestCase):
 
         order = await app_models.NestedOrder.objects.aget(pk=result["id"])
         self.assertEqual(await order.items.acount(), 0)
+
+    def test_sync_bulk_nested_child_failure_rolls_back_only_its_parent(self):
+        valid = self.payload("valid", items=[{"name": "good", "description": "d"}])
+        invalid = self.payload("invalid", items=[{"name": "bad", "description": "d"}])
+
+        def fail_bad_child(obj):
+            if obj.name == "bad":
+                raise ValueError("child failed")
+
+        with patch.object(
+            app_models.NestedOrderItem, "post_create", autospec=True
+        ) as hook:
+            hook.side_effect = fail_bad_child
+            result = app_models.NestedOrder.bulk_create([valid, invalid])
+        self.assertEqual([obj.name for obj in result.succeeded], ["valid"])
+        self.assertEqual(result.failure_count, 1)
+        self.assertEqual(
+            list(app_models.NestedOrder.objects.values_list("name", flat=True)),
+            ["valid"],
+        )
+        self.assertEqual(
+            list(app_models.NestedOrderItem.objects.values_list("name", flat=True)),
+            ["good"],
+        )
+
+    def test_sync_nested_child_dict_is_validated(self):
+        payload = self.payload("raw")
+        payload.items.append({"name": "child", "description": "d"})
+        result = app_models.NestedOrder.bulk_create([payload])
+        self.assertEqual(result.failed, [])
+        self.assertEqual(result.success_count, 1)
+        self.assertEqual(app_models.NestedOrderItem.objects.get().name, "child")
+
+    def test_sync_cross_database_graph_is_rejected_before_writes(self):
+        with patch(
+            "ninja_aio.models.utils.router.db_for_write",
+            side_effect=lambda model: "other"
+            if model is app_models.NestedOrderItem
+            else "default",
+        ):
+            result = app_models.NestedOrder.bulk_create([self.payload()])
+        self.assertEqual(result.succeeded, [])
+        self.assertIn("one database", result.failed[0].message)
+        self.assertFalse(app_models.NestedOrder.objects.exists())
 
     async def test_nested_child_schema_excludes_injected_fk(self):
         # "order" must not be a required/accepted field on the nested child
@@ -95,7 +139,7 @@ class NestedWritesTestCase(TestCase):
         return self.schema_in(name=name, description="d", **kwargs)
 
     async def test_parsing_preserves_public_two_tuple_contract(self):
-        payload, customs = await self.util.parse_input_data(
+        payload, customs = await self.util.aparse_input_data(
             self.request.post(), self.payload(items=[{"name": "i", "description": "d"}])
         )
         self.assertNotIn("items", payload)
@@ -116,15 +160,15 @@ class NestedWritesTestCase(TestCase):
         self.assertEqual(second.items, [])
 
     def test_standalone_child_schema_retains_parent_fk(self):
-        standalone = app_models.NestedOrderItem.generate_create_s()
+        standalone = app_models.NestedOrderItem.create_schema
         self.assertIn("order", standalone.model_fields)
 
     async def test_nested_children_run_lifecycle_hooks(self):
         with patch.object(
-            app_models.NestedOrderItem, "custom_actions", new_callable=AsyncMock
+            app_models.NestedOrderItem, "acustom_actions", new_callable=AsyncMock
         ) as custom:
             with patch.object(
-                app_models.NestedOrderItem, "post_create", new_callable=AsyncMock
+                app_models.NestedOrderItem, "apost_create", new_callable=AsyncMock
             ) as post:
                 await self.util.create_s(
                     self.request.post(),
@@ -168,7 +212,7 @@ class NestedWritesTestCase(TestCase):
             name="outside-scope", description="d"
         )
         scoped = AsyncMock(return_value=app_models.NestedLinkedObject.objects.none())
-        with patch.object(app_models.NestedLinkedObject, "queryset_request", scoped):
+        with patch.object(app_models.NestedLinkedObject, "aqueryset_request", scoped):
             with self.assertRaises(NotFoundError):
                 await self.util.create_s(
                     self.request.post(),
@@ -208,8 +252,8 @@ class NestedWritesTestCase(TestCase):
         parsed = AsyncMock(
             return_value=({"name": "i", "description": "d", "order_id": other.pk}, {})
         )
-        with patch.object(child_util, "parse_input_data", parsed):
-            item = await child_util._create_instance(
+        with patch.object(child_util, "aparse_input_data", parsed):
+            item = await child_util.acreate_instance(
                 self.request.post(),
                 schema(name="i", description="d"),
                 extra_fields={"order": owner},
@@ -234,7 +278,7 @@ class NestedWritesTestCase(TestCase):
     async def test_child_hook_failure_rolls_back_whole_graph(self):
         with patch.object(
             app_models.NestedOrderItem,
-            "post_create",
+            "apost_create",
             new=AsyncMock(side_effect=RuntimeError("hook failed")),
         ):
             with self.assertRaisesRegex(RuntimeError, "hook failed"):
@@ -271,14 +315,40 @@ class NestedWritesTestCase(TestCase):
         )
         self.assertEqual(await app_models.NestedOrderItem.objects.acount(), 1)
 
+    async def test_async_bulk_facade_rolls_back_only_failed_graph(self):
+        result = await app_models.NestedOrder.abulk_create(
+            [
+                self.payload(
+                    "bad",
+                    items=[
+                        {"name": "duplicate", "description": "d"},
+                        {"name": "duplicate", "description": "d"},
+                    ],
+                ),
+                self.payload("good", items=[{"name": "item", "description": "d"}]),
+            ]
+        )
+        self.assertEqual([obj.name for obj in result.succeeded], ["good"])
+        self.assertEqual(result.failure_count, 1)
+        self.assertEqual(
+            [
+                name
+                async for name in app_models.NestedOrder.objects.values_list(
+                    "name", flat=True
+                )
+            ],
+            ["good"],
+        )
+        self.assertEqual(await app_models.NestedOrderItem.objects.acount(), 1)
+
     async def test_failing_nested_hook_does_not_schedule_later_hook(self):
         with patch.object(
             app_models.NestedOrderItem,
-            "custom_actions",
+            "acustom_actions",
             new=AsyncMock(side_effect=RuntimeError("custom failed")),
         ):
             with patch.object(
-                app_models.NestedOrderItem, "post_create", new_callable=AsyncMock
+                app_models.NestedOrderItem, "apost_create", new_callable=AsyncMock
             ) as post:
                 with self.assertRaisesRegex(RuntimeError, "custom failed"):
                     await self.util.create_s(
@@ -379,12 +449,12 @@ class NestedWritesTestCase(TestCase):
 
     def test_cyclic_configuration_is_rejected_and_state_is_reset(self):
         with self.assertRaisesRegex(ImproperlyConfigured, "Cyclic"):
-            app_models.NestedNode.generate_create_s()
+            app_models.NestedNode.create_schema
         self.assertTrue(app_models.NestedOrder.get_nested_customs())
 
     def test_update_schema_does_not_accept_nested_collections(self):
         self.assertNotIn(
-            "items", app_models.NestedOrder.generate_update_s().model_fields
+            "items", app_models.NestedOrder.update_schema.model_fields
         )
 
     async def test_http_create_validates_and_serializes_nested_children(self):

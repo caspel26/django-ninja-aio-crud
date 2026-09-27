@@ -1,13 +1,11 @@
 from django.test import TestCase, tag
-from ninja import Status
 
 from ninja_aio import NinjaAIO
 from ninja_aio.decorators import on
 from ninja_aio.decorators.actions import ActionConfig
 from ninja_aio.models import ModelUtil
-from ninja_aio.views import APIViewSet
 from tests.generics.request import Request
-from tests.test_app import models, schema, views
+from tests.test_app import models, views
 
 
 @tag("on_action")
@@ -112,14 +110,14 @@ class OnActionExecutionTestCase(TestCase):
         self.assertEqual(obj.name, "renamed_base")
 
     async def test_on_handler_calls_on_before_operation(self):
-        """on_before_operation is called by the built on_handler."""
+        """aon_before_operation is called by the built on_handler."""
         await self.model.objects.all().adelete()
         obj = await self.model.objects.acreate(name="hook_test", description="d")
 
         called_operations = []
 
         class TrackingViewSet(views.OnActionTestAPI):
-            async def on_before_operation(self, request, operation):
+            async def aon_before_operation(self, request, operation):
                 called_operations.append(operation)
 
         vs = TrackingViewSet()

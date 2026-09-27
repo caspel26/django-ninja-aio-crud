@@ -1,0 +1,70 @@
+name: Validate Docs
+
+on:
+  push:
+    branches: [main, feat/v3-api-redesign]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      update_snapshots:
+        description: Generate Linux baselines for review as an artifact
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: docs-tests/package-lock.json
+      - name: Install build dependencies
+        run: |
+          pip install --only-binary :all: --require-hashes -r .github/requirements/docs.txt
+          python -m flit install --symlink --deps none
+      - name: Validate Python examples
+        run: |
+          python -W error::DeprecationWarning docs-tests/python/manage.py test test_examples
+      - name: Build documentation
+        run: zensical build --strict
+      - name: Install browser tests
+        working-directory: docs-tests
+        run: |
+          npm ci --ignore-scripts
+          ./node_modules/.bin/playwright install --with-deps chromium
+      - name: Validate visuals, accessibility, and performance budgets
+        working-directory: docs-tests
+        env:
+          UPDATE_SNAPSHOTS: ${{ inputs.update_snapshots }}
+        run: |
+          if [ "$UPDATE_SNAPSHOTS" = "true" ]; then
+            npm run update
+          else
+            npm test
+          fi
+      - name: Save browser reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docs-validation
+          path: |
+            docs-tests/playwright-report/
+            docs-tests/test-results/
+          retention-days: 7
+      - name: Save regenerated Linux baselines
+        if: inputs.update_snapshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: docs-linux-baselines
+          path: docs-tests/baselines/linux/
+          retention-days: 7

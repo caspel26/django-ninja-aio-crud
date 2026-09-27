@@ -101,10 +101,10 @@ class SchemaGenerationPerformanceTest(PerformanceMixin, TestCase):
         """Benchmark generating all schema types from a ModelSerializer."""
 
         def gen():
-            models.TestModelSerializer.generate_read_s()
-            models.TestModelSerializer.generate_create_s()
-            models.TestModelSerializer.generate_update_s()
-            models.TestModelSerializer.generate_detail_s()
+            models.TestModelSerializer.read_schema
+            models.TestModelSerializer.create_schema
+            models.TestModelSerializer.update_schema
+            models.TestModelSerializer.detail_schema
 
         stats = self._benchmark(gen)
         self._record("model_serializer_schema_generation", stats)
@@ -113,19 +113,45 @@ class SchemaGenerationPerformanceTest(PerformanceMixin, TestCase):
         """Benchmark generating schemas from a Meta-driven Serializer."""
 
         def gen():
-            serializers.TestModelForeignKeySerializer.generate_read_s()
-            serializers.TestModelForeignKeySerializer.generate_create_s()
-            serializers.TestModelForeignKeySerializer.generate_update_s()
+            serializers.TestModelForeignKeySerializer.read_schema
+            serializers.TestModelForeignKeySerializer.create_schema
+            serializers.TestModelForeignKeySerializer.update_schema
 
         stats = self._benchmark(gen)
         self._record("meta_serializer_schema_generation", stats)
+
+    def test_model_serializer_lazy_schema_cold_cache(self):
+        """Benchmark lazy attributes when the ModelSerializer cache is cold."""
+
+        def gen() -> None:
+            models.TestModelSerializer.clear_schema_cache()
+            _ = models.TestModelSerializer.read_schema
+            _ = models.TestModelSerializer.create_schema
+            _ = models.TestModelSerializer.update_schema
+            _ = models.TestModelSerializer.detail_schema
+
+        stats = self._benchmark(gen)
+        self._record("model_serializer_lazy_schema_cold_cache", stats)
+
+    def test_meta_serializer_lazy_schema_cold_cache(self):
+        """Benchmark lazy attributes when the standalone cache is cold."""
+
+        def gen() -> None:
+            serializers.TestModelForeignKeySerializer.clear_schema_cache()
+            _ = serializers.TestModelForeignKeySerializer.read_schema
+            _ = serializers.TestModelForeignKeySerializer.create_schema
+            _ = serializers.TestModelForeignKeySerializer.update_schema
+            _ = serializers.TestModelForeignKeySerializer.detail_schema
+
+        stats = self._benchmark(gen)
+        self._record("meta_serializer_lazy_schema_cold_cache", stats)
 
     def test_schema_with_relations(self):
         """Benchmark schema generation for models with FK relations."""
 
         def gen():
-            models.TestModelSerializerForeignKey.generate_read_s()
-            models.TestModelSerializerReverseForeignKey.generate_read_s()
+            models.TestModelSerializerForeignKey.read_schema
+            models.TestModelSerializerReverseForeignKey.read_schema
 
         stats = self._benchmark(gen)
         self._record("schema_with_relations", stats)
@@ -134,9 +160,9 @@ class SchemaGenerationPerformanceTest(PerformanceMixin, TestCase):
         """Benchmark schema generation including validator collection."""
 
         def gen():
-            serializers.TestModelWithValidatorsMetaSerializer.generate_create_s()
-            serializers.TestModelWithValidatorsMetaSerializer.generate_read_s()
-            serializers.TestModelWithValidatorsMetaSerializer.generate_update_s()
+            serializers.TestModelWithValidatorsMetaSerializer.create_schema
+            serializers.TestModelWithValidatorsMetaSerializer.read_schema
+            serializers.TestModelWithValidatorsMetaSerializer.update_schema
 
         stats = self._benchmark(gen)
         self._record("schema_with_validators", stats)
@@ -156,7 +182,7 @@ class SerializationPerformanceTest(PerformanceMixin, TestCase):
         cls.api = NinjaAIO(urls_namespace="perf_serialization")
         cls.util = ModelUtil(models.TestModelSerializer)
         cls.request = Request("test-model-serializers").get()
-        cls.schema_out = models.TestModelSerializer.generate_read_s()
+        cls.schema_out = models.TestModelSerializer.read_schema
         cls.obj = models.TestModelSerializer.objects.create(
             name="perf_test", description="perf_desc"
         )
@@ -195,11 +221,11 @@ class SerializationPerformanceTest(PerformanceMixin, TestCase):
 
     def test_input_parsing(self):
         """Benchmark parsing inbound request data."""
-        schema_in = models.TestModelSerializer.generate_create_s()
+        schema_in = models.TestModelSerializer.create_schema
         data = schema_in(name="parse_test", description="parse_desc")
 
         async def parse():
-            await self.util.parse_input_data(self.request, data)
+            await self.util.aparse_input_data(self.request, data)
 
         stats = self._benchmark_async(parse)
         self._record("input_parsing", stats)
@@ -215,7 +241,7 @@ class SerializationPerformanceTest(PerformanceMixin, TestCase):
             test_model_serializer=parent,
         )
         util = ModelUtil(models.TestModelSerializerForeignKey)
-        schema = models.TestModelSerializerForeignKey.generate_read_s()
+        schema = models.TestModelSerializerForeignKey.read_schema
         child = models.TestModelSerializerForeignKey.objects.select_related(
             "test_model_serializer"
         ).first()
@@ -253,7 +279,7 @@ class CRUDPerformanceTest(PerformanceMixin, TestCase):
 
     def test_create_performance(self):
         """Benchmark create endpoint throughput."""
-        view = self.viewset.create_view()
+        view = self.viewset.acreate_view()
         schema_in = self.viewset.schema_in
         counter = [0]
 
@@ -269,7 +295,7 @@ class CRUDPerformanceTest(PerformanceMixin, TestCase):
 
     def test_list_performance(self):
         """Benchmark list endpoint with pagination."""
-        view = self.viewset.list_view()
+        view = self.viewset.alist_view()
         pagination = self.viewset.pagination_class.Input(page=1)
         filters = self.viewset.filters_schema()
 
@@ -286,7 +312,7 @@ class CRUDPerformanceTest(PerformanceMixin, TestCase):
     def test_retrieve_performance(self):
         """Benchmark single object retrieval."""
         obj = models.TestModelSerializer.objects.first()
-        view = self.viewset.retrieve_view()
+        view = self.viewset.aretrieve_view()
         path_schema = self.viewset.path_schema(id=obj.pk)
 
         async def retrieve():
@@ -298,7 +324,7 @@ class CRUDPerformanceTest(PerformanceMixin, TestCase):
     def test_update_performance(self):
         """Benchmark update endpoint."""
         obj = models.TestModelSerializer.objects.first()
-        view = self.viewset.update_view()
+        view = self.viewset.aupdate_view()
         schema_update = self.viewset.schema_update
         path_schema = self.viewset.path_schema(id=obj.pk)
         data = schema_update(description="updated_desc")
@@ -311,7 +337,7 @@ class CRUDPerformanceTest(PerformanceMixin, TestCase):
 
     def test_delete_performance(self):
         """Benchmark delete endpoint throughput."""
-        view = self.viewset.delete_view()
+        view = self.viewset.adelete_view()
         objs = models.TestModelSerializer.objects.bulk_create(
             [
                 models.TestModelSerializer(
@@ -385,7 +411,7 @@ class FilterPerformanceTest(PerformanceMixin, TestCase):
 
     def test_icontains_filter(self):
         """Benchmark icontains string filtering."""
-        view = self.viewset.list_view()
+        view = self.viewset.alist_view()
         pagination = self.viewset.pagination_class.Input(page=1)
         filters = self.viewset.filters_schema(name="filter_5")
 
@@ -401,7 +427,7 @@ class FilterPerformanceTest(PerformanceMixin, TestCase):
 
     def test_boolean_filter(self):
         """Benchmark boolean field filtering."""
-        view = self.viewset.list_view()
+        view = self.viewset.alist_view()
         pagination = self.viewset.pagination_class.Input(page=1)
         filters = self.viewset.filters_schema(active=True)
 
@@ -417,7 +443,7 @@ class FilterPerformanceTest(PerformanceMixin, TestCase):
 
     def test_numeric_filter(self):
         """Benchmark numeric field filtering."""
-        view = self.viewset.list_view()
+        view = self.viewset.alist_view()
         pagination = self.viewset.pagination_class.Input(page=1)
         filters = self.viewset.filters_schema(age=50)
 
@@ -433,7 +459,7 @@ class FilterPerformanceTest(PerformanceMixin, TestCase):
 
     def test_relation_filter(self):
         """Benchmark relation-based filtering."""
-        view = self.relation_viewset.list_view()
+        view = self.relation_viewset.alist_view()
         pagination = self.relation_viewset.pagination_class.Input(page=1)
         filters = self.relation_viewset.filters_schema(test_model_serializer=1)
 
@@ -449,7 +475,7 @@ class FilterPerformanceTest(PerformanceMixin, TestCase):
 
     def test_match_case_filter(self):
         """Benchmark match case conditional filtering."""
-        view = self.match_viewset.list_view()
+        view = self.match_viewset.alist_view()
         pagination = self.match_viewset.pagination_class.Input(page=1)
         filters = self.match_viewset.filters_schema(is_approved=True)
 
@@ -465,7 +491,7 @@ class FilterPerformanceTest(PerformanceMixin, TestCase):
 
     def test_combined_filters(self):
         """Benchmark multiple filters applied simultaneously."""
-        view = self.viewset.list_view()
+        view = self.viewset.alist_view()
         pagination = self.viewset.pagination_class.Input(page=1)
         filters = self.viewset.filters_schema(
             name="filter", active=True, age=10
@@ -515,7 +541,7 @@ class MultiFKPerformanceTest(PerformanceMixin, TestCase):
 
     def test_create_with_3_fks(self):
         """Benchmark create with 3 FK fields (batch resolution)."""
-        view = self.viewset.create_view()
+        view = self.viewset.acreate_view()
         schema_in = self.viewset.schema_in
         counter = [0]
 
@@ -535,7 +561,7 @@ class MultiFKPerformanceTest(PerformanceMixin, TestCase):
 
     def test_bulk_create_with_3_fks(self):
         """Benchmark bulk create with 3 FK fields (50 objects)."""
-        view = self.viewset.bulk_create_view()
+        view = self.viewset.abulk_create_view()
         schema_in = self.viewset.schema_in
 
         items = [
@@ -579,7 +605,7 @@ class LargeListPerformanceTest(PerformanceMixin, TestCase):
 
     def test_list_1000_page_20(self):
         """List 1000 records, page size 20."""
-        view = self.viewset.list_view()
+        view = self.viewset.alist_view()
         pagination = self.viewset.pagination_class.Input(page=1, page_size=20)
         filters = self.viewset.filters_schema()
 
@@ -595,7 +621,7 @@ class LargeListPerformanceTest(PerformanceMixin, TestCase):
 
     def test_list_1000_page_100(self):
         """List 1000 records, page size 100."""
-        view = self.viewset.list_view()
+        view = self.viewset.alist_view()
         pagination = self.viewset.pagination_class.Input(page=1, page_size=100)
         filters = self.viewset.filters_schema()
 

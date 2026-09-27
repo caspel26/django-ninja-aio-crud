@@ -3,9 +3,12 @@ import json
 from django.http import JsonResponse
 from django.test import TestCase, tag
 from ninja import Status
+from ninja.testing import TestClient
 
 from ninja_aio import NinjaAIO
 from ninja_aio.models import ModelUtil
+from ninja_aio.views import APIViewSet
+from ninja_aio.views.mixins import FieldSelectionViewSetMixin
 from tests.generics.request import Request
 from tests.test_app import models, views
 
@@ -38,7 +41,7 @@ class FieldSelectionListTestCase(TestCase):
 
     async def test_list_without_fields_returns_full_response(self):
         """List without ?fields returns Status(200, ...) as usual."""
-        view = self.viewset.list_view()
+        view = self.viewset.alist_view()
         result = await view(self.request.get())
         self.assertIsInstance(result, Status)
         self.assertEqual(result.status_code, 200)
@@ -49,7 +52,7 @@ class FieldSelectionListTestCase(TestCase):
 
     async def test_list_with_valid_fields_returns_json_response(self):
         """List with ?fields returns JsonResponse with only requested fields."""
-        view = self.viewset.list_view()
+        view = self.viewset.alist_view()
         filters = self.viewset.filters_schema(fields="id,name")
         result = await view(self.request.get(), filters=filters)
         self.assertIsInstance(result, JsonResponse)
@@ -63,7 +66,7 @@ class FieldSelectionListTestCase(TestCase):
 
     async def test_list_fields_single_field(self):
         """Requesting a single field returns only that field."""
-        view = self.viewset.list_view()
+        view = self.viewset.alist_view()
         filters = self.viewset.filters_schema(fields="name")
         result = await view(self.request.get(), filters=filters)
         self.assertIsInstance(result, JsonResponse)
@@ -75,7 +78,7 @@ class FieldSelectionListTestCase(TestCase):
 
     async def test_list_fields_ignores_unknown_fields(self):
         """Unknown field names are silently ignored."""
-        view = self.viewset.list_view()
+        view = self.viewset.alist_view()
         filters = self.viewset.filters_schema(fields="id,nonexistent_field")
         result = await view(self.request.get(), filters=filters)
         self.assertIsInstance(result, JsonResponse)
@@ -86,7 +89,7 @@ class FieldSelectionListTestCase(TestCase):
 
     async def test_list_all_unknown_fields_returns_full_response(self):
         """All-unknown fields fall back to full response (no valid fields found)."""
-        view = self.viewset.list_view()
+        view = self.viewset.alist_view()
         filters = self.viewset.filters_schema(fields="nonexistent,also_bad")
         result = await view(self.request.get(), filters=filters)
         self.assertIsInstance(result, Status)
@@ -94,21 +97,21 @@ class FieldSelectionListTestCase(TestCase):
 
     async def test_list_empty_fields_returns_full_response(self):
         """Empty ?fields value returns the full response."""
-        view = self.viewset.list_view()
+        view = self.viewset.alist_view()
         filters = self.viewset.filters_schema(fields="")
         result = await view(self.request.get(), filters=filters)
         self.assertIsInstance(result, Status)
 
     async def test_list_fields_none_returns_full_response(self):
         """fields=None returns the full response."""
-        view = self.viewset.list_view()
+        view = self.viewset.alist_view()
         filters = self.viewset.filters_schema(fields=None)
         result = await view(self.request.get(), filters=filters)
         self.assertIsInstance(result, Status)
 
     async def test_list_count_preserved_with_field_selection(self):
         """Count is correct when field selection is active."""
-        view = self.viewset.list_view()
+        view = self.viewset.alist_view()
         filters = self.viewset.filters_schema(fields="id")
         result = await view(self.request.get(), filters=filters)
         data = json.loads(result.content)
@@ -116,7 +119,7 @@ class FieldSelectionListTestCase(TestCase):
 
     async def test_list_fields_not_passed_to_query_params_handler(self):
         """'fields' does not leak into the queryset filter (no invalid queryset filter)."""
-        view = self.viewset.list_view()
+        view = self.viewset.alist_view()
         filters = self.viewset.filters_schema(fields="id,name")
         # Should not raise FieldError or similar
         result = await view(self.request.get(), filters=filters)
@@ -143,9 +146,9 @@ class FieldSelectionRetrieveTestCase(TestCase):
 
     async def test_retrieve_without_fields_returns_status(self):
         """Retrieve without ?fields returns Status(200, ...) as usual."""
-        pk_schema = cls.viewset.path_schema if hasattr(self, "cls") else self.viewset.path_schema
+        pk_schema = self.viewset.path_schema
         pk_name = self.viewset.model_util.model_pk_name
-        view = self.viewset.retrieve_view()
+        view = self.viewset.aretrieve_view()
         pk_schema = self.viewset.path_schema(**{pk_name: self.obj.pk})
         result = await view(self.request.get(), pk=pk_schema)
         self.assertIsInstance(result, Status)
@@ -156,7 +159,7 @@ class FieldSelectionRetrieveTestCase(TestCase):
     async def test_retrieve_with_fields_returns_json_response(self):
         """Retrieve with ?fields returns JsonResponse with only requested fields."""
         pk_name = self.viewset.model_util.model_pk_name
-        view = self.viewset.retrieve_view()
+        view = self.viewset.aretrieve_view()
         pk_schema = self.viewset.path_schema(**{pk_name: self.obj.pk})
         result = await view(self.request.get(), pk=pk_schema, fields="id,name")
         self.assertIsInstance(result, JsonResponse)
@@ -168,7 +171,7 @@ class FieldSelectionRetrieveTestCase(TestCase):
     async def test_retrieve_unknown_fields_ignored(self):
         """Unknown field names are silently ignored in retrieve."""
         pk_name = self.viewset.model_util.model_pk_name
-        view = self.viewset.retrieve_view()
+        view = self.viewset.aretrieve_view()
         pk_schema = self.viewset.path_schema(**{pk_name: self.obj.pk})
         result = await view(self.request.get(), pk=pk_schema, fields="id,does_not_exist")
         self.assertIsInstance(result, JsonResponse)
@@ -179,7 +182,7 @@ class FieldSelectionRetrieveTestCase(TestCase):
     async def test_retrieve_all_unknown_fields_returns_full(self):
         """All-unknown fields fall back to full response."""
         pk_name = self.viewset.model_util.model_pk_name
-        view = self.viewset.retrieve_view()
+        view = self.viewset.aretrieve_view()
         pk_schema = self.viewset.path_schema(**{pk_name: self.obj.pk})
         result = await view(self.request.get(), pk=pk_schema, fields="totally_fake")
         self.assertIsInstance(result, Status)
@@ -203,9 +206,8 @@ class FieldSelectionRetrieveWithObjectHooksTestCase(TestCase):
     async def test_retrieve_with_fields_and_object_hooks(self):
         """Retrieve with field selection works when obj is pre-fetched via hooks."""
         pk_name = self.viewset.model_util.model_pk_name
-        view = self.viewset.retrieve_view()
+        view = self.viewset.aretrieve_view()
         pk_schema = self.viewset.path_schema(**{pk_name: self.obj.pk})
-        request = views.FieldSelectionWithPermissionsTestAPI.__bases__[0].__bases__[0]  # just need the request
 
         from tests.generics.request import Request
         req = Request(self.viewset.model_util.verbose_name_path_resolver()).get()
@@ -221,7 +223,7 @@ class FieldSelectionRetrieveWithObjectHooksTestCase(TestCase):
     async def test_retrieve_without_fields_and_object_hooks(self):
         """Retrieve without field selection returns full Status response with hooks."""
         pk_name = self.viewset.model_util.model_pk_name
-        view = self.viewset.retrieve_view()
+        view = self.viewset.aretrieve_view()
         pk_schema = self.viewset.path_schema(**{pk_name: self.obj.pk})
 
         from tests.generics.request import Request
@@ -256,7 +258,7 @@ class FieldSelectionWithFiltersTestCase(TestCase):
 
     async def test_field_selection_with_filter(self):
         """Field selection and icontains filter work together."""
-        view = self.viewset.list_view()
+        view = self.viewset.alist_view()
         filters = self.viewset.filters_schema(fields="id,name", name="ap")
         result = await view(self.request.get(), filters=filters)
         self.assertIsInstance(result, JsonResponse)
@@ -266,3 +268,50 @@ class FieldSelectionWithFiltersTestCase(TestCase):
         self.assertIn("id", item)
         self.assertIn("name", item)
         self.assertNotIn("description", item)
+
+
+@tag("field_selection")
+class FieldSelectionCustomParamHTTPTestCase(TestCase):
+    """A custom ``fields_param`` is honored by list and retrieve, over HTTP."""
+
+    @classmethod
+    def setUpTestData(cls):
+        class OnlyAPI(FieldSelectionViewSetMixin, APIViewSet):
+            model = models.TestModelSerializer
+            execution_mode = "sync"
+            fields_param = "only"
+            query_params = {"name": (str, None)}
+            seen_filters: list = []
+
+            def query_params_handler(self, queryset, filters):
+                self.seen_filters.append(dict(filters))
+                if filters.get("name"):
+                    queryset = queryset.filter(name=filters["name"])
+                return queryset
+
+        cls.view_class = OnlyAPI
+        api = NinjaAIO(urls_namespace="field_selection_custom_param")
+        OnlyAPI(api=api, prefix="items").add_views_to_route()
+        cls.api_client = TestClient(api)
+        cls.obj = models.TestModelSerializer.objects.create(name="Alpha", description="first")
+
+    def setUp(self):
+        self.view_class.seen_filters.clear()
+
+    def test_list_uses_the_custom_parameter(self):
+        response = self.api_client.get("/items?only=id,name&name=Alpha")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["items"], [{"id": self.obj.pk, "name": "Alpha"}])
+
+    def test_custom_parameter_is_not_passed_to_the_query_handler(self):
+        self.api_client.get("/items?only=id&name=Alpha")
+        self.assertEqual(self.view_class.seen_filters, [{"name": "Alpha"}])
+
+    def test_retrieve_uses_the_custom_parameter(self):
+        response = self.api_client.get(f"/items/{self.obj.pk}?only=name")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"name": "Alpha"})
+
+    def test_default_parameter_name_is_not_used(self):
+        response = self.api_client.get(f"/items/{self.obj.pk}?fields=name")
+        self.assertIn("description", response.json())

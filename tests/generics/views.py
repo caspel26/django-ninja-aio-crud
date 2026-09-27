@@ -182,7 +182,7 @@ class Tests:
             for k, v in data.items():
                 if isinstance(v, ModelSerializer):
                     new_data[k] = await ModelUtil(v.__class__).read_s(
-                        v.__class__.generate_related_s(), self.get_request, v
+                        v.__class__.related_schema, self.get_request, v
                     )
                 elif isinstance(v, models.Model):
                     new_data[k] = await ModelUtil(v.__class__).read_s(
@@ -191,7 +191,7 @@ class Tests:
             return new_data
 
         async def _create_view(self):
-            view = self.viewset.create_view()
+            view = self.viewset.acreate_view()
             result = await view(self.post_request, self.create_data)
             self.assertEqual(result.status_code, 201)
             content = result.value
@@ -223,7 +223,7 @@ class Tests:
             await self._create_view()
 
         async def test_list(self):
-            view = self.viewset.list_view()
+            view = self.viewset.alist_view()
             result = await view(self.get_request, **self.list_kwargs)
             self.assertEqual(result.status_code, 200)
             content = result.value
@@ -232,13 +232,13 @@ class Tests:
             count = content["count"]
             obj_count = await self.model.objects.select_related().acount()
             self.assertEqual(obj_count, count)
-            item = items[0]
+            item = next(item for item in items if item[self.pk_att] == self.obj_content[self.pk_att])
             item.pop(self.pk_att)
             self.assertEqual(await self._parse_output_data(self.response_data), item)
 
         async def test_retrieve(self):
-            view = self.viewset.retrieve_view()
-            result = await view(self.get_request, self._path_schema(1))
+            view = self.viewset.aretrieve_view()
+            result = await view(self.get_request, self._path_schema(self.obj_content[self.pk_att]))
             self.assertEqual(result.status_code, 200)
             content = result.value
             content.pop(self.pk_att)
@@ -247,8 +247,8 @@ class Tests:
         async def test_retrieve_object_not_found(self):
             with self.assertRaises(NotFoundError) as exc:
                 await self.model.objects.select_related().all().adelete()
-                view = self.viewset.retrieve_view()
-                await view(self.get_request, self._path_schema(1))
+                view = self.viewset.aretrieve_view()
+                await view(self.get_request, self._path_schema(self.obj_content[self.pk_att]))
             self.assertEqual(exc.exception.status_code, 404)
             self.assertEqual(
                 exc.exception.error,
@@ -256,9 +256,9 @@ class Tests:
             )
 
         async def test_update(self):
-            view = self.viewset.update_view()
+            view = self.viewset.aupdate_view()
             result = await view(
-                self.patch_request, self.update_data, self._path_schema(1)
+                self.patch_request, self.update_data, self._path_schema(self.obj_content[self.pk_att])
             )
             self.assertEqual(result.status_code, 200)
             content = result.value
@@ -269,7 +269,7 @@ class Tests:
             )
 
         async def test_delete(self):
-            view = self.viewset.delete_view()
+            view = self.viewset.adelete_view()
             pk = self.obj_content[self.pk_att]
             result = await view(self.delete_request, self._path_schema(pk))
             self.assertEqual(result.status_code, 204)
@@ -301,7 +301,7 @@ class Tests:
             cls.relation_pk = async_to_sync(cls._create_relation)(cls.relation_data)
             cls.relation_util = ModelUtil(cls.relation_viewset.model)
             cls.relation_request = cls.request.get(cls.relation_viewset.path)
-            cls.relation_obj = async_to_sync(cls.relation_util.get_object)(
+            cls.relation_obj = async_to_sync(cls.relation_util.aget_object)(
                 cls.relation_request, cls.relation_pk
             )
             cls.relation_read_s = async_to_sync(cls.relation_util.read_s)(
@@ -313,7 +313,7 @@ class Tests:
         @classmethod
         async def _create_relation(cls, data: dict) -> int:
             cls.relation_viewset.api = cls.api
-            view = cls.relation_viewset.create_view()
+            view = cls.relation_viewset.acreate_view()
             result = await view(
                 cls.post_request, cls.relation_viewset.schema_in(**data)
             )
@@ -325,6 +325,12 @@ class Tests:
         @classmethod
         def setUpTestData(cls):
             super().setUpTestData()
+            # The fixture creates a second child for obj_content. Compare with
+            # that child's actual PK, rather than the first parent's child.
+            child = cls.relation_model.objects.get(**{f"{cls.foreign_key_field}_id": cls.obj_content[cls.pk_att]})
+            cls.relation_schema_data = async_to_sync(cls.relation_util.read_s)(
+                cls.relation_viewset.schema_out, cls.relation_request, child
+            )
             cls.relation_schema_data.pop(cls.foreign_key_field)
 
         @classmethod
@@ -344,7 +350,7 @@ class Tests:
 
         async def _create_view(self):
             create_content = await super()._create_view()
-            rel_view = self.relation_viewset.create_view()
+            rel_view = self.relation_viewset.acreate_view()
             await rel_view(
                 self.post_request,
                 self.relation_viewset.schema_in(

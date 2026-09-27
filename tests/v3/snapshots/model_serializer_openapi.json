@@ -1,0 +1,51 @@
+{
+  "paths": {
+    "/api/items": {
+      "get": {
+        "operationId": "ninja_aio_views_api_list_testmodelserializers",
+        "responses": ["200", "400", "401", "403", "404"]
+      }
+    },
+    "/api/items/": {
+      "post": {
+        "operationId": "ninja_aio_views_api_create_testmodelserializer",
+        "responses": ["201", "400", "401", "403", "404"]
+      }
+    },
+    "/api/items/sum": {
+      "post": {
+        "operationId": "tests_generics_views_sum",
+        "responses": ["200"]
+      }
+    },
+    "/api/items/{id}": {
+      "get": {
+        "operationId": "ninja_aio_views_api_retrieve_testmodelserializer",
+        "responses": ["200", "400", "401", "403", "404"]
+      }
+    },
+    "/api/items/{id}/": {
+      "delete": {
+        "operationId": "ninja_aio_views_api_delete_testmodelserializer",
+        "responses": ["204", "400", "401", "403", "404"]
+      },
+      "patch": {
+        "operationId": "ninja_aio_views_api_update_testmodelserializer",
+        "responses": ["200", "400", "401", "403", "404"]
+      }
+    }
+  },
+  "schemas": [
+    "GenericMessageSchema",
+    "Input",
+    "PaginatedtestmodelserializerSchemaOut",
+    "SumSchemaIn",
+    "SumSchemaOut",
+    "testmodelserializerDetailSchemaOut",
+    "testmodelserializerFiltersSchema",
+    "testmodelserializerPathSchema",
+    "testmodelserializerSchemaIn",
+    "testmodelserializerSchemaOut",
+    "testmodelserializerSchemaPatch"
+  ]
+}

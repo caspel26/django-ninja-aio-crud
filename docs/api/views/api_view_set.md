@@ -1,1373 +1,155 @@
-# :material-view-grid: APIViewSet
-
-`APIViewSet` auto-generates async CRUD endpoints and optional Many-to-Many (M2M) endpoints for a Django `Model` or a `ModelSerializer`. It supports dynamic schema generation, per-verb authentication, pagination, list & relation filtering with runtime-built Pydantic schemas, and custom view injection.
-
-## :material-auto-fix: Generated CRUD Endpoints
-
-| Method | Path            | Summary        | Response                                                              |
-| ------ | --------------- | -------------- | --------------------------------------------------------------------- |
-| POST   | `/{base}/`      | Create Model   | `201 schema_create_out` (falls back to `schema_out`)                  |
-| GET    | `/{base}/`      | List Models    | `200 List[schema_out]` (paginated)                                    |
-| GET    | `/{base}/{pk}`  | Retrieve Model | `200 schema_detail` (or `schema_out` if none)                         |
-| PATCH  | `/{base}/{pk}/` | Update Model   | `200 schema_update_out` (falls back to `schema_out`)                  |
-| DELETE | `/{base}/{pk}/` | Delete Model   | `204 No Content` or `200 schema_delete_out` (if `schema_delete_out` is set) |
-
-Notes:
-
-- Retrieve path typically includes a trailing slash by default (see settings below); update/delete include a trailing slash.
-- `{base}` auto-resolves from model verbose name plural (lowercase) unless `api_route_path` is provided.
-- Error responses may use a unified generic schema for codes: 400, 401, 404.
-
-### Settings: trailing slash behavior
-
-- NINJA_AIO_APPEND_SLASH (default: True)
-  - When True (default, for backward compatibility), retrieve and POST paths includes a trailing slash into CRUD: `/{base}/{pk}/`.
-  - When False, retrieve and post paths is generated without a trailing slash: `/{base}/{pk}`.
-
-## :material-transit-connection-variant: Request Lifecycle
-
-```mermaid
-graph TD
-    A[Incoming Request] --> B{Auth Check}
-    B -->|Fail| X[401 Unauthorized]
-    B -->|Pass| C{Route Match}
-    C -->|List| D[Apply Filters]
-    C -->|Create/Update| E[Parse & Validate Schema]
-    C -->|Delete| F[Lookup Object]
-    D --> G[Apply Ordering]
-    G --> H[Paginate QuerySet]
-    H --> I[Serialize Response]
-    E --> J[Run Hooks & Save]
-    J --> I
-    F --> K[Delete & Return 204 or 200]
-    I --> L[JSON Response]
-
-    style A fill:#7c4dff,stroke:#7c4dff,color:#fff
-    style B fill:#ff6d00,stroke:#ff6d00,color:#fff
-    style X fill:#d50000,stroke:#d50000,color:#fff
-    style L fill:#00c853,stroke:#00c853,color:#fff
-    style K fill:#00c853,stroke:#00c853,color:#fff
-```
-
+---
+type: reference
+title: APIViewSet
+description: Lookup page for APIViewSet arguments, class attributes, endpoints, methods and hooks.
 ---
 
-## :material-star: Recommended: `@action` Decorator
+# APIViewSet
 
-The `@action` decorator is the recommended way to add custom endpoints to your ViewSet. It provides automatic URL generation, auth inheritance, detail/list distinction, and full OpenAPI metadata support.
+`APIViewSet` turns a model into CRUD endpoints. For how to use it, see
+[Viewsets](../../guides/viewsets.md).
 
 ```python
-from ninja_aio.decorators import action
+from ninja_aio import APIViewSet
 ```
 
-### Basic Usage
+## Registration
 
 ```python
-from ninja import Schema, Status
-from ninja_aio.decorators import action
-
-class CountSchema(Schema):
-    count: int
-
-@api.viewset(model=Article)
+@api.viewset(model=Article, prefix="articles", tags=["Articles"])
 class ArticleViewSet(APIViewSet):
-    @action(detail=True, methods=["post"], url_path="activate")
-    async def activate(self, request, pk):
-        obj = await self.model_util.get_object(request, pk)
-        obj.is_active = True
-        await obj.asave()
-        return Status(200, {"message": "activated"})
-
-    @action(detail=False, methods=["get"], url_path="count", response=CountSchema)
-    async def count(self, request):
-        total = await self.model.objects.acount()
-        return {"count": total}
-```
-
-### Parameters
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `detail` | `bool` | — (required) | `True` = instance action (`/{pk}/path`), `False` = collection action |
-| `methods` | `list[str]` | `["get"]` | HTTP methods to register |
-| `url_path` | `str \| None` | `None` | Custom URL segment. Defaults to method name with `_` → `-` |
-| `url_name` | `str \| None` | `None` | Django URL name for reverse resolution |
-| `auth` | `Any` | `NOT_SET` | Auth override. `NOT_SET` inherits from viewset per-verb auth |
-| `response` | `Any` | `NOT_SET` | Response schema. `NOT_SET` lets Django Ninja infer it |
-| `summary` | `str \| None` | `None` | OpenAPI summary (auto-generated if None) |
-| `description` | `str \| None` | `None` | OpenAPI description |
-| `tags` | `list[str] \| None` | `None` | OpenAPI tags (inherits from viewset if None) |
-| `deprecated` | `bool \| None` | `None` | Mark as deprecated in OpenAPI |
-| `decorators` | `list[Callable] \| None` | `None` | Additional decorators to apply |
-| `throttle` | `BaseThrottle \| list[BaseThrottle]` | `NOT_SET` | Throttle configuration |
-| `include_in_schema` | `bool` | `True` | Whether to include in OpenAPI schema |
-| `openapi_extra` | `dict \| None` | `None` | Additional OpenAPI metadata |
-
-### Detail vs List Actions
-
-**Detail actions** (`detail=True`) operate on a single instance. The `pk` parameter is automatically added to the URL and renamed to match the model's primary key field name:
-
-```python
-@action(detail=True, methods=["post"], url_path="publish")
-async def publish(self, request, pk):
-    # URL: /article/{id}/publish
-    obj = await self.model_util.get_object(request, pk)
-    ...
-```
-
-**List actions** (`detail=False`) operate on the collection:
-
-```python
-@action(detail=False, methods=["get"], url_path="stats")
-async def stats(self, request):
-    # URL: /article/stats
-    ...
-```
-
-### Multiple HTTP Methods
-
-Register the same action for multiple HTTP methods:
-
-```python
-@action(detail=True, methods=["get", "post"], url_path="toggle")
-async def toggle(self, request, pk):
-    # Registers both GET and POST on /article/{id}/toggle
-    ...
-```
-
-### Auth Inheritance
-
-Actions inherit authentication from the viewset by default:
-
-```python
-@api.viewset(model=Article)
-class ArticleViewSet(APIViewSet):
-    auth = [JWTAuth()]
-
-    # Inherits JWTAuth from viewset
-    @action(detail=False, methods=["get"], url_path="protected")
-    async def protected(self, request):
-        ...
-
-    # Override: make public
-    @action(detail=False, methods=["get"], url_path="public", auth=None)
-    async def public(self, request):
-        ...
-```
-
-### Custom Decorators
-
-Apply additional decorators to action handlers:
-
-```python
-from ninja_aio.decorators import aatomic
-
-@action(detail=False, methods=["post"], url_path="batch-op", decorators=[aatomic])
-async def batch_operation(self, request):
-    # Wrapped in atomic transaction
-    ...
-```
-
-### URL Path Auto-Generation
-
-When `url_path` is not provided, the method name is used with underscores replaced by hyphens:
-
-```python
-@action(detail=False, methods=["get"])
-async def my_custom_endpoint(self, request):
-    # URL: /article/my-custom-endpoint
-    ...
-```
-
-### Actions and `disable`
-
-Actions are **not affected** by `disable = ["all"]`. Custom actions are always registered even when all CRUD endpoints are disabled:
-
-```python
-@api.viewset(model=Article)
-class ArticleViewSet(APIViewSet):
-    disable = ["all"]  # No CRUD endpoints
-
-    @action(detail=False, methods=["get"], url_path="health")
-    async def health(self, request):
-        return {"status": "ok"}  # Still registered
-```
-
-## :material-factory: Alternative: `@api_get` / `@api_post` decorators
-
-Class method decorators for adding custom endpoints. These provide direct control over the path and HTTP method, but without the automatic features of `@action` (no auto `{pk}`, no auth inheritance, no auto URL path).
-
-Available decorators (from `ninja_aio.decorators`):
-
-- `@api_get(path, ...)`
-- `@api_post(path, ...)`
-- `@api_put(path, ...)`
-- `@api_patch(path, ...)`
-- `@api_delete(path, ...)`
-- `@api_options(path, ...)`
-- `@api_head(path, ...)`
-
-Example:
-
-```python
-from ninja_aio import NinjaAIO
-from ninja_aio.views import APIViewSet
-from ninja_aio.decorators import api_get, api_post
-from .models import Article
-
-api = NinjaAIO(title="Blog API")
-
-@api.viewset(model=Article)
-class ArticleViewSet(APIViewSet):
-    @api_get("/stats/")
-    async def stats(self, request):
-        total = await self.model.objects.acount()
-        return {"total": total}
-
-    @api_post("/{pk}/publish/")
-    async def publish(self, request, pk: int):
-        obj = await self.model.objects.aget(pk=pk)
-        obj.is_published = True
-        await obj.asave()
-        return {"message": "published"}
-```
-
-Notes:
-
-- Decorators support per-endpoint `auth`, `response`, `tags`, `summary`, `description`, and more.
-- Sync methods are executed via `sync_to_async` automatically.
-- Signatures and type hints are preserved for OpenAPI (excluding `self`).
-
-## :material-history: Legacy: views() method (still supported)
-
-The previous pattern of injecting endpoints inside `views()` is still supported, but the `@action` and `@api_*` approaches above are now recommended.
-
-```python
-class ArticleViewSet(APIViewSet):
-    model = Article
-    api = api
-
-    def views(self):
-        @self.router.get("/stats/")
-        async def stats(request):
-            total = await self.model.objects.acount()
-            return {"total": total}
-
-        @self.router.post("/{pk}/publish/")
-        async def publish(request, pk: int):
-            obj = await self.model.objects.aget(pk=pk)
-            obj.is_published = True
-            await obj.asave()
-            return {"message": "published"}
-```
-
-## :material-cog: Core Attributes
-
-| Attribute                   | Type                          | Default                                            | Description                                                             |
-| --------------------------- | ----------------------------- | -------------------------------------------------- | ----------------------------------------------------------------------- |
-| `model`                     | `ModelSerializer \| Model`    | —                                                  | Target model (required)                                                 |
-| `api`                       | `NinjaAPI`                    | —                                                  | API instance (required)                                                 |
-| `serializer_class`          | `Serializer \| None`          | `None`                                             | Serializer class for plain models (alternative to ModelSerializer)      |
-| `schema_in`                 | `Schema \| None`              | `None` (auto)                                      | Create input schema override                                            |
-| `schema_out`                | `Schema \| None`              | `None` (auto)                                      | Default output schema (list, and fallback for create/update responses)  |
-| `schema_detail`             | `Schema \| None`              | `None` (auto)                                      | Retrieve/detail schema override (falls back to `schema_out`)            |
-| `schema_update`             | `Schema \| None`              | `None` (auto)                                      | Update input schema override                                            |
-| `schema_create_out`         | `Schema \| None`              | `None` (falls back to `schema_out`)                | Response schema for create endpoint (POST)                              |
-| `schema_update_out`         | `Schema \| None`              | `None` (falls back to `schema_out`)                | Response schema for update endpoint (PATCH)                             |
-| `schema_delete_out`         | `Schema \| None`              | `None` (204 No Content)                            | Response schema for delete endpoint (DELETE). When set, returns `200` with the serialized deleted object instead of `204` |
-| `pagination_class`          | `type[AsyncPaginationBase]`   | `PageNumberPagination`                             | Pagination strategy                                                     |
-| `query_params`              | `dict[str, tuple[type, ...]]` | `{}`                                               | List endpoint filters definition                                        |
-| `disable`                   | `list[type[VIEW_TYPES]]`      | `[]`                                               | Disable views (`create`,`list`,`retrieve`,`update`,`delete`,`bulk_create`,`bulk_update`,`bulk_delete`,`all`) |
-| `api_route_path`            | `str`                         | `""`                                               | Base route segment                                                      |
-| `list_docs`                 | `str`                         | `"List all objects."`                              | List endpoint description                                               |
-| `create_docs`               | `str`                         | `"Create a new object."`                           | Create endpoint description                                             |
-| `retrieve_docs`             | `str`                         | `"Retrieve a specific object by its primary key."` | Retrieve endpoint description                                           |
-| `update_docs`               | `str`                         | `"Update an object by its primary key."`           | Update endpoint description                                             |
-| `delete_docs`               | `str`                         | `"Delete an object by its primary key."`           | Delete endpoint description                                             |
-| `m2m_relations`             | `list[M2MRelationSchema]`     | `[]`                                               | M2M relation configs                                                    |
-| `m2m_auth`                  | `list \| None`                | `NOT_SET`                                          | Default auth for all M2M endpoints (overridden per relation if set)     |
-| `extra_decorators`          | `DecoratorsSchema`            | `DecoratorsSchema()`                               | Custom decorators for CRUD and bulk operations                          |
-| `model_verbose_name`        | `str`                         | `""`                                               | Override model verbose name for display                                 |
-| `model_verbose_name_plural` | `str`                         | `""`                                               | Override model verbose name plural for display                          |
-| `bulk_operations`           | `list[Literal["create", "update", "delete"]]` | `[]`                          | Bulk operations to enable (opt-in)                                      |
-| `bulk_response_fields`      | `list[str] \| str \| None`    | `None`                                             | Field(s) returned in bulk success details (`None` = PK)                 |
-| `bulk_create_docs`          | `str`                         | `"Create multiple objects in a single request."`   | Bulk create endpoint description                                        |
-| `bulk_update_docs`          | `str`                         | `"Update multiple objects in a single request."`   | Bulk update endpoint description                                        |
-| `bulk_delete_docs`          | `str`                         | `"Delete multiple objects in a single request."`   | Bulk delete endpoint description                                        |
-| `ordering_fields`           | `list[str]`                   | `[]`                                               | Fields allowed for ordering (empty = disabled)                          |
-| `default_ordering`          | `str \| list[str]`            | `[]`                                               | Default ordering when no `?ordering` param is provided                  |
-| `require_update_fields`     | `bool`                        | `False`                                            | Reject PATCH with empty payload (`SerializeError`)                      |
-
-### :material-tag: Verbose Name Resolution
-
-Verbose names are resolved using a three-tier priority:
-
-| Priority | Source | Example |
-|---|---|---|
-| 1 | ViewSet class attribute (`model_verbose_name`) | Set on the ViewSet directly |
-| 2 | `NinjaAIOMeta` inner class on the model | `class NinjaAIOMeta: verbose_name = "Blog Article"` |
-| 3 | Django `Meta` (`model._meta.verbose_name`) | Auto-derived from model class name |
-
-**Using `NinjaAIOMeta` on the model (recommended for reuse across ViewSets):**
-
-```python
-class BlogPost(models.Model):
-    title = models.CharField(max_length=255)
-
-    class NinjaAIOMeta:
-        not_found_name = "article"          # custom 404 error key
-        verbose_name = "Blog Article"       # used for endpoint summaries
-        verbose_name_plural = "Blog Articles"  # used for route paths & display
-```
-
-All attributes are optional. `NinjaAIOMeta` values are used as-is (no `.capitalize()`), while Django Meta values are auto-capitalized.
-
-**Using ViewSet attributes (per-ViewSet override):**
-
-```python
-@api.viewset(BlogPost)
-class BlogPostAPI(APIViewSet):
-    model_verbose_name = "Article"
-    model_verbose_name_plural = "Articles"
-```
-
-ViewSet attributes take highest priority, so they can override `NinjaAIOMeta` for a specific ViewSet.
-
-## :material-shield-lock: Authentication Attributes
-
-| Attribute     | Type           | Default   | Description              |
-| ------------- | -------------- | --------- | ------------------------ |
-| `auth`        | `list \| None` | `NOT_SET` | Global fallback auth     |
-| `get_auth`    | `list \| None` | `NOT_SET` | Auth for list + retrieve |
-| `post_auth`   | `list \| None` | `NOT_SET` | Auth for create          |
-| `patch_auth`  | `list \| None` | `NOT_SET` | Auth for update          |
-| `delete_auth` | `list \| None` | `NOT_SET` | Auth for delete          |
-
-Resolution rules:
-
-- Per-verb auth overrides `auth` when not `NOT_SET`.
-- `None` makes the endpoint public (no authentication).
-- M2M endpoints use relation-level auth (`m2m_data.auth`) or fall back to `m2m_auth`.
-
-## :material-database-sync: Transaction Management
-
-Create, update, and delete operations are automatically wrapped in atomic transactions using the `@aatomic` decorator. This ensures that database operations are rolled back on exceptions:
-
-```python
-@api.viewset(model=Article)
-class ArticleViewSet(APIViewSet):
-    pass  # create/update/delete automatically transactional
-```
-
-The transaction behavior is applied by default. Custom decorators can be added via `extra_decorators` attribute.
-
-## :material-file-document-edit: Automatic Schema Generation
-
-If `model` is a subclass of `ModelSerializerMeta`:
-
-- `schema_out` is generated from `ReadSerializer`
-- `schema_detail` is generated from `DetailSerializer` (optional, falls back to `schema_out`)
-- `schema_in` from `CreateSerializer`
-- `schema_update` from `UpdateSerializer`
-- `schema_create_out` falls back to `schema_out` unless explicitly set
-- `schema_update_out` falls back to `schema_out` unless explicitly set
-- `schema_delete_out` defaults to `None` (204 No Content) unless explicitly set
-
-For plain Django models, you can provide a `serializer_class` (Serializer) instead:
-
-```python
-from ninja_aio.models import serializers
-
-class ArticleSerializer(serializers.Serializer):
-    class Meta:
-        model = models.Article
-        schema_in = serializers.SchemaModelConfig(
-            fields=["title", "content", "author"]
-        )
-        schema_out = serializers.SchemaModelConfig(
-            fields=["id", "title", "content", "author"]
-        )
-
-@api.viewset(model=models.Article)
-class ArticleViewSet(APIViewSet):
-    serializer_class = ArticleSerializer
-```
-
-Otherwise provide schemas manually via `schema_in`, `schema_out`, `schema_detail`, `schema_update`, and the per-operation out schemas attributes.
-
-### Detail Schema for Retrieve Endpoint
-
-Use `schema_detail` (or `DetailSerializer` on ModelSerializer) when you want the retrieve endpoint to return more fields than the list endpoint. This is useful for:
-
-- **Performance optimization**: List endpoints return minimal fields, retrieve endpoints include expensive relations
-- **API design**: Clients get a summary in lists and full details on individual requests
-
-```python
-from ninja_aio.models import ModelSerializer
-from django.db import models
-
-class Article(ModelSerializer):
-    title = models.CharField(max_length=200)
-    summary = models.TextField()
-    content = models.TextField()
-    author = models.ForeignKey(User, on_delete=models.CASCADE)
-    tags = models.ManyToManyField(Tag)
-
-    class ReadSerializer:
-        # List view: minimal fields
-        fields = ["id", "title", "summary"]
-
-    class DetailSerializer:
-        # Detail view: all fields
-        fields = ["id", "title", "summary", "content", "author", "tags"]
-
-@api.viewset(model=Article)
-class ArticleViewSet(APIViewSet):
-    pass  # Schemas auto-generated from model
-```
-
-Endpoints behavior:
-- `GET /articles/` returns `[{"id": 1, "title": "...", "summary": "..."}, ...]`
-- `GET /articles/1` returns `{"id": 1, "title": "...", "summary": "...", "content": "...", "author": {...}, "tags": [...]}`
-
-### Per-Operation Response Schemas
-
-Use `schema_create_out`, `schema_update_out`, and `schema_delete_out` when you want create, update, or delete endpoints to return a different shape than `schema_out`.
-
-**Resolution order:**
-
-| Attribute | Fallback | Endpoint |
-|---|---|---|
-| `schema_create_out` | `schema_out` | `POST /` (201) |
-| `schema_update_out` | `schema_out` | `PATCH /{pk}/` (200) |
-| `schema_delete_out` | `None` → 204 No Content | `DELETE /{pk}/` (200 when set) |
-
-**Example — lightweight create/update responses:**
-
-```python
-from ninja import Schema
-
-class ArticleIn(Schema):
-    title: str
-    content: str
-    author_id: int
-
-class ArticleOut(Schema):
-    id: int
-    title: str
-    content: str
-    author_id: int
-    created_at: str
-
-class ArticleCreatedOut(Schema):
-    id: int
-    title: str
-
-class ArticleUpdatedOut(Schema):
-    id: int
-    title: str
-    updated_at: str
-
-@api.viewset(model=Article)
-class ArticleViewSet(APIViewSet):
-    schema_in = ArticleIn
-    schema_out = ArticleOut
-    schema_create_out = ArticleCreatedOut  # POST returns only id + title
-    schema_update_out = ArticleUpdatedOut  # PATCH returns id + title + updated_at
-    # DELETE still returns 204 No Content (schema_delete_out not set)
-```
-
-**Example — delete that returns the deleted object:**
-
-```python
-class ArticleDeletedOut(Schema):
-    id: int
-    title: str
-
-@api.viewset(model=Article)
-class ArticleViewSet(APIViewSet):
-    schema_in = ArticleIn
-    schema_out = ArticleOut
-    schema_delete_out = ArticleDeletedOut  # DELETE now returns 200 with the deleted object
-```
-
-When `schema_delete_out` is set, the delete endpoint:
-
-1. Fetches and serializes the object using `schema_delete_out`
-2. Deletes the object from the database
-3. Returns `200` with the serialized data
-
-!!! note
-    `schema_create_out` and `schema_update_out` are independent of each other and of `schema_out`. Setting one does not affect the others.
-
-## :material-shield-check: Partial Update Validation
-
-By default, PATCH endpoints accept empty payloads silently (no fields updated, but `save()` is still called). Enable `require_update_fields` to reject empty updates:
-
-```python
-@api.viewset(model=Article)
-class ArticleViewSet(APIViewSet):
-    require_update_fields = True
-```
-
-When enabled, a PATCH request with no update fields raises a `SerializeError` with message `"No fields provided for update."` (HTTP 400).
-
-This applies to both single update and bulk update operations. In bulk updates, empty items are collected as errors without affecting other items (partial success semantics).
-
----
-
-## :material-content-copy: Bulk Operations
-
-Bulk operations allow creating, updating, or deleting multiple objects in a single request. They are **opt-in** — no bulk endpoints are registered unless explicitly enabled via `bulk_operations`.
-
-### Enabling Bulk Operations
-
-```python
-@api.viewset(model=Article)
-class ArticleViewSet(APIViewSet):
-    bulk_operations = ["create", "update", "delete"]
-```
-
-### Generated Bulk Endpoints
-
-| Method | Path             | Summary       | Response                  |
-| ------ | ---------------- | ------------- | ------------------------- |
-| POST   | `/{base}/bulk/`  | Bulk Create   | `200 BulkResultSchema`    |
-| PATCH  | `/{base}/bulk/`  | Bulk Update   | `200 BulkResultSchema`    |
-| DELETE | `/{base}/bulk/`  | Bulk Delete   | `200 BulkResultSchema`    |
-
-### Response Format
-
-All bulk endpoints return a `BulkResultSchema` with **partial success** semantics — each item is processed independently, and failures don't affect other items:
-
-```json
-{
-  "success": {
-    "count": 2,
-    "details": [1, 3]
-  },
-  "errors": {
-    "count": 1,
-    "details": [{"error": "Not found."}]
-  }
-}
-```
-
-- **`success.details`** — list of primary keys of successfully processed objects (default). Customizable via `bulk_response_fields`.
-- **`errors.details`** — list of error detail dicts for each failed item.
-
-### Custom Response Fields
-
-By default, `success.details` contains primary keys. Use `bulk_response_fields` to return different field(s):
-
-**Single field** — returns a flat list of values:
-
-```python
-@api.viewset(model=Article)
-class ArticleViewSet(APIViewSet):
-    bulk_operations = ["create", "update", "delete"]
-    bulk_response_fields = "title"
-```
-
-```json
-{
-  "success": {
-    "count": 2,
-    "details": ["Article 1", "Article 2"]
-  }
-}
-```
-
-**Multiple fields** — returns a list of dicts:
-
-```python
-@api.viewset(model=Article)
-class ArticleViewSet(APIViewSet):
-    bulk_operations = ["create", "update", "delete"]
-    bulk_response_fields = ["id", "title"]
-```
-
-```json
-{
-  "success": {
-    "count": 2,
-    "details": [
-      {"id": 1, "title": "Article 1"},
-      {"id": 2, "title": "Article 2"}
-    ]
-  }
-}
-```
-
-!!! note
-    For bulk delete, the requested fields are fetched **before** deletion so they can be included in the response.
-
-### Request Formats
-
-**Bulk Create** — request body is `List[schema_in]`:
-
-```json
-[
-  {"title": "Article 1", "content": "..."},
-  {"title": "Article 2", "content": "..."}
-]
-```
-
-**Bulk Update** — request body is a list of objects with the PK field (required) plus update fields. A dynamic schema is generated combining the PK field with `schema_update`:
-
-```json
-[
-  {"id": 1, "title": "Updated Title"},
-  {"id": 2, "content": "Updated Content"}
-]
-```
-
-**Bulk Delete** — request body contains a list of PK values:
-
-```json
-{"ids": [1, 2, 3]}
-```
-
-### Selective Enablement
-
-Enable only specific operations:
-
-```python
-bulk_operations = ["create"]          # Only bulk create
-bulk_operations = ["create", "delete"]  # Create and delete, no update
-```
-
-### Disabling Individual Bulk Views
-
-Bulk views can also be disabled via the `disable` attribute:
-
-```python
-@api.viewset(model=Article)
-class ArticleViewSet(APIViewSet):
-    bulk_operations = ["create", "update", "delete"]
-    disable = ["bulk_update"]  # Disable only bulk update
-```
-
-Valid disable values: `bulk_create`, `bulk_update`, `bulk_delete`.
-
-### Partial Success Semantics
-
-Each item in a bulk request is processed independently. If an item fails (validation error, not found, etc.), the error is collected in the response but other items continue processing normally. This means:
-
-- Successful items are committed to the database immediately.
-- Failed items appear in `errors.details` with the error message.
-- The response always returns HTTP `200` with the combined result.
-
-??? info "Performance"
-
-    - **Bulk Delete** is optimized to use a single database query (`DELETE ... WHERE pk IN (...)`) instead of deleting objects one by one.
-    - **Bulk Create** and **Bulk Update** process items individually to preserve `save()` validations and hooks.
-
-??? info "Authentication"
-
-    Bulk endpoints inherit per-verb authentication:
-
-    | Bulk Operation | Auth Source    |
-    | -------------- | ------------- |
-    | Bulk Create    | `post_auth`   |
-    | Bulk Update    | `patch_auth`  |
-    | Bulk Delete    | `delete_auth` |
-
-??? info "Hooks and Validators"
-
-    Bulk operations call the same hooks as single-item operations, **per item**:
-
-    - `parse_input_data()` — field validation, FK resolution, base64 decoding
-    - `custom_actions()` — custom field processing (create, update)
-    - `post_create()` — post-creation hook (create only)
-
-??? example "Extra Decorators"
-
-    Apply custom decorators to bulk endpoints via `extra_decorators`:
-
-    ```python
-    extra_decorators = DecoratorsSchema(
-        bulk_create=[rate_limit],
-        bulk_update=[log_operation],
-        bulk_delete=[admin_only],
-    )
-    ```
-
-### Core Attributes
-
-| Attribute              | Type                             | Default | Description                                      |
-| ---------------------- | -------------------------------- | ------- | ------------------------------------------------ |
-| `bulk_operations`      | `list[Literal["create", "update", "delete"]]` | `[]`    | Which bulk operations to enable                  |
-| `bulk_response_fields` | `list[str] \| str \| None`       | `None`  | Field(s) returned in success details (`None` = PK) |
-| `bulk_create_docs`     | `str`                            | `"Create multiple objects in a single request."`  | Bulk create endpoint description                 |
-| `bulk_update_docs`     | `str`                            | `"Update multiple objects in a single request."`  | Bulk update endpoint description                 |
-| `bulk_delete_docs`     | `str`                            | `"Delete multiple objects in a single request."`  | Bulk delete endpoint description                 |
-
-## :material-sort: Ordering
-
-Add native ordering support to the list endpoint with `ordering_fields` and `default_ordering`:
-
-```python
-@api.viewset(model=Article)
-class ArticleViewSet(APIViewSet):
-    ordering_fields = ["created_at", "title", "views"]
-    default_ordering = "-created_at"
-```
-
-This automatically adds an `ordering` query parameter to the list endpoint:
-
-```bash
-# Single field ascending
-GET /api/article/?ordering=title
-
-# Single field descending
-GET /api/article/?ordering=-title
-
-# Multiple fields (comma-separated)
-GET /api/article/?ordering=-views,title
-
-# No ordering param → default_ordering applied
-GET /api/article/
-```
-
-### How It Works
-
-- When `ordering_fields` is set, an `ordering` query parameter is automatically added to the filters schema.
-- The `ordering` value is popped from the filters dict **before** `query_params_handler` runs, so existing filter mixins never see it.
-- Each field in the comma-separated value is validated against `ordering_fields`. Invalid fields are silently ignored.
-- Both `field` (ascending) and `-field` (descending) are valid if `field` is in `ordering_fields`.
-- If no valid fields remain, `default_ordering` is applied as fallback.
-- `default_ordering` accepts a single string (`"-created_at"`) or a list (`["-created_at", "title"]`).
-- When `ordering_fields` is empty (default), the feature is completely disabled — no query parameter is added.
-
-### Ordering with Filters
-
-Ordering works seamlessly with existing `query_params` and filter mixins:
-
-```python
-@api.viewset(model=Article)
-class ArticleViewSet(
-    APIViewSet,
-    IcontainsFilterViewSetMixin,
-):
-    ordering_fields = ["title", "created_at"]
-    default_ordering = "-created_at"
-    query_params = {
-        "title": (str, None),
-        "is_published": (bool, None),
-    }
-```
-
-```bash
-# Filter + ordering combined
-GET /api/article/?title=django&ordering=-created_at
-```
-
-## :material-filter: List Filtering
-
-Define filters for the list view with `query_params`:
-
-```python
-query_params = {
-    "is_active": (bool, None),
-    "role": (str, None),
-    "search": (str, None),
-}
-```
-
-Override handler:
-
-```python
-async def query_params_handler(self, queryset, filters: dict):
-    if filters.get("is_active") is not None:
-        queryset = queryset.filter(is_active=filters["is_active"])
-    if filters.get("role"):
-        queryset = queryset.filter(role=filters["role"])
-    if filters.get("search"):
-        from django.db.models import Q
-        s = filters["search"]
-        queryset = queryset.filter(Q(username__icontains=s) | Q(email__icontains=s))
-    return queryset
-```
-
-A dynamic Pydantic model (`FiltersSchema`) is built with `pydantic.create_model` from `query_params`.
-
-## :material-format-list-bulleted: List and Retrieve implementations
-
-List now leverages ModelUtil.get_objects and list_read_s, automatically applying read optimizations and optional filters:
-
-```python
-class ArticleViewSet(APIViewSet):
-    model = Article
-    api = api
-
-    def views(self):
-        @self.router.get("/")
-        async def list(request, filters: self.filters_schema = None):
-            qs = await self.model_util.get_objects(
-                request,
-                query_data=self._get_query_data(),  # defaults from ModelSerializer.QuerySet.read
-                is_for_read=True,
-            )
-            if filters is not None:
-                qs = await self.query_params_handler(qs, filters.model_dump())
-            return await self.model_util.list_read_s(self.schema_out, request, qs)
-```
-
-Retrieve uses read_s with getters, deriving PK type from the model:
-
-```python
-@self.router.get("/{pk}/")
-async def retrieve(request, pk: self.path_schema):
-    return await self.model_util.read_s(
-        self.schema_out,
-        request,
-        query_data=QuerySchema(getters={"pk": self._get_pk(pk)}),
-        is_for_read=True,
-    )
-```
-
-- Path schema PK type is inferred from the model’s primary key field.
-
-## :material-link-variant: Many-to-Many Relations
-
-Relations are declared via `M2MRelationSchema` objects (not tuples). Each schema can include:
-
-- `model`: related Django model or ModelSerializer
-- `related_name`: attribute name on the main model (e.g. `"tags"`)
-- `path`: custom URL segment (optional)
-- `auth`: list of auth instances (optional)
-- `add`: enable additions (bool)
-- `remove`: enable removals (bool)
-- `get`: enable GET listing (bool)
-- `filters`: dict of `{param_name: (type, default)}` for relation-level filtering
-- `related_schema`: optional pre-built schema for the related model (auto-generated if the `model` is a `ModelSerializer`)
-- `serializer_class`: optional `Serializer` class for plain Django models. When provided, `related_schema` is auto-generated from the serializer. Cannot be used when `model` is a `ModelSerializer`.
-- `append_slash`: bool to control trailing slash for the GET relation endpoint path. Defaults to `False` (no trailing slash) for backward compatibility. When `True`, the GET path ends with a trailing slash.
-- `verbose_name_plural`: optional human-readable plural name for the related model, used in endpoint summaries and descriptions. When not provided, defaults to the related model's `_meta.verbose_name_plural`.
-- `get_decorators`: optional list of decorators to apply to the GET (list related objects) endpoint. Decorators are applied via `decorate_view()` alongside built-in decorators like `unique_view` and `paginate`.
-- `post_decorators`: optional list of decorators to apply to the POST (add/remove) endpoint. Decorators are applied via `decorate_view()` alongside the built-in `unique_view` decorator.
-
-If `path` is empty it falls back to the related model verbose name (lowercase plural).
-If `filters` is provided, a per-relation filters schema is auto-generated and exposed on the GET relation endpoint:
-`GET /{base}/{pk}/{related_path}?param=value`
-
-Custom filter hook naming convention:
-`<related_name>_query_params_handler(self, queryset, filters_dict)`
-
-The M2M helper:
-
-- Returns a paginated list of related items on GET.
-- Supports both sync and async custom filter handlers.
-- Uses `list_read_s` for related items serialization.
-
-Example filter handler (sync or async):
-
-```python
-def tags_query_params_handler(self, queryset, filters_dict):
-    name = filters_dict.get("name")
-    return queryset.filter(name=name) if name else queryset
-
-# or
-
-async def tags_query_params_handler(self, queryset, filters_dict):
-    # perform async lookups if needed, then return queryset
-    return queryset
-```
-
-Warning: Model support
-
-- You can supply a standard Django `Model` (not a `ModelSerializer`) in `M2MRelationSchema.model`. When doing so you must provide either `related_schema` manually or `serializer_class`:
-
-=== "With related_schema"
-    ```python
-    M2MRelationSchema(
-        model=Tag,                # plain django.db.models.Model
-        related_name="tags",
-        related_schema=TagOut,    # a Pydantic/Ninja Schema you define
-        add=True,
-        remove=True,
-        get=True,
-    )
-    ```
-
-=== "With serializer_class"
-    ```python
-    from ninja_aio.models import serializers
-
-    class TagSerializer(serializers.Serializer):
-        class Meta:
-            model = Tag
-            schema_out = serializers.SchemaModelConfig(fields=["id", "name"])
-
-    M2MRelationSchema(
-        model=Tag,                        # plain django.db.models.Model
-        related_name="tags",
-        serializer_class=TagSerializer,   # auto-generates related_schema
-        add=True,
-        remove=True,
-        get=True,
-    )
-    ```
-
-For `ModelSerializer` models, `related_schema` can be inferred automatically (via internal helpers).
-
-Note: You cannot use `serializer_class` when `model` is already a `ModelSerializer` - this will raise a `ValueError`.
-
-Example with filters:
-
-```python
-class UserViewSet(APIViewSet):
-    model = User
-    api = api
-    m2m_relations = [
-        M2MRelationSchema(
-            model=Tag,
-            related_name="tags",
-            filters={"name": (str, "")}
-        )
-    ]
-
-    async def tags_query_params_handler(self, queryset, filters):
-        name_filter = filters.get("name")
-        if name_filter:
-            queryset = queryset.filter(name__icontains=name_filter)
-        return queryset
-```
-
-### Relation Handlers: GET filters vs POST per-PK resolution
-
-- GET filters handler (per relation):
-
-  - Name: `<related_name>_query_params_handler(self, queryset, filters_dict)`
-  - Purpose: apply filters to the related list queryset (GET endpoint).
-  - Supports both synchronous and asynchronous functions.
-
-- POST per-PK resolution handler (per relation):
-  - Name: `<related_name>_query_handler(self, request, pk, instance)`
-  - Purpose: resolve a single related object (for add/remove validation) before mutation.
-  - Must return a queryset; the object is resolved with `.afirst()`.
-  - Automatic fallback if missing: `ModelUtil(related_model).get_objects(request, ObjectsQuerySchema(filters={"pk": pk}))` + `.afirst()`.
-
-Example:
-
-```python
-class MyViewSet(APIViewSet):
-    model = Article
-    api = api
-
-    async def tags_query_params_handler(self, qs, filters: dict):
-        name = filters.get("name")
-        return qs.filter(name__icontains=name) if name else qs
-
-    async def tags_query_handler(self, request, pk, instance):
-        # allow only tags belonging to the same project as the instance
-        return Tag.objects.filter(pk=pk, project_id=instance.project_id)
-```
-
-### Endpoint paths and operation naming
-
-- GET relation: `/{base}/{pk}/{rel_path}` by default (no trailing slash). You can enable a trailing slash per relation with `append_slash=True`, resulting in `/{base}/{pk}/{rel_path}/`.
-- POST relation: `/{base}/{pk}/{rel_path}/` (always with trailing slash).
-
-Path normalization rules:
-
-- Relation `path` is normalized internally; providing `path` with or without a leading slash produces the same final URL.
-  - Example: `path="tags"` or `path="/tags"` both yield `GET /{base}/{pk}/tags` (or `GET /{base}/{pk}/tags/` when `append_slash=True`) and `POST /{base}/{pk}/tags/`.
-- If `path` is empty, it falls back to the related model verbose name.
-
-### Request/Response and concurrency
-
-Request bodies:
-
-- Add & Remove: `{ "add": number[], "remove": number[] }`
-- Add only: `{ "add": number[] }`
-- Remove only: `{ "remove": number[] }`
-
-Standard response (M2MSchemaOut):
-
-```json
-{
-  "results": { "count": X, "details": ["..."] },
-  "errors": { "count": Y, "details": ["..."] }
-}
-```
-
-- Concurrency: `aadd(...)` and `aremove(...)` run in parallel via `asyncio.gather` when both lists are non-empty.
-- Per-PK errors include: object not found, state mismatch (removing non-related, adding already-related).
-- Per-PK success messages indicate the executed action.
-
-### Generated M2M Endpoints (per relation)
-
-| Method | Path                       | Feature                                            |
-| ------ | -------------------------- | -------------------------------------------------- |
-| GET    | `/{base}/{pk}/{rel_path}`  | List related objects (paginated, optional filters) |
-| POST   | `/{base}/{pk}/{rel_path}/` | Add/remove related objects                         |
-
-Example:
-
-```python
-class ArticleViewSet(APIViewSet):
-    model = Article
-    api = api
-    m2m_relations = [
-        M2MRelationSchema(model=Tag, related_name="tags"),
-        M2MRelationSchema(model=Category, related_name="categories", path="article-categories"),
-        M2MRelationSchema(model=User, related_name="authors", path="co-authors", auth=[AdminAuth()])
-    ]
-    m2m_auth = [JWTAuth()]  # fallback for relations without custom auth
-```
-
-Example with trailing slash on GET relation:
-
-```python
-M2MRelationSchema(
-    model=Tag,
-    related_name="tags",
-    filters={"name": (str, "")},
-    append_slash=True,  # GET /{base}/{pk}/tags/
-)
-```
-
-Example with custom verbose name:
-
-```python
-M2MRelationSchema(
-    model=Tag,
-    related_name="tags",
-    verbose_name_plural="Article Tags",  # Used in summaries: "Get Article Tags", "Add or Remove Article Tags"
-    add=True,
-    remove=True,
-    get=True,
-)
-```
-
-Example with custom decorators:
-
-```python
-from functools import wraps
-
-def cache_response(timeout=60):
-    """Cache decorator for GET endpoints."""
-    def decorator(func):
-        @wraps(func)
-        async def wrapper(*args, **kwargs):
-            # caching logic here
-            return await func(*args, **kwargs)
-        return wrapper
-    return decorator
-
-def rate_limit(max_calls=100):
-    """Rate limiting decorator for POST endpoints."""
-    def decorator(func):
-        @wraps(func)
-        async def wrapper(*args, **kwargs):
-            # rate limiting logic here
-            return await func(*args, **kwargs)
-        return wrapper
-    return decorator
-
-M2MRelationSchema(
-    model=Tag,
-    related_name="tags",
-    get_decorators=[cache_response(timeout=300)],  # Cache GET for 5 minutes
-    post_decorators=[rate_limit(max_calls=50)],     # Rate limit POST operations
-    add=True,
-    remove=True,
-    get=True,
-)
-```
-
-Note: Decorators are applied in addition to built-in decorators (`unique_view`, `paginate`). The order follows standard Python decorator stacking: decorators listed first are applied outermost.
-
-## :material-pencil-plus: Custom Views
-
-Preferred (decorators): see the section above.
-
-Legacy (still supported):
-
-```python
-def views(self):
-    @self.router.get("/stats/", response={200: GenericMessageSchema})
-    async def stats(request):
-        total = await self.model.objects.acount()
-        return {"message": f"Total: {total}"}
-```
-
-## :material-rename-box: Dynamic View Naming
-
-All generated handlers are decorated with `@unique_view(...)` to ensure stable unique function names (prevents collisions and ensures consistent OpenAPI schema generation). Relation endpoints use explicit names like `get_<model>_<rel_path>` and `manage_<model>_<rel_path>`.
-
-## :material-decagram: Extra Decorators
-
-Apply custom decorators to specific CRUD operations via the `extra_decorators` attribute:
-
-```python
-from ninja_aio.schemas.helpers import DecoratorsSchema
-from functools import wraps
-
-def log_operation(func):
-    @wraps(func)
-    async def wrapper(*args, **kwargs):
-        print(f"Calling {func.__name__}")
-        return await func(*args, **kwargs)
-    return wrapper
-
-@api.viewset(model=Article)
-class ArticleViewSet(APIViewSet):
-    extra_decorators = DecoratorsSchema(
-        create=[log_operation],
-        update=[log_operation],
-        delete=[log_operation],
-    )
-```
-
-Available decorator fields:
-- `create`: Decorators for create endpoint
-- `list`: Decorators for list endpoint
-- `retrieve`: Decorators for retrieve endpoint
-- `update`: Decorators for update endpoint
-- `delete`: Decorators for delete endpoint
-- `bulk_create`: Decorators for bulk create endpoint
-- `bulk_update`: Decorators for bulk update endpoint
-- `bulk_delete`: Decorators for bulk delete endpoint
-
-## :material-hook: Overridable Hooks
-
-| Hook                                                     | Purpose                         |
-| -------------------------------------------------------- | ------------------------------- |
-| `views()`                                                | Register custom endpoints       |
-| `query_params_handler(queryset, filters)`                | Apply list filters              |
-| `<related_name>_query_params_handler(queryset, filters)` | Apply relation-specific filters |
-
-## :material-alert-circle: Error Handling
-
-All CRUD and M2M endpoints may respond with `error_schema` (default `GenericMessageSchema`) for error codes: 400 (validation), 401 (auth), 403 (forbidden), 404 (not found).
-
-`error_schema` is a class attribute on `API` (the common base of `APIView` and `APIViewSet`), so it's inherited by every view/viewset. Override it once, on your own shared base class, to make every generated endpoint's OpenAPI schema document *your* project's error contract instead of the generic default — without touching a single `response=` declaration by hand:
-
-```python
-from ninja import Schema
-from ninja_aio.views import APIViewSet
-
-class ErrorResponse(Schema):
-    error_id: str
-    error_description: str
-
-class MyBaseViewSet(APIViewSet):
-    error_schema = ErrorResponse  # every generated endpoint documents this instead
-
-class BookAPI(MyBaseViewSet):
-    model = Book
-```
-
-This only changes what the OpenAPI/Swagger schema *documents* for those status codes — it has no effect on the actual response your exception handlers produce at runtime.
-
-## :material-lightning-bolt: Performance Tips
-
-1. Implement `@classmethod async def queryset_request(cls, request)` in your `ModelSerializer` to prefetch related objects.
-2. Use database indexes on filtered fields (`query_params` and relation `filters`).
-3. Keep pagination enabled for large datasets.
-4. Prefetch reverse relations via `model_util.get_reverse_relations()` (already applied in list view).
-5. Limit slice size for expensive searches if needed (`queryset = queryset[:1000]`).
-
-## :material-rocket-launch: Minimal Usage
-
-=== "Recommended"
-    ```python
-    from ninja_aio import NinjaAIO
-    from ninja_aio.views import APIViewSet
-    from .models import User
-    from ninja_aio.decorators import api_get
-
-    api = NinjaAIO(title="My API")
-
-    @api.viewset(model=User)
-    class UserViewSet(APIViewSet):
-        @api_get("/stats/")
-        async def stats(self, request):
-            total = await self.model.objects.acount()
-            return {"total": total}
-    ```
-
-=== "Alternative implementation"
-    ```python
-    from ninja_aio import NinjaAIO
-    from ninja_aio.views import APIViewSet
-    from .models import User
-
-    api = NinjaAIO(title="My API")
-
-    class UserViewSet(APIViewSet):
-        model = User
-        api = api
-
-        def views(self):
-            @self.router.get("/stats/")
-            async def stats(request):
-                total = await self.model.objects.acount()
-                return {"total": total}
-
-    UserViewSet().add_views_to_route()
-    ```
-
-Note: prefix and tags are optional. If omitted, the base path is inferred from the model verbose name plural and tags default to the model verbose name.
-
-## :material-eye-off: Disable Selected Views
-
-```python
-@api.viewset(model=User)
-class ReadOnlyUserViewSet(APIViewSet):
-    disable = ["create", "update", "delete"]
-
-# Disable specific bulk operations
-@api.viewset(model=Article)
-class ArticleViewSet(APIViewSet):
-    bulk_operations = ["create", "update", "delete"]
-    disable = ["bulk_delete"]  # Enable bulk create/update, disable bulk delete
-```
-
-## :material-shield-lock: Authentication Example
-
-```python
-@api.viewset(model=User)
-class UserViewSet(APIViewSet):
-    auth = [JWTAuth()]      # global fallback
-    get_auth = None         # list/retrieve public
-    delete_auth = [AdminAuth()]  # delete restricted
-```
-
-## :material-code-braces: Complete M2M + Filters Example
-
-Recommended:
-
-```python
-from ninja_aio import NinjaAIO
-from ninja_aio.views import APIViewSet
-from ninja_aio.models import ModelSerializer
-from ninja_aio.decorators import api_get
-from django.db import models
-
-api = NinjaAIO(title="My API")
-
-class Tag(ModelSerializer):
-    name = models.CharField(max_length=100)
-    class ReadSerializer:
-        fields = ["id", "name"]
-
-class User(ModelSerializer):
-    username = models.CharField(max_length=150)
-    tags = models.ManyToManyField(Tag, related_name="users")
-    class ReadSerializer:
-        fields = ["id", "username", "tags"]
-
-@api.viewset(model=User)
-class UserViewSet(APIViewSet):
-    query_params = {"search": (str, None)}
-    m2m_relations = [
-        M2MRelationSchema(
-            model=Tag,
-            related_name="tags",
-            filters={"name": (str, "")},
-            add=True,
-            remove=True,
-            get=True,
-        )
-    ]
-
-    async def query_params_handler(self, queryset, filters):
-        if filters.get("search"):
-            from django.db.models import Q
-            s = filters["search"]
-            return queryset.filter(Q(username__icontains=s))
-        return queryset
-
-    async def tags_query_params_handler(self, queryset, filters):
-        name_filter = filters.get("name")
-        if name_filter:
-            queryset = queryset.filter(name__icontains=name_filter)
-        return queryset
-```
-
-Alternative implementation:
-
-```python
-class UserViewSet(APIViewSet):
-    model = User
-    api = api
-    query_params = {"search": (str, None)}
-    m2m_relations = [
-        M2MRelationSchema(
-            model=Tag,
-            related_name="tags",
-            filters={"name": (str, "")},
-            add=True,
-            remove=True,
-            get=True,
-        )
-    ]
-
-    async def query_params_handler(self, queryset, filters):
-        if filters.get("search"):
-            from django.db.models import Q
-            s = filters["search"]
-            return queryset.filter(Q(username__icontains=s))
-        return queryset
-
-    async def tags_query_params_handler(self, queryset, filters):
-        name_filter = filters.get("name")
-        if name_filter:
-            queryset = queryset.filter(name__icontains=name_filter)
-        return queryset
-
-UserViewSet().add_views_to_route()
-```
-
-## :material-eye: ReadOnlyViewSet
-
-ReadOnlyViewSet enables only list and retrieve endpoints.
-
-```python
-@api.viewset(model=MyModel)
-class MyModelReadOnlyViewSet(ReadOnlyViewSet):
     pass
 ```
 
-## :material-pencil: WriteOnlyViewSet
+| Argument | Type | Default | Description |
+| --- | --- | --- | --- |
+| `model` | model class | required | A `ModelSerializer`, or a Django model with `serializer_class` |
+| `prefix` | `str \| None` | `None` | URL path. Falls back to `api_route_path`, then to the plural verbose name with spaces as hyphens |
+| `tags` | `list[str] \| None` | `None` | OpenAPI tags. Takes precedence over `router_tags` |
 
-WriteOnlyViewSet enables only create, update, and delete endpoints.
+`NinjaAIORouter` has the same `viewset()` decorator.
+
+## Class attributes
+
+| Attribute | Type | Default | Description |
+| --- | --- | --- | --- |
+| `serializer_class` | `type[Serializer] \| None` | `None` | Serializer for a plain Django model |
+| `execution_mode` | `"async" \| "sync"` | `"async"` | Mode of the generated endpoints |
+| `auth` | `list \| None` | `NOT_SET` | Auth for every endpoint. `NOT_SET` uses the API auth, `None` makes it public |
+| `get_auth`, `post_auth`, `patch_auth`, `delete_auth` | `list \| None` | `NOT_SET` | Auth for one HTTP method. `NOT_SET` uses `auth` |
+| `m2m_relations` | `list[M2MRelationSchema]` | `[]` | Many-to-many endpoints to add |
+| `m2m_auth` | `list \| None` | `NOT_SET` | Auth for the many-to-many endpoints. `NOT_SET` uses `get_auth` for the list and `patch_auth` for add/remove |
+| `disable` | `list[str]` | `[]` | Endpoints to skip: `create`, `list`, `retrieve`, `update`, `delete`, `bulk_create`, `bulk_update`, `bulk_delete`, `all` |
+| `pagination_class` | `type[AsyncPaginationBase]` | `PageNumberPagination` | Paginator of the list endpoint |
+| `query_params` | `dict[str, tuple]` | `{}` | List filters as `{"name": (type, default)}` |
+| `ordering_fields` | `list[str]` | `[]` | Fields accepted by `?ordering=` |
+| `default_ordering` | `str \| list[str]` | `[]` | Ordering when the client sends none |
+| `bulk_operations` | `list[str]` | `[]` | Bulk endpoints to add: `create`, `update`, `delete` |
+| `bulk_response_fields` | `list[str] \| str \| None` | `None` | Value returned per bulk success. `None` returns the primary key |
+| `require_update_fields` | `bool` | `False` | Reject an empty update body with `400` |
+| `extra_decorators` | `DecoratorsSchema` | `DecoratorsSchema()` | Decorators per endpoint, one list per endpoint name |
+| `schema_in` | `Schema \| None` | `None` | Create body. `None` uses the `create` schema |
+| `schema_out` | `Schema \| None` | `None` | List items and default response. `None` uses the `read` schema |
+| `schema_detail` | `Schema \| None` | `None` | Retrieve response. `None` uses the `detail` schema, then `schema_out` |
+| `schema_update` | `Schema \| None` | `None` | Update body. `None` uses the `update` schema |
+| `schema_create_out` | `Schema \| None` | `None` | Create response. `None` uses `schema_out` |
+| `schema_update_out` | `Schema \| None` | `None` | Update response. `None` uses `schema_out` |
+| `schema_delete_out` | `Schema \| None` | `None` | Delete response. When set, delete returns `200` with this schema |
+| `list_docs`, `create_docs`, `retrieve_docs`, `update_docs`, `delete_docs` | `str` | Short sentence | OpenAPI description of each endpoint |
+| `bulk_create_docs`, `bulk_update_docs`, `bulk_delete_docs` | `str` | Short sentence | OpenAPI description of each bulk endpoint |
+| `model_verbose_name`, `model_verbose_name_plural` | `str` | `""` | Names in summaries. `""` uses `NinjaAIOMeta`, then the model `Meta` |
+| `api_route_path` | `str` | `""` | URL path, set in the class instead of `prefix` |
+| `router_tag` | `str` | `""` | Single tag. `""` uses `model_verbose_name` |
+| `router_tags` | `list[str]` | `[]` | OpenAPI tags, used when `tags` is empty. Falls back to `[router_tag]` |
+| `error_schema` | `type[Schema]` | `GenericMessageSchema` | Schema documented for `400`, `401`, `403` and `404` |
+
+`disable = ["all"]` skips the five CRUD endpoints only.
+
+## Generated endpoints
+
+Paths for `prefix="articles"` with the default `NINJA_AIO_APPEND_SLASH = True`.
+An endpoint is only added when its body schema exists (delete always is).
+
+| Operation | Method | Path | Status | Body | Response |
+| --- | --- | --- | --- | --- | --- |
+| `list` | `GET` | `/api/articles` | 200 | | `{"items": [...], "count": N}` of `schema_out` |
+| `create` | `POST` | `/api/articles/` | 201 | `schema_in` | `schema_create_out` |
+| `retrieve` | `GET` | `/api/articles/{id}` | 200 | | `schema_detail` |
+| `update` | `PATCH` | `/api/articles/{id}/` | 200 | `schema_update` | `schema_update_out` |
+| `delete` | `DELETE` | `/api/articles/{id}/` | 204 | | none, or `schema_delete_out` with 200 |
+| `bulk_create` | `POST` | `/api/articles/bulk/` | 200 | list of `schema_in` | `BulkResultSchema` |
+| `bulk_update` | `PATCH` | `/api/articles/bulk/` | 200 | list of `schema_update` plus the primary key | `BulkResultSchema` |
+| `bulk_delete` | `DELETE` | `/api/articles/bulk/` | 200 | `{"ids": [...]}` | `BulkResultSchema` |
+| many-to-many list | `GET` | `/api/articles/{id}/tags` | 200 | | Paginated related objects |
+| many-to-many add/remove | `POST` | `/api/articles/{id}/tags/` | 200 | `{"add": [...], "remove": [...]}` | `M2MSchemaOut` |
+
+With `NINJA_AIO_APPEND_SLASH = False` no path ends with a slash. The
+many-to-many path defaults to the plural verbose name of the related model.
+
+## Operation methods
+
+Each endpoint calls one of these methods. Sync viewsets call the plain names,
+async viewsets the `a` names. They return a Django Ninja `Status`.
+
+| Operation | Sync | Async | Arguments |
+| --- | --- | --- | --- |
+| Create | `create` | `acreate` | `request`, `data` |
+| List | `list` | `alist` | `request`, `filters`, `ninja_pagination` |
+| Retrieve | `retrieve` | `aretrieve` | `request`, `pk` |
+| Update | `update` | `aupdate` | `request`, `data`, `pk` |
+| Delete | `delete` | `adelete` | `request`, `pk` |
+| Bulk create | `bulk_create` | `abulk_create` | `request`, `data` |
+| Bulk update | `bulk_update` | `abulk_update` | `request`, `data` |
+| Bulk delete | `bulk_delete` | `abulk_delete` | `request`, `data` |
+
+`pk` is a schema with the primary key as attribute, like `pk.id`.
+
+## Hooks
+
+Override the name that matches the mode. A mismatch raises
+`ImproperlyConfigured` at startup. See [Request lifecycle](../../concepts/lifecycle.md).
+
+| Hook | Arguments | Runs |
+| --- | --- | --- |
+| `on_before_operation` / `aon_before_operation` | `request`, `operation` | Before every endpoint, bulk endpoint and custom action |
+| `on_before_object_operation` / `aon_before_object_operation` | `request`, `operation`, `obj` | After the object is loaded, on retrieve, update, delete and detail actions. Defining it is enough; mixins that define it count too |
+| `on_list_queryset` | `request`, `queryset` | On list, before filters and pagination. Plain `def` in both modes. Returns the queryset |
+| `query_params_handler` / `aquery_params_handler` | `queryset`, `filters` | On list, with the filter values as a dict. Returns the queryset |
+| `views()` | none | At registration. Add Django Ninja routes to `self.router` |
+
+::: ninja_aio.views.api.API.aon_before_operation
+    options:
+      show_root_heading: true
+      show_root_full_path: false
+
+::: ninja_aio.views.api.APIViewSet.aon_before_object_operation
+    options:
+      show_root_heading: true
+      show_root_full_path: false
+
+::: ninja_aio.views.api.APIViewSet.on_list_queryset
+    options:
+      show_root_heading: true
+      show_root_full_path: false
+
+Custom endpoints use `@action` and `@on`. See [Custom actions](../../guides/custom-actions.md).
+
+## Shipped subclasses
 
 ```python
-@api.viewset(model=MyModel)
-class MyModelWriteOnlyViewSet(WriteOnlyViewSet):
-    pass
+from ninja_aio.views import ReadOnlyViewSet, WriteOnlyViewSet
 ```
 
-## :material-bookshelf: See Also
+| Class | `disable` | Endpoints |
+| --- | --- | --- |
+| `ReadOnlyViewSet` | `["create", "update", "delete"]` | List and retrieve |
+| `WriteOnlyViewSet` | `["list", "retrieve"]` | Create, update and delete |
 
-<div class="grid cards" markdown>
+Mixins for filters, permissions and soft delete are listed in [Mixins](mixins.md).
 
--   :material-database:{ .lg .middle } **ModelSerializer**
+## See also
 
-    ---
-
-    [:octicons-arrow-right-24: Schema generation](../models/model_serializer.md)
-
--   :material-shield-lock:{ .lg .middle } **Authentication**
-
-    ---
-
-    [:octicons-arrow-right-24: JWT auth setup](../authentication.md)
-
--   :material-page-next:{ .lg .middle } **Pagination**
-
-    ---
-
-    [:octicons-arrow-right-24: Custom strategies](../pagination.md)
-
--   :material-eye:{ .lg .middle } **APIView**
-
-    ---
-
-    [:octicons-arrow-right-24: Simple endpoints](api_view.md)
-
-</div>
+- [Viewsets](../../guides/viewsets.md)
+- [Custom actions](../../guides/custom-actions.md)
+- [Request lifecycle](../../concepts/lifecycle.md)
+- [APIView](api_view.md)

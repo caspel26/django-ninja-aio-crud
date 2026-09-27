@@ -1,12 +1,71 @@
-from typing import Literal
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any, Generic, Literal, TypeAlias, TypeVar
+from uuid import UUID
 
-from joserfc import jwk
 from django.db.models import Model
-from typing import TypeAlias
+from joserfc import jwk
+from ninja import Schema
 
 S_TYPES = Literal["read", "detail", "create", "update"]
 F_TYPES = Literal["fields", "customs", "optionals", "excludes"]
 SCHEMA_TYPES = Literal["In", "Out", "Detail", "Patch", "Related"]
+SchemaKind: TypeAlias = Literal["create", "update", "read", "detail", "related"]
+SchemaType: TypeAlias = type[Schema]
+InputData: TypeAlias = dict[str, Any] | Schema
+Payload: TypeAlias = dict[str, Any]
+PrimaryKey: TypeAlias = int | str | UUID
+
+
+class HttpMethod(str, Enum):
+    """HTTP methods supported by generated routes and actions; members compare equal to their value."""
+
+    GET = "get"
+    POST = "post"
+    PUT = "put"
+    PATCH = "patch"
+    DELETE = "delete"
+    HEAD = "head"
+    OPTIONS = "options"
+
+    def __str__(self) -> str:
+        return self.value
+
+
+HttpMethodName: TypeAlias = Literal["get", "post", "put", "patch", "delete", "head", "options"]
+QueryPurpose: TypeAlias = Literal["read", "detail"]
+"""Which read/detail relation optimizations a lookup applies."""
+BulkItemT = TypeVar("BulkItemT")
+
+
+@dataclass(frozen=True)
+class BulkFailure:
+    index: int
+    code: str
+    message: str
+    fields: dict[str, list[str]] = field(default_factory=dict)
+    pk: PrimaryKey | None = None
+    error: dict[str, Any] = field(default_factory=dict)
+    """Legacy error payload, as returned in HTTP bulk responses."""
+
+
+@dataclass
+class BulkResult(Generic[BulkItemT]):
+    succeeded: list[BulkItemT] = field(default_factory=list)
+    failed: list[BulkFailure] = field(default_factory=list)
+
+    @property
+    def has_errors(self) -> bool:
+        return bool(self.failed)
+
+    @property
+    def success_count(self) -> int:
+        return len(self.succeeded)
+
+    @property
+    def failure_count(self) -> int:
+        return len(self.failed)
+
 VIEW_TYPES = Literal[
     "list",
     "retrieve",

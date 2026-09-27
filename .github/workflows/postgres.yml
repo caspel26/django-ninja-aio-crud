@@ -1,0 +1,61 @@
+name: PostgreSQL Integration
+
+on:
+  push:
+    branches: [main, feat/v3-api-redesign]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - python: '3.13'
+            django: 'Django>=5.2,<5.3'
+            lock: django52
+          - python: '3.14'
+            django: 'Django>=6.0,<6.1'
+            lock: django60
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: ninja_aio
+          POSTGRES_USER: postgres
+          # The database is isolated to this disposable runner and loopback.
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 127.0.0.1:5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      PGDATABASE: ninja_aio
+      PGUSER: postgres
+      PGHOST: 127.0.0.1
+      PGPORT: '5432'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install dependencies
+        run: |
+          pip install --only-binary :all: --require-hashes -r '.github/requirements/${{ matrix.lock }}.txt'
+          python -m flit install --symlink --deps none
+      - name: Framework integration tests
+        run: python -m django test --settings=tests.postgres_settings --exclude-tag=performance --exclude-tag=scalability --exclude-tag=comparison
+      - name: Library sync/async parity
+        working-directory: examples/library
+        env:
+          LIBRARY_DATABASE_BACKEND: postgresql
+        run: python -W error::DeprecationWarning -W error::RuntimeWarning -W error::UserWarning manage.py test library

@@ -27,9 +27,9 @@ class Tests:
             cls.pk_att = cls.model._meta.pk.attname
             cls.obj = cls.model.objects.select_related().create(**cls().create_data)
             if isinstance(cls.model, ModelSerializerMeta):
-                cls.schema_in = cls.model.generate_create_s()
-                cls.schema_out = cls.model.generate_read_s()
-                cls.schema_patch = cls.model.generate_update_s()
+                cls.schema_in = cls.model.create_schema
+                cls.schema_out = cls.model.read_schema
+                cls.schema_patch = cls.model.update_schema
 
         @property
         def serializable_fields(self) -> list:
@@ -113,7 +113,7 @@ class Tests:
 
         async def test_get_object_not_found(self):
             with self.assertRaises(NotFoundError) as exc:
-                await self.model_util.get_object(self.request.get(), 0)
+                await self.model_util.aget_object(self.request.get(), 0)
             self.assertEqual(
                 exc.exception.error,
                 {self.model._meta.verbose_name.replace(" ", "_"): NOT_FOUND},
@@ -121,12 +121,12 @@ class Tests:
             self.assertEqual(exc.exception.status_code, 404)
 
         @mock.patch(
-            "ninja_aio.models.ModelSerializer.queryset_request",
+            "ninja_aio.models.ModelSerializer.aqueryset_request",
             new_callable=mock.AsyncMock,
         )
         async def test_get_object(self, mock_queryset_request: mock.AsyncMock):
             mock_queryset_request.return_value = self.model.objects.select_related()
-            obj = await self.model_util.get_object(self.request.get(), self.obj.pk)
+            obj = await self.model_util.aget_object(self.request.get(), self.obj.pk)
             self.assertEqual(obj, self.obj)
             if isinstance(self.model, ModelSerializerMeta):
                 mock_queryset_request.assert_awaited_once()
@@ -134,7 +134,7 @@ class Tests:
                 mock_queryset_request.assert_not_awaited()
 
         @mock.patch(
-            "ninja_aio.models.ModelSerializer.queryset_request",
+            "ninja_aio.models.ModelSerializer.aqueryset_request",
             new_callable=mock.AsyncMock,
         )
         async def test_get_object_with_additional_data(
@@ -143,7 +143,7 @@ class Tests:
             mock_queryset_request.return_value = (
                 self.model.objects.select_related().all()
             )
-            obj = await self.model_util.get_object(
+            obj = await self.model_util.aget_object(
                 self.request.get(),
                 query_data=QuerySchema(
                     filters=self.additional_filters, getters=self.additional_getters
@@ -166,18 +166,18 @@ class Tests:
             )
 
         async def test_parse_input_data(self):
-            payload, customs = await self.model_util.parse_input_data(
+            payload, customs = await self.model_util.aparse_input_data(
                 self.request.post(), self.data_in
             )
             self.assertEqual(payload, self.parsed_input_data.get("payload", {}))
             self.assertEqual(customs, self.parsed_input_data.get("customs", {}))
 
         @mock.patch(
-            "ninja_aio.models.ModelSerializer.custom_actions",
+            "ninja_aio.models.ModelSerializer.acustom_actions",
             new_callable=mock.AsyncMock,
         )
         @mock.patch(
-            "ninja_aio.models.ModelSerializer.post_create",
+            "ninja_aio.models.ModelSerializer.apost_create",
             new_callable=mock.AsyncMock,
         )
         async def test_create_s(
@@ -189,9 +189,11 @@ class Tests:
                 self.request.post(), self.data_in, self.schema_out
             )
             self.assertEqual(
-                self.read_data | {self.pk_att: self.read_data[self.pk_att] + 1},
+                self.read_data | {self.pk_att: response[self.pk_att]},
                 response,
             )
+            self.assertNotEqual(response[self.pk_att], self.obj.pk)
+            self.assertTrue(await self.model.objects.filter(pk=response[self.pk_att], **self.create_data).aexists())
             if isinstance(self.model, ModelSerializerMeta):
                 mock_post_create.assert_awaited_once()
                 mock_custom_actions.assert_awaited_once()
@@ -222,7 +224,7 @@ class Tests:
                 await self.model_util.read_s(None, self.request.get(), self.obj)
 
         async def test_get_object_filters_and_getters(self):
-            obj = await self.model_util.get_object(
+            obj = await self.model_util.aget_object(
                 self.request.get(),
                 query_data=QuerySchema(filters={}, getters={self.pk_att: self.obj.pk}),
             )
@@ -230,7 +232,7 @@ class Tests:
 
         async def test_get_object_not_found_with_getters(self):
             with self.assertRaises(NotFoundError):
-                await self.model_util.get_object(
+                await self.model_util.aget_object(
                     self.request.get(),
                     query_data=QuerySchema(getters={self.pk_att: 999999}),
                 )
@@ -242,7 +244,7 @@ class Tests:
                 ValueError,
                 msg="Either pk or getters must be provided for single object retrieval.",
             ):
-                await self.model_util.get_object(
+                await self.model_util.aget_object(
                     self.request.get(),
                     query_data=QuerySchema(),
                     with_qs_request=False,
@@ -252,10 +254,10 @@ class Tests:
             if not isinstance(self.model, ModelSerializerMeta):
                 return
             with mock.patch(
-                "ninja_aio.models.ModelSerializer.queryset_request",
+                "ninja_aio.models.ModelSerializer.aqueryset_request",
                 new_callable=mock.AsyncMock,
             ) as m_qs:
-                await self.model_util.get_object(
+                await self.model_util.aget_object(
                     self.request.get(),
                     self.obj.pk,
                     query_data=QuerySchema(),
@@ -284,7 +286,7 @@ class Tests:
                     autospec=True,
                 ) as m_pref,
             ):
-                await self.model_util.get_object(
+                await self.model_util.aget_object(
                     self.request.get(),
                     query_data=query_data,
                     is_for="read",

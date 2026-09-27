@@ -25,7 +25,7 @@ class ActionTestViewSet(APIViewSet):
 
     @action(detail=True, methods=["post"], url_path="activate")
     async def activate(self, request, pk):
-        obj = await self.model_util.get_object(request, pk)
+        obj = await self.model_util.aget_object(request, pk)
         obj.name = f"{obj.name}_activated"
         await obj.asave()
         return Status(200, {"message": "activated"})
@@ -272,3 +272,49 @@ class ActionAuthTestCase(TestCase):
         """Action with explicit auth uses the override."""
         no_auth_config = self.viewset.no_auth._action_config
         self.assertIsNone(no_auth_config.auth)
+
+
+class NestedActionErrorSchemaTestCase(TestCase):
+    def test_untyped_action_documents_nested_errors_with_resolvable_components(self):
+        from ninja import NinjaAPI
+        from ninja.testing import TestClient
+
+        class ErrorDetail(Schema):
+            reason: str
+
+        class NestedError(Schema):
+            detail: ErrorDetail
+
+        for api_type in (NinjaAIO, NinjaAPI):
+            api = api_type(urls_namespace=f"nested_error_{api_type.__name__}")
+
+            class CustomErrors(APIViewSet):
+                model = models.TestModel
+                disable = ["all"]
+                error_schema = NestedError
+                execution_mode = "sync"
+
+                @action(detail=False)
+                def unrestricted(self, request):
+                    return Status(201, {"arbitrary": [1, {"nested": True}]})
+
+                @action(detail=False, response=None)
+                def empty(self, request):
+                    return Status(204, None)
+
+            view = CustomErrors(api=api)
+            view.add_views_to_route()
+            spec = api.get_openapi_schema(path_prefix="")
+            operation = next(path["get"] for key, path in spec["paths"].items() if key.endswith("/unrestricted"))
+            error = operation["responses"][400]["content"]["application/json"]["schema"]
+            component = spec["components"]["schemas"][error["$ref"].split("/")[-1]]
+            detail = component["properties"]["detail"]
+            self.assertEqual(detail["$ref"], "#/components/schemas/ErrorDetail")
+            self.assertIn("reason", spec["components"]["schemas"]["ErrorDetail"]["properties"])
+            client = TestClient(view.router)
+            response = client.get("/unrestricted")
+            self.assertEqual(response.status_code, 201)
+            self.assertEqual(response.json(), {"arbitrary": [1, {"nested": True}]})
+            empty = client.get("/empty")
+            self.assertEqual(empty.status_code, 204)
+            self.assertEqual(empty.content, b"")

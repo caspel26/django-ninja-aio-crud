@@ -1,30 +1,39 @@
 import asyncio
-import base64
+import inspect
 import logging
+import warnings
 from collections import OrderedDict
+from contextlib import nullcontext
 from functools import cached_property
-from typing import Any, Generic, Literal, TypeVar
+from typing import Any, Callable, Generic, Iterable, Literal, TypeVar
 
 from ninja import Schema
 from ninja.orm import fields
 from ninja.errors import ConfigError
+from pydantic import ValidationError
 
-from django.db import models, router
+from django.db import models, router, transaction
 from django.db.models import Q, aprefetch_related_objects
 from django.http import HttpRequest
-from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist
+from django.core.exceptions import ImproperlyConfigured, MultipleObjectsReturned, ObjectDoesNotExist
 from asgiref.sync import sync_to_async
-from django.db.models.fields.related_descriptors import (
-    ReverseManyToOneDescriptor,
-    ReverseOneToOneDescriptor,
-    ManyToManyDescriptor,
-    ForwardManyToOneDescriptor,
-    ForwardOneToOneDescriptor,
+from ninja_aio.exceptions import (
+    BaseException as OperationError,
+    MultipleObjectsError,
+    NotFoundError,
+    OperationValidationError,
+    SerializeError,
 )
-
-from ninja_aio.exceptions import SerializeError, NotFoundError
 from ninja_aio.decorators.views import AsyncAtomicContextManager
-from ninja_aio.types import ModelSerializerMeta, get_ninja_aio_meta_attr
+from ninja_aio.models.hooks import resolve_async_hook, resolve_sync_hook
+from ninja_aio.types import (
+    BulkFailure,
+    BulkResult,
+    ModelSerializerMeta,
+    PrimaryKey,
+    QueryPurpose,
+    get_ninja_aio_meta_attr,
+)
 
 from ninja_aio.schemas.helpers import (
     ModelQuerySetSchema,
@@ -32,6 +41,7 @@ from ninja_aio.schemas.helpers import (
     ObjectQuerySchema,
     ObjectsQuerySchema,
 )
+from ninja_aio.models import transformations as model_transformations
 
 # TypeVar for generic model typing
 ModelT = TypeVar("ModelT", bound=models.Model)
@@ -55,7 +65,9 @@ logger = logging.getLogger("ninja_aio.models")
 _SERIALIZER_REGISTRY: dict[type[models.Model], type] = {}
 
 
-def register_serializer_for_model(model: type[models.Model], serializer_cls: type) -> None:
+def register_serializer_for_model(
+    model: type[models.Model], serializer_cls: type
+) -> None:
     """Register *serializer_cls* as the FK-resolution scope for *model*.
 
     Called automatically by `ModelSerializer` and `Serializer` subclasses.
@@ -74,6 +86,85 @@ def register_serializer_for_model(model: type[models.Model], serializer_cls: typ
 def get_serializer_for_model(model: type[models.Model]) -> type | None:
     """Return the registered serializer for *model*, or None."""
     return _SERIALIZER_REGISTRY.get(model)
+
+
+def _warn_deprecated(old: str, replacement: str) -> None:
+    warnings.warn(
+        f"ModelUtil.{old}() is deprecated; use {replacement} instead.",
+        DeprecationWarning,
+        stacklevel=3,
+    )
+
+
+def bulk_failure(
+    index: int, exc: Exception, pk: PrimaryKey | None = None
+) -> BulkFailure:
+    """Describe one failed bulk item, keeping the legacy HTTP error payload."""
+    error = exc.error if hasattr(exc, "error") else {"error": str(exc)}
+    if isinstance(exc, OperationError):
+        return BulkFailure(index, exc.code, exc.message, exc.field_errors, pk, error)
+    if isinstance(exc, ValidationError):
+        return BulkFailure(
+            index,
+            "validation_error",
+            str(exc),
+            OperationValidationError(exc).field_errors,
+            pk,
+            error,
+        )
+    if isinstance(exc, ValueError):
+        code = "invalid_value"
+    elif isinstance(exc, TypeError):
+        code = "invalid_type"
+    else:
+        code = "operation_error"
+    return BulkFailure(index, code, str(exc), pk=pk, error=error)
+
+
+def _no_prepare(item: Any) -> tuple[None, Any]:
+    return None, item
+
+
+def run_bulk(
+    model: type[models.Model],
+    items: Iterable[Any],
+    operation: Callable[[Any], Any],
+    prepare: Callable[[Any], tuple[PrimaryKey | None, Any]] = _no_prepare,
+    atomic: bool = True,
+) -> BulkResult:
+    """Run *operation* per item in its own transaction, collecting partial results."""
+    result = BulkResult()
+    using = router.db_for_write(model)
+    for index, item in enumerate(items):
+        pk = None
+        try:
+            pk, payload = prepare(item)
+            with transaction.atomic(using=using) if atomic else nullcontext():
+                result.succeeded.append(operation(payload))
+        except Exception as exc:
+            result.failed.append(bulk_failure(index, exc, pk))
+    return result
+
+
+async def arun_bulk(
+    model: type[models.Model],
+    items: Iterable[Any],
+    operation: Callable[[Any], Any],
+    prepare: Callable[[Any], tuple[PrimaryKey | None, Any]] = _no_prepare,
+    atomic: bool = True,
+) -> BulkResult:
+    """Async counterpart of run_bulk; *operation* returns an awaitable."""
+    result = BulkResult()
+    using = router.db_for_write(model)
+    for index, item in enumerate(items):
+        pk = None
+        try:
+            pk, payload = prepare(item)
+            async with AsyncAtomicContextManager(using=using) if atomic else nullcontext():
+                result.succeeded.append(await operation(payload))
+        except Exception as exc:
+            result.failed.append(bulk_failure(index, exc, pk))
+    return result
 
 
 class LRUCache:
@@ -180,7 +271,7 @@ class ModelUtil(Generic[ModelT]):
     -----------
     - get_object() -> ModelT : Retrieve a single typed instance
     - get_objects() -> QuerySet[ModelT] : Retrieve a typed queryset
-    - parse_input_data() : Transform inbound schema to model-ready payload
+    - aparse_input_data() : Transform inbound schema to model-ready payload
     - create_s / read_s / update_s / delete_s : High-level CRUD operations
 
     Error Handling
@@ -396,7 +487,7 @@ class ModelUtil(Generic[ModelT]):
 
     async def _get_base_queryset(
         self,
-        request: HttpRequest,
+        request: HttpRequest | None,
         query_data: QuerySchema,
         with_qs_request: bool,
         is_for: Literal["read", "detail"] | None = None,
@@ -425,7 +516,7 @@ class ModelUtil(Generic[ModelT]):
         obj_qs = (
             self.model.objects.all()
             if self.serializer_class is None
-            else await self.serializer_class.queryset_request(request)
+            else await resolve_async_hook(self.serializer_class, "queryset_request")(request)
         )
 
         # Apply queryset_request hook if available. This may return an entirely
@@ -433,26 +524,42 @@ class ModelUtil(Generic[ModelT]):
         # before the read/detail-scoped optimizations below, or those would be
         # silently discarded.
         if isinstance(self.model, ModelSerializerMeta) and with_qs_request:
-            obj_qs = await self.model.queryset_request(request)
+            obj_qs = await resolve_async_hook(self.model, "queryset_request")(request)
 
-        # Apply query optimizations for the requested scope. select_related/
-        # prefetch_related are additive, so re-applying them here on top of
-        # whatever the hook returned is safe even if it already optimized
-        # for its own (queryset_request) scope.
-        obj_qs = self._apply_query_optimizations(obj_qs, query_data, is_for)
+        return self._finalize_queryset(obj_qs, query_data, is_for)
 
-        # Apply filters if present (supports dict or Q object)
-        if hasattr(query_data, "filters") and query_data.filters:
-            if isinstance(query_data.filters, Q):
-                obj_qs = obj_qs.filter(query_data.filters)
-            else:
-                obj_qs = obj_qs.filter(**query_data.filters)
-
-        return obj_qs
-
-    async def get_objects(
+    def _finalize_queryset(
         self,
-        request: HttpRequest,
+        queryset: models.QuerySet[ModelT],
+        query_data: QuerySchema,
+        is_for: Literal["read", "detail"] | None,
+    ) -> models.QuerySet[ModelT]:
+        """Apply execution-mode-independent optimizations and filters."""
+        queryset = self._apply_query_optimizations(queryset, query_data, is_for)
+        filters = getattr(query_data, "filters", None)
+        if isinstance(filters, Q):
+            return queryset.filter(filters)
+        if filters:
+            return queryset.filter(**filters)
+        return queryset
+
+    def _apply_object_lookup(
+        self,
+        queryset: models.QuerySet[ModelT],
+        pk: PrimaryKey | None,
+        getters: dict[str, Any] | Q,
+    ) -> tuple[models.QuerySet[ModelT], dict[str, Any]]:
+        """Apply a Q lookup or build keyword lookup criteria for one object."""
+        if isinstance(getters, Q):
+            queryset = queryset.filter(getters)
+            if pk is not None:
+                queryset = queryset.filter(**{self.model_pk_name: pk})
+            return queryset, {}
+        return queryset, self._build_lookup_query(pk, getters)
+
+    async def aget_objects(
+        self,
+        request: HttpRequest | None,
         query_data: ObjectsQuerySchema = None,
         with_qs_request=True,
         is_for: Literal["read", "detail"] | None = None,
@@ -495,10 +602,27 @@ class ModelUtil(Generic[ModelT]):
             request, query_data, with_qs_request, is_for
         )
 
-    async def get_object(
+    def get_objects(
         self,
-        request: HttpRequest,
-        pk: int | str = None,
+        request: HttpRequest | None,
+        query_data: ObjectsQuerySchema | None = None,
+        with_qs_request: bool = True,
+        is_for: Literal["read", "detail"] | None = None,
+    ) -> models.QuerySet[ModelT]:
+        """Retrieve an optimized queryset using only synchronous ORM operations."""
+        query_data = query_data or ObjectsQuerySchema()
+        queryset = self.model._default_manager.all()
+        if with_qs_request:
+            if self.serializer_class is not None:
+                queryset = resolve_sync_hook(self.serializer_class, "queryset_request")(request)
+            elif isinstance(self.model, ModelSerializerMeta):
+                queryset = resolve_sync_hook(self.model, "queryset_request")(request)
+        return self._finalize_queryset(queryset, query_data, is_for)
+
+    async def aget_object(
+        self,
+        request: HttpRequest | None,
+        pk: PrimaryKey | None = None,
         query_data: ObjectQuerySchema = None,
         with_qs_request=True,
         is_for: Literal["read", "detail"] | None = None,
@@ -558,27 +682,57 @@ class ModelUtil(Generic[ModelT]):
             request, query_data, with_qs_request, is_for
         )
 
-        # Apply getters (supports dict or Q object)
-        if isinstance(query_data.getters, Q):
-            obj_qs = obj_qs.filter(query_data.getters)
-            if pk is not None:
-                obj_qs = obj_qs.filter(**{self.model_pk_name: pk})
-            try:
-                obj = await obj_qs.aget()
-            except ObjectDoesNotExist:
-                logger.debug(f"{self.model.__name__} not found (pk={pk})")
-                raise NotFoundError(self.model)
-        else:
-            get_q = self._build_lookup_query(pk, query_data.getters)
-            try:
-                obj = await obj_qs.aget(**get_q)
-            except ObjectDoesNotExist:
-                logger.debug(f"{self.model.__name__} not found (pk={pk})")
-                raise NotFoundError(self.model)
+        obj_qs, lookup = self._apply_object_lookup(obj_qs, pk, query_data.getters)
+        try:
+            return await obj_qs.aget(**lookup)
+        except ObjectDoesNotExist:
+            logger.debug(f"{self.model.__name__} not found (pk={pk})")
+            raise NotFoundError(self.model)
+        except MultipleObjectsReturned:
+            matches = obj_qs.filter(**lookup)
+            pks = [value async for value in matches.order_by().values_list("pk", flat=True).distinct()[:2]]
+            if len(pks) > 1:
+                raise MultipleObjectsError(self.model)
+            # Joins in queryset_request can repeat the same row.
+            return await matches.afirst()
 
-        return obj
+    def get_object(
+        self,
+        request: HttpRequest | None,
+        pk: PrimaryKey | None = None,
+        query_data: ObjectQuerySchema | None = None,
+        with_qs_request: bool = True,
+        is_for: Literal["read", "detail"] | None = None,
+    ) -> ModelT:
+        """Retrieve one object using only synchronous ORM operations."""
+        query_data = query_data or ObjectQuerySchema()
+        if not query_data.getters and pk is None:
+            raise ValueError(
+                "Either pk or getters must be provided for single object retrieval."
+            )
+        queryset = self.get_objects(
+            request,
+            query_data=query_data,
+            with_qs_request=with_qs_request,
+            is_for=is_for,
+        )
+        queryset, lookup = self._apply_object_lookup(queryset, pk, query_data.getters)
+        try:
+            return queryset.get(**lookup)
+        except ObjectDoesNotExist as exc:
+            raise NotFoundError(self.model) from exc
+        except MultipleObjectsReturned as exc:
+            matches = queryset.filter(**lookup)
+            if len(matches.order_by().values_list("pk", flat=True).distinct()[:2]) > 1:
+                raise MultipleObjectsError(self.model) from exc
+            # Joins in queryset_request can repeat the same row.
+            return matches.first()
 
-    def _build_lookup_query(self, pk: int | str = None, getters: dict = None) -> dict:
+    def _build_lookup_query(
+        self,
+        pk: PrimaryKey | None = None,
+        getters: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Build lookup query dict from pk and additional getters.
 
@@ -594,17 +748,14 @@ class ModelUtil(Generic[ModelT]):
         dict
             Combined lookup criteria.
         """
-        get_q = {self.model_pk_name: pk} if pk is not None else {}
-        if getters:
-            get_q |= getters
-        return get_q
+        return model_transformations.build_lookup_query(self.model_pk_name, pk, getters)
 
     def _apply_query_optimizations(
         self,
-        queryset: models.QuerySet,
+        queryset: models.QuerySet[ModelT],
         query_data: QuerySchema,
         is_for: Literal["read", "detail"] | None = None,
-    ) -> models.QuerySet:
+    ) -> models.QuerySet[ModelT]:
         """
         Apply select_related and prefetch_related optimizations to queryset.
 
@@ -623,26 +774,27 @@ class ModelUtil(Generic[ModelT]):
         QuerySet
             Optimized queryset.
         """
-        select_related = (
-            query_data.select_related + self.get_select_relateds(is_for)
-            if is_for
-            else query_data.select_related
+        explicit_plan = model_transformations.RelationPlan(
+            tuple(query_data.select_related), tuple(query_data.prefetch_related)
         )
-        prefetch_related = (
-            query_data.prefetch_related + self.get_reverse_relations(is_for)
+        discovered_plan = (
+            model_transformations.RelationPlan(
+                tuple(self.get_select_relateds(is_for)),
+                tuple(self.get_reverse_relations(is_for)),
+            )
             if is_for
-            else query_data.prefetch_related
+            else None
         )
+        plan = model_transformations.combine_relation_plans(
+            explicit_plan, discovered_plan
+        )
+        queryset = model_transformations.apply_relation_plan(queryset, plan)
 
-        if select_related:
-            queryset = queryset.select_related(*select_related)
-        if prefetch_related:
-            queryset = queryset.prefetch_related(*prefetch_related)
-
-        if select_related or prefetch_related:
+        if plan.select_related or plan.prefetch_related:
             logger.debug(
                 f"Query optimizations for {self.model.__name__}:"
-                f" select_related={select_related}, prefetch_related={prefetch_related}"
+                f" select_related={list(plan.select_related)},"
+                f" prefetch_related={list(plan.prefetch_related)}"
             )
 
         return queryset
@@ -695,31 +847,29 @@ class ModelUtil(Generic[ModelT]):
         cache_key = (id(self.model), id(self.serializer_class), is_for)
         cached = self._relation_cache.get(cache_key)
         if cached is not None:
-            logger.debug(f"Reverse relations cache hit for {self.model.__name__} (is_for={is_for})")
+            logger.debug(
+                f"Reverse relations cache hit for {self.model.__name__} (is_for={is_for})"
+            )
             return cached
 
         config_rels = self._get_read_optimizations(is_for).prefetch_related
         if config_rels:
             self._relation_cache.set(cache_key, config_rels)
-            logger.debug(f"Reverse relations from config for {self.model.__name__}: {config_rels}")
+            logger.debug(
+                f"Reverse relations from config for {self.model.__name__}: {config_rels}"
+            )
             return config_rels
 
-        reverse_rels = []
-        serializable_fields = self._get_serializable_field_names(is_for)
-        for f in serializable_fields:
-            field_obj = getattr(self.model, f)
-            if isinstance(field_obj, ManyToManyDescriptor):
-                reverse_rels.append(f)
-                continue
-            if isinstance(field_obj, ReverseManyToOneDescriptor):
-                reverse_rels.append(field_obj.field._related_name)
-                continue
-            if isinstance(field_obj, ReverseOneToOneDescriptor):
-                reverse_rels.append(field_obj.related.name)
+        relation_plan = model_transformations.discover_relation_plan(
+            self.model, self._get_serializable_field_names(is_for)
+        )
+        reverse_rels = list(relation_plan.prefetch_related)
 
         # Cache the result
         self._relation_cache.set(cache_key, reverse_rels)
-        logger.debug(f"Reverse relations discovered for {self.model.__name__}: {reverse_rels}")
+        logger.debug(
+            f"Reverse relations discovered for {self.model.__name__}: {reverse_rels}"
+        )
         return reverse_rels
 
     def get_select_relateds(
@@ -745,61 +895,68 @@ class ModelUtil(Generic[ModelT]):
         cache_key = (id(self.model), id(self.serializer_class), "select", is_for)
         cached = self._relation_cache.get(cache_key)
         if cached is not None:
-            logger.debug(f"Select related cache hit for {self.model.__name__} (is_for={is_for})")
+            logger.debug(
+                f"Select related cache hit for {self.model.__name__} (is_for={is_for})"
+            )
             return cached
 
         config_rels = self._get_read_optimizations(is_for).select_related
         if config_rels:
             self._relation_cache.set(cache_key, config_rels)
-            logger.debug(f"Select related from config for {self.model.__name__}: {config_rels}")
+            logger.debug(
+                f"Select related from config for {self.model.__name__}: {config_rels}"
+            )
             return config_rels
 
-        select_rels = []
-        serializable_fields = self._get_serializable_field_names(is_for)
-        for f in serializable_fields:
-            field_obj = getattr(self.model, f)
-            if isinstance(field_obj, ForwardOneToOneDescriptor):
-                select_rels.append(f)
-                continue
-            if isinstance(field_obj, ForwardManyToOneDescriptor):
-                select_rels.append(f)
+        relation_plan = model_transformations.discover_relation_plan(
+            self.model, self._get_serializable_field_names(is_for)
+        )
+        select_rels = list(relation_plan.select_related)
 
         # Cache the result
         self._relation_cache.set(cache_key, select_rels)
-        logger.debug(f"Select related discovered for {self.model.__name__}: {select_rels}")
+        logger.debug(
+            f"Select related discovered for {self.model.__name__}: {select_rels}"
+        )
         return select_rels
 
     def _resolve_field_objects(self, field_names: list[str]) -> list[models.Field]:
         """Resolve Django field objects for a list of field names (sync)."""
-        return [getattr(self.model, k).field for k in field_names]
+        return model_transformations.resolve_model_fields(self.model, field_names)
 
-    def _serialize_queryset_sync(self, queryset, schema: Schema) -> list[dict]:
+    def _dump_queryset(
+        self,
+        queryset: Iterable[ModelT],
+        schema: type[Schema],
+    ) -> list[dict[str, Any]]:
         """Serialize a queryset to a list of dicts using Pydantic schema (sync)."""
-        return [schema.from_orm(obj).model_dump() for obj in queryset]
+        return model_transformations.dump_models(queryset, schema)
 
     def _decode_binary(
-        self, payload: dict, k: str, v: Any, field_obj: models.Field
+        self,
+        payload: dict[str, Any],
+        k: str,
+        v: Any,
+        field_obj: models.Field,
     ) -> None:
         """Decode base64-encoded binary field values in place."""
         if not isinstance(field_obj, models.BinaryField):
             return
-        try:
-            payload[k] = base64.b64decode(v)
-            logger.debug(f"Decoded binary field '{k}' for {self.model.__name__}")
-        except Exception as exc:
-            logger.warning(f"Failed to decode binary field '{k}' for {self.model.__name__}: {exc}")
-            raise SerializeError({k: ". ".join(exc.args)}, 400)
+        payload[k] = model_transformations.decode_binary_value(k, v)
+        logger.debug(f"Decoded binary field '{k}' for {self.model.__name__}")
 
-    async def _bump_object_from_schema(self, obj: ModelT, schema: Schema) -> dict:
+    async def _bump_object_from_schema(
+        self, obj: ModelT, schema: type[Schema]
+    ) -> dict[str, Any]:
         """Convert model instance to dict using Pydantic schema."""
-        return (await sync_to_async(schema.from_orm)(obj)).model_dump()
+        return await sync_to_async(model_transformations.dump_model)(obj, schema)
 
     async def _bump_queryset_from_schema(
-        self, queryset: models.QuerySet[ModelT], schema: Schema
-    ) -> list[dict]:
+        self, queryset: models.QuerySet[ModelT], schema: type[Schema]
+    ) -> list[dict[str, Any]]:
         """Convert a queryset to a list of dicts using Pydantic schema in a single sync_to_async call."""
 
-        return await sync_to_async(self._serialize_queryset_sync)(queryset, schema)
+        return await sync_to_async(self._dump_queryset)(queryset, schema)
 
     async def _prefetch_reverse_relations_on_instance(
         self,
@@ -836,32 +993,16 @@ class ModelUtil(Generic[ModelT]):
         return obj
 
     def _validate_read_params(
-        self, request: HttpRequest, query_data: QuerySchema
+        self,
+        request: HttpRequest | None,
+        query_data: QuerySchema | None,
     ) -> None:
         """Validate required parameters for read operations."""
-        if request is None:
-            raise SerializeError(
-                {"request": "must be provided when object is not given"}, 400
-            )
-
-        if query_data is None:
-            raise SerializeError(
-                {"query_data": "must be provided when object is not given"}, 400
-            )
-
-        if (
-            hasattr(query_data, "filters")
-            and hasattr(query_data, "getters")
-            and query_data.filters
-            and query_data.getters
-        ):
-            raise SerializeError(
-                {"query_data": "cannot contain both filters and getters"}, 400
-            )
+        model_transformations.validate_read_params(request, query_data)
 
     async def _handle_query_mode(
         self,
-        request: HttpRequest,
+        request: HttpRequest | None,
         query_data: QuerySchema,
         schema: Schema,
         is_for: Literal["read", "detail"] | None = None,
@@ -881,28 +1022,31 @@ class ModelUtil(Generic[ModelT]):
 
     async def _serialize_queryset(
         self,
-        request: HttpRequest,
+        request: HttpRequest | None,
         query_data: QuerySchema,
         schema: Schema,
         is_for: Literal["read", "detail"] | None = None,
     ):
         """Serialize a queryset of objects."""
-        objs = await self.get_objects(request, query_data=query_data, is_for=is_for)
+        objs = await self.aget_objects(request, query_data=query_data, is_for=is_for)
         return await self._bump_queryset_from_schema(objs, schema)
 
     async def _serialize_single_object(
         self,
-        request: HttpRequest,
+        request: HttpRequest | None,
         query_data: QuerySchema,
         obj_schema: Schema,
         is_for: Literal["read", "detail"] | None = None,
     ):
         """Serialize a single object."""
-        obj = await self.get_object(request, query_data=query_data, is_for=is_for)
+        obj = await self.aget_object(request, query_data=query_data, is_for=is_for)
         return await self._bump_object_from_schema(obj, obj_schema)
 
     def _collect_custom_and_optional_fields(
-        self, payload: dict, is_serializer: bool, serializer
+        self,
+        payload: dict[str, Any],
+        is_serializer: bool,
+        serializer: model_transformations.FieldPolicy | None,
     ) -> tuple[dict[str, Any], list[str]]:
         """
         Collect custom and optional fields from payload.
@@ -921,25 +1065,17 @@ class ModelUtil(Generic[ModelT]):
         tuple[dict[str, Any], list[str]]
             (custom_fields_dict, optional_field_names)
         """
-        customs: dict[str, Any] = {}
-        optionals: list[str] = []
-
-        if not is_serializer:
-            return customs, optionals
-
-        customs = {
-            k: v
-            for k, v in payload.items()
-            if serializer.is_custom(k) and k not in self.model_fields
-        }
-        optionals = [
-            k for k, v in payload.items() if serializer.is_optional(k) and v is None
-        ]
-
-        return customs, optionals
+        policy = serializer if is_serializer else None
+        plan = model_transformations.plan_input_payload(
+            payload, model_fields=self.model_fields, field_policy=policy
+        )
+        return plan.customs, list(plan.optionals)
 
     def _determine_skip_keys(
-        self, payload: dict, is_serializer: bool, serializer
+        self,
+        payload: dict[str, Any],
+        is_serializer: bool,
+        serializer: model_transformations.FieldPolicy | None,
     ) -> set[str]:
         """
         Determine which keys to skip during model field processing.
@@ -958,20 +1094,25 @@ class ModelUtil(Generic[ModelT]):
         set[str]
             Set of keys to skip.
         """
-        if not is_serializer:
-            return set()
+        policy = serializer if is_serializer else None
+        return set(
+            model_transformations.plan_input_payload(
+                payload, model_fields=self.model_fields, field_policy=policy
+            ).skip_keys
+        )
 
-        skip_keys = {
-            k
-            for k, v in payload.items()
-            if (serializer.is_custom(k) and k not in self.model_fields)
-            or (serializer.is_optional(k) and v is None)
-        }
-        return skip_keys
+    @staticmethod
+    def _scoped_fk_util(rel_model: type[models.Model]) -> "ModelUtil | None":
+        if isinstance(rel_model, ModelSerializerMeta):
+            return ModelUtil(rel_model)
+        serializer_class = get_serializer_for_model(rel_model)
+        if serializer_class is not None:
+            return ModelUtil(rel_model, serializer_class=serializer_class)
+        return None
 
-    async def _resolve_fk(
+    async def _aresolve_fk(
         self,
-        request: HttpRequest,
+        request: HttpRequest | None,
         payload: dict,
         k: str,
         v: Any,
@@ -1017,14 +1158,9 @@ class ModelUtil(Generic[ModelT]):
             f"Resolving FK '{k}' -> {rel_model.__name__} (pk={v}) for {self.model.__name__}"
         )
 
-        if isinstance(rel_model, ModelSerializerMeta):
-            payload[k] = await ModelUtil(rel_model).get_object(request, pk=v)
-        elif (
-            rel_serializer_cls := get_serializer_for_model(rel_model)
-        ) is not None:
-            payload[k] = await ModelUtil(
-                rel_model, serializer_class=rel_serializer_cls
-            ).get_object(request, pk=v)
+        related_util = self._scoped_fk_util(rel_model)
+        if related_util is not None:
+            payload[k] = await related_util.aget_object(request, pk=v)
         else:
             try:
                 payload[k] = await rel_model.objects.aget(pk=v)
@@ -1036,7 +1172,7 @@ class ModelUtil(Generic[ModelT]):
 
     async def _process_payload_fields(
         self,
-        request: HttpRequest,
+        request: HttpRequest | None,
         payload: dict,
         fields_to_process: list[tuple[str, Any]],
         fk_cache: dict[tuple[type, Any], Any] | None = None,
@@ -1062,7 +1198,7 @@ class ModelUtil(Generic[ModelT]):
             return
 
         field_names = [k for k, _ in fields_to_process]
-        field_objs = await sync_to_async(self._resolve_field_objects)(field_names)
+        field_objs = model_transformations.resolve_model_fields(self.model, field_names)
 
         # Single pass: decode binary + collect FK tasks
         fk_tasks = []
@@ -1070,7 +1206,7 @@ class ModelUtil(Generic[ModelT]):
             self._decode_binary(payload, k, v, field_obj)
             if isinstance(field_obj, models.ForeignKey) and v is not None:
                 fk_tasks.append(
-                    self._resolve_fk(request, payload, k, v, field_obj, fk_cache)
+                    self._aresolve_fk(request, payload, k, v, field_obj, fk_cache)
                 )
 
         if fk_tasks:
@@ -1086,12 +1222,14 @@ class ModelUtil(Generic[ModelT]):
             for name, child in self.model.get_nested_fields().items()
         }
 
-    async def parse_input_data(
+    async def aparse_input_data(
         self,
-        request: HttpRequest,
+        request: HttpRequest | None,
         data: Schema,
         fk_cache: dict[tuple[type, Any], Any] | None = None,
-    ):
+        *,
+        partial: bool = False,
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
         """
         Transform inbound schema data to a model-ready payload.
 
@@ -1122,51 +1260,298 @@ class ModelUtil(Generic[ModelT]):
         SerializeError
             On base64 decoding failure or invalid field names.
         """
-        payload = data.model_dump(mode="json")
+        payload, plan = self._prepare_input_payload(data, partial=partial)
+        await self._process_payload_fields(
+            request, payload, plan.fields_to_process, fk_cache
+        )
+        return plan.model_payload(), plan.customs
 
-        # Keep the public two-tuple return contract. Nested values are consumed
-        # separately by _create_instance, never treated as scalar model fields.
-        for name in self.nested_fields:
-            payload.pop(name, None)
-
+    def _prepare_input_payload(
+        self, data: Schema, *, partial: bool = False
+    ) -> tuple[dict[str, Any], model_transformations.InputPayloadPlan]:
+        """Dump and classify validated input before execution-mode-specific work."""
+        payload = model_transformations.schema_to_payload(data, self.nested_fields)
         is_serializer = (
             isinstance(self.model, ModelSerializerMeta) or self.with_serializer
         )
         serializer = self.serializer if self.with_serializer else self.model
-
-        # Note: Field validation is handled by Pydantic during schema deserialization
-        # No additional validation needed here since data is already a validated Schema instance
-
-        # Collect custom and optional fields
-        customs, optionals = self._collect_custom_and_optional_fields(
-            payload, is_serializer, serializer
+        plan = model_transformations.plan_input_payload(
+            payload,
+            model_fields=self.model_fields,
+            field_policy=serializer if is_serializer else None,
+            set_fields=frozenset(data.model_fields_set) if partial else None,
         )
+        return plan.payload, plan
 
-        # Determine which keys to skip during model field processing
-        skip_keys = self._determine_skip_keys(payload, is_serializer, serializer)
-
-        # Process payload fields - gather field objects in parallel for better performance
-        fields_to_process = [(k, v) for k, v in payload.items() if k not in skip_keys]
-        await self._process_payload_fields(
-            request, payload, fields_to_process, fk_cache
-        )
-
-        # Preserve original exclusion semantics (customs if present else optionals)
-        exclude_keys = customs.keys() or optionals
-        new_payload = {k: v for k, v in payload.items() if k not in exclude_keys}
-
-        return new_payload, customs
-
-    async def _create_instance(
+    def parse_input_data(
         self,
-        request: HttpRequest,
+        request: HttpRequest | None,
+        data: Schema,
+        fk_cache: dict[tuple[type, Any], Any] | None = None,
+        *,
+        partial: bool = False,
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Transform input data using only synchronous field resolution."""
+        payload, plan = self._prepare_input_payload(data, partial=partial)
+        fields_to_process = plan.fields_to_process
+        fields = model_transformations.resolve_model_fields(
+            self.model, [name for name, _ in fields_to_process]
+        )
+        for (name, value), field in zip(fields_to_process, fields):
+            self._decode_binary(payload, name, value, field)
+            if isinstance(field, models.ForeignKey) and value is not None:
+                payload[name] = self._resolve_fk(
+                    request, field.related_model, value, fk_cache
+                )
+        return plan.model_payload(), plan.customs
+
+    def _resolve_fk(
+        self,
+        request: HttpRequest | None,
+        related_model: type[models.Model],
+        value: Any,
+        fk_cache: dict[tuple[type, Any], Any] | None,
+    ) -> models.Model:
+        cache_key = (related_model, value)
+        if fk_cache is not None and cache_key in fk_cache:
+            return fk_cache[cache_key]
+
+        related_util = self._scoped_fk_util(related_model)
+        if related_util is not None:
+            obj = related_util.get_object(request, pk=value)
+        else:
+            try:
+                obj = related_model._default_manager.get(pk=value)
+            except related_model.DoesNotExist as exc:
+                raise NotFoundError(related_model) from exc
+        if fk_cache is not None:
+            fk_cache[cache_key] = obj
+        return obj
+
+    def create_instance(
+        self,
+        request: HttpRequest | None,
         data: Schema,
         fk_cache: dict[tuple[type, Any], Any] | None = None,
         extra_fields: dict[str, Any] | None = None,
-    ):
+    ) -> ModelT:
+        """Create one model instance with Django's synchronous ORM."""
+        using = router.db_for_write(self.model)
+        if any(
+            router.db_for_write(child) != using
+            for child, _ in self.nested_fields.values()
+        ):
+            raise ImproperlyConfigured(
+                "Nested writes require one database for the owned graph"
+            )
+        from ninja_aio.models.hooks import (
+            get_hooks,
+            suppress_signals,
+        )
+
+        payload, customs = self.parse_input_data(request, data, fk_cache)
+        if extra_fields:
+            for name in extra_fields:
+                payload.pop(self.model._meta.get_field(name).attname, None)
+            payload.update(extra_fields)
+        logger.info(f"Creating {self.model.__name__}")
+        hooks = get_hooks(self.serializer_class or self.model)
+        atomic = (
+            transaction.atomic(using=using)
+            if self._needs_atomic(hooks) or self.nested_fields
+            else nullcontext()
+        )
+        with atomic:
+            with suppress_signals():
+                obj = (
+                    self.serializer._create_instance(payload)
+                    if self.with_serializer
+                    else self.model._default_manager.create(**payload)
+                )
+            self._invoke_create_hooks(request, obj, payload, customs, hooks)
+            self._create_nested_children(request, data, obj)
+        logger.debug(f"Created {self.model.__name__} (pk={obj.pk})")
+        return obj
+
+    @cached_property
+    def _has_lifecycle_hooks(self) -> bool:
+        """True when a hook runs after the row is written and may still fail."""
+        from ninja_aio.models.hooks import _is_overridden
+
+        target = self.serializer_class or self.model
+        return any(
+            _is_overridden(target, name)
+            for name in (
+                "post_create",
+                "apost_create",
+                "custom_actions",
+                "acustom_actions",
+                "after_save",
+                "on_create_after_save",
+                "on_delete",
+            )
+        )
+
+    def _needs_atomic(self, hooks: dict | None) -> bool:
+        return bool(hooks) or self._has_lifecycle_hooks
+
+    def _reactive_target(self, obj: ModelT) -> tuple[Any, ModelT | None]:
+        """Return (hook owner, instance argument) for reactive hooks."""
+        return (self.serializer, obj) if self.with_serializer else (obj, None)
+
+    def _invoke_create_hooks(
+        self,
+        request: HttpRequest | None,
+        obj: ModelT,
+        payload: dict,
+        customs: dict,
+        hooks: dict | None,
+    ) -> None:
+        from ninja_aio.models.hooks import (
+            OperationContext,
+            execute_reactive_hooks,
+            invoke_hook,
+        )
+
+        context = OperationContext(
+            request, "create", self.serializer or obj, obj, payload
+        )
+        if self.with_serializer:
+            invoke_hook(context, "custom_actions", customs, obj)
+            invoke_hook(context, "post_create", obj)
+            if hooks:
+                execute_reactive_hooks(self.serializer, hooks["create"], obj)
+        elif isinstance(self.model, ModelSerializerMeta):
+            invoke_hook(context, "custom_actions", customs)
+            invoke_hook(context, "post_create")
+            if hooks:
+                execute_reactive_hooks(obj, hooks["create"])
+
+    def _create_nested_children(
+        self, request: HttpRequest | None, data: Schema, obj: ModelT
+    ) -> None:
+        for name, (child_model, fk_name) in self.nested_fields.items():
+            child_util = ModelUtil(child_model)
+            child_schema = child_model.generate_nested_child_schema(fk_name)
+            for child_data in getattr(data, name, ()):
+                if not isinstance(child_data, child_schema):
+                    child_data = child_schema.model_validate(
+                        child_data.model_dump(by_alias=True)
+                        if isinstance(child_data, Schema)
+                        else child_data
+                    )
+                child_util.create_instance(
+                    request, child_data, extra_fields={fk_name: obj}
+                )
+
+    def update_instance(
+        self,
+        request: HttpRequest | None,
+        data: Schema,
+        pk: PrimaryKey,
+        instance: ModelT | None = None,
+        fk_cache: dict[tuple[type, Any], Any] | None = None,
+    ) -> ModelT:
+        """Update one model instance with Django's synchronous ORM."""
+        from ninja_aio.models.hooks import (
+            OperationContext,
+            detect_changed_fields,
+            fire_update_hooks,
+            get_hooks,
+            invoke_hook,
+            suppress_signals,
+        )
+
+        obj = instance or self.get_object(request, pk, is_for="read")
+        logger.info(f"Updating {self.model.__name__} (pk={obj.pk})")
+        payload, customs = self.parse_input_data(
+            request, data, fk_cache, partial=True
+        )
+        hooks = get_hooks(self.serializer_class or self.model)
+        changed = (
+            detect_changed_fields(obj, payload, hooks["update_field"])
+            if hooks
+            else set()
+        )
+        context = OperationContext(
+            request, "update", self.serializer or obj, obj, payload, changed
+        )
+        atomic = (
+            transaction.atomic(using=router.db_for_write(self.model))
+            if self._needs_atomic(hooks)
+            else nullcontext()
+        )
+        with atomic:
+            for name, value in payload.items():
+                setattr(obj, name, value)
+            if self.with_serializer:
+                invoke_hook(context, "custom_actions", customs, obj)
+            elif isinstance(self.model, ModelSerializerMeta):
+                invoke_hook(context, "custom_actions", customs)
+            with suppress_signals():
+                if self.with_serializer:
+                    self.serializer._save_instance(obj)
+                else:
+                    obj.save()
+            if hooks:
+                target, hook_instance = self._reactive_target(obj)
+                fire_update_hooks(target, changed, hooks, hook_instance)
+        return obj
+
+    def destroy_instance(
+        self,
+        request: HttpRequest | None,
+        pk: PrimaryKey,
+        instance: ModelT | None = None,
+    ) -> None:
+        """Destroy one model instance with Django's synchronous ORM."""
+        from ninja_aio.models.hooks import (
+            _is_overridden,
+            execute_reactive_hooks,
+            get_hooks,
+            suppress_signals,
+        )
+
+        obj = instance or self.get_object(request, pk)
+        logger.info(f"Deleting {self.model.__name__} (pk={obj.pk})")
+        hooks = get_hooks(self.serializer_class or self.model)
+        atomic = (
+            transaction.atomic(using=router.db_for_write(self.model))
+            if self._needs_atomic(hooks)
+            else nullcontext()
+        )
+        with atomic:
+            with suppress_signals():
+                obj.delete()
+            if self.with_serializer and _is_overridden(self.serializer, "on_delete"):
+                self.serializer.on_delete(obj)
+            if hooks:
+                target, hook_instance = self._reactive_target(obj)
+                execute_reactive_hooks(target, hooks["delete"], hook_instance)
+
+    async def acreate_instance(
+        self,
+        request: HttpRequest | None,
+        data: Schema,
+        fk_cache: dict[tuple[type, Any], Any] | None = None,
+        extra_fields: dict[str, Any] | None = None,
+    ) -> ModelT:
         """Create an owned object graph atomically, including direct/bulk calls."""
         if not self.nested_fields:
-            return await self._persist_instance(request, data, fk_cache, extra_fields)
+            from ninja_aio.models.hooks import get_hooks
+
+            hooks = get_hooks(self.serializer_class or self.model)
+            atomic = (
+                AsyncAtomicContextManager(using=router.db_for_write(self.model))
+                if self._needs_atomic(hooks)
+                else nullcontext()
+            )
+            # Like the sync path: resolve input and foreign keys before the transaction.
+            parsed = await self.aparse_input_data(request, data, fk_cache)
+            async with atomic:
+                return await self._persist_instance(
+                    request, data, fk_cache, extra_fields, parsed=parsed
+                )
         using = router.db_for_write(self.model)
         if any(
             router.db_for_write(child) != using
@@ -1188,18 +1573,19 @@ class ModelUtil(Generic[ModelT]):
                             if isinstance(child_data, Schema)
                             else child_data
                         )
-                    await child_util._create_instance(
+                    await child_util.acreate_instance(
                         request, child_data, extra_fields={fk_name: obj}
                     )
             return obj
 
     async def _persist_instance(
         self,
-        request: HttpRequest,
+        request: HttpRequest | None,
         data: Schema,
         fk_cache: dict[tuple[type, Any], Any] | None = None,
         extra_fields: dict[str, Any] | None = None,
-    ):
+        parsed: tuple[dict, dict] | None = None,
+    ) -> ModelT:
         """
         Create a new instance and run hooks.
 
@@ -1221,40 +1607,40 @@ class ModelUtil(Generic[ModelT]):
             The created model instance.
         """
         from ninja_aio.models.hooks import (
-            suppress_signals,
+            OperationContext,
+            ainvoke_hook,
+            asuppress_signals,
             get_hooks,
-            execute_reactive_hooks,
+            aexecute_reactive_hooks,
         )
 
         logger.info(f"Creating {self.model.__name__}")
-        payload, customs = await self.parse_input_data(request, data, fk_cache)
+        payload, customs = parsed or await self.aparse_input_data(request, data, fk_cache)
         if extra_fields:
             for name in extra_fields:
                 # The parent owns this FK, including its raw *_id alias.
                 payload.pop(self.model._meta.get_field(name).attname, None)
             payload.update(extra_fields)
-        async with suppress_signals():
+        async with asuppress_signals():
             obj = (
                 await self.model.objects.acreate(**payload)
                 if not self.with_serializer
-                else await self.serializer.create(payload)
+                else await self.serializer._acreate(payload)
             )
         logger.debug(f"Created {self.model.__name__} (pk={obj.pk})")
-        if isinstance(self.model, ModelSerializerMeta):
-            if self.nested_fields or extra_fields:
-                # Nested graph hooks must finish before rollback can begin.
-                await obj.custom_actions(customs)
-                await obj.post_create()
-            else:
-                await asyncio.gather(obj.custom_actions(customs), obj.post_create())
-            hooks = get_hooks(self.model)
-            if hooks and hooks["create"]:
-                await execute_reactive_hooks(obj, hooks["create"])
+        context = OperationContext(
+            request, "create", self.serializer or obj, obj, payload
+        )
         if self.with_serializer:
-            await asyncio.gather(
-                self.serializer.custom_actions(customs, obj),
-                self.serializer.post_create(obj),
-            )
+            await ainvoke_hook(context, "custom_actions", customs, obj)
+            await ainvoke_hook(context, "post_create", obj)
+        elif isinstance(self.model, ModelSerializerMeta):
+            await ainvoke_hook(context, "custom_actions", customs)
+            await ainvoke_hook(context, "post_create")
+        hooks = get_hooks(self.serializer_class or self.model)
+        if hooks and hooks["create"]:
+            target, hook_instance = self._reactive_target(obj)
+            await aexecute_reactive_hooks(target, hooks["create"], hook_instance)
         return obj
 
     async def create_s(self, request: HttpRequest, data: Schema, obj_schema: Schema):
@@ -1274,10 +1660,11 @@ class ModelUtil(Generic[ModelT]):
         dict
             Serialized created object.
         """
-        obj = await self._create_instance(request, data)
+        _warn_deprecated("create_s", "acreate() and amodel_dump()")
+        obj = await self.acreate_instance(request, data)
         # Only prefetch reverse relations (forward FKs already loaded)
         obj = await self._prefetch_reverse_relations_on_instance(obj, is_for="read")
-        return await self.read_s(obj_schema, request, obj)
+        return await self._read_s(obj_schema, request, obj)
 
     async def _read_s(
         self,
@@ -1373,6 +1760,7 @@ class ModelUtil(Generic[ModelT]):
         - When instance is provided, request and query_data are ignored
         - Query optimizations applied when is_for is specified
         """
+        _warn_deprecated("read_s", "aget_object() and amodel_dump()")
         return await self._read_s(
             schema,
             request,
@@ -1429,6 +1817,7 @@ class ModelUtil(Generic[ModelT]):
         - Query optimizations applied when is_for is specified
         - Processes queryset asynchronously for efficiency
         """
+        _warn_deprecated("list_read_s", "aget_objects() and amodel_dumps()")
         return await self._read_s(
             schema,
             request,
@@ -1437,14 +1826,15 @@ class ModelUtil(Generic[ModelT]):
             is_for,
         )
 
-    async def _update_instance(
+    async def aupdate_instance(
         self,
-        request: HttpRequest,
+        request: HttpRequest | None,
         data: Schema,
-        pk: int | str,
+        pk: PrimaryKey,
         require_fields: bool = False,
         fk_cache: dict[tuple[type, Any], Any] | None = None,
-    ):
+        instance: ModelT | None = None,
+    ) -> ModelT:
         """
         Update an existing instance and run hooks.
 
@@ -1470,37 +1860,59 @@ class ModelUtil(Generic[ModelT]):
             The updated model instance.
         """
         from ninja_aio.models.hooks import (
-            suppress_signals, get_hooks, detect_changed_fields, fire_update_hooks,
+            OperationContext,
+            ainvoke_hook,
+            asuppress_signals,
+            get_hooks,
+            detect_changed_fields,
+            afire_update_hooks,
         )
 
         logger.info(f"Updating {self.model.__name__} (pk={pk})")
-        obj = await self.get_object(request, pk, is_for="read")
-        payload, customs = await self.parse_input_data(request, data, fk_cache)
+        obj = (
+            instance
+            if instance is not None
+            else await self.aget_object(request, pk, is_for="read")
+        )
+        payload, customs = await self.aparse_input_data(
+            request, data, fk_cache, partial=True
+        )
+        context = OperationContext(
+            request, "update", self.serializer or obj, obj, payload
+        )
         if require_fields and not payload and not customs:
             raise SerializeError("No fields provided for update.")
 
-        hooks = get_hooks(self.model)
+        hooks = get_hooks(self.serializer_class or self.model)
         changed_fields = (
             detect_changed_fields(obj, payload, hooks.get("update_field", {}))
             if hooks
             else set()
         )
+        context.changed_fields = changed_fields
 
-        for k, v in payload.items():
-            if v is not None:
+        atomic = (
+            AsyncAtomicContextManager(using=router.db_for_write(self.model))
+            if self._needs_atomic(hooks)
+            else nullcontext()
+        )
+        async with atomic:
+            for k, v in payload.items():
                 setattr(obj, k, v)
 
-        async with suppress_signals():
-            if isinstance(self.model, ModelSerializerMeta):
-                await obj.custom_actions(customs)
             if self.with_serializer:
-                await self.serializer.custom_actions(customs, obj)
-                await self.serializer.save(obj)
-            else:
-                await obj.asave()
+                await ainvoke_hook(context, "custom_actions", customs, obj)
+            elif isinstance(self.model, ModelSerializerMeta):
+                await ainvoke_hook(context, "custom_actions", customs)
+            async with asuppress_signals():
+                if self.with_serializer:
+                    await self.serializer._asave_instance(obj)
+                else:
+                    await obj.asave()
 
-        if isinstance(self.model, ModelSerializerMeta) and hooks:
-            await fire_update_hooks(obj, changed_fields, hooks)
+            if hooks:
+                target, hook_instance = self._reactive_target(obj)
+                await afire_update_hooks(target, changed_fields, hooks, hook_instance)
 
         logger.debug(f"Updated {self.model.__name__} (pk={pk})")
         return obj
@@ -1533,17 +1945,31 @@ class ModelUtil(Generic[ModelT]):
         dict
             Serialized updated object.
         """
-        obj = await self._update_instance(request, data, pk, require_fields)
-        # FK instances from parse_input_data are already attached to obj
+        _warn_deprecated("update_s", "aupdate() and amodel_dump()")
+        obj = await self.aupdate_instance(request, data, pk, require_fields)
+        # FK instances from aparse_input_data are already attached to obj
         # Only refresh reverse relations since they might have changed
         updated_object = await self._prefetch_reverse_relations_on_instance(
             obj, is_for="read"
         )
-        return await self.read_s(obj_schema, request, updated_object)
+        return await self._read_s(obj_schema, request, updated_object)
 
     async def delete_s(
-        self, request: HttpRequest, pk: int | str, instance: ModelT | None = None
+        self,
+        request: HttpRequest | None,
+        pk: PrimaryKey,
+        instance: ModelT | None = None,
     ):
+        """Deprecated alias of ``adestroy()``."""
+        _warn_deprecated("delete_s", "adestroy()")
+        await self.adestroy_instance(request, pk, instance=instance)
+
+    async def adestroy_instance(
+        self,
+        request: HttpRequest | None,
+        pk: PrimaryKey,
+        instance: ModelT | None = None,
+    ) -> None:
         """
         Delete an instance by primary key.
 
@@ -1563,24 +1989,274 @@ class ModelUtil(Generic[ModelT]):
         None
         """
         from ninja_aio.models.hooks import (
-            suppress_signals, get_hooks, execute_reactive_hooks,
+            asuppress_signals,
+            get_hooks,
+            aexecute_reactive_hooks,
+            _is_overridden,
         )
 
         logger.info(f"Deleting {self.model.__name__} (pk={pk})")
-        obj = instance if instance is not None else await self.get_object(request, pk)
-        async with suppress_signals():
-            await obj.adelete()
-        logger.debug(f"Deleted {self.model.__name__} (pk={pk})")
+        obj = instance if instance is not None else await self.aget_object(request, pk)
+        hooks = get_hooks(self.serializer_class or self.model)
+        atomic = (
+            AsyncAtomicContextManager(using=router.db_for_write(self.model))
+            if self._needs_atomic(hooks)
+            else nullcontext()
+        )
+        async with atomic:
+            async with asuppress_signals():
+                await obj.adelete()
+            logger.debug(f"Deleted {self.model.__name__} (pk={pk})")
+            if self.with_serializer and _is_overridden(self.serializer, "on_delete"):
+                await sync_to_async(self.serializer.on_delete)(obj)
 
-        hooks = get_hooks(self.model)
-        if hooks and hooks["delete"]:
-            await execute_reactive_hooks(obj, hooks["delete"])
-        if self.with_serializer:
-            ser_hooks = get_hooks(self.serializer_class)
-            if ser_hooks and ser_hooks["delete"]:
-                await execute_reactive_hooks(self.serializer, ser_hooks["delete"], obj)
+            if hooks and hooks["delete"]:
+                target, hook_instance = self._reactive_target(obj)
+                await aexecute_reactive_hooks(target, hooks["delete"], hook_instance)
 
-        return None
+    @staticmethod
+    def _split_target(target: ModelT | PrimaryKey) -> tuple[PrimaryKey, ModelT | None]:
+        if isinstance(target, models.Model):
+            return target.pk, target
+        return target, None
+
+    def get(
+        self,
+        pk: PrimaryKey,
+        *,
+        request: HttpRequest | None = None,
+        optimize_for: QueryPurpose | None = None,
+    ) -> ModelT:
+        """Retrieve one request-scoped instance synchronously."""
+        return self.get_object(request, pk, is_for=optimize_for)
+
+    async def aget(
+        self,
+        pk: PrimaryKey,
+        *,
+        request: HttpRequest | None = None,
+        optimize_for: QueryPurpose | None = None,
+    ) -> ModelT:
+        """Retrieve one request-scoped instance asynchronously."""
+        return await self.aget_object(request, pk, is_for=optimize_for)
+
+    def get_queryset(
+        self,
+        *,
+        request: HttpRequest | None = None,
+        optimize_for: QueryPurpose | None = None,
+    ) -> models.QuerySet[ModelT]:
+        """Return the request-scoped queryset synchronously."""
+        return self.get_objects(request, is_for=optimize_for)
+
+    async def aget_queryset(
+        self,
+        *,
+        request: HttpRequest | None = None,
+        optimize_for: QueryPurpose | None = None,
+    ) -> models.QuerySet[ModelT]:
+        """Return the request-scoped queryset asynchronously."""
+        return await self.aget_objects(request, is_for=optimize_for)
+
+    def create(self, data: Schema, *, request: HttpRequest | None = None) -> ModelT:
+        """Create one instance from already-validated input synchronously."""
+        return self.create_instance(request, data)
+
+    async def acreate(
+        self, data: Schema, *, request: HttpRequest | None = None
+    ) -> ModelT:
+        """Create one instance from already-validated input asynchronously."""
+        return await self.acreate_instance(request, data)
+
+    def update(
+        self,
+        target: ModelT | PrimaryKey,
+        data: Schema,
+        *,
+        request: HttpRequest | None = None,
+    ) -> ModelT:
+        """Update one instance, reusing *target* when it is already loaded."""
+        pk, instance = self._split_target(target)
+        return self.update_instance(request, data, pk, instance=instance)
+
+    async def aupdate(
+        self,
+        target: ModelT | PrimaryKey,
+        data: Schema,
+        *,
+        request: HttpRequest | None = None,
+    ) -> ModelT:
+        """Update one instance asynchronously, reusing a loaded *target*."""
+        pk, instance = self._split_target(target)
+        return await self.aupdate_instance(request, data, pk, instance=instance)
+
+    def destroy(
+        self, target: ModelT | PrimaryKey, *, request: HttpRequest | None = None
+    ) -> None:
+        """Delete one instance synchronously."""
+        pk, instance = self._split_target(target)
+        self.destroy_instance(request, pk, instance=instance)
+
+    async def adestroy(
+        self, target: ModelT | PrimaryKey, *, request: HttpRequest | None = None
+    ) -> None:
+        """Delete one instance asynchronously."""
+        pk, instance = self._split_target(target)
+        await self.adestroy_instance(request, pk, instance=instance)
+
+    def model_dump(self, instance: ModelT, *, schema: type[Schema]) -> dict[str, Any]:
+        """Serialize one instance with *schema*."""
+        return model_transformations.dump_model(instance, schema)
+
+    def model_dumps(
+        self, instances: Iterable[ModelT], *, schema: type[Schema]
+    ) -> list[dict[str, Any]]:
+        """Serialize instances with *schema*."""
+        return model_transformations.dump_models(instances, schema)
+
+    async def amodel_dump(
+        self, instance: ModelT, *, schema: type[Schema]
+    ) -> dict[str, Any]:
+        """Serialize one instance with *schema* from async code."""
+        return await self._bump_object_from_schema(instance, schema)
+
+    async def amodel_dumps(
+        self,
+        instances: Iterable[ModelT] | models.QuerySet[ModelT],
+        *,
+        schema: type[Schema],
+    ) -> list[dict[str, Any]]:
+        """Serialize instances with *schema* from async code."""
+        return await self._bump_queryset_from_schema(instances, schema)
+
+    def _bulk_target(self, target: ModelT | PrimaryKey) -> tuple[PrimaryKey, Any]:
+        return self._split_target(target)[0], target
+
+    def _bulk_update_target(self, item: tuple) -> tuple[PrimaryKey, tuple]:
+        return self._split_target(item[0])[0], item
+
+    @cached_property
+    def _can_sync_bulk_create(self) -> bool:
+        """Use one thread bridge only when creation has no async customization."""
+        from ninja_aio.models.hooks import _is_overridden, get_hooks
+
+        target = self.serializer_class or self.model
+        if self.nested_fields or self.model._meta.many_to_many or any(field.is_relation for field in self.model._meta.concrete_fields):
+            return False
+        if any(_is_overridden(target, name) for name in ("apost_create", "acustom_actions")):
+            return False
+        hooks = get_hooks(target)
+        if hooks and any(inspect.iscoroutinefunction(getattr(target, name)) for name in hooks["create"]):
+            return False
+        # Respect custom async saves, managers, and queryset implementations.
+        return (
+            self.model.asave is models.Model.asave
+            and type(self.model._default_manager) is models.Manager
+            and self.model.objects is self.model._default_manager
+            and type(self.model.objects.get_queryset()) is models.QuerySet
+        )
+
+    @property
+    def _item_transaction(self) -> bool:
+        # Plain models write once per item and open their own transaction for
+        # hooks/nested writes; serializer custom hooks need the per-item rollback.
+        return self.with_serializer or isinstance(self.model, ModelSerializerMeta)
+
+    def bulk_create(
+        self, items: Iterable[Schema], *, request: HttpRequest | None = None
+    ) -> BulkResult[ModelT]:
+        """Create each validated item in its own transaction."""
+        fk_cache: dict[tuple[type, Any], Any] = {}
+        return run_bulk(
+            self.model,
+            items,
+            lambda data: self.create_instance(request, data, fk_cache),
+            atomic=self._item_transaction,
+        )
+
+    async def abulk_create(
+        self, items: Iterable[Schema], *, request: HttpRequest | None = None
+    ) -> BulkResult[ModelT]:
+        """Create each validated item in its own transaction, asynchronously."""
+        fk_cache: dict[tuple[type, Any], Any] = {}
+        return await arun_bulk(
+            self.model,
+            items,
+            lambda data: self.acreate_instance(request, data, fk_cache),
+            atomic=self._item_transaction,
+        )
+
+    def bulk_update(
+        self,
+        items: Iterable[tuple[ModelT | PrimaryKey, Schema]],
+        *,
+        request: HttpRequest | None = None,
+    ) -> BulkResult[ModelT]:
+        """Update each ``(target, data)`` pair in its own transaction."""
+        fk_cache: dict[tuple[type, Any], Any] = {}
+
+        def update(item: tuple) -> ModelT:
+            pk, instance = self._split_target(item[0])
+            return self.update_instance(
+                request, item[1], pk, instance=instance, fk_cache=fk_cache
+            )
+
+        return run_bulk(
+            self.model, items, update, self._bulk_update_target, self._item_transaction
+        )
+
+    async def abulk_update(
+        self,
+        items: Iterable[tuple[ModelT | PrimaryKey, Schema]],
+        *,
+        request: HttpRequest | None = None,
+    ) -> BulkResult[ModelT]:
+        """Update each ``(target, data)`` pair in its own transaction, asynchronously."""
+        fk_cache: dict[tuple[type, Any], Any] = {}
+
+        async def update(item: tuple) -> ModelT:
+            pk, instance = self._split_target(item[0])
+            return await self.aupdate_instance(
+                request, item[1], pk, fk_cache=fk_cache, instance=instance
+            )
+
+        return await arun_bulk(
+            self.model, items, update, self._bulk_update_target, self._item_transaction
+        )
+
+    def bulk_destroy(
+        self,
+        targets: Iterable[ModelT | PrimaryKey],
+        *,
+        request: HttpRequest | None = None,
+    ) -> BulkResult[PrimaryKey]:
+        """Delete each target in its own transaction, returning deleted primary keys."""
+
+        def destroy(target: ModelT | PrimaryKey) -> PrimaryKey:
+            pk, instance = self._split_target(target)
+            self.destroy_instance(request, pk, instance=instance)
+            return pk
+
+        return run_bulk(
+            self.model, targets, destroy, self._bulk_target, self._item_transaction
+        )
+
+    async def abulk_destroy(
+        self,
+        targets: Iterable[ModelT | PrimaryKey],
+        *,
+        request: HttpRequest | None = None,
+    ) -> BulkResult[PrimaryKey]:
+        """Delete each target in its own transaction asynchronously."""
+
+        async def destroy(target: ModelT | PrimaryKey) -> PrimaryKey:
+            pk, instance = self._split_target(target)
+            await self.adestroy_instance(request, pk, instance=instance)
+            return pk
+
+        return await arun_bulk(
+            self.model, targets, destroy, self._bulk_target, self._item_transaction
+        )
 
     @staticmethod
     def _format_bulk_error(exc: Exception) -> dict[str, str]:
@@ -1627,6 +2303,7 @@ class ModelUtil(Generic[ModelT]):
         tuple[list, list[dict]]
             (success_details, error_details)
         """
+        _warn_deprecated("bulk_create_s", "abulk_create()")
         logger.info(f"Bulk creating {len(data_list)} {self.model.__name__} instances")
         extractor = detail_extractor or (lambda obj: obj.pk)
         success_details = []
@@ -1638,7 +2315,7 @@ class ModelUtil(Generic[ModelT]):
 
         for data in data_list:
             try:
-                obj = await self._create_instance(request, data, fk_cache)
+                obj = await self.acreate_instance(request, data, fk_cache)
                 success_details.append(extractor(obj))
             except (SerializeError, NotFoundError) as e:
                 error_details.append(self._format_bulk_error(e))
@@ -1680,6 +2357,7 @@ class ModelUtil(Generic[ModelT]):
         tuple[list, list[dict]]
             (success_details, error_details)
         """
+        _warn_deprecated("bulk_update_s", "abulk_update()")
         logger.info(f"Bulk updating {len(data_list)} {self.model.__name__} instances")
         extractor = detail_extractor or (lambda obj: obj.pk)
         success_details = []
@@ -1690,7 +2368,7 @@ class ModelUtil(Generic[ModelT]):
 
         for pk, data in data_list:
             try:
-                obj = await self._update_instance(
+                obj = await self.aupdate_instance(
                     request, data, pk, require_fields, fk_cache
                 )
                 success_details.append(extractor(obj))
@@ -1720,16 +2398,15 @@ class ModelUtil(Generic[ModelT]):
             is None.
         """
         if not detail_fields:
-            existing_pks: set = set()
-            async for pk_val in matched_qs.values_list(
-                self.model_pk_name, flat=True
-            ):
-                existing_pks.add(pk_val)
+            existing_pks = {
+                pk_val
+                async for pk_val in matched_qs.values_list(
+                    self.model_pk_name, flat=True
+                )
+            }
             return existing_pks, {}
 
-        fields_with_pk = list(
-            dict.fromkeys([self.model_pk_name] + detail_fields)
-        )
+        fields_with_pk = list(dict.fromkeys([self.model_pk_name] + detail_fields))
         detail_map: dict = {}
         single_field = len(detail_fields) == 1
         async for row in matched_qs.values(*fields_with_pk):
@@ -1778,11 +2455,12 @@ class ModelUtil(Generic[ModelT]):
         tuple[list, list[dict]]
             (success_details, error_details)
         """
+        _warn_deprecated("bulk_delete_s", "abulk_destroy()")
         logger.info(f"Bulk deleting {len(pks)} {self.model.__name__} instances")
         if not pks:
             return [], []
 
-        qs = await self.get_objects(request, is_for="read")
+        qs = await self.aget_objects(request, is_for="read")
         matched_qs = qs.filter(**{f"{self.model_pk_name}__in": pks})
 
         existing_pks, detail_map = await self._resolve_existing_pks(
@@ -1790,19 +2468,13 @@ class ModelUtil(Generic[ModelT]):
         )
 
         error_details = [
-            NotFoundError(self.model).error
-            for pk in pks
-            if pk not in existing_pks
+            NotFoundError(self.model).error for pk in pks if pk not in existing_pks
         ]
 
         success_details: list = []
         if existing_pks:
-            await qs.filter(
-                **{f"{self.model_pk_name}__in": existing_pks}
-            ).adelete()
-            success_details = self._build_success_details(
-                pks, existing_pks, detail_map
-            )
+            await qs.filter(**{f"{self.model_pk_name}__in": existing_pks}).adelete()
+            success_details = self._build_success_details(pks, existing_pks, detail_map)
 
         logger.debug(
             f"Bulk delete {self.model.__name__}: "

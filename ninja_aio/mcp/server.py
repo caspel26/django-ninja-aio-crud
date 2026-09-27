@@ -25,8 +25,12 @@ Then point an MCP client (e.g. Claude Code's ``.mcp.json``) at
 from __future__ import annotations
 
 import logging
+import re
+from collections import Counter
+from dataclasses import replace
 from typing import Iterable, Optional
 
+from django.core.exceptions import ImproperlyConfigured
 from mcp import types
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
@@ -36,6 +40,13 @@ from .introspect import ToolSpec, describe_api_view, describe_viewset
 from .invoke import invoke_tool
 
 logger = logging.getLogger("ninja_aio.mcp")
+
+
+def _route_prefix(owner) -> str:
+    """Tool-name prefix built from the owner's full URL path, e.g. ``sync/books`` -> ``sync_books``."""
+    mount = getattr(getattr(owner, "api", None), "mount_path", None)
+    path = "/".join(p for p in ((mount() if mount else ""), getattr(owner, "api_route_path", "") or "") if p)
+    return re.sub(r"[^0-9a-zA-Z]+", "_", path).strip("_").lower() or type(owner).__name__.lower()
 
 
 class NinjaAIOMCPServer:
@@ -51,8 +62,8 @@ class NinjaAIOMCPServer:
         request_factory: Optional[RequestFactory] = None,
     ) -> None:
         self.api = api
-        self.viewsets = list(viewsets) if viewsets is not None else list(api._viewsets)
-        self.views = list(views) if views is not None else list(api._views)
+        self.viewsets = list(viewsets) if viewsets is not None else api.registered_viewsets()
+        self.views = list(views) if views is not None else api.registered_views()
         self.request_factory = request_factory
         self.server = Server(name)
         self._tools: dict[str, ToolSpec] = {}
@@ -60,12 +71,18 @@ class NinjaAIOMCPServer:
         self._register_handlers()
 
     def _build_tools(self) -> None:
-        for viewset in self.viewsets:
-            for spec in describe_viewset(viewset):
-                self._tools[spec.name] = spec
-        for view in self.views:
-            for spec in describe_api_view(view):
-                self._tools[spec.name] = spec
+        specs = [spec for viewset in self.viewsets for spec in describe_viewset(viewset)]
+        specs += [spec for view in self.views for spec in describe_api_view(view)]
+        counts = Counter(spec.name for spec in specs)
+        for spec in specs:
+            if counts[spec.name] > 1:
+                spec = replace(spec, name=f"{_route_prefix(spec.owner)}_{spec.name}")
+            if spec.name in self._tools:
+                raise ImproperlyConfigured(
+                    f"Two MCP tools are both named '{spec.name}'. Register the "
+                    "viewsets or views under different prefixes."
+                )
+            self._tools[spec.name] = spec
         logger.debug(f"Registered {len(self._tools)} MCP tool(s)")
 
     def _register_handlers(self) -> None:

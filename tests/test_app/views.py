@@ -365,10 +365,10 @@ class PermissionTestAPI(GenericAPIViewSet, mixins.PermissionViewSetMixin):
 
     model = models.TestModelSerializer
 
-    async def has_permission(self, request, operation):
+    async def ahas_permission(self, request, operation):
         return getattr(request, "_allow", True)
 
-    async def has_object_permission(self, request, operation, obj):
+    async def ahas_object_permission(self, request, operation, obj):
         return getattr(request, "_allow_obj", True)
 
     def get_permission_queryset(self, request, queryset):
@@ -409,7 +409,7 @@ class PermissionWithFilterTestAPI(
     model = models.TestModelSerializer
     query_params = {"name": (str, None)}
 
-    async def has_permission(self, request, operation):
+    async def ahas_permission(self, request, operation):
         return getattr(request, "_allow", True)
 
 

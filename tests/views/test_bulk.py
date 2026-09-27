@@ -59,7 +59,7 @@ class BulkModelViewSetTestCase(TestCase):
             schema.TestModelSchemaIn(name="bulk_3", description="desc_3"),
         ]
 
-        view = self.viewset.bulk_create_view()
+        view = self.viewset.abulk_create_view()
         result = await view(self.post_request, items)
 
         self.assertEqual(result.status_code, 200)
@@ -77,7 +77,7 @@ class BulkModelViewSetTestCase(TestCase):
 
     async def test_bulk_create_empty_list(self):
         """Bulk create with an empty list returns empty result."""
-        view = self.viewset.bulk_create_view()
+        view = self.viewset.abulk_create_view()
         result = await view(self.post_request, [])
 
         self.assertEqual(result.status_code, 200)
@@ -96,7 +96,7 @@ class BulkModelViewSetTestCase(TestCase):
             self.viewset.bulk_update_schema(id=obj2.pk, description="updated_2"),
         ]
 
-        view = self.viewset.bulk_update_view()
+        view = self.viewset.abulk_update_view()
         result = await view(self.patch_request, update_items)
 
         self.assertEqual(result.status_code, 200)
@@ -122,7 +122,7 @@ class BulkModelViewSetTestCase(TestCase):
             self.viewset.bulk_update_schema(id=99999, description="nope"),
         ]
 
-        view = self.viewset.bulk_update_view()
+        view = self.viewset.abulk_update_view()
         result = await view(self.patch_request, update_items)
 
         self.assertEqual(result.status_code, 200)
@@ -140,7 +140,7 @@ class BulkModelViewSetTestCase(TestCase):
 
         delete_data = self.viewset.bulk_delete_schema(ids=[obj1.pk, obj2.pk])
 
-        view = self.viewset.bulk_delete_view()
+        view = self.viewset.abulk_delete_view()
         result = await view(self.delete_request, delete_data)
 
         self.assertEqual(result.status_code, 200)
@@ -163,7 +163,7 @@ class BulkModelViewSetTestCase(TestCase):
 
         delete_data = self.viewset.bulk_delete_schema(ids=[obj1.pk, 99999])
 
-        view = self.viewset.bulk_delete_view()
+        view = self.viewset.abulk_delete_view()
         result = await view(self.delete_request, delete_data)
 
         self.assertEqual(result.status_code, 200)
@@ -180,7 +180,7 @@ class BulkModelViewSetTestCase(TestCase):
 
         delete_data = self.viewset.bulk_delete_schema(ids=[])
 
-        view = self.viewset.bulk_delete_view()
+        view = self.viewset.abulk_delete_view()
         result = await view(self.delete_request, delete_data)
 
         self.assertEqual(result.status_code, 200)
@@ -198,7 +198,7 @@ class BulkModelViewSetTestCase(TestCase):
             schema.TestModelSchemaIn(name="bad_item", description="desc"),
         ]
 
-        original = self.viewset.model_util._create_instance
+        original = self.viewset.model_util.acreate_instance
 
         async def mock_create(request, data, *args, **kwargs):
             if data.name == "bad_item":
@@ -206,9 +206,9 @@ class BulkModelViewSetTestCase(TestCase):
             return await original(request, data, *args, **kwargs)
 
         with patch.object(
-            self.viewset.model_util, "_create_instance", side_effect=mock_create
+            self.viewset.model_util, "acreate_instance", side_effect=mock_create
         ):
-            view = self.viewset.bulk_create_view()
+            view = self.viewset.abulk_create_view()
             result = await view(self.post_request, items)
 
         self.assertEqual(result.status_code, 200)
@@ -225,10 +225,10 @@ class BulkModelViewSetTestCase(TestCase):
 
         with patch.object(
             self.viewset.model_util,
-            "_create_instance",
+            "acreate_instance",
             side_effect=RuntimeError("unexpected"),
         ):
-            view = self.viewset.bulk_create_view()
+            view = self.viewset.abulk_create_view()
             result = await view(self.post_request, items)
 
         self.assertEqual(result.status_code, 200)
@@ -248,10 +248,10 @@ class BulkModelViewSetTestCase(TestCase):
 
         with patch.object(
             self.viewset.model_util,
-            "_update_instance",
+            "aupdate_instance",
             side_effect=RuntimeError("unexpected update"),
         ):
-            view = self.viewset.bulk_update_view()
+            view = self.viewset.abulk_update_view()
             result = await view(self.patch_request, update_items)
 
         self.assertEqual(result.status_code, 200)
@@ -301,7 +301,7 @@ class BulkModelSerializerViewSetTestCase(TestCase):
             schema_in(name="ms_bulk_2", description="desc_2"),
         ]
 
-        view = self.viewset.bulk_create_view()
+        view = self.viewset.abulk_create_view()
         result = await view(self.post_request, items)
 
         self.assertEqual(result.status_code, 200)
@@ -327,7 +327,7 @@ class BulkModelSerializerViewSetTestCase(TestCase):
             self.viewset.bulk_update_schema(id=obj2.pk, description="ms_updated_2"),
         ]
 
-        view = self.viewset.bulk_update_view()
+        view = self.viewset.abulk_update_view()
         result = await view(self.patch_request, update_items)
 
         self.assertEqual(result.status_code, 200)
@@ -345,7 +345,7 @@ class BulkModelSerializerViewSetTestCase(TestCase):
 
         delete_data = self.viewset.bulk_delete_schema(ids=[obj1.pk, obj2.pk])
 
-        view = self.viewset.bulk_delete_view()
+        view = self.viewset.abulk_delete_view()
         result = await view(self.delete_request, delete_data)
 
         self.assertEqual(result.status_code, 200)
@@ -448,7 +448,7 @@ class BulkResponseFieldsSingleTestCase(TestCase):
             schema.TestModelSchemaIn(name="field_2", description="desc_2"),
         ]
 
-        view = self.viewset.bulk_create_view()
+        view = self.viewset.abulk_create_view()
         result = await view(self.post_request, items)
 
         self.assertEqual(result.status_code, 200)
@@ -468,7 +468,7 @@ class BulkResponseFieldsSingleTestCase(TestCase):
             self.viewset.bulk_update_schema(id=obj2.pk, description="new_d2"),
         ]
 
-        view = self.viewset.bulk_update_view()
+        view = self.viewset.abulk_update_view()
         result = await view(self.patch_request, update_items)
 
         self.assertEqual(result.status_code, 200)
@@ -484,7 +484,7 @@ class BulkResponseFieldsSingleTestCase(TestCase):
 
         delete_data = self.viewset.bulk_delete_schema(ids=[obj1.pk, obj2.pk])
 
-        view = self.viewset.bulk_delete_view()
+        view = self.viewset.abulk_delete_view()
         result = await view(self.delete_request, delete_data)
 
         self.assertEqual(result.status_code, 200)
@@ -533,7 +533,7 @@ class BulkResponseFieldsMultiTestCase(TestCase):
             schema.TestModelSchemaIn(name="multi_2", description="desc_2"),
         ]
 
-        view = self.viewset.bulk_create_view()
+        view = self.viewset.abulk_create_view()
         result = await view(self.post_request, items)
 
         self.assertEqual(result.status_code, 200)
@@ -557,7 +557,7 @@ class BulkResponseFieldsMultiTestCase(TestCase):
             self.viewset.bulk_update_schema(id=obj1.pk, description="new_d1"),
         ]
 
-        view = self.viewset.bulk_update_view()
+        view = self.viewset.abulk_update_view()
         result = await view(self.patch_request, update_items)
 
         self.assertEqual(result.status_code, 200)
@@ -575,7 +575,7 @@ class BulkResponseFieldsMultiTestCase(TestCase):
 
         delete_data = self.viewset.bulk_delete_schema(ids=[obj1.pk, obj2.pk])
 
-        view = self.viewset.bulk_delete_view()
+        view = self.viewset.abulk_delete_view()
         result = await view(self.delete_request, delete_data)
 
         self.assertEqual(result.status_code, 200)
@@ -621,7 +621,7 @@ class RequireUpdateFieldsTestCase(TestCase):
         obj = await self.model.objects.acreate(name="orig", description="desc")
         empty_data = self.viewset.schema_update()
 
-        view = self.viewset.update_view()
+        view = self.viewset.aupdate_view()
         pk_schema = self.viewset.path_schema(**{self.pk_att: obj.pk})
         with self.assertRaises(SerializeError):
             await view(self.patch_request, empty_data, pk_schema)
@@ -631,7 +631,7 @@ class RequireUpdateFieldsTestCase(TestCase):
         obj = await self.model.objects.acreate(name="orig", description="desc")
         data = self.viewset.schema_update(description="updated")
 
-        view = self.viewset.update_view()
+        view = self.viewset.aupdate_view()
         pk_schema = self.viewset.path_schema(**{self.pk_att: obj.pk})
         result = await view(self.patch_request, data, pk_schema)
 

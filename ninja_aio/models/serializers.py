@@ -1,20 +1,29 @@
 from typing import (
     Annotated,
     Any,
+    ClassVar,
     Generic,
     List,
     Literal,
     Optional,
+    TypeAlias,
     TypeVar,
+    TYPE_CHECKING,
     Union,
+    cast,
     get_args,
     get_origin,
     ForwardRef,
+    overload,
 )
 import types
 import warnings
+import weakref
 import sys
 import threading
+from collections import OrderedDict
+from collections.abc import Callable, Iterable
+from contextlib import ExitStack
 from functools import lru_cache
 from asgiref.sync import sync_to_async
 
@@ -22,7 +31,9 @@ from django.conf import settings
 from ninja import Schema
 from django.core.exceptions import FieldDoesNotExist, ImproperlyConfigured
 from ninja.orm import create_schema
-from django.db import models
+from ninja.orm.fields import get_schema_field
+from django.db import connections, models
+from django.db.models import aprefetch_related_objects, prefetch_related_objects
 from django.http import HttpRequest
 from django.db.models.fields.related_descriptors import (
     ReverseManyToOneDescriptor,
@@ -31,26 +42,133 @@ from django.db.models.fields.related_descriptors import (
     ForwardManyToOneDescriptor,
     ForwardOneToOneDescriptor,
 )
-from pydantic import BeforeValidator, Field
+from pydantic import AliasChoices, BeforeValidator, Field, ValidationError
+from copy import copy
 from pydantic._internal._decorators import PydanticDescriptorProxy
+from pydantic.fields import FieldInfo
 
 from ninja_aio.types import (
+    BulkResult,
     S_TYPES,
     F_TYPES,
     SCHEMA_TYPES,
+    InputData,
     ModelSerializerMeta,
+    PrimaryKey,
+    QueryPurpose,
+    SchemaKind,
+    SchemaType,
     SerializerMeta,
     get_ninja_aio_meta_attr,
 )
 from ninja_aio.schemas.helpers import (
     ModelQuerySetSchema,
     ModelQuerySetExtraSchema,
+    ObjectQuerySchema,
 )
+from ninja_aio.models import transformations as model_transformations
+from ninja_aio.models.config import (
+    CONFIG_KINDS,
+    EMPTY_SCHEMA_CONFIG,
+    ConfigKind,
+    SchemaConfig,
+)
+from ninja_aio.models.utils import ModelUtil, arun_bulk, bulk_failure, run_bulk
+from ninja_aio.exceptions import OperationValidationError
 
 # TypeVar for generic model typing in Serializers
 ModelT = TypeVar("ModelT", bound=models.Model)
+ModelSerializerT = TypeVar("ModelSerializerT", bound="ModelSerializer")
 
 _nested_schema_state = threading.local()
+
+SchemaCacheKey: TypeAlias = tuple[type["BaseSerializer"], SchemaKind, int]
+
+_SCHEMA_CACHE_MAXSIZE = 640
+_DUMP_PRELOAD_ERROR = "Synchronous dump requires preloaded fields and relations"
+_SCHEMA_TYPE_BY_KIND: dict[SchemaKind, SCHEMA_TYPES] = {
+    "create": "In",
+    "update": "Patch",
+    "read": "Out",
+    "detail": "Detail",
+    "related": "Related",
+}
+_schema_cache: OrderedDict[SchemaCacheKey, SchemaType | None] = OrderedDict()
+_schema_cache_lock = threading.RLock()
+
+SERIALIZER_CLASSES: "weakref.WeakSet[type[BaseSerializer]]" = weakref.WeakSet()
+"""Every concrete serializer class, inspected by the ``ninja_aio`` system checks."""
+
+
+def _register_serializer_config(cls: type, legacy: list[str]) -> None:
+    SERIALIZER_CLASSES.add(cls)
+    if not legacy:
+        return
+    names = ", ".join(legacy)
+    if "Schemas" in cls.__dict__:
+        raise ImproperlyConfigured(
+            f"{cls.__name__} declares both Schemas and legacy {names}; keep only Schemas."
+        )
+    warnings.warn(
+        f"{cls.__name__}: {names} is deprecated; declare a Schemas class with "
+        "SchemaConfig entries instead.",
+        DeprecationWarning,
+        stacklevel=3,
+    )
+
+
+class _LazySchemaAttribute:
+    """Resolve a serializer's default schema on first class-level access."""
+
+    kind: SchemaKind
+
+    def __init__(self, kind: SchemaKind) -> None:
+        self.kind = kind
+
+    @overload
+    def __get__(
+        self,
+        instance: None,
+        owner: type["BaseSerializer"],
+    ) -> SchemaType | None: ...
+
+    @overload
+    def __get__(
+        self,
+        instance: "BaseSerializer",
+        owner: Optional[type["BaseSerializer"]] = None,
+    ) -> SchemaType | None: ...
+
+    def __get__(
+        self,
+        instance: Optional["BaseSerializer"],
+        owner: Optional[type["BaseSerializer"]] = None,
+    ) -> SchemaType | None:
+        if owner is None:
+            if instance is None:
+                raise AttributeError("Lazy schema access requires a serializer class")
+            owner = type(instance)
+        serializer_class = owner
+        return serializer_class.get_schema(self.kind)
+
+
+class _DeprecatedUtilAttribute:
+    """Version 2 ``.util`` access, kept as a warning alias of ``_util`` until v4."""
+
+    def __get__(
+        self,
+        instance: Optional["BaseSerializer"],
+        owner: Optional[type["BaseSerializer"]] = None,
+    ) -> "ModelUtil[models.Model]":
+        owner = owner or type(instance)
+        warnings.warn(
+            f"{owner.__name__}.util is deprecated; use the serializer methods "
+            "(create/acreate, get/aget, update/aupdate, destroy/adestroy, "
+            "model_dump/amodel_dump, ...) instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return owner._util
 
 
 def _extract_pk(v: Any) -> Any:
@@ -92,6 +210,22 @@ class BaseSerializer:
     - _get_model(): return the Django model class associated with the serializer
     - _get_relations_serializers(): optional mapping of relation field -> serializer (may be empty)
     """
+
+    create_schema: ClassVar[SchemaType | None] = cast(
+        Any, _LazySchemaAttribute("create")
+    )
+    update_schema: ClassVar[SchemaType | None] = cast(
+        Any, _LazySchemaAttribute("update")
+    )
+    read_schema: ClassVar[SchemaType | None] = cast(Any, _LazySchemaAttribute("read"))
+    detail_schema: ClassVar[SchemaType | None] = cast(
+        Any, _LazySchemaAttribute("detail")
+    )
+    related_schema: ClassVar[SchemaType | None] = cast(
+        Any, _LazySchemaAttribute("related")
+    )
+    _util: ClassVar["ModelUtil[models.Model]"]
+    util: ClassVar["ModelUtil[models.Model]"] = cast(Any, _DeprecatedUtilAttribute())
 
     class QuerySet:
         """
@@ -306,92 +440,93 @@ class BaseSerializer:
                 setattr(subclass, attr_name, rebound)
         return subclass
 
-    @classmethod
-    def _get_validators(cls, schema_type: type[SCHEMA_TYPES]) -> dict:
-        """
-        Return collected validators for the given schema type.
-
-        Subclasses must implement this to map schema types to the appropriate
-        validator source class.
-
-        Parameters
-        ----------
-        schema_type : SCHEMA_TYPES
-            One of ``"In"``, ``"Patch"``, ``"Out"``, ``"Detail"``, or ``"Related"``.
-
-        Returns
-        -------
-        dict
-            Mapping of validator names to ``PydanticDescriptorProxy`` instances.
-        """
-        return {}
+    _KIND_BY_SCHEMA_TYPE: ClassVar[dict[str, ConfigKind]] = {
+        "In": "create",
+        "Patch": "update",
+        "Out": "read",
+        "Detail": "detail",
+        "Related": "read",
+    }
+    _VALIDATORS_CLASS_BY_KIND: ClassVar[dict[ConfigKind, str]] = {
+        "create": "CreateValidators",
+        "update": "UpdateValidators",
+        "read": "ReadValidators",
+        "detail": "DetailValidators",
+    }
 
     @classmethod
-    def _get_model_config(cls, schema_type: type[SCHEMA_TYPES]) -> dict | None:
-        """
-        Return Pydantic ``ConfigDict`` for the given schema type.
+    def _schema_config(cls, kind: str) -> SchemaConfig:
+        """Return the ``SchemaConfig`` for a kind, from ``Schemas`` or legacy configuration."""
+        if kind not in CONFIG_KINDS:
+            return EMPTY_SCHEMA_CONFIG
+        schemas = getattr(cls, "Schemas", None)
+        if schemas is None:
+            return cls._legacy_schema_config(kind)
+        config = getattr(schemas, kind, None)
+        if config is None and kind == "detail":
+            config = getattr(schemas, "read", None)
+        return EMPTY_SCHEMA_CONFIG if config is None else config
 
-        Subclasses may override this to source ``model_config`` from their
-        configuration classes.
+    @classmethod
+    def _legacy_schema_config(cls, kind: ConfigKind) -> SchemaConfig:
+        """Convert version 2 configuration into a ``SchemaConfig``."""
+        return EMPTY_SCHEMA_CONFIG
 
-        Parameters
-        ----------
-        schema_type : SCHEMA_TYPES
-            One of ``"In"``, ``"Patch"``, ``"Out"``, ``"Detail"``, or ``"Related"``.
+    @classmethod
+    def _legacy_fields(cls, kind: ConfigKind, f_type: F_TYPES) -> list:
+        """Read one version 2 field category without building a ``SchemaConfig``."""
+        return []
 
-        Returns
-        -------
-        dict | None
-            A ``ConfigDict`` instance, or ``None`` if not configured.
-        """
+    @classmethod
+    def _legacy_config_class(cls, kind: ConfigKind) -> type | None:
+        """Version 2 class that may also declare validators and schema overrides."""
         return None
 
     @classmethod
-    def _get_schema_overrides(cls, schema_type: type[SCHEMA_TYPES]) -> dict:
-        """
-        Return collected schema method overrides for the given schema type.
-
-        Subclasses must implement this to map schema types to the appropriate
-        source class for method overrides.
-
-        Parameters
-        ----------
-        schema_type : SCHEMA_TYPES
-            One of ``"In"``, ``"Patch"``, ``"Out"``, ``"Detail"``, or ``"Related"``.
-
-        Returns
-        -------
-        dict
-            Mapping of method names to callables.
-        """
-        return {}
+    def _config_sources(cls, schema_type: SCHEMA_TYPES) -> list[type]:
+        kind = cls._KIND_BY_SCHEMA_TYPE.get(schema_type)
+        if kind is None:
+            return []
+        sources = (
+            cls._legacy_config_class(kind),
+            getattr(cls, cls._VALIDATORS_CLASS_BY_KIND[kind], None),
+        )
+        return [source for source in sources if source is not None]
 
     @classmethod
-    def _get_fields(cls, s_type: type[S_TYPES], f_type: type[F_TYPES]):
-        """
-        Return raw configuration list for the given serializer/field category.
-
-        Parameters
-        ----------
-        s_type : S_TYPES
-            Serializer type (``"create"`` | ``"update"`` | ``"read"`` | ``"detail"``).
-        f_type : F_TYPES
-            Field category (``"fields"`` | ``"optionals"`` | ``"customs"`` | ``"excludes"``).
-
-        Returns
-        -------
-        list
-            Raw configuration list for the requested category.
-
-        Raises
-        ------
-        NotImplementedError
-            Subclasses must provide an implementation.
-        """
-        raise NotImplementedError
+    def _get_validators(cls, schema_type: SCHEMA_TYPES) -> dict:
+        """Collect Pydantic validators declared for the schema type."""
+        validators: dict = {}
+        for source in cls._config_sources(schema_type):
+            validators.update(cls._collect_validators(source))
+        return validators
 
     @classmethod
-    def _get_model(cls) -> models.Model:
+    def _get_model_config(cls, schema_type: SCHEMA_TYPES) -> dict | None:
+        """Return the Pydantic ``ConfigDict`` configured for the schema type."""
+        kind = cls._KIND_BY_SCHEMA_TYPE.get(schema_type)
+        return None if kind is None else cls._schema_config(kind).model_config
+
+    @classmethod
+    def _get_schema_overrides(cls, schema_type: SCHEMA_TYPES) -> dict:
+        """Collect schema method overrides declared for the schema type."""
+        overrides: dict = {}
+        for source in cls._config_sources(schema_type):
+            overrides.update(cls._collect_schema_overrides(source))
+        return overrides
+
+    @classmethod
+    def _get_fields(cls, s_type: S_TYPES, f_type: F_TYPES):
+        """Return the raw configuration list for a serializer type and field category."""
+        if s_type not in CONFIG_KINDS:
+            return []
+        if getattr(cls, "Schemas", None) is None:
+            # Hot path during schema generation: skip building a SchemaConfig.
+            return cls._legacy_fields(s_type, f_type)
+        return getattr(cls._schema_config(s_type), f_type, None) or []
+
+    @classmethod
+    def _get_model(cls) -> type[models.Model]:
         """
         Return the Django model class associated with this serializer.
 
@@ -555,21 +690,6 @@ class BaseSerializer:
         return {}
 
     @classmethod
-    def _get_relations_as_id(cls) -> list[str]:
-        """
-        Return relation field names that should be serialized as IDs.
-
-        Subclasses may override to specify which relation fields should be
-        represented as primary key values instead of nested objects.
-
-        Returns
-        -------
-        list[str]
-            Field names to serialize as IDs. Empty by default.
-        """
-        return []
-
-    @classmethod
     def _generate_union_schema(cls, resolved_union: Any) -> Any:
         """
         Generate a Union schema from multiple resolved serializers.
@@ -588,7 +708,7 @@ class BaseSerializer:
         schemas = tuple(
             schema
             for serializer_type in get_args(resolved_union)
-            if (schema := serializer_type.generate_related_s()) is not None
+            if (schema := serializer_type.get_schema("related")) is not None
         )
 
         if not schemas:
@@ -642,7 +762,7 @@ class BaseSerializer:
                 has_readable_fields = rel_model.get_fields(
                     "read"
                 ) or rel_model.get_custom_fields("read")
-                return rel_model.generate_related_s() if has_readable_fields else None
+                return rel_model.get_schema("related") if has_readable_fields else None
 
             # Resolve from explicit serializer mapping
             rel_serializers = cls._get_relations_serializers() or {}
@@ -658,15 +778,13 @@ class BaseSerializer:
                 return cls._generate_union_schema(resolved)
 
             # Handle single serializer
-            return resolved.generate_related_s()
+            return resolved.get_schema("related")
         finally:
             # Always pop from resolution stack when done
             cls._pop_resolution()
 
     @classmethod
-    def _is_special_field(
-        cls, s_type: type[S_TYPES], field: str, f_type: type[F_TYPES]
-    ) -> bool:
+    def _is_special_field(cls, s_type: S_TYPES, field: str, f_type: F_TYPES) -> bool:
         """
         Check whether a field appears in the given category for a serializer type.
 
@@ -688,7 +806,7 @@ class BaseSerializer:
         return any(field in special_f for special_f in special_fields)
 
     @classmethod
-    def get_custom_fields(cls, s_type: type[S_TYPES]) -> list[tuple[str, type, Any]]:
+    def get_custom_fields(cls, s_type: S_TYPES) -> list[tuple[str, type, Any]]:
         """
         Normalize declared custom field specs into ``(name, py_type, default)`` tuples.
 
@@ -731,7 +849,7 @@ class BaseSerializer:
         return normalized
 
     @classmethod
-    def get_optional_fields(cls, s_type: type[S_TYPES]):
+    def get_optional_fields(cls, s_type: S_TYPES):
         """
         Return optional field specs normalized to ``(name, type, None)`` tuples.
 
@@ -831,12 +949,15 @@ class BaseSerializer:
         Returns
         -------
         bool
-            ``True`` if the field appears in the customs category for either
-            ``create`` or ``update`` serializer types.
+            ``True`` if the field appears in the customs category (or as an
+            inline custom tuple in ``fields``) for either ``create`` or
+            ``update`` serializer types.
         """
-        return cls._is_special_field(
-            "create", field, "customs"
-        ) or cls._is_special_field("update", field, "customs")
+        return any(
+            cls._is_special_field(kind, field, "customs")
+            or any(name == field for name, *_ in cls.get_inline_customs(kind))
+            for kind in ("create", "update")
+        )
 
     @classmethod
     def is_optional(cls, field: str) -> bool:
@@ -1109,7 +1230,7 @@ class BaseSerializer:
         model = cls._get_model()
         relations_serializers = cls._get_relations_serializers() or {}
         # Fetch once to avoid repeated method calls during field processing
-        relations_as_id = cls._get_relations_as_id()
+        relations_as_id = cls._schema_config(fields_type).relations_as_id
 
         fields: list[str] = []
         reverse_rels: list[tuple] = []
@@ -1144,13 +1265,13 @@ class BaseSerializer:
     @classmethod
     def _create_out_or_detail_schema(
         cls,
-        schema_type: type[SCHEMA_TYPES],
-        model,
-        validators,
-        depth: int = None,
-        model_config: dict = None,
-        schema_overrides: dict = None,
-    ) -> Schema | None:
+        schema_type: SCHEMA_TYPES,
+        model: type[models.Model],
+        validators: dict[str, Any],
+        depth: int | None = None,
+        model_config: dict[str, Any] | None = None,
+        schema_overrides: dict[str, Any] | None = None,
+    ) -> SchemaType | None:
         """Create schema for Out or Detail types."""
         fields, reverse_rels, excludes, customs, optionals = cls.get_schema_out_data(
             schema_type
@@ -1170,8 +1291,12 @@ class BaseSerializer:
 
     @classmethod
     def _create_related_schema(
-        cls, model, validators, model_config: dict = None, schema_overrides: dict = None
-    ) -> Schema | None:
+        cls,
+        model: type[models.Model],
+        validators: dict[str, Any],
+        model_config: dict[str, Any] | None = None,
+        schema_overrides: dict[str, Any] | None = None,
+    ) -> SchemaType | None:
         """Create schema for Related type."""
         fields, customs = cls.get_related_schema_data()
         if not fields and not customs:
@@ -1189,7 +1314,7 @@ class BaseSerializer:
         """
         Return synthetic custom field tuples for nested-write relations.
 
-        Overridden by ``ModelSerializer`` to translate ``CreateSerializer.nested``
+        Overridden by ``ModelSerializer`` to translate ``Schemas.create nested``
         into ``(field_name, list[ChildInSchema], default)`` tuples consumable by
         ``create_schema``. The base implementation is a no-op so ``Serializer``
         (Meta-driven) does not need to support nested writes.
@@ -1203,12 +1328,12 @@ class BaseSerializer:
     @classmethod
     def _create_in_or_patch_schema(
         cls,
-        schema_type: type[SCHEMA_TYPES],
-        model,
-        validators,
-        model_config: dict = None,
-        schema_overrides: dict = None,
-    ) -> Schema | None:
+        schema_type: SCHEMA_TYPES,
+        model: type[models.Model],
+        validators: dict[str, Any],
+        model_config: dict[str, Any] | None = None,
+        schema_overrides: dict[str, Any] | None = None,
+    ) -> SchemaType | None:
         """Create schema for In or Patch types."""
         s_type = "create" if schema_type == "In" else "update"
         fields = cls.get_fields(s_type)
@@ -1237,6 +1362,7 @@ class BaseSerializer:
         if not any([fields, customs, excludes]):
             return None
 
+        customs = cls._foreign_key_input_fields(model, fields, excludes, customs)
         schema = create_schema(
             model=model,
             name=f"{model._meta.model_name}Schema{schema_type}",
@@ -1246,12 +1372,52 @@ class BaseSerializer:
         )
         return cls._apply_validators(schema, validators, model_config, schema_overrides)
 
+    @staticmethod
+    def _foreign_key_alias_info(info: FieldInfo, name: str, field: models.Field) -> FieldInfo:
+        alias = info.validation_alias
+        if isinstance(alias, AliasChoices):
+            choices = list(alias.choices)
+        else:
+            choices = [alias] if alias else []
+        for key in (info.alias, name, field.name, field.attname):
+            if key is not None and key not in choices:
+                choices.append(key)
+        return FieldInfo.merge_field_infos(info, validation_alias=AliasChoices(*choices))
+
+    @classmethod
+    def _foreign_key_input_fields(
+        cls,
+        model: type[models.Model],
+        fields: list[str],
+        excludes: list[str],
+        customs: list[tuple[str, Any, Any]],
+    ) -> list[tuple[str, Any, Any]]:
+        """Apply FK input aliases before Ninja builds the Pydantic class."""
+        definitions = {name: (annotation, default) for name, annotation, default in customs}
+        for field in model._meta.concrete_fields:
+            if field.is_relation and not field.many_to_many:
+                cls._add_foreign_key_input_fields(field, fields, excludes, definitions)
+        return [(name, annotation, default) for name, (annotation, default) in definitions.items()]
+
+    @classmethod
+    def _add_foreign_key_input_fields(cls, field, fields, excludes, definitions) -> None:
+        selected = field.name in fields if fields else field.name not in excludes
+        for name in (field.name, field.attname):
+            if name in definitions:
+                annotation, default = definitions[name]
+                info = copy(default) if isinstance(default, FieldInfo) else Field(default)
+            elif name == field.name and selected:
+                annotation, info = get_schema_field(field)
+            else:
+                continue
+            definitions[name] = (annotation, cls._foreign_key_alias_info(info, name, field))
+
     @classmethod
     def _generate_model_schema(
         cls,
-        schema_type: type[SCHEMA_TYPES],
-        depth: int = None,
-    ) -> Schema:
+        schema_type: SCHEMA_TYPES,
+        depth: int | None = None,
+    ) -> SchemaType | None:
         """
         Core schema factory bridging serializer configuration to ``ninja.orm.create_schema``.
 
@@ -1325,98 +1491,580 @@ class BaseSerializer:
         return non_relation_fields, customs
 
     @classmethod
-    @lru_cache(maxsize=128)
-    def generate_read_s(cls, depth: int = 1) -> Schema:
-        """
-        Generate the read (Out) schema for list responses.
-
-        Performance: Results are cached per (class, depth) combination.
-
-        Parameters
-        ----------
-        depth : int, optional
-            Nesting depth for related models. Defaults to ``1``.
-
-        Returns
-        -------
-        Schema | None
-            Generated Pydantic schema, or ``None`` if no read fields are configured.
-        """
-        return cls._generate_model_schema("Out", depth)
-
-    @classmethod
-    @lru_cache(maxsize=128)
-    def generate_detail_s(cls, depth: int = 1) -> Schema:
-        """
-        Generate the detail (single-object) read schema.
-
-        Falls back to the standard read schema if no detail-specific
-        configuration is defined.
-
-        Performance: Results are cached per (class, depth) combination.
-
-        Parameters
-        ----------
-        depth : int, optional
-            Nesting depth for related models. Defaults to ``1``.
-
-        Returns
-        -------
-        Schema
-            Generated Pydantic schema (never ``None``; falls back to read schema).
-        """
-        return cls._generate_model_schema("Detail", depth) or cls.generate_read_s(depth)
+    def _schema_override(cls, kind: SchemaKind) -> tuple[bool, SchemaType | None]:
+        """Return an explicit schema attribute override from the serializer MRO."""
+        attribute = f"{kind}_schema"
+        for base in cls.__mro__:
+            if attribute not in base.__dict__:
+                continue
+            value = base.__dict__[attribute]
+            if isinstance(value, _LazySchemaAttribute):
+                return False, None
+            if value is not None and not (
+                isinstance(value, type) and issubclass(value, Schema)
+            ):
+                raise ImproperlyConfigured(
+                    f"{cls.__name__}.{attribute} must be a Schema subclass or None"
+                )
+            return True, cast(SchemaType | None, value)
+        return False, None
 
     @classmethod
-    @lru_cache(maxsize=128)
-    def generate_create_s(cls) -> Schema:
-        """
-        Generate the create (In) schema for input validation.
+    def get_schema(
+        cls,
+        kind: SchemaKind,
+        *,
+        depth: int = 1,
+    ) -> SchemaType | None:
+        """Return a generated or explicitly overridden serializer schema.
 
-        Performance: Results are cached per class.
-
-        Returns
-        -------
-        Schema | None
-            Generated Pydantic schema, or ``None`` if no create fields are configured.
+        Default schema attributes such as ``detail_schema`` delegate here.
+        Read and detail schemas accept a non-negative relation depth; other
+        schema kinds do not use depth and require its default value.
         """
-        return cls._generate_model_schema("In")
+        schema_kinds: tuple[SchemaKind, ...] = tuple(_SCHEMA_TYPE_BY_KIND)
+        if kind not in schema_kinds:
+            expected = ", ".join(schema_kinds)
+            raise ValueError(
+                f"Unknown schema kind {kind!r}; expected one of: {expected}"
+            )
+        if isinstance(depth, bool) or not isinstance(depth, int) or depth < 0:
+            raise ValueError("Schema depth must be a non-negative integer")
+        if kind not in ("read", "detail") and depth != 1:
+            raise ValueError(f"Schema kind {kind!r} does not support custom depth")
+
+        has_override, override = cls._schema_override(kind)
+        if has_override:
+            return override
+
+        return cls._get_cached_schema(kind, depth)
 
     @classmethod
-    @lru_cache(maxsize=128)
-    def generate_update_s(cls) -> Schema:
-        """
-        Generate the update (Patch) schema for partial updates.
+    def _get_cached_schema(
+        cls,
+        kind: SchemaKind,
+        depth: int,
+    ) -> SchemaType | None:
+        """Generate a schema once and retain it in the bounded shared LRU."""
+        cache_depth = depth if kind in ("read", "detail") else 1
+        key: SchemaCacheKey = (cls, kind, cache_depth)
+        with _schema_cache_lock:
+            if key in _schema_cache:
+                schema = _schema_cache.pop(key)
+                _schema_cache[key] = schema
+                return schema
 
-        Performance: Results are cached per class.
+            schema = cls._generate_model_schema(
+                _SCHEMA_TYPE_BY_KIND[kind],
+                cache_depth if kind in ("read", "detail") else None,
+            )
+            if kind == "detail" and schema is None:
+                schema = cls._get_cached_schema("read", cache_depth)
 
-        Returns
-        -------
-        Schema | None
-            Generated Pydantic schema, or ``None`` if no update fields are configured.
-        """
-        return cls._generate_model_schema("Patch")
-
-    @classmethod
-    @lru_cache(maxsize=128)
-    def generate_related_s(cls) -> Schema:
-        """
-        Generate the related (nested) schema for embedding in parent schemas.
-
-        Includes only non-relational model fields and custom fields, preventing
-        infinite nesting of related objects.
-
-        Performance: Results are cached per class.
-
-        Returns
-        -------
-        Schema | None
-            Generated Pydantic schema, or ``None`` if no fields are configured.
-        """
-        return cls._generate_model_schema("Related")
+            _schema_cache[key] = schema
+            while len(_schema_cache) > _SCHEMA_CACHE_MAXSIZE:
+                _schema_cache.popitem(last=False)
+            return schema
 
     @classmethod
-    async def queryset_request(cls, request: HttpRequest):
+    def clear_schema_cache(cls) -> None:
+        """Clear generated schemas cached for this serializer class."""
+        with _schema_cache_lock:
+            keys = [key for key in _schema_cache if key[0] is cls]
+            for key in keys:
+                del _schema_cache[key]
+
+    @classmethod
+    def _deprecated_schema(
+        cls, old: str, kind: SchemaKind, depth: int = 1
+    ) -> SchemaType | None:
+        replacement = (
+            f"{kind}_schema" if depth == 1 else f'get_schema("{kind}", depth={depth})'
+        )
+        warnings.warn(
+            f"{cls.__name__}.{old}() is deprecated; use {replacement} instead.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        return cls.get_schema(kind, depth=depth)
+
+    @classmethod
+    def generate_read_s(cls, depth: int = 1) -> SchemaType | None:
+        """Deprecated alias of ``read_schema`` / ``get_schema("read", depth=...)``."""
+        return cls._deprecated_schema("generate_read_s", "read", depth)
+
+    @classmethod
+    def generate_detail_s(cls, depth: int = 1) -> SchemaType | None:
+        """Deprecated alias of ``detail_schema`` / ``get_schema("detail", depth=...)``."""
+        return cls._deprecated_schema("generate_detail_s", "detail", depth)
+
+    @classmethod
+    def generate_create_s(cls) -> SchemaType | None:
+        """Deprecated alias of ``create_schema``."""
+        return cls._deprecated_schema("generate_create_s", "create")
+
+    @classmethod
+    def generate_update_s(cls) -> SchemaType | None:
+        """Deprecated alias of ``update_schema``."""
+        return cls._deprecated_schema("generate_update_s", "update")
+
+    @classmethod
+    def generate_related_s(cls) -> SchemaType | None:
+        """Deprecated alias of ``related_schema``."""
+        return cls._deprecated_schema("generate_related_s", "related")
+
+    @classmethod
+    def _validate_operation_data(
+        cls,
+        kind: Literal["create", "update"],
+        data: InputData,
+    ) -> Schema:
+        """Validate direct-operation input against the configured schema."""
+        schema = cls.get_schema(kind)
+        if schema is None:
+            raise ImproperlyConfigured(
+                f"{cls.__name__} does not define a {kind} schema"
+            )
+        if isinstance(data, schema):
+            return data
+        payload = data.model_dump(by_alias=True) if isinstance(data, Schema) else data
+        try:
+            return schema.model_validate(payload)
+        except ValidationError as exc:
+            raise OperationValidationError(exc) from exc
+
+    @classmethod
+    def _dump_schema(
+        cls, kind: Literal["read", "detail"], schema: SchemaType | None
+    ) -> SchemaType:
+        selected = schema or cls.get_schema(kind)
+        if selected is None:
+            raise ImproperlyConfigured(
+                f"{cls.__name__} does not define a {kind} schema"
+            )
+        return selected
+
+    @classmethod
+    def _dump_models(
+        cls,
+        instances: Iterable[models.Model],
+        schema: SchemaType | None,
+        kind: Literal["read", "detail"] = "read",
+        strict: bool = False,
+    ) -> list[dict[str, Any]]:
+        selected_schema = cls._dump_schema(kind, schema)
+        unevaluated = isinstance(instances, models.QuerySet) and instances._result_cache is None
+        if strict and unevaluated:
+            raise ValueError("Synchronous dump requires an evaluated queryset")
+        if not strict:
+            plan = cls._dump_relation_plan(selected_schema)
+            if unevaluated:
+                instances = list(model_transformations.apply_relation_plan(instances, plan))
+            else:
+                instances = list(instances)
+                relations = (*plan.select_related, *plan.prefetch_related)
+                if relations and instances:
+                    # One query per missing relation for the whole batch; loaded ones are skipped.
+                    cls._cache_null_dump_relations(instances, relations)
+                    prefetch_related_objects(instances, *relations)
+        with ExitStack() as stack:
+            for connection in connections.all():
+                stack.enter_context(connection.execute_wrapper(cls._reject_dump_query))
+            result = []
+            for instance in instances:
+                cls._require_preloaded_fields(instance, selected_schema)
+                result.append(
+                    model_transformations.dump_model(instance, selected_schema)
+                )
+            return result
+
+    @staticmethod
+    def _cache_null_dump_relations(instances: Iterable[models.Model], relations: Iterable[str]) -> None:
+        # Django 5.2.0 can issue an unnecessary prefetch query for a null FK.
+        # A loaded null attname is sufficient to cache the relation as None.
+        roots = {name.split("__", 1)[0] for name in relations}
+        for instance in instances:
+            for name in roots:
+                try:
+                    field = instance._meta.get_field(name)
+                except FieldDoesNotExist:
+                    continue
+                if (
+                    field.is_relation
+                    and not field.auto_created
+                    and getattr(field, "attname", None) in instance.__dict__
+                    and instance.__dict__[field.attname] is None
+                    and not field.is_cached(instance)
+                ):
+                    field.set_cached_value(instance, None)
+
+    @staticmethod
+    def _require_preloaded_fields(instance: models.Model, schema: SchemaType) -> None:
+        if instance.get_deferred_fields():
+            raise ValueError(_DUMP_PRELOAD_ERROR)
+        for name in schema.model_fields:
+            try:
+                relation = instance._meta.get_field(name)
+            except FieldDoesNotExist:
+                continue
+            if not relation.is_relation:
+                continue
+            if relation.one_to_many or relation.many_to_many:
+                loaded = name in getattr(instance, "_prefetched_objects_cache", {})
+            elif (
+                getattr(relation, "attname", None)
+                and instance.__dict__.get(relation.attname) is None
+            ):
+                loaded = True
+            else:
+                loaded = relation.is_cached(instance)
+            if not loaded:
+                raise ValueError(_DUMP_PRELOAD_ERROR)
+
+    @staticmethod
+    def _reject_dump_query(execute, sql, params, many, context) -> None:
+        raise ValueError(_DUMP_PRELOAD_ERROR)
+
+    @classmethod
+    def _dump_relation_plan(
+        cls, schema: SchemaType
+    ) -> model_transformations.RelationPlan:
+        return model_transformations.schema_relation_plan(cls._get_model(), schema)
+
+    @classmethod
+    async def _amodel_dump_operation(
+        cls, instance: models.Model, schema: SchemaType | None
+    ) -> dict[str, Any]:
+        selected = cls._dump_schema("detail", schema)
+        plan = cls._dump_relation_plan(selected)
+        relations = (*plan.select_related, *plan.prefetch_related)
+        if relations and not model_transformations.relations_are_loaded([instance], relations):
+            cls._cache_null_dump_relations([instance], relations)
+            await aprefetch_related_objects([instance], *relations)
+        return await sync_to_async(model_transformations.dump_model)(instance, selected)
+
+    @classmethod
+    async def _amodel_dumps_operation(
+        cls, instances: Iterable[models.Model], schema: SchemaType | None
+    ) -> list[dict[str, Any]]:
+        selected = cls._dump_schema("read", schema)
+        plan = cls._dump_relation_plan(selected)
+        if isinstance(instances, models.QuerySet) and instances._result_cache is None:
+            queryset = model_transformations.apply_relation_plan(instances, plan)
+            loaded = [instance async for instance in queryset]
+        else:
+            loaded = list(instances)
+            relations = (*plan.select_related, *plan.prefetch_related)
+            if relations and loaded and not model_transformations.relations_are_loaded(loaded, relations):
+                cls._cache_null_dump_relations(loaded, relations)
+                await aprefetch_related_objects(loaded, *relations)
+        return await sync_to_async(model_transformations.dump_models)(loaded, selected)
+
+    @classmethod
+    def _resolve_operation_target(
+        cls,
+        target: models.Model | PrimaryKey,
+    ) -> tuple[PrimaryKey, models.Model | None]:
+        """Return a target primary key and its optional loaded instance."""
+        model = cls._get_model()
+        if isinstance(target, model):
+            if target.pk is None:
+                raise ValueError("A persisted model instance is required")
+            return cast(PrimaryKey, target.pk), target
+        if isinstance(target, models.Model):
+            raise TypeError(
+                f"target must be a {model.__name__} instance or primary key"
+            )
+        if not isinstance(target, PrimaryKey):
+            raise TypeError("target must be a model instance or primary key")
+        return target, None
+
+    @staticmethod
+    def _operation_lookup_query(
+        pk: PrimaryKey | None, lookups: dict[str, Any]
+    ) -> ObjectQuerySchema | None:
+        if pk is None and not lookups:
+            raise ValueError("Exactly one of pk or keyword lookups must be provided")
+        if pk is not None and lookups:
+            raise ValueError("pk and keyword lookups cannot be combined")
+        return ObjectQuerySchema(getters=lookups) if lookups else None
+
+    @classmethod
+    async def _acreate_operation(
+        cls,
+        data: InputData,
+        *,
+        request: HttpRequest | None,
+    ) -> models.Model:
+        """Execute asynchronous creation for a concrete serializer class."""
+        validated = cls._validate_operation_data("create", data)
+        return await cls._util.acreate_instance(request, validated)
+
+    @classmethod
+    async def _aget_operation(
+        cls,
+        pk: PrimaryKey | None,
+        *,
+        request: HttpRequest | None,
+        lookups: dict[str, Any],
+        optimize_for: QueryPurpose | None = None,
+    ) -> models.Model:
+        """Execute one request-aware asynchronous lookup."""
+        return await cls._util.aget_object(
+            request,
+            pk=pk,
+            query_data=cls._operation_lookup_query(pk, lookups),
+            is_for=optimize_for,
+        )
+
+    @classmethod
+    def get_queryset(
+        cls,
+        *,
+        request: HttpRequest | None = None,
+        optimize_for: QueryPurpose | None = None,
+    ) -> models.QuerySet:
+        """Return the request-scoped queryset, optionally optimized for read/detail dumps."""
+        return cls._util.get_objects(request, is_for=optimize_for)
+
+    @classmethod
+    async def aget_queryset(
+        cls,
+        *,
+        request: HttpRequest | None = None,
+        optimize_for: QueryPurpose | None = None,
+    ) -> models.QuerySet:
+        """Async counterpart of ``get_queryset`` (runs ``aqueryset_request``)."""
+        return await cls._util.aget_objects(request, is_for=optimize_for)
+
+    @classmethod
+    async def _aupdate_operation(
+        cls,
+        target: models.Model | PrimaryKey,
+        data: InputData,
+        *,
+        request: HttpRequest | None,
+        fk_cache: dict[tuple[type, Any], Any] | None = None,
+    ) -> models.Model:
+        """Execute asynchronous update without refetching loaded targets."""
+        pk, instance = cls._resolve_operation_target(target)
+        validated = cls._validate_operation_data("update", data)
+        return await cls._util.aupdate_instance(
+            request,
+            validated,
+            pk,
+            fk_cache=fk_cache,
+            instance=instance,
+        )
+
+    @classmethod
+    async def _adestroy_operation(
+        cls,
+        target: models.Model | PrimaryKey,
+        *,
+        request: HttpRequest | None,
+    ) -> None:
+        """Execute asynchronous deletion without refetching loaded targets."""
+        pk, instance = cls._resolve_operation_target(target)
+        await cls._util.adestroy_instance(request, pk, instance=instance)
+
+    @classmethod
+    def _create_operation(
+        cls,
+        data: InputData,
+        *,
+        request: HttpRequest | None,
+        fk_cache: dict[tuple[type, Any], Any] | None = None,
+    ) -> models.Model:
+        """Execute synchronous creation for a concrete serializer class."""
+        return cls._util.create_instance(
+            request, cls._validate_operation_data("create", data), fk_cache=fk_cache
+        )
+
+    @classmethod
+    def _bulk_create_operation(
+        cls,
+        items: Iterable[InputData],
+        *,
+        request: HttpRequest | None,
+    ) -> BulkResult[models.Model]:
+        """Create each item independently, retaining successful model instances."""
+        fk_cache: dict[tuple[type, Any], Any] = {}
+        return run_bulk(
+            cls._get_model(),
+            items,
+            lambda data: cls._create_operation(
+                data, request=request, fk_cache=fk_cache
+            ),
+        )
+
+    _bulk_failure = staticmethod(bulk_failure)
+
+    @staticmethod
+    def _bulk_target(
+        target: models.Model | PrimaryKey,
+    ) -> tuple[PrimaryKey, models.Model | PrimaryKey]:
+        return (target.pk if isinstance(target, models.Model) else target), target
+
+    @classmethod
+    def _bulk_update_prepare(
+        cls, item: InputData | tuple[models.Model | PrimaryKey, InputData]
+    ) -> tuple[PrimaryKey, tuple[models.Model | PrimaryKey, InputData]]:
+        target, data = cls._bulk_update_item(item)
+        return cls._bulk_target(target)[0], (target, data)
+
+    @classmethod
+    def _bulk_update_item(
+        cls, item: InputData | tuple[models.Model | PrimaryKey, InputData]
+    ) -> tuple[models.Model | PrimaryKey, InputData]:
+        if isinstance(item, tuple):
+            return item
+        payload = (
+            item.model_dump(by_alias=True, exclude_unset=True)
+            if isinstance(item, Schema)
+            else dict(item)
+        )
+        target = payload.pop(cls._get_model()._meta.pk.name)
+        return target, payload
+
+    @classmethod
+    async def abulk_create(
+        cls,
+        items: Iterable[InputData],
+        *,
+        request: HttpRequest | None = None,
+    ) -> BulkResult[models.Model]:
+        if cls._util._can_sync_bulk_create:
+            return await sync_to_async(cls._bulk_create_operation)(items, request=request)
+        fk_cache: dict[tuple[type, Any], Any] = {}
+        return await arun_bulk(
+            cls._get_model(),
+            items,
+            lambda data: cls._util.acreate_instance(
+                request, cls._validate_operation_data("create", data), fk_cache
+            ),
+        )
+
+    @classmethod
+    def bulk_update(
+        cls,
+        items: Iterable[InputData | tuple[models.Model | PrimaryKey, InputData]],
+        *,
+        request: HttpRequest | None = None,
+    ) -> BulkResult[models.Model]:
+        fk_cache: dict[tuple[type, Any], Any] = {}
+        return run_bulk(
+            cls._get_model(),
+            items,
+            lambda pair: cls._update_operation(
+                *pair, request=request, fk_cache=fk_cache
+            ),
+            cls._bulk_update_prepare,
+        )
+
+    @classmethod
+    async def abulk_update(
+        cls,
+        items: Iterable[InputData | tuple[models.Model | PrimaryKey, InputData]],
+        *,
+        request: HttpRequest | None = None,
+    ) -> BulkResult[models.Model]:
+        fk_cache: dict[tuple[type, Any], Any] = {}
+        return await arun_bulk(
+            cls._get_model(),
+            items,
+            lambda pair: cls._aupdate_operation(
+                *pair, request=request, fk_cache=fk_cache
+            ),
+            cls._bulk_update_prepare,
+        )
+
+    @classmethod
+    def bulk_destroy(
+        cls,
+        targets: Iterable[models.Model | PrimaryKey],
+        *,
+        request: HttpRequest | None = None,
+    ) -> BulkResult[PrimaryKey]:
+        def destroy(target: models.Model | PrimaryKey) -> PrimaryKey:
+            pk, _ = cls._resolve_operation_target(target)
+            cls._destroy_operation(target, request=request)
+            return pk
+
+        return run_bulk(cls._get_model(), targets, destroy, cls._bulk_target)
+
+    @classmethod
+    async def abulk_destroy(
+        cls,
+        targets: Iterable[models.Model | PrimaryKey],
+        *,
+        request: HttpRequest | None = None,
+    ) -> BulkResult[PrimaryKey]:
+        async def destroy(target: models.Model | PrimaryKey) -> PrimaryKey:
+            pk, _ = cls._resolve_operation_target(target)
+            await cls._adestroy_operation(target, request=request)
+            return pk
+
+        return await arun_bulk(cls._get_model(), targets, destroy, cls._bulk_target)
+
+    @classmethod
+    def _get_operation(
+        cls,
+        pk: PrimaryKey | None,
+        *,
+        request: HttpRequest | None,
+        lookups: dict[str, Any],
+        optimize_for: QueryPurpose | None = None,
+    ) -> models.Model:
+        """Execute one request-aware synchronous lookup."""
+        return cls._util.get_object(
+            request,
+            pk=pk,
+            query_data=cls._operation_lookup_query(pk, lookups),
+            is_for=optimize_for,
+        )
+
+    @classmethod
+    def _update_operation(
+        cls,
+        target: models.Model | PrimaryKey,
+        data: InputData,
+        *,
+        request: HttpRequest | None,
+        fk_cache: dict[tuple[type, Any], Any] | None = None,
+    ) -> models.Model:
+        """Execute synchronous update without refetching loaded targets."""
+        pk, instance = cls._resolve_operation_target(target)
+        return cls._util.update_instance(
+            request,
+            cls._validate_operation_data("update", data),
+            pk,
+            instance=instance,
+            fk_cache=fk_cache,
+        )
+
+    @classmethod
+    def _destroy_operation(
+        cls,
+        target: models.Model | PrimaryKey,
+        *,
+        request: HttpRequest | None,
+    ) -> None:
+        """Execute synchronous deletion without refetching loaded targets."""
+        pk, instance = cls._resolve_operation_target(target)
+        cls._util.destroy_instance(request, pk, instance=instance)
+
+    @classmethod
+    def queryset_request(
+        cls, request: HttpRequest | None
+    ) -> models.QuerySet[models.Model]:
+        """Override to return a request-scoped filtered queryset."""
+        raise NotImplementedError
+
+    @classmethod
+    async def aqueryset_request(
+        cls, request: HttpRequest | None
+    ) -> models.QuerySet[models.Model]:
         """
         Override to return a request-scoped filtered queryset.
 
@@ -1444,9 +2092,22 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
         super().__init_subclass__(**kwargs)
         from ninja_aio.models.utils import ModelUtil, register_serializer_for_model
         from ninja_aio.helpers.query import QueryUtil
-        from ninja_aio.models.hooks import collect_reactive_hooks, register_signals
+        from ninja_aio.models.hooks import (
+            collect_reactive_hooks,
+            register_signals,
+            validate_serializer_hooks,
+        )
 
-        cls.util = ModelUtil(cls)
+        validate_serializer_hooks(cls)
+        _register_serializer_config(
+            cls,
+            [
+                name
+                for name in cls._LEGACY_CONFIG_CLASSES.values()
+                if name in cls.__dict__
+            ],
+        )
+        cls._util = ModelUtil(cls)
         cls.query_util = QueryUtil(cls)
         cls._reactive_hooks = collect_reactive_hooks(cls)
         register_signals(cls)
@@ -1468,6 +2129,217 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
 
     class Meta:
         abstract = True
+
+    @classmethod
+    def create(
+        cls: type[ModelSerializerT],
+        data: InputData,
+        *,
+        request: HttpRequest | None = None,
+    ) -> ModelSerializerT:
+        """Create and return one model instance synchronously."""
+        return cast(ModelSerializerT, cls._create_operation(data, request=request))
+
+    @classmethod
+    def bulk_create(
+        cls: type[ModelSerializerT],
+        items: Iterable[InputData],
+        *,
+        request: HttpRequest | None = None,
+    ) -> BulkResult[ModelSerializerT]:
+        return cast(
+            BulkResult[ModelSerializerT],
+            cls._bulk_create_operation(items, request=request),
+        )
+
+    @classmethod
+    async def abulk_create(
+        cls: type[ModelSerializerT],
+        items: Iterable[InputData],
+        *,
+        request: HttpRequest | None = None,
+    ) -> BulkResult[ModelSerializerT]:
+        return cast(
+            BulkResult[ModelSerializerT],
+            await super().abulk_create(items, request=request),
+        )
+
+    @classmethod
+    def bulk_update(
+        cls: type[ModelSerializerT],
+        items: Iterable[InputData | tuple[models.Model | PrimaryKey, InputData]],
+        *,
+        request: HttpRequest | None = None,
+    ) -> BulkResult[ModelSerializerT]:
+        return cast(
+            BulkResult[ModelSerializerT], super().bulk_update(items, request=request)
+        )
+
+    @classmethod
+    async def abulk_update(
+        cls: type[ModelSerializerT],
+        items: Iterable[InputData | tuple[models.Model | PrimaryKey, InputData]],
+        *,
+        request: HttpRequest | None = None,
+    ) -> BulkResult[ModelSerializerT]:
+        return cast(
+            BulkResult[ModelSerializerT],
+            await super().abulk_update(items, request=request),
+        )
+
+    @classmethod
+    def get_queryset(
+        cls: type[ModelSerializerT],
+        *,
+        request: HttpRequest | None = None,
+        optimize_for: QueryPurpose | None = None,
+    ) -> models.QuerySet[ModelSerializerT]:
+        return super().get_queryset(request=request, optimize_for=optimize_for)
+
+    @classmethod
+    async def aget_queryset(
+        cls: type[ModelSerializerT],
+        *,
+        request: HttpRequest | None = None,
+        optimize_for: QueryPurpose | None = None,
+    ) -> models.QuerySet[ModelSerializerT]:
+        return await super().aget_queryset(request=request, optimize_for=optimize_for)
+
+    @classmethod
+    def get(
+        cls: type[ModelSerializerT],
+        pk: PrimaryKey | None = None,
+        *,
+        request: HttpRequest | None = None,
+        optimize_for: QueryPurpose | None = None,
+        **lookups: Any,
+    ) -> ModelSerializerT:
+        """Retrieve and return one model instance synchronously."""
+        return cast(
+            ModelSerializerT,
+            cls._get_operation(
+                pk, request=request, lookups=lookups, optimize_for=optimize_for
+            ),
+        )
+
+    @classmethod
+    def update(
+        cls: type[ModelSerializerT],
+        target: ModelSerializerT | PrimaryKey,
+        data: InputData,
+        *,
+        request: HttpRequest | None = None,
+    ) -> ModelSerializerT:
+        """Update and return one model instance synchronously."""
+        return cast(
+            ModelSerializerT,
+            cls._update_operation(target, data, request=request),
+        )
+
+    @classmethod
+    def destroy(
+        cls: type[ModelSerializerT],
+        target: ModelSerializerT | PrimaryKey,
+        *,
+        request: HttpRequest | None = None,
+    ) -> None:
+        """Destroy one model instance synchronously."""
+        cls._destroy_operation(target, request=request)
+
+    @classmethod
+    def model_dump(
+        cls: type[ModelSerializerT],
+        instance: ModelSerializerT,
+        *,
+        schema: SchemaType | None = None,
+        strict: bool = False,
+    ) -> dict[str, Any]:
+        """Serialize one instance, loading missing schema relations; ``strict=True`` never queries."""
+        return cls._dump_models((instance,), schema, "detail", strict)[0]
+
+    @classmethod
+    def model_dumps(
+        cls: type[ModelSerializerT],
+        instances: Iterable[ModelSerializerT] | models.QuerySet[ModelSerializerT],
+        *,
+        schema: SchemaType | None = None,
+        strict: bool = False,
+    ) -> list[dict[str, Any]]:
+        """Serialize a collection with the read schema, one query per missing relation."""
+        return cls._dump_models(instances, schema, strict=strict)
+
+    @classmethod
+    async def amodel_dump(
+        cls: type[ModelSerializerT],
+        instance: ModelSerializerT,
+        *,
+        schema: SchemaType | None = None,
+    ) -> dict[str, Any]:
+        """Serialize one instance, loading relations required by the schema."""
+        return await cls._amodel_dump_operation(instance, schema)
+
+    @classmethod
+    async def amodel_dumps(
+        cls: type[ModelSerializerT],
+        instances: Iterable[ModelSerializerT] | models.QuerySet[ModelSerializerT],
+        *,
+        schema: SchemaType | None = None,
+    ) -> list[dict[str, Any]]:
+        """Serialize instances, loading relations required by the read schema."""
+        return await cls._amodel_dumps_operation(instances, schema)
+
+    @classmethod
+    async def acreate(
+        cls: type[ModelSerializerT],
+        data: InputData,
+        *,
+        request: HttpRequest | None = None,
+    ) -> ModelSerializerT:
+        """Create and return one model instance asynchronously."""
+        return cast(
+            ModelSerializerT, await cls._acreate_operation(data, request=request)
+        )
+
+    @classmethod
+    async def aget(
+        cls: type[ModelSerializerT],
+        pk: PrimaryKey | None = None,
+        *,
+        request: HttpRequest | None = None,
+        optimize_for: QueryPurpose | None = None,
+        **lookups: Any,
+    ) -> ModelSerializerT:
+        """Retrieve and return one model instance asynchronously."""
+        return cast(
+            ModelSerializerT,
+            await cls._aget_operation(
+                pk, request=request, lookups=lookups, optimize_for=optimize_for
+            ),
+        )
+
+    @classmethod
+    async def aupdate(
+        cls: type[ModelSerializerT],
+        target: ModelSerializerT | PrimaryKey,
+        data: InputData,
+        *,
+        request: HttpRequest | None = None,
+    ) -> ModelSerializerT:
+        """Update and return one model instance asynchronously."""
+        return cast(
+            ModelSerializerT,
+            await cls._aupdate_operation(target, data, request=request),
+        )
+
+    @classmethod
+    async def adestroy(
+        cls: type[ModelSerializerT],
+        target: ModelSerializerT | PrimaryKey,
+        *,
+        request: HttpRequest | None = None,
+    ) -> None:
+        """Destroy one model instance asynchronously."""
+        await cls._adestroy_operation(target, request=request)
 
     class CreateSerializer:
         """Configuration container describing how to build a create (input) schema for a model.
@@ -1567,114 +2439,58 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
         optionals: list[tuple[str, Any]] = []
         excludes: list[str] = []
 
-    # Serializer type to configuration class mapping
-    _SERIALIZER_CONFIG_MAP = {
+    # Legacy (version 2) inner configuration classes, converted by _legacy_schema_config
+    _LEGACY_CONFIG_CLASSES: ClassVar[dict[ConfigKind, str]] = {
         "create": "CreateSerializer",
         "update": "UpdateSerializer",
         "read": "ReadSerializer",
         "detail": "DetailSerializer",
     }
 
-    # Schema type to serializer type mapping for validator resolution
-    _SCHEMA_TO_S_TYPE = {
-        "In": "create",
-        "Patch": "update",
-        "Out": "read",
-        "Detail": "detail",
-        "Related": "read",
-    }
+    @classmethod
+    def _legacy_config_class(cls, kind: ConfigKind) -> type | None:
+        return getattr(cls, cls._LEGACY_CONFIG_CLASSES[kind], None)
 
     @classmethod
-    def _get_validators(cls, schema_type: type[SCHEMA_TYPES]) -> dict:
-        """
-        Collect validators from the inner serializer class for the given schema type.
-
-        Parameters
-        ----------
-        schema_type : SCHEMA_TYPES
-            One of ``"In"``, ``"Patch"``, ``"Out"``, ``"Detail"``, or ``"Related"``.
-
-        Returns
-        -------
-        dict
-            Mapping of validator names to ``PydanticDescriptorProxy`` instances.
-        """
-        s_type = cls._SCHEMA_TO_S_TYPE.get(schema_type)
-        config_name = cls._SERIALIZER_CONFIG_MAP.get(s_type)
-        config_class = getattr(cls, config_name, None) if config_name else None
-        return cls._collect_validators(config_class)
+    def _legacy_fields(cls, kind: ConfigKind, f_type: F_TYPES) -> list:
+        values = getattr(cls._legacy_config_class(kind), f_type, None) or []
+        if not values and kind == "detail":
+            # Each empty detail category falls back to the read category.
+            values = getattr(cls.ReadSerializer, f_type, None) or []
+        return values
 
     @classmethod
-    def _get_model_config(cls, schema_type: type[SCHEMA_TYPES]) -> dict | None:
-        """
-        Return Pydantic ``ConfigDict`` from the inner serializer class.
-
-        Parameters
-        ----------
-        schema_type : SCHEMA_TYPES
-            One of ``"In"``, ``"Patch"``, ``"Out"``, ``"Detail"``, or ``"Related"``.
-
-        Returns
-        -------
-        dict | None
-            A ``ConfigDict`` instance, or ``None`` if not configured.
-        """
-        s_type = cls._SCHEMA_TO_S_TYPE.get(schema_type)
-        config_name = cls._SERIALIZER_CONFIG_MAP.get(s_type)
-        config_class = getattr(cls, config_name, None) if config_name else None
-        if config_class is None:
-            return None
-        return getattr(config_class, "model_config", None)
-
-    @classmethod
-    def _get_schema_overrides(cls, schema_type: type[SCHEMA_TYPES]) -> dict:
-        """
-        Collect schema method overrides from the inner serializer class.
-
-        Parameters
-        ----------
-        schema_type : SCHEMA_TYPES
-            One of ``"In"``, ``"Patch"``, ``"Out"``, ``"Detail"``, or ``"Related"``.
-
-        Returns
-        -------
-        dict
-            Mapping of method names to callables.
-        """
-        s_type = cls._SCHEMA_TO_S_TYPE.get(schema_type)
-        config_name = cls._SERIALIZER_CONFIG_MAP.get(s_type)
-        config_class = getattr(cls, config_name, None) if config_name else None
-        return cls._collect_schema_overrides(config_class)
-
-    @classmethod
-    def _get_relations_as_id(cls) -> list[str]:
-        """
-        Return relation fields to serialize as primary key values.
-
-        Reads the ``relations_as_id`` attribute from ``ReadSerializer``.
-
-        Returns
-        -------
-        list[str]
-            Field names whose related objects should be serialized as IDs.
-        """
-        return getattr(cls.ReadSerializer, "relations_as_id", [])
+    def _legacy_schema_config(cls, kind: ConfigKind) -> SchemaConfig:
+        source = cls._legacy_config_class(kind)
+        return SchemaConfig(
+            **{
+                name: list(cls._legacy_fields(kind, name))
+                for name in ("fields", "optionals", "customs", "excludes")
+            },
+            relations_as_id=(
+                list(getattr(cls.ReadSerializer, "relations_as_id", None) or [])
+                if kind in ("read", "detail")
+                else []
+            ),
+            nested=(getattr(source, "nested", None) or {}) if kind == "create" else {},
+            model_config=getattr(source, "model_config", None),
+        )
 
     @classmethod
     def get_nested_fields(cls) -> dict[str, type["ModelSerializer"]]:
         """
         Return the reverse-FK relations declared for nested creation.
 
-        Reads the ``nested`` attribute from ``CreateSerializer``.
+        Reads ``nested`` from the create ``SchemaConfig``.
 
         Returns
         -------
         dict[str, type[ModelSerializer]]
             Mapping of reverse accessor name -> child ``ModelSerializer`` class.
         """
-        nested = getattr(cls.CreateSerializer, "nested", {}) or {}
+        nested = cls._schema_config("create").nested
         if not isinstance(nested, dict):
-            raise ImproperlyConfigured("CreateSerializer.nested must be a dict")
+            raise ImproperlyConfigured("Schemas.create nested must be a dict")
         return nested
 
     @classmethod
@@ -1706,7 +2522,7 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
             )
             if relation is None:
                 raise ImproperlyConfigured(
-                    f"{cls.__name__}.CreateSerializer.nested: unknown relation '{field_name}'"
+                    f"{cls.__name__}.Schemas.create nested: unknown relation '{field_name}'"
                 ) from exc
         child = cls.get_nested_fields()[field_name]
         if (
@@ -1717,7 +2533,7 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
             or relation.get_accessor_name() != field_name
         ):
             raise ImproperlyConfigured(
-                f"{cls.__name__}.CreateSerializer.nested['{field_name}'] must "
+                f"{cls.__name__}.Schemas.create nested['{field_name}'] must "
                 "reference the ModelSerializer for a reverse ForeignKey relation"
             )
         return relation.field.name
@@ -1728,7 +2544,7 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
         """
         Build the create-input schema used for this model as a nested child.
 
-        Identical to ``generate_create_s()`` except ``fk_field_name`` (the FK
+        Identical to the create schema except ``fk_field_name`` (the FK
         pointing back at the nested-write parent) is always excluded, since it
         is injected programmatically rather than supplied by the client.
         Used both to type the parent's nested custom field and to re-validate
@@ -1779,7 +2595,7 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
         """
         Build ``(field_name, list[ChildInSchema], default)`` tuples for nested writes.
 
-        For each entry in ``CreateSerializer.nested``, generates a dedicated
+        For each entry in ``Schemas.create nested``, generates a dedicated
         input schema for the child model that excludes the FK field pointing
         back at the parent (it is injected at creation time, not supplied by
         the client).
@@ -1794,7 +2610,7 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
             return []
         path = getattr(_nested_schema_state, "path", ())
         if cls in path:
-            raise ImproperlyConfigured("Cyclic CreateSerializer.nested configuration")
+            raise ImproperlyConfigured("Cyclic Schemas.create nested configuration")
         _nested_schema_state.path = path + (cls,)
         try:
             customs = []
@@ -1811,33 +2627,7 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
             _nested_schema_state.path = path
 
     @classmethod
-    def _get_fields(cls, s_type: type[S_TYPES], f_type: type[F_TYPES]):
-        """
-        Internal accessor for raw configuration lists.
-
-        Parameters
-        ----------
-        s_type : str
-            Serializer type ("create" | "update" | "read").
-        f_type : str
-            Field category ("fields" | "optionals" | "customs" | "excludes").
-
-        Returns
-        -------
-        list
-            Raw configuration list or empty list.
-        """
-        config_class_name = cls._SERIALIZER_CONFIG_MAP.get(s_type)
-        if not config_class_name:
-            return []
-        config_class = getattr(cls, config_class_name)
-        fields = getattr(config_class, f_type, [])
-        if not fields and s_type == "detail":
-            fields = getattr(cls.ReadSerializer, f_type, [])
-        return fields
-
-    @classmethod
-    def _get_model(cls) -> "ModelSerializer":
+    def _get_model(cls) -> type["ModelSerializer"]:
         """
         Return the model class itself.
 
@@ -1909,19 +2699,31 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
         return await sync_to_async(self.has_changed)(field)
 
     @classmethod
-    async def queryset_request(cls, request: HttpRequest):
+    async def aqueryset_request(
+        cls, request: HttpRequest | None
+    ) -> models.QuerySet["ModelSerializer"]:
         return cls.query_util.apply_queryset_optimizations(
             queryset=cls.objects.all(),
             scope=cls.query_util.SCOPES.QUERYSET_REQUEST,
         )
 
-    async def post_create(self) -> None:
+    @classmethod
+    def queryset_request(
+        cls, request: HttpRequest | None
+    ) -> models.QuerySet["ModelSerializer"]:
+        """Synchronous counterpart for request-scoped query construction."""
+        return cls.query_util.apply_queryset_optimizations(
+            queryset=cls.objects.all(),
+            scope=cls.query_util.SCOPES.QUERYSET_REQUEST,
+        )
+
+    async def apost_create(self) -> None:
         """
         Async hook executed after first persistence (create path).
         """
         pass
 
-    async def custom_actions(self, payload: dict[str, Any]):
+    async def acustom_actions(self, payload: dict[str, Any]):
         """
         Async hook for reacting to provided custom (synthetic) fields.
 
@@ -1930,6 +2732,14 @@ class ModelSerializer(models.Model, BaseSerializer, metaclass=ModelSerializerMet
         payload : dict
             Custom field name/value pairs.
         """
+        pass
+
+    def post_create(self) -> None:
+        """Synchronous counterpart for post-create lifecycle work."""
+        pass
+
+    def custom_actions(self, payload: dict[str, Any]) -> None:
+        """Synchronous counterpart for custom field handling."""
         pass
 
     def after_save(self):
@@ -2024,8 +2834,8 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
     Generic, Meta-driven serializer for Django models providing type-safe CRUD operations.
 
     This class is generic over the model type, providing proper type hints for all
-    methods. When you specify the model type parameter, methods like create(), update(),
-    save(), and model_dump() are automatically typed to work with that specific model.
+    methods. When you specify the model type parameter, class-level operations
+    like create(), update(), and model_dump() are typed for that model.
 
     Type Safety Example
     -------------------
@@ -2034,21 +2844,17 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
     ...         model = Book
     ...         schema_in = SchemaModelConfig(fields=["title", "author"])
     ...
-    >>> serializer = BookSerializer()
-    >>> book: Book = await serializer.create({"title": "1984"})        # Returns Book
-    >>> book: Book = await serializer.save(book)                        # Accepts/returns Book
-    >>> data: dict = await serializer.model_dump(book)                  # Accepts Book
+    >>> book: Book = BookSerializer.create({"title": "1984"})
+    >>> book: Book = await BookSerializer.acreate({"title": "1984"})
+    >>> data: dict = BookSerializer.model_dump(book)
+    >>> data: dict = await BookSerializer.amodel_dump(book)
     >>>
-    >>> # Instance-bound usage — pass instance once, omit it from calls
+    >>> # Binding is supported for save and change tracking, not CRUD facades
     >>> serializer = BookSerializer(instance=book)
-    >>> book: Book = await serializer.update({"title": "New title"})   # Uses bound instance
-    >>> data: dict = await serializer.model_dump()                      # Uses bound instance
-    >>> changed: bool = serializer.has_changed("title")                 # Uses bound instance
+    >>> book: Book = await serializer.save()
+    >>> changed: bool = serializer.has_changed("title")
     >>>
-    >>> # Or assign after construction
-    >>> serializer = BookSerializer()
-    >>> serializer.instance = book
-    >>> data: dict = await serializer.model_dump()
+    >>> book: Book = await BookSerializer.aupdate(book, {"title": "New title"})
 
     Configuration
     -------------
@@ -2062,61 +2868,67 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
     SchemaModelConfig : Configuration object for defining field sets per operation
     """
 
-    # Serializer type to Meta schema attribute mapping
-    _SCHEMA_META_MAP = {
-        "create": "in",
-        "update": "update",
-        "read": "out",
-        "detail": "detail",
+    # Legacy (version 2) Meta schema attributes, converted by _legacy_schema_config
+    _LEGACY_META_ATTRS: ClassVar[dict[ConfigKind, str]] = {
+        "create": "schema_in",
+        "update": "schema_update",
+        "read": "schema_out",
+        "detail": "schema_detail",
     }
 
-    # Schema type to validators inner class mapping
-    _VALIDATORS_CLASS_MAP = {
-        "In": "CreateValidators",
-        "Patch": "UpdateValidators",
-        "Out": "ReadValidators",
-        "Detail": "DetailValidators",
-        "Related": "ReadValidators",
-    }
+    model: type[ModelT]
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         from ninja_aio.models.utils import ModelUtil, register_serializer_for_model
         from ninja_aio.helpers.query import QueryUtil
-        from ninja_aio.models.hooks import collect_reactive_hooks
+        from ninja_aio.models.hooks import (
+            collect_reactive_hooks,
+            validate_serializer_hooks,
+        )
 
+        validate_serializer_hooks(cls)
+        legacy = [
+            f"Meta.{name}"
+            for name in (*cls._LEGACY_META_ATTRS.values(), "relations_as_id")
+            if getattr(cls.Meta, name, None)
+        ]
+        _register_serializer_config(cls, legacy)
         cls.model = cls._get_model()
-        cls.util = ModelUtil(cls.model, serializer_class=cls)
+        cls._util = ModelUtil(cls.model, serializer_class=cls)
         cls.query_util = QueryUtil(cls)
         cls._meta = cls.Meta
         cls._reactive_hooks = collect_reactive_hooks(cls)
         register_serializer_for_model(cls.model, cls)
 
-    class Meta:
-        model: Optional[type[ModelT]] = None
-        schema_in: Optional[SchemaModelConfig] = None
-        schema_out: Optional[SchemaModelConfig] = None
-        schema_update: Optional[SchemaModelConfig] = None
-        schema_detail: Optional[SchemaModelConfig] = None
-        relations_serializers: dict[str, "Serializer"] = {}
-        relations_as_id: list[str] = []
+    if TYPE_CHECKING:
+        # Applications supply their own options class rather than inheriting it.
+        Meta: ClassVar[Any]
+    else:
+        class Meta:
+            model: Optional[type[ModelT]] = None
+            schema_in: Optional[SchemaModelConfig] = None
+            schema_out: Optional[SchemaModelConfig] = None
+            schema_update: Optional[SchemaModelConfig] = None
+            schema_detail: Optional[SchemaModelConfig] = None
+            relations_serializers: dict[str, "Serializer"] = {}
+            relations_as_id: list[str] = []
 
     def __init__(self, instance: Optional[ModelT] = None):
         """
         Initialize the serializer with an optional bound model instance.
 
         Binding an instance allows you to omit the ``instance`` argument on
-        ``save``, ``update``, ``model_dump``, ``has_changed``, and
-        ``ahas_changed`` calls made on this serializer object. The binding
+        ``save``, ``has_changed``, and ``ahas_changed`` calls. The binding
         can also be set or replaced at any time via attribute assignment::
 
             serializer = BookSerializer(instance=book)
-            await serializer.update({"title": "New title"})
+            await serializer.save()
 
             # or assign after construction
             serializer = BookSerializer()
             serializer.instance = book
-            data = await serializer.model_dump()
+            changed = serializer.has_changed("title")
 
         Parameters
         ----------
@@ -2125,6 +2937,200 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
             ``None`` (no bound instance).
         """
         self.instance = instance
+
+    @classmethod
+    def create(
+        cls: type["Serializer[ModelT]"],
+        data: InputData,
+        *,
+        request: HttpRequest | None = None,
+    ) -> ModelT:
+        """Create and return one model instance synchronously."""
+        return cast(ModelT, cls._create_operation(data, request=request))
+
+    @classmethod
+    def bulk_create(
+        cls: type["Serializer[ModelT]"],
+        items: Iterable[InputData],
+        *,
+        request: HttpRequest | None = None,
+    ) -> BulkResult[ModelT]:
+        return cast(
+            BulkResult[ModelT], cls._bulk_create_operation(items, request=request)
+        )
+
+    @classmethod
+    async def abulk_create(
+        cls: type["Serializer[ModelT]"],
+        items: Iterable[InputData],
+        *,
+        request: HttpRequest | None = None,
+    ) -> BulkResult[ModelT]:
+        return cast(BulkResult[ModelT], await super().abulk_create(items, request=request))
+
+    @classmethod
+    def bulk_update(
+        cls: type["Serializer[ModelT]"],
+        items: Iterable[InputData | tuple[models.Model | PrimaryKey, InputData]],
+        *,
+        request: HttpRequest | None = None,
+    ) -> BulkResult[ModelT]:
+        return cast(BulkResult[ModelT], super().bulk_update(items, request=request))
+
+    @classmethod
+    async def abulk_update(
+        cls: type["Serializer[ModelT]"],
+        items: Iterable[InputData | tuple[models.Model | PrimaryKey, InputData]],
+        *,
+        request: HttpRequest | None = None,
+    ) -> BulkResult[ModelT]:
+        return cast(BulkResult[ModelT], await super().abulk_update(items, request=request))
+
+    @classmethod
+    def get_queryset(
+        cls: type["Serializer[ModelT]"],
+        *,
+        request: HttpRequest | None = None,
+        optimize_for: QueryPurpose | None = None,
+    ) -> models.QuerySet[ModelT]:
+        return super().get_queryset(request=request, optimize_for=optimize_for)
+
+    @classmethod
+    async def aget_queryset(
+        cls: type["Serializer[ModelT]"],
+        *,
+        request: HttpRequest | None = None,
+        optimize_for: QueryPurpose | None = None,
+    ) -> models.QuerySet[ModelT]:
+        return await super().aget_queryset(request=request, optimize_for=optimize_for)
+
+    @classmethod
+    def get(
+        cls: type["Serializer[ModelT]"],
+        pk: PrimaryKey | None = None,
+        *,
+        request: HttpRequest | None = None,
+        optimize_for: QueryPurpose | None = None,
+        **lookups: Any,
+    ) -> ModelT:
+        """Retrieve and return one model instance synchronously."""
+        return cast(
+            ModelT,
+            cls._get_operation(
+                pk, request=request, lookups=lookups, optimize_for=optimize_for
+            ),
+        )
+
+    @classmethod
+    def update(
+        cls: type["Serializer[ModelT]"],
+        target: ModelT | PrimaryKey,
+        data: InputData,
+        *,
+        request: HttpRequest | None = None,
+    ) -> ModelT:
+        """Update and return one model instance synchronously."""
+        return cast(ModelT, cls._update_operation(target, data, request=request))
+
+    @classmethod
+    def destroy(
+        cls: type["Serializer[ModelT]"],
+        target: ModelT | PrimaryKey,
+        *,
+        request: HttpRequest | None = None,
+    ) -> None:
+        """Destroy one model instance synchronously."""
+        cls._destroy_operation(target, request=request)
+
+    @classmethod
+    def model_dump(
+        cls: type["Serializer[ModelT]"],
+        instance: ModelT,
+        *,
+        schema: SchemaType | None = None,
+        strict: bool = False,
+    ) -> dict[str, Any]:
+        """Serialize one instance, loading missing schema relations; ``strict=True`` never queries."""
+        return cls._dump_models((instance,), schema, "detail", strict)[0]
+
+    @classmethod
+    def model_dumps(
+        cls: type["Serializer[ModelT]"],
+        instances: Iterable[ModelT] | models.QuerySet[ModelT],
+        *,
+        schema: SchemaType | None = None,
+        strict: bool = False,
+    ) -> list[dict[str, Any]]:
+        """Serialize a collection with the read schema, one query per missing relation."""
+        return cls._dump_models(instances, schema, strict=strict)
+
+    @classmethod
+    async def amodel_dump(
+        cls: type["Serializer[ModelT]"],
+        instance: ModelT,
+        *,
+        schema: SchemaType | None = None,
+    ) -> dict[str, Any]:
+        """Serialize one instance, loading relations required by the schema."""
+        return await cls._amodel_dump_operation(instance, schema)
+
+    @classmethod
+    async def amodel_dumps(
+        cls: type["Serializer[ModelT]"],
+        instances: Iterable[ModelT] | models.QuerySet[ModelT],
+        *,
+        schema: SchemaType | None = None,
+    ) -> list[dict[str, Any]]:
+        """Serialize instances, loading relations required by the read schema."""
+        return await cls._amodel_dumps_operation(instances, schema)
+
+    @classmethod
+    async def acreate(
+        cls: type["Serializer[ModelT]"],
+        data: InputData,
+        *,
+        request: HttpRequest | None = None,
+    ) -> ModelT:
+        """Create and return one model instance asynchronously."""
+        return cast(ModelT, await cls._acreate_operation(data, request=request))
+
+    @classmethod
+    async def aget(
+        cls: type["Serializer[ModelT]"],
+        pk: PrimaryKey | None = None,
+        *,
+        request: HttpRequest | None = None,
+        optimize_for: QueryPurpose | None = None,
+        **lookups: Any,
+    ) -> ModelT:
+        """Retrieve and return one model instance asynchronously."""
+        return cast(
+            ModelT,
+            await cls._aget_operation(
+                pk, request=request, lookups=lookups, optimize_for=optimize_for
+            ),
+        )
+
+    @classmethod
+    async def aupdate(
+        cls: type["Serializer[ModelT]"],
+        target: ModelT | PrimaryKey,
+        data: InputData,
+        *,
+        request: HttpRequest | None = None,
+    ) -> ModelT:
+        """Update and return one model instance asynchronously."""
+        return cast(ModelT, await cls._aupdate_operation(target, data, request=request))
+
+    @classmethod
+    async def adestroy(
+        cls: type["Serializer[ModelT]"],
+        target: ModelT | PrimaryKey,
+        *,
+        request: HttpRequest | None = None,
+    ) -> None:
+        """Destroy one model instance asynchronously."""
+        await cls._adestroy_operation(target, request=request)
 
     def _resolve_instance(self, instance: Optional[ModelT]) -> ModelT:
         """
@@ -2174,93 +3180,39 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         dict
             Parsed payload.
         """
-        return payload.model_dump() if isinstance(payload, Schema) else payload
+        return model_transformations.serializer_payload(payload)
 
     @classmethod
-    def _get_validators(cls, schema_type: type[SCHEMA_TYPES]) -> dict:
-        """
-        Collect validators from the inner validators class for the given schema type.
-
-        Looks for inner classes named ``CreateValidators``, ``ReadValidators``,
-        ``UpdateValidators``, or ``DetailValidators`` on the serializer.
-
-        Parameters
-        ----------
-        schema_type : SCHEMA_TYPES
-            One of ``"In"``, ``"Patch"``, ``"Out"``, ``"Detail"``, or ``"Related"``.
-
-        Returns
-        -------
-        dict
-            Mapping of validator names to ``PydanticDescriptorProxy`` instances.
-        """
-        class_name = cls._VALIDATORS_CLASS_MAP.get(schema_type)
-        validators_class = getattr(cls, class_name, None) if class_name else None
-        return cls._collect_validators(validators_class)
+    def _legacy_meta_config(cls, kind: ConfigKind) -> "SchemaModelConfig | None":
+        meta_config = getattr(cls.Meta, cls._LEGACY_META_ATTRS[kind], None)
+        if meta_config is None and kind == "detail":
+            meta_config = getattr(cls.Meta, "schema_out", None)
+        return meta_config
 
     @classmethod
-    def _get_model_config(cls, schema_type: type[SCHEMA_TYPES]) -> dict | None:
-        """
-        Return Pydantic ``ConfigDict`` from the ``SchemaModelConfig`` for the given schema type.
-
-        Parameters
-        ----------
-        schema_type : SCHEMA_TYPES
-            One of ``"In"``, ``"Patch"``, ``"Out"``, ``"Detail"``, or ``"Related"``.
-
-        Returns
-        -------
-        dict | None
-            A ``ConfigDict`` instance, or ``None`` if not configured.
-        """
-        schema_type_to_key = {
-            "In": "in",
-            "Patch": "update",
-            "Out": "out",
-            "Detail": "detail",
-            "Related": "out",
-        }
-        schema_key = schema_type_to_key.get(schema_type)
-        if not schema_key:
-            return None
-        schema_meta = cls._get_schema_meta(schema_key)
-        if schema_meta is None:
-            return None
-        return getattr(schema_meta, "model_config_override", None)
+    def _legacy_fields(cls, kind: ConfigKind, f_type: F_TYPES) -> list:
+        meta_config = cls._legacy_meta_config(kind)
+        # Version 2 looked up `excludes`, so SchemaModelConfig.exclude never applied.
+        if meta_config is None or f_type == "excludes":
+            return []
+        return getattr(meta_config, f_type, None) or []
 
     @classmethod
-    def _get_schema_overrides(cls, schema_type: type[SCHEMA_TYPES]) -> dict:
-        """
-        Collect schema method overrides from the validator inner class.
-
-        Parameters
-        ----------
-        schema_type : SCHEMA_TYPES
-            One of ``"In"``, ``"Patch"``, ``"Out"``, ``"Detail"``, or ``"Related"``.
-
-        Returns
-        -------
-        dict
-            Mapping of method names to callables.
-        """
-        class_name = cls._VALIDATORS_CLASS_MAP.get(schema_type)
-        validators_class = getattr(cls, class_name, None) if class_name else None
-        return cls._collect_schema_overrides(validators_class)
-
-    @classmethod
-    def _get_relations_as_id(cls) -> list[str]:
-        """
-        Return relation fields to serialize as primary key values.
-
-        Reads the ``relations_as_id`` attribute from ``Meta``.
-
-        Returns
-        -------
-        list[str]
-            Field names whose related objects should be serialized as IDs.
-        """
-        relations_as_id = cls._get_meta_data("relations_as_id")
-        return relations_as_id or []
+    def _legacy_schema_config(cls, kind: ConfigKind) -> SchemaConfig:
+        meta_config = cls._legacy_meta_config(kind)
+        if meta_config is None:
+            return EMPTY_SCHEMA_CONFIG
+        return SchemaConfig(
+            fields=list(cls._legacy_fields(kind, "fields")),
+            optionals=list(cls._legacy_fields(kind, "optionals")),
+            customs=list(cls._legacy_fields(kind, "customs")),
+            relations_as_id=(
+                list(cls._get_meta_data("relations_as_id") or [])
+                if kind in ("read", "detail")
+                else []
+            ),
+            model_config=meta_config.model_config_override,
+        )
 
     @classmethod
     def _get_meta_data(cls, attr_name: str) -> Any:
@@ -2280,7 +3232,7 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         return getattr(cls.Meta, attr_name, None)
 
     @classmethod
-    def _get_model(cls) -> models.Model:
+    def _get_model(cls) -> type[models.Model]:
         """
         Return the Django model class from ``Meta.model``.
 
@@ -2305,33 +3257,6 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         return relations_serializers or {}
 
     @classmethod
-    def _get_schema_meta(cls, schema_type: str) -> SchemaModelConfig | None:
-        """
-        Retrieve the ``SchemaModelConfig`` for the given schema type.
-
-        Parameters
-        ----------
-        schema_type : str
-            One of ``"in"``, ``"out"``, ``"update"``, or ``"detail"``.
-
-        Returns
-        -------
-        SchemaModelConfig | None
-            The configuration object, or ``None`` if not defined.
-        """
-        match schema_type:
-            case "in":
-                return cls._get_meta_data("schema_in")
-            case "out":
-                return cls._get_meta_data("schema_out")
-            case "update":
-                return cls._get_meta_data("schema_update")
-            case "detail":
-                return cls._get_meta_data("schema_detail")
-            case _:
-                return None
-
-    @classmethod
     def _validate_model(cls):
         """
         Validate and return the model defined in ``Meta.model``.
@@ -2354,45 +3279,17 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         return model
 
     @classmethod
-    def _get_fields(cls, s_type: type[S_TYPES], f_type: type[F_TYPES]):
-        """
-        Return raw configuration list from the Meta schema for the given categories.
-
-        Falls back to the ``out`` schema when ``detail`` is requested but not defined.
-
-        Parameters
-        ----------
-        s_type : S_TYPES
-            Serializer type (``"create"`` | ``"update"`` | ``"read"`` | ``"detail"``).
-        f_type : F_TYPES
-            Field category (``"fields"`` | ``"optionals"`` | ``"customs"`` | ``"excludes"``).
-
-        Returns
-        -------
-        list
-            Raw configuration list, or empty list if not configured.
-        """
-        schema_key = cls._SCHEMA_META_MAP.get(s_type)
-        if not schema_key:
-            return []
-        schema = cls._get_schema_meta(schema_key)
-        if not schema:
-            if s_type == "detail":
-                schema = cls._get_schema_meta("out")
-            else:
-                return []
-        return getattr(schema, f_type, []) or []
-
-    def _get_dump_schema(self, schema: Schema = None) -> Schema:
-        if schema is None:
-            detail_schema = self.generate_detail_s()
-            if detail_schema is None:
-                return self.generate_read_s()
-            return detail_schema
-        return schema
+    async def aqueryset_request(
+        cls, request: HttpRequest | None
+    ) -> models.QuerySet[ModelT]:
+        return cls.query_util.apply_queryset_optimizations(
+            queryset=cls.model._default_manager.all(),
+            scope=cls.query_util.SCOPES.QUERYSET_REQUEST,
+        )
 
     @classmethod
-    async def queryset_request(cls, request: HttpRequest):
+    def queryset_request(cls, request: HttpRequest | None) -> models.QuerySet[ModelT]:
+        """Synchronous counterpart for request-scoped query construction."""
         return cls.query_util.apply_queryset_optimizations(
             queryset=cls.model._default_manager.all(),
             scope=cls.query_util.SCOPES.QUERYSET_REQUEST,
@@ -2451,13 +3348,13 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         """
         return await sync_to_async(self.has_changed)(field, instance)
 
-    async def post_create(self, instance: models.Model) -> None:
+    async def apost_create(self, instance: models.Model) -> None:
         """
         Async hook executed after first persistence (create path).
         """
         pass
 
-    async def custom_actions(self, payload: dict[str, Any], instance: models.Model):
+    async def acustom_actions(self, payload: dict[str, Any], instance: models.Model):
         """
         Async hook for reacting to provided custom (synthetic) fields.
 
@@ -2466,6 +3363,14 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         payload : dict
             Custom field name/value pairs.
         """
+        pass
+
+    def post_create(self, instance: models.Model) -> None:
+        """Synchronous counterpart for post-create lifecycle work."""
+        pass
+
+    def custom_actions(self, payload: dict[str, Any], instance: models.Model) -> None:
+        """Synchronous counterpart for custom field handling."""
         pass
 
     async def save(self, instance: Optional[ModelT] = None) -> ModelT:
@@ -2486,7 +3391,7 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         ModelT
             The saved model instance.
         """
-        from ninja_aio.models.hooks import execute_reactive_hooks, fire_update_hooks
+        from ninja_aio.models.hooks import aexecute_reactive_hooks, afire_update_hooks
 
         instance = self._resolve_instance(instance)
         creation = instance._state.adding
@@ -2499,26 +3404,55 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
                 if await self.ahas_changed(field, instance):
                     changed_fields.add(field)
 
-        if creation:
-            await sync_to_async(self.on_create_before_save)(instance)
-        await sync_to_async(self.before_save)(instance)
-        await instance.asave()
-        if creation:
-            await sync_to_async(self.on_create_after_save)(instance)
-        await sync_to_async(self.after_save)(instance)
+        await self._asave_instance(instance)
 
         # Fire reactive hooks
         if hooks:
             if creation:
-                await execute_reactive_hooks(self, hooks.get("create", []), instance)
+                await aexecute_reactive_hooks(self, hooks.get("create", []), instance)
             else:
-                await fire_update_hooks(self, changed_fields, hooks, instance)
+                await afire_update_hooks(self, changed_fields, hooks, instance)
 
         return instance
 
-    async def create(self, payload: dict[str, Any] | Schema) -> ModelT:
+    def _overridden_hooks(self, *names: str) -> list[Callable]:
+        from ninja_aio.models.hooks import _is_overridden
+
+        return [getattr(self, name) for name in names if _is_overridden(self, name)]
+
+    def _save_instance(self, instance: ModelT) -> ModelT:
+        """Save with the before/after lifecycle hooks; reactive hooks are left to the caller."""
+        creation = instance._state.adding
+        before = ("on_create_before_save", "before_save") if creation else ("before_save",)
+        after = ("on_create_after_save", "after_save") if creation else ("after_save",)
+        for hook in self._overridden_hooks(*before):
+            hook(instance)
+        instance.save()
+        for hook in self._overridden_hooks(*after):
+            hook(instance)
+        return instance
+
+    async def _asave_instance(self, instance: ModelT) -> ModelT:
+        """Async counterpart of ``_save_instance``."""
+        creation = instance._state.adding
+        before = ("on_create_before_save", "before_save") if creation else ("before_save",)
+        after = ("on_create_after_save", "after_save") if creation else ("after_save",)
+        for hook in self._overridden_hooks(*before):
+            await sync_to_async(hook)(instance)
+        await instance.asave()
+        for hook in self._overridden_hooks(*after):
+            await sync_to_async(hook)(instance)
+        return instance
+
+    def _create_instance(self, payload: dict[str, Any] | Schema) -> ModelT:
+        """Build and save a new instance with lifecycle hooks (no reactive hooks)."""
+        return self._save_instance(self.model(**self._parse_payload(payload)))
+
+    async def _acreate(self, payload: dict[str, Any] | Schema) -> ModelT:
         """
         Create a new model instance from the provided payload.
+
+        Runs the before/after save hooks; reactive hooks are fired by the caller.
 
         Parameters
         ----------
@@ -2530,87 +3464,7 @@ class Serializer(BaseSerializer, Generic[ModelT], metaclass=SerializerMeta):
         ModelT
             Created model instance.
         """
-        instance: ModelT = self.model(**self._parse_payload(payload))
-        return await self.save(instance)
-
-    async def update(
-        self,
-        payload: dict[str, Any] | Schema,
-        instance: Optional[ModelT] = None,
-    ) -> ModelT:
-        """
-        Update an existing model instance with the provided payload.
-
-        If *instance* is omitted the serializer's bound ``self.instance`` is
-        used.  A ``ValueError`` is raised when neither is available.
-
-        Parameters
-        ----------
-        payload : dict | Schema
-            Input data to apply to the instance.
-        instance : ModelT | None
-            The model instance to update. Falls back to ``self.instance``
-            when ``None``.
-
-        Returns
-        -------
-        ModelT
-            The updated model instance.
-        """
-        instance = self._resolve_instance(instance)
-        for attr, value in self._parse_payload(payload).items():
-            setattr(instance, attr, value)
-        return await self.save(instance)
-
-    async def model_dump(
-        self,
-        instance: Optional[ModelT] = None,
-        schema: Schema = None,
-    ) -> dict[str, Any]:
-        """
-        Serialize a model instance to a dictionary using the Out schema.
-
-        If *instance* is omitted the serializer's bound ``self.instance`` is
-        used.  A ``ValueError`` is raised when neither is available.
-
-        Parameters
-        ----------
-        instance : ModelT | None
-            The model instance to serialize. Falls back to ``self.instance``
-            when ``None``.
-        schema : Schema | None
-            The Pydantic schema to use for serialization. Defaults to the
-            detail schema if defined, otherwise the read schema.
-
-        Returns
-        -------
-        dict
-            Serialized data.
-        """
-        instance = self._resolve_instance(instance)
-        return await self.util.read_s(
-            schema=self._get_dump_schema(schema), instance=instance
-        )
-
-    async def models_dump(
-        self, instances: models.QuerySet[models.Model], schema: Schema = None
-    ) -> list[dict[str, Any]]:
-        """
-        Serialize a list of model instances to a list of dictionaries using the Out schema.
-
-        Parameters
-        ----------
-        instances : list[models.Model]
-            The list of model instances to serialize.
-
-        Returns
-        -------
-        list[dict]
-            List of serialized data.
-        """
-        return await self.util.list_read_s(
-            schema=self._get_dump_schema(schema), instances=instances
-        )
+        return await self._asave_instance(self.model(**self._parse_payload(payload)))
 
     def after_save(self, instance: models.Model):
         """

@@ -35,18 +35,80 @@ Usage on Serializer (receives instance as parameter)::
 """
 
 import asyncio
+import inspect
 import logging
+from dataclasses import dataclass, field as dataclass_field
 from collections.abc import AsyncIterator, Callable
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, contextmanager
 from contextvars import ContextVar
 from typing import Any
 
 from asgiref.sync import sync_to_async, async_to_sync
+from django.core.exceptions import ImproperlyConfigured
+from django.http import HttpRequest
 from django.db.models.signals import post_save, post_delete
 
 logger = logging.getLogger("ninja_aio.models")
 
 _HOOK_ATTR = "_reactive_hook_meta"
+
+
+@dataclass
+class OperationContext:
+    request: HttpRequest | None
+    operation: str
+    serializer: Any
+    instance: Any = None
+    data: dict[str, Any] = dataclass_field(default_factory=dict)
+    changed_fields: set[str] = dataclass_field(default_factory=set)
+
+
+SERIALIZER_HOOKS = ("queryset_request", "post_create", "custom_actions")
+_SERIALIZER_MODULE = "ninja_aio.models.serializers"
+
+
+def _is_overridden(target: Any, name: str) -> bool:
+    klass = target if isinstance(target, type) else type(target)
+    owner = next((k for k in klass.__mro__ if name in k.__dict__), None)
+    return owner is not None and owner.__module__ != _SERIALIZER_MODULE
+
+
+def resolve_sync_hook(target: Any, name: str) -> Callable:
+    """Return the sync hook, bridging to ``a<name>`` when only that one is overridden."""
+    async_name = f"a{name}"
+    if not _is_overridden(target, name) and _is_overridden(target, async_name):
+        return async_to_sync(getattr(target, async_name))
+    return getattr(target, name)
+
+
+def resolve_async_hook(target: Any, name: str) -> Callable:
+    """Return the ``a<name>`` hook, bridging to ``name`` when only that one is overridden."""
+    async_name = f"a{name}"
+    if not _is_overridden(target, async_name) and _is_overridden(target, name):
+        return sync_to_async(getattr(target, name))
+    return getattr(target, async_name)
+
+
+def validate_serializer_hooks(cls: type) -> None:
+    """Reject v2-style ``async def post_create`` etc.: async hooks are ``a<name>``."""
+    for name in SERIALIZER_HOOKS:
+        if inspect.iscoroutinefunction(getattr(cls, name, None)):
+            raise ImproperlyConfigured(
+                f"{cls.__name__}.{name} is async; rename it to a{name} "
+                f"(sync hooks use the plain name)."
+            )
+        if not inspect.iscoroutinefunction(getattr(cls, f"a{name}", None)):
+            raise ImproperlyConfigured(f"{cls.__name__}.a{name} must be async.")
+
+
+def invoke_hook(context: OperationContext, name: str, *args: Any) -> None:
+    """Invoke one lifecycle hook from synchronous CRUD."""
+    resolve_sync_hook(context.serializer or context.instance, name)(*args)
+
+
+async def ainvoke_hook(context: OperationContext, name: str, *args: Any) -> None:
+    """Invoke one lifecycle hook from asynchronous CRUD."""
+    await resolve_async_hook(context.serializer or context.instance, name)(*args)
 
 
 class _HookMeta:
@@ -71,7 +133,9 @@ def on_delete(func: Callable) -> Callable:
     return func
 
 
-def on_update(_func_or_field: Callable | str | None = None, *extra_fields: str) -> Callable:
+def on_update(
+    _func_or_field: Callable | str | None = None, *extra_fields: str
+) -> Callable:
     """Mark a method to fire after instance update.
 
     Usage::
@@ -84,9 +148,7 @@ def on_update(_func_or_field: Callable | str | None = None, *extra_fields: str) 
         setattr(_func_or_field, _HOOK_ATTR, _HookMeta("update"))
         return _func_or_field
 
-    fields = (
-        (_func_or_field,) + extra_fields if _func_or_field else extra_fields
-    )
+    fields = (_func_or_field,) + extra_fields if _func_or_field else extra_fields
 
     def decorator(func):
         setattr(func, _HOOK_ATTR, _HookMeta("update", fields))
@@ -138,7 +200,7 @@ def collect_reactive_hooks(cls: type) -> dict[str, Any]:
     return hooks
 
 
-async def execute_reactive_hooks(
+async def aexecute_reactive_hooks(
     target: Any, hook_names: list[str], instance: Any = None
 ) -> None:
     """Execute a list of hook methods sequentially on *target*.
@@ -155,7 +217,7 @@ async def execute_reactive_hooks(
     """
     for name in hook_names:
         method = getattr(target, name)
-        if asyncio.iscoroutinefunction(method):
+        if inspect.iscoroutinefunction(method):
             if instance is not None:
                 await method(instance)
             else:
@@ -185,7 +247,7 @@ def detect_changed_fields(
     return changed
 
 
-async def fire_update_hooks(
+async def afire_update_hooks(
     target: Any, changed_fields: set[str], hooks: dict[str, Any], instance: Any = None
 ) -> None:
     """Fire field-specific and generic update hooks.
@@ -201,20 +263,33 @@ async def fire_update_hooks(
     instance
         For Serializer, the model instance.
     """
-    for field in changed_fields:
+    for field in hooks["update_field"]:
+        if field not in changed_fields:
+            continue
         field_hooks = hooks["update_field"].get(field, [])
         if field_hooks:
-            logger.debug(f"Firing @on_update('{field}') hooks on {type(target).__name__}")
-            await execute_reactive_hooks(target, field_hooks, instance)
+            logger.debug(
+                f"Firing @on_update('{field}') hooks on {type(target).__name__}"
+            )
+            await aexecute_reactive_hooks(target, field_hooks, instance)
 
     if hooks["update_any"]:
         logger.debug(f"Firing @on_update hooks on {type(target).__name__}")
-        await execute_reactive_hooks(target, hooks["update_any"], instance)
+        await aexecute_reactive_hooks(target, hooks["update_any"], instance)
 
 
-def _run_hook_sync(method: Callable, instance: Any = None) -> None:
+def fire_update_hooks(
+    target: Any, changed_fields: set[str], hooks: dict[str, Any], instance: Any = None
+) -> None:
+    for field in hooks["update_field"]:
+        if field in changed_fields:
+            execute_reactive_hooks(target, hooks["update_field"][field], instance)
+    execute_reactive_hooks(target, hooks["update_any"], instance)
+
+
+def _run_hook(method: Callable, instance: Any = None) -> None:
     """Run a single hook method, handling both sync and async."""
-    if asyncio.iscoroutinefunction(method):
+    if inspect.iscoroutinefunction(method):
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
@@ -236,11 +311,13 @@ def _run_hook_sync(method: Callable, instance: Any = None) -> None:
             method()
 
 
-def _execute_hooks_sync(target: Any, hook_names: list[str], instance: Any = None) -> None:
+def execute_reactive_hooks(
+    target: Any, hook_names: list[str], instance: Any = None
+) -> None:
     """Execute hook methods synchronously (for signal handlers)."""
     for name in hook_names:
         method = getattr(target, name)
-        _run_hook_sync(method, instance)
+        _run_hook(method, instance)
 
 
 # When True, signal handlers skip execution (API path fires hooks directly)
@@ -248,7 +325,7 @@ _api_hooks_active: ContextVar[bool] = ContextVar("_api_hooks_active", default=Fa
 
 
 @asynccontextmanager
-async def suppress_signals() -> AsyncIterator[None]:
+async def asuppress_signals() -> AsyncIterator[None]:
     """Suppress reactive hook signals during API operations.
 
     Prevents double-firing: the async API path fires hooks directly
@@ -262,12 +339,27 @@ async def suppress_signals() -> AsyncIterator[None]:
         _api_hooks_active.reset(token)
 
 
+@contextmanager
+def suppress_signals():
+    """Suppress signals while synchronous CRUD invokes hooks explicitly."""
+    token = _api_hooks_active.set(True)
+    try:
+        yield
+    finally:
+        _api_hooks_active.reset(token)
+
+
 def get_hooks(model_or_serializer: type) -> dict[str, Any] | None:
     """Get reactive hooks dict from a model or serializer class, or None."""
     hooks = getattr(model_or_serializer, "_reactive_hooks", None)
     if not hooks:
         return None
-    if hooks["create"] or hooks["update_any"] or hooks["update_field"] or hooks["delete"]:
+    if (
+        hooks["create"]
+        or hooks["update_any"]
+        or hooks["update_field"]
+        or hooks["delete"]
+    ):
         return hooks
     return None
 
@@ -288,11 +380,11 @@ def _on_post_save(sender: type, instance: Any, created: bool, **kwargs: Any) -> 
     if created:
         if hooks["create"]:
             logger.debug(f"Signal post_save (create) firing hooks on {sender.__name__}")
-            _execute_hooks_sync(instance, hooks["create"])
+            execute_reactive_hooks(instance, hooks["create"])
     else:
         if hooks["update_any"]:
             logger.debug(f"Signal post_save (update) firing hooks on {sender.__name__}")
-            _execute_hooks_sync(instance, hooks["update_any"])
+            execute_reactive_hooks(instance, hooks["update_any"])
 
 
 def _on_post_delete(sender: type, instance: Any, **kwargs: Any) -> None:
@@ -309,7 +401,7 @@ def _on_post_delete(sender: type, instance: Any, **kwargs: Any) -> None:
 
     if hooks["delete"]:
         logger.debug(f"Signal post_delete firing hooks on {sender.__name__}")
-        _execute_hooks_sync(instance, hooks["delete"])
+        execute_reactive_hooks(instance, hooks["delete"])
 
 
 def register_signals(model_class: type) -> None:

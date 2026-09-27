@@ -2,6 +2,7 @@ from django.test import TestCase, tag
 from ninja import Path
 
 from ninja_aio import NinjaAIO
+from ninja_aio.decorators import action
 from ninja_aio.mcp import (
     NinjaAIOMCPServer,
     ToolInvocationError,
@@ -10,6 +11,7 @@ from ninja_aio.mcp import (
 )
 from ninja_aio.views import APIView
 from tests.generics.views import GenericAPIView
+from tests.test_app import schema
 
 
 @tag("mcp")
@@ -54,6 +56,29 @@ class InvokeApiViewTests(TestCase):
 
 
 @tag("mcp")
+class InvokeSyncApiViewTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        class SyncSumView(APIView):
+            api_route_path = "sync-sum/"
+            router_tag = "sync_sum"
+
+            def views(self):
+                @self.router.post("/", response=schema.SumSchemaOut)
+                def sync_sum(request, data: schema.SumSchemaIn):
+                    return {"result": data.a + data.b}
+
+        cls.api = NinjaAIO(urls_namespace="mcp_invoke_sync_apiview")
+        cls.view = SyncSumView(api=cls.api)
+        cls.view.add_views_to_route()
+        cls.spec = describe_api_view(cls.view)[0]
+
+    async def test_sync_endpoint_is_dispatched_off_the_event_loop(self):
+        result = await invoke_tool(self.spec, {"data": {"a": 4, "b": 5}})
+        self.assertEqual(result["result"], 9)
+
+
+@tag("mcp")
 class DescribeApiViewAnnotatedAndHiddenTests(TestCase):
     """Covers django-ninja's Annotated param markers (Path[X]/Query[X]) and
     endpoints excluded from the schema (include_in_schema=False)."""
@@ -83,6 +108,22 @@ class DescribeApiViewAnnotatedAndHiddenTests(TestCase):
 
     def test_endpoint_excluded_from_schema_is_not_exposed_as_a_tool(self):
         self.assertNotIn("miscview_hidden_get", self.by_name)
+
+
+@tag("mcp")
+class DescribeApiViewActionNameTests(TestCase):
+    def test_action_tool_uses_the_method_name(self):
+        class ReportsView(APIView):
+            @action(detail=False)
+            async def totals(self, request):
+                return {"total": 1}
+
+        api = NinjaAIO(urls_namespace="mcp_describe_apiview_action_name")
+        view = ReportsView(api=api, prefix="mcp-reports")
+        view.add_views_to_route()
+        names = [spec.name for spec in describe_api_view(view)]
+
+        self.assertEqual(names, ["reportsview_totals_get"])
 
 
 @tag("mcp")

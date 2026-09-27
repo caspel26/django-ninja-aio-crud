@@ -60,15 +60,12 @@ def _classify_fields(model: type) -> dict:
     """
     Derive Django Admin configuration from a ModelSerializer's field config.
 
-    Uses ReadSerializer fields for list_display and UpdateSerializer fields
-    to determine which fields are readonly.
+    Uses the read schema for list_display; fields missing from the update
+    schema (fields, optionals or excludes) are readonly.
     """
     read_fields = model.get_fields("read")
-    update_fields = (
-        model.get_fields("update")
-        if hasattr(model, "UpdateSerializer")
-        else []
-    )
+    update_schema = model.get_schema("update")
+    update_fields = list(update_schema.model_fields) if update_schema else []
     pk_name = model._meta.pk.name if model._meta.pk else "id"
 
     list_display: list[str] = []
@@ -253,12 +250,17 @@ def register_admin(model=None, *, site=None, **overrides):
     target_site = site or admin.site
 
     def decorator(cls: type) -> type:
+        if not isinstance(cls, ModelSerializerMeta):
+            raise TypeError(
+                f"register_admin expects a ModelSerializer, got {cls.__name__}. "
+                "Register plain models with django.contrib.admin instead."
+            )
         admin_class = model_admin_factory(cls, **overrides)
         target_site.register(cls, admin_class)
         return cls
 
     # Called as @register_admin (no parentheses) — model is the class itself
-    if model is not None and isinstance(model, ModelSerializerMeta):
+    if model is not None:
         return decorator(model)
 
     # Called as @register_admin(...) with keyword args

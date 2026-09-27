@@ -1,8 +1,13 @@
 import datetime
 import logging
+import inspect
+import asyncio
+from contextvars import ContextVar
 from typing import Optional
+from asgiref.sync import async_to_sync
 
 from joserfc import jwt, jwk, errors
+from django.core.exceptions import ImproperlyConfigured
 from django.http.request import HttpRequest
 from django.utils import timezone
 from django.conf import settings
@@ -17,6 +22,12 @@ JWT_MANDATORY_CLAIMS = [
     ("iss", "JWT_ISSUER"),
     ("aud", "JWT_AUDIENCE"),
 ]
+
+# Auth instances are shared by every request, so the decoded token must live in
+# the request's own context (asyncio task or thread), never on the instance.
+_decoded_token: ContextVar[Optional[jwt.Token]] = ContextVar(
+    "ninja_aio_decoded_jwt", default=None
+)
 
 
 class JwtAuthMixin:
@@ -37,12 +48,44 @@ class JwtAuthMixin:
         algorithms (list[str]):
             List of permitted JWT algorithms for signature verification. Defaults to ["RS256"].
         dcd (jwt.Token | None):
-            Set after successful decode; holds the decoded token object (assigned dynamically).
+            The decoded token of the request being authenticated. Scoped to the
+            current request context, so concurrent requests never share it.
     """
 
     jwt_public: JwtKeys
     claims: dict[str, dict]
-    algorithms: list[str] = ["RS256"]
+    algorithms: list[str] | None = None
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        if not isinstance(getattr(self, "claims", None), dict):
+            raise ImproperlyConfigured(
+                f"{type(self).__name__}.claims is required: a dict of claim rules, "
+                'like {"iss": {"value": "https://auth.example"}}. Use {} to skip checks.'
+            )
+
+    def __call__(self, request: HttpRequest):
+        result = super().__call__(request)
+        if inspect.isawaitable(result):
+            try:
+                asyncio.get_running_loop()
+            except RuntimeError:
+                # Ninja's sync dispatcher otherwise calls auth twice and leaks
+                # the coroutine returned by the first call.
+                return async_to_sync(self._await_auth_result)(result)
+        return result
+
+    @staticmethod
+    async def _await_auth_result(result):
+        return await result
+
+    @property
+    def dcd(self) -> Optional[jwt.Token]:
+        return _decoded_token.get()
+
+    @dcd.setter
+    def dcd(self, token: Optional[jwt.Token]) -> None:
+        _decoded_token.set(token)
 
     @classmethod
     def get_claims(cls):
@@ -51,6 +94,12 @@ class JwtAuthMixin:
     def validate_claims(self, claims: jwt.Claims):
         jwt_claims = self.get_claims()
         jwt_claims.validate(claims)
+
+    def _verification_key(self) -> JwtKeys:
+        return validate_key(getattr(self, "jwt_public", None), "JWT_PUBLIC_KEY")
+
+    def _algorithms(self) -> list[str]:
+        return self.algorithms or [default_algorithm()]
 
     async def auth_handler(self, request: HttpRequest):
         """
@@ -63,11 +112,12 @@ class JwtAuthMixin:
         Authenticate the request and return the user if authentication is successful.
         If authentication fails, returns false.
         """
+        self.dcd = None
         if not token:
             logger.debug("No JWT token provided")
             return False
         try:
-            self.dcd = jwt.decode(token, self.jwt_public, algorithms=self.algorithms)
+            self.dcd = jwt.decode(token, self._verification_key(), algorithms=self._algorithms())
             self.validate_claims(self.dcd.claims)
         except errors.JoseError as exc:
             logger.debug(f"JWT authentication failed: {exc}")
@@ -142,6 +192,11 @@ class AsyncJwtCookie(JwtAuthMixin, APIKeyCookie):
         return key
 
 
+def default_algorithm() -> str:
+    """The JWS algorithm used when none is given: ``settings.JWT_ALGORITHM``, or RS256."""
+    return getattr(settings, "JWT_ALGORITHM", None) or "RS256"
+
+
 def validate_key(key: Optional[JwtKeys], setting_name: str) -> JwtKeys:
     if key is None:
         key = getattr(settings, setting_name, None)
@@ -149,7 +204,7 @@ def validate_key(key: Optional[JwtKeys], setting_name: str) -> JwtKeys:
         raise ValueError(f"{setting_name} is required")
     if not isinstance(key, (jwk.RSAKey, jwk.ECKey, jwk.OctKey)):
         raise ValueError(
-            f"{setting_name} must be an instance of jwk.RSAKey or jwk.ECKey"
+            f"{setting_name} must be an instance of jwk.RSAKey, jwk.ECKey or jwk.OctKey"
         )
     return key
 
@@ -180,14 +235,14 @@ def encode_jwt(
     Parameters:
       - claims (dict): additional claims to merge into the payload (can override defaults)
       - duration (int): token lifetime in seconds
-      - private_key (jwk.RSAKey): RSA/EC JWK for signing; defaults to settings.JWT_PRIVATE_KEY
+      - private_key (jwk.RSAKey | jwk.ECKey | jwk.OctKey): signing key; defaults to settings.JWT_PRIVATE_KEY
       - algorithm (str): JWS algorithm (default "RS256")
 
     Returns:
       - str: JWT compact string
 
     Raises:
-      - ValueError: if private_key is missing or not jwk.RSAKey/jwk.ECKey
+      - ValueError: if private_key is missing or not an RSA, EC or oct JWK
       - ValueError: if mandatory claims (iss, aud) are missing and not in settings
 
     Notes:
@@ -197,8 +252,8 @@ def encode_jwt(
     now = timezone.now()
     nbf = now
     pkey = validate_key(private_key, "JWT_PRIVATE_KEY")
-    algorithm = algorithm or "RS256"
-    claims = validate_mandatory_claims(claims)
+    algorithm = algorithm or default_algorithm()
+    claims = validate_mandatory_claims(dict(claims))
     kid_h = {"kid": pkey.kid} if pkey.kid else {}
     logger.debug(f"Encoding JWT (algorithm={algorithm}, duration={duration}s)")
     return jwt.encode(
@@ -224,15 +279,15 @@ def decode_jwt(
     This function decodes the JWT, verifies its signature, and returns the decoded token object.
     Parameters:
     - token (str): The JWT string to decode.
-    - public_key (jwk.RSAKey, optional): RSA public key used to verify the token's signature.
-        If not provided, settings.JWT_PUBLIC_KEY will be used. Must be an instance of jwk.RSAKey.
+    - public_key (jwk.RSAKey | jwk.ECKey | jwk.OctKey, optional): key used to verify the token's signature.
+        If not provided, settings.JWT_PUBLIC_KEY will be used.
     - algorithms (list[str], optional): List of permitted algorithms for signature verification.
         Defaults to ["RS256"] if not provided.
     Returns:
     - jwt.Token: The decoded JWT token object containing header and claims.
     Raises:
-    - ValueError: If no public key is provided or if the provided key is not an instance of jwk.RSAKey.
-    - jose.errors.JoseError: If the token is invalid or fails verification.
+    - ValueError: If no public key is provided or the key is not an RSA, EC or oct JWK.
+    - joserfc.errors.JoseError: If the token is invalid or fails verification.
     Notes:
     - The function uses the specified algorithms to restrict acceptable signing methods.
     Example:
@@ -246,7 +301,7 @@ def decode_jwt(
     return jwt.decode(
         token,
         validate_key(public_key, "JWT_PUBLIC_KEY"),
-        algorithms=algorithms or ["RS256"],
+        algorithms=algorithms or [default_algorithm()],
     )
 
 

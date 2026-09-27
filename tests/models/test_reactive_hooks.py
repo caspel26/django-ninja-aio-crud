@@ -1,8 +1,8 @@
 from django.db import models
 from django.test import TestCase, tag
 
-from ninja_aio import NinjaAIO
-from ninja_aio.models import ModelSerializer, ModelUtil, on_create, on_update, on_delete
+from ninja_aio import NinjaAIO, SchemaConfig
+from ninja_aio.models import ModelSerializer, ModelUtil, hooks, on_create, on_update, on_delete
 from ninja_aio.models.serializers import Serializer, SchemaModelConfig
 from tests.generics.request import Request
 from tests.generics.views import GenericAPIViewSet
@@ -76,6 +76,67 @@ class SyncHookTestModel(ModelSerializer):
         _hook_calls.append(("sync_create", self.pk))
 
 
+class OrderedHookModel(ModelSerializer):
+    name = models.CharField(max_length=255)
+
+    class Meta:
+        app_label = "test_app"
+
+    class CreateSerializer:
+        fields = ["name"]
+
+    class UpdateSerializer:
+        optionals = [("name", str)]
+
+    def custom_actions(self, payload):
+        _hook_calls.append(("custom", self.pk))
+
+    def post_create(self):
+        _hook_calls.append(("post_create", self.pk))
+
+    @on_create
+    def created(self):
+        _hook_calls.append(("reactive", self.pk))
+
+    @on_update("name")
+    def name_changed(self):
+        _hook_calls.append(("changed", self.pk))
+
+    @on_update
+    def updated(self):
+        _hook_calls.append(("updated", self.pk))
+
+    @on_delete
+    def deleted(self):
+        _hook_calls.append(("deleted", self.pk))
+
+
+class FailingHookModel(ModelSerializer):
+    name = models.CharField(max_length=255)
+
+    class Meta:
+        app_label = "test_app"
+
+    class CreateSerializer:
+        fields = ["name"]
+
+    class UpdateSerializer:
+        optionals = [("name", str)]
+
+    @on_create
+    def fail_create(self):
+        if self.name == "fail-create":
+            raise ValueError("create hook failed")
+
+    @on_update
+    def fail_update(self):
+        raise ValueError("update hook failed")
+
+    @on_delete
+    def fail_delete(self):
+        raise ValueError("delete hook failed")
+
+
 # ─── Plain model + Serializer ────────────────────────────
 
 
@@ -107,6 +168,39 @@ class HookPlainSerializer(Serializer):
         _hook_calls.append(("ser_delete", instance.pk))
 
 
+class ShadowedHookModel(ModelSerializer):
+    """Defines an ``on_delete`` lifecycle method before the reactive delete hook."""
+
+    name = models.CharField(max_length=255)
+
+    class Meta:
+        app_label = "test_app"
+
+    class CreateSerializer:
+        fields = ["name"]
+
+    def on_delete(self):
+        _hook_calls.append(("lifecycle_delete", self.name))
+
+    @hooks.on_delete
+    def reactive_delete(self):
+        _hook_calls.append(("reactive_delete", self.name))
+
+
+class ShadowedHookSerializer(Serializer):
+    class Meta:
+        model = HookPlainModel
+        schema_in = SchemaModelConfig(fields=["name", "status"])
+        schema_out = SchemaModelConfig(fields=["id", "name", "status"])
+
+    def on_delete(self, instance):
+        _hook_calls.append(("ser_lifecycle_delete", instance.name))
+
+    @hooks.on_delete
+    def reactive_delete(self, instance):
+        _hook_calls.append(("ser_reactive_delete", instance.name))
+
+
 # ─── ViewSets ────────────────────────────────────────────
 
 
@@ -121,9 +215,9 @@ class SyncHookTestAPI(GenericAPIViewSet):
 class HookPlainAPI(GenericAPIViewSet):
     model = HookPlainModel
     serializer_class = HookPlainSerializer
-    schema_in = HookPlainSerializer.generate_create_s()
-    schema_out = HookPlainSerializer.generate_read_s()
-    schema_update = HookPlainSerializer.generate_update_s()
+    schema_in = HookPlainSerializer.create_schema
+    schema_out = HookPlainSerializer.read_schema
+    schema_update = HookPlainSerializer.update_schema
 
 
 # ─── Tests: ModelSerializer ──────────────────────────────
@@ -148,7 +242,7 @@ class ModelSerializerReactiveHooksTestCase(TestCase):
     async def test_on_create_fires(self):
         """@on_create fires after creation."""
         await self.model.objects.all().adelete()
-        view = self.viewset.create_view()
+        view = self.viewset.acreate_view()
         data = self.viewset.schema_in(name="test", description="d", status="draft")
         await view(self.request.post(), data)
 
@@ -162,7 +256,7 @@ class ModelSerializerReactiveHooksTestCase(TestCase):
         obj = await self.model.objects.acreate(name="test", description="d")
         _reset()
 
-        view = self.viewset.update_view()
+        view = self.viewset.aupdate_view()
         data = self.viewset.schema_update(description="updated")
         pk_schema = self.viewset.path_schema(id=obj.pk)
         await view(self.request.patch(), data, pk_schema)
@@ -176,7 +270,7 @@ class ModelSerializerReactiveHooksTestCase(TestCase):
         obj = await self.model.objects.acreate(name="test", status="draft")
         _reset()
 
-        view = self.viewset.update_view()
+        view = self.viewset.aupdate_view()
         data = self.viewset.schema_update(status="published")
         pk_schema = self.viewset.path_schema(id=obj.pk)
         await view(self.request.patch(), data, pk_schema)
@@ -192,7 +286,7 @@ class ModelSerializerReactiveHooksTestCase(TestCase):
         obj = await self.model.objects.acreate(name="test", status="draft")
         _reset()
 
-        view = self.viewset.update_view()
+        view = self.viewset.aupdate_view()
         data = self.viewset.schema_update(description="only desc changed")
         pk_schema = self.viewset.path_schema(id=obj.pk)
         await view(self.request.patch(), data, pk_schema)
@@ -207,7 +301,7 @@ class ModelSerializerReactiveHooksTestCase(TestCase):
         obj = await self.model.objects.acreate(name="test")
         _reset()
 
-        view = self.viewset.update_view()
+        view = self.viewset.aupdate_view()
         data = self.viewset.schema_update(description="updated")
         pk_schema = self.viewset.path_schema(id=obj.pk)
         await view(self.request.patch(), data, pk_schema)
@@ -218,7 +312,7 @@ class ModelSerializerReactiveHooksTestCase(TestCase):
     async def test_on_update_does_not_fire_on_create(self):
         """@on_update does NOT fire on create."""
         await self.model.objects.all().adelete()
-        view = self.viewset.create_view()
+        view = self.viewset.acreate_view()
         data = self.viewset.schema_in(name="test", description="d", status="draft")
         await view(self.request.post(), data)
 
@@ -232,13 +326,34 @@ class ModelSerializerReactiveHooksTestCase(TestCase):
         obj = await self.model.objects.acreate(name="del_me")
         _reset()
 
-        view = self.viewset.delete_view()
+        view = self.viewset.adelete_view()
         pk_schema = self.viewset.path_schema(id=obj.pk)
         await view(self.request.delete(), pk_schema)
 
         self.assertEqual(len(_hook_calls), 1)
         self.assertEqual(_hook_calls[0][0], "delete")
         self.assertEqual(_hook_calls[0][2], "del_me")
+
+    async def test_on_delete_fires_for_each_bulk_deleted_object(self):
+        """Bulk delete goes through the per-object destroy, so @on_delete fires."""
+        await self.model.objects.all().adelete()
+        first = await self.model.objects.acreate(name="bulk_1")
+        second = await self.model.objects.acreate(name="bulk_2")
+        _reset()
+
+        class BulkHookAPI(HookTestAPI):
+            bulk_operations = ["delete"]
+
+        viewset = BulkHookAPI()
+        result = await viewset.abulk_delete_view()(
+            self.request.delete(), viewset.bulk_delete_schema(ids=[first.pk, second.pk])
+        )
+
+        self.assertEqual(result.value["success"]["details"], [first.pk, second.pk])
+        self.assertEqual(
+            [(event, name) for event, _, name in _hook_calls],
+            [("delete", "bulk_1"), ("delete", "bulk_2")],
+        )
 
 
 @tag("reactive_hooks")
@@ -260,12 +375,84 @@ class SyncHookTestCase(TestCase):
     async def test_sync_hook_fires(self):
         """Sync @on_create hook is properly wrapped and fires."""
         await self.model.objects.all().adelete()
-        view = self.viewset.create_view()
+        view = self.viewset.acreate_view()
         data = self.viewset.schema_in(name="sync_test")
         await view(self.request.post(), data)
 
         self.assertEqual(len(_hook_calls), 1)
         self.assertEqual(_hook_calls[0][0], "sync_create")
+
+
+@tag("reactive_hooks")
+class OperationContextHookParityTests(TestCase):
+    def setUp(self):
+        _reset()
+
+    def test_sync_create_hook_order(self):
+        OrderedHookModel.create({"name": "sync"})
+        self.assertEqual(
+            [event for event, _ in _hook_calls],
+            ["custom", "post_create", "reactive"],
+        )
+
+    async def test_async_create_hook_order(self):
+        await OrderedHookModel.acreate({"name": "async"})
+        self.assertEqual(
+            [event for event, _ in _hook_calls],
+            ["custom", "post_create", "reactive"],
+        )
+
+    def test_sync_update_and_delete_hook_order(self):
+        obj = OrderedHookModel.objects.create(name="old")
+        _reset()
+        OrderedHookModel.update(obj, {"name": "new"})
+        OrderedHookModel.destroy(obj)
+        self.assertEqual(
+            [event for event, _ in _hook_calls],
+            ["custom", "changed", "updated", "deleted"],
+        )
+
+    async def test_async_update_and_delete_hook_order(self):
+        obj = await OrderedHookModel.objects.acreate(name="old")
+        _reset()
+        await OrderedHookModel.aupdate(obj, {"name": "new"})
+        await OrderedHookModel.adestroy(obj)
+        self.assertEqual(
+            [event for event, _ in _hook_calls],
+            ["custom", "changed", "updated", "deleted"],
+        )
+
+    def test_sync_create_rolls_back_on_hook_error(self):
+        with self.assertRaisesRegex(ValueError, "create hook failed"):
+            FailingHookModel.create({"name": "fail-create"})
+        self.assertFalse(FailingHookModel.objects.exists())
+
+    async def test_async_create_rolls_back_on_hook_error(self):
+        with self.assertRaisesRegex(ValueError, "create hook failed"):
+            await FailingHookModel.acreate({"name": "fail-create"})
+        self.assertFalse(await FailingHookModel.objects.aexists())
+
+    def test_sync_update_and_delete_roll_back_on_hook_error(self):
+        obj = FailingHookModel.objects.create(name="before")
+        pk = obj.pk
+        with self.assertRaisesRegex(ValueError, "update hook failed"):
+            FailingHookModel.update(obj, {"name": "after"})
+        obj.refresh_from_db()
+        self.assertEqual(obj.name, "before")
+        with self.assertRaisesRegex(ValueError, "delete hook failed"):
+            FailingHookModel.destroy(obj)
+        self.assertTrue(FailingHookModel.objects.filter(pk=pk).exists())
+
+    async def test_async_update_and_delete_roll_back_on_hook_error(self):
+        obj = await FailingHookModel.objects.acreate(name="before")
+        pk = obj.pk
+        with self.assertRaisesRegex(ValueError, "update hook failed"):
+            await FailingHookModel.aupdate(obj, {"name": "after"})
+        await obj.arefresh_from_db()
+        self.assertEqual(obj.name, "before")
+        with self.assertRaisesRegex(ValueError, "delete hook failed"):
+            await FailingHookModel.adestroy(obj)
+        self.assertTrue(await FailingHookModel.objects.filter(pk=pk).aexists())
 
 
 # ─── Tests: Serializer (Meta-driven) ────────────────────
@@ -287,10 +474,19 @@ class SerializerReactiveHooksTestCase(TestCase):
     def setUp(self):
         _reset()
 
+    def test_sync_serializer_reactive_hooks(self):
+        obj = HookPlainSerializer.create({"name": "sync", "status": "draft"})
+        HookPlainSerializer.update(obj, {"status": "published"})
+        HookPlainSerializer.destroy(obj)
+        self.assertEqual(
+            [event for event, *_ in _hook_calls],
+            ["ser_create", "ser_update_status", "ser_delete"],
+        )
+
     async def test_serializer_on_create_fires(self):
         """@on_create on Serializer fires with instance parameter."""
         await self.model.objects.all().adelete()
-        view = self.viewset.create_view()
+        view = self.viewset.acreate_view()
         data = self.viewset.schema_in(name="ser_test", status="draft")
         await view(self.request.post(), data)
 
@@ -304,7 +500,7 @@ class SerializerReactiveHooksTestCase(TestCase):
         obj = await self.model.objects.acreate(name="test", status="draft")
         _reset()
 
-        view = self.viewset.update_view()
+        view = self.viewset.aupdate_view()
         data = self.viewset.schema_update(status="published")
         pk_schema = self.viewset.path_schema(id=obj.pk)
         await view(self.request.patch(), data, pk_schema)
@@ -318,7 +514,7 @@ class SerializerReactiveHooksTestCase(TestCase):
         obj = await self.model.objects.acreate(name="del_me")
         _reset()
 
-        view = self.viewset.delete_view()
+        view = self.viewset.adelete_view()
         pk_schema = self.viewset.path_schema(id=obj.pk)
         await view(self.request.delete(), pk_schema)
 
@@ -435,9 +631,9 @@ class SyncSerializerHook(Serializer):
 class SyncSerializerHookAPI(GenericAPIViewSet):
     model = HookPlainModel
     serializer_class = SyncSerializerHook
-    schema_in = SyncSerializerHook.generate_create_s()
-    schema_out = SyncSerializerHook.generate_read_s()
-    schema_update = SyncSerializerHook.generate_update_s()
+    schema_in = SyncSerializerHook.create_schema
+    schema_out = SyncSerializerHook.read_schema
+    schema_update = SyncSerializerHook.update_schema
 
 
 @tag("reactive_hooks")
@@ -459,7 +655,7 @@ class SyncSerializerHookTestCase(TestCase):
     async def test_sync_serializer_hook_fires(self):
         """Sync @on_create on Serializer is wrapped and fires with instance."""
         await self.model.objects.all().adelete()
-        view = self.viewset.create_view()
+        view = self.viewset.acreate_view()
         data = self.viewset.schema_in(name="sync_ser", status="draft")
         await view(self.request.post(), data)
 
@@ -579,27 +775,27 @@ class HookInternalCoverageTestCase(TestCase):
     """Unit tests for internal hook functions to cover edge case branches."""
 
     def test_run_hook_sync_with_sync_method_and_instance(self):
-        """_run_hook_sync calls sync method with instance when provided."""
-        from ninja_aio.models.hooks import _run_hook_sync
+        """_run_hook calls sync method with instance when provided."""
+        from ninja_aio.models.hooks import _run_hook
 
         calls = []
 
         def my_hook(inst):
             calls.append(("sync_with_instance", inst))
 
-        _run_hook_sync(my_hook, instance="fake_instance")
+        _run_hook(my_hook, instance="fake_instance")
         self.assertEqual(calls, [("sync_with_instance", "fake_instance")])
 
     def test_run_hook_sync_with_async_method_and_instance(self):
-        """_run_hook_sync wraps async method with async_to_sync when instance provided."""
-        from ninja_aio.models.hooks import _run_hook_sync
+        """_run_hook wraps async method with async_to_sync when instance provided."""
+        from ninja_aio.models.hooks import _run_hook
 
         calls = []
 
         async def my_async_hook(inst):
             calls.append(("async_with_instance", inst))
 
-        _run_hook_sync(my_async_hook, instance="fake_instance")
+        _run_hook(my_async_hook, instance="fake_instance")
         self.assertEqual(calls, [("async_with_instance", "fake_instance")])
 
     def test_on_post_save_noop_for_model_without_hooks(self):
@@ -636,8 +832,8 @@ class HookInternalCoverageTestCase(TestCase):
         register_signals(NoAttrModel)  # should not raise
 
     async def test_run_hook_sync_skips_async_when_loop_running(self):
-        """_run_hook_sync skips async hooks when an event loop is already running."""
-        from ninja_aio.models.hooks import _run_hook_sync
+        """_run_hook skips async hooks when an event loop is already running."""
+        from ninja_aio.models.hooks import _run_hook
 
         calls = []
 
@@ -645,5 +841,197 @@ class HookInternalCoverageTestCase(TestCase):
             calls.append("should_not_fire")
 
         # We're inside an async test, so there IS a running event loop
-        _run_hook_sync(my_async_hook)
+        _run_hook(my_async_hook)
         self.assertEqual(calls, [])
+
+
+# ─── Sync/async lifecycle consistency ───────────────────
+
+
+class NullableHookModel(ModelSerializer):
+    name = models.CharField(max_length=255)
+    note = models.CharField(max_length=255, null=True)
+
+    class Meta:
+        app_label = "test_app"
+
+    class Schemas:
+        create = SchemaConfig(fields=["name"], optionals=[("note", str)])
+        update = SchemaConfig(
+            optionals=[("name", str), ("note", str | None)],
+            customs=[("shout", bool, False)],
+        )
+        read = SchemaConfig(fields=["id", "name", "note"])
+
+    def custom_actions(self, payload):
+        if payload.get("shout"):
+            self.name = self.name.upper()
+
+    @on_update("note")
+    def note_changed(self):
+        _hook_calls.append(("note_changed", self.pk))
+
+
+class LifecycleSerializer(Serializer):
+    class Meta:
+        model = HookPlainModel
+
+    class Schemas:
+        create = SchemaConfig(fields=["name", "status"])
+        update = SchemaConfig(optionals=[("name", str), ("status", str)])
+        read = SchemaConfig(fields=["id", "name", "status"])
+
+    def on_create_before_save(self, instance):
+        _hook_calls.append(("on_create_before_save",))
+
+    def before_save(self, instance):
+        _hook_calls.append(("before_save",))
+
+    def on_create_after_save(self, instance):
+        _hook_calls.append(("on_create_after_save",))
+
+    def after_save(self, instance):
+        _hook_calls.append(("after_save",))
+
+    def custom_actions(self, payload, instance):
+        _hook_calls.append(("custom_actions",))
+
+    async def acustom_actions(self, payload, instance):
+        _hook_calls.append(("custom_actions",))
+
+    def post_create(self, instance):
+        if instance.name == "boom":
+            raise ValueError("post_create failed")
+        _hook_calls.append(("post_create",))
+
+    async def apost_create(self, instance):
+        self.post_create(instance)
+
+    @on_create
+    def created(self, instance):
+        _hook_calls.append(("reactive_create",))
+
+    @on_update
+    def updated(self, instance):
+        _hook_calls.append(("reactive_update",))
+
+    @on_delete
+    def deleted(self, instance):
+        _hook_calls.append(("reactive_delete",))
+
+    # Defined after @on_delete: in a class body this name shadows the decorator.
+    def on_delete(self, instance):
+        _hook_calls.append(("on_delete",))
+
+
+_LIFECYCLE_CREATE = [
+    "on_create_before_save",
+    "before_save",
+    "on_create_after_save",
+    "after_save",
+    "custom_actions",
+    "post_create",
+    "reactive_create",
+]
+_LIFECYCLE_UPDATE = ["custom_actions", "before_save", "after_save", "reactive_update"]
+_LIFECYCLE_DELETE = ["on_delete", "reactive_delete"]
+
+
+@tag("reactive_hooks")
+class LifecycleConsistencyTests(TestCase):
+    """Both execution modes and both serializer styles run the same lifecycle."""
+
+    def setUp(self):
+        _reset()
+
+    def _events(self):
+        events = [event for event, *_ in _hook_calls]
+        _reset()
+        return events
+
+    def test_sync_serializer_lifecycle(self):
+        obj = LifecycleSerializer.create({"name": "sync", "status": "draft"})
+        self.assertEqual(self._events(), _LIFECYCLE_CREATE)
+        LifecycleSerializer.update(obj, {"status": "published"})
+        self.assertEqual(self._events(), _LIFECYCLE_UPDATE)
+        LifecycleSerializer.destroy(obj)
+        self.assertEqual(self._events(), _LIFECYCLE_DELETE)
+
+    async def test_async_serializer_lifecycle(self):
+        obj = await LifecycleSerializer.acreate({"name": "async", "status": "draft"})
+        self.assertEqual(self._events(), _LIFECYCLE_CREATE)
+        await LifecycleSerializer.aupdate(obj, {"status": "published"})
+        self.assertEqual(self._events(), _LIFECYCLE_UPDATE)
+        await LifecycleSerializer.adestroy(obj)
+        self.assertEqual(self._events(), _LIFECYCLE_DELETE)
+
+    def test_sync_create_rolls_back_when_post_create_fails(self):
+        with self.assertRaisesRegex(ValueError, "post_create failed"):
+            LifecycleSerializer.create({"name": "boom", "status": "draft"})
+        self.assertFalse(HookPlainModel.objects.filter(name="boom").exists())
+
+    async def test_async_create_rolls_back_when_post_create_fails(self):
+        with self.assertRaisesRegex(ValueError, "post_create failed"):
+            await LifecycleSerializer.acreate({"name": "boom", "status": "draft"})
+        self.assertFalse(await HookPlainModel.objects.filter(name="boom").aexists())
+
+    def test_sync_update_sets_explicit_null_and_ignores_omitted_fields(self):
+        obj = NullableHookModel.create({"name": "a", "note": "n"})
+        NullableHookModel.update(obj, {"name": "b"})
+        obj.refresh_from_db()
+        self.assertEqual((obj.name, obj.note), ("b", "n"))
+        self.assertEqual(self._events(), [])
+        NullableHookModel.update(obj, {"note": None})
+        obj.refresh_from_db()
+        self.assertIsNone(obj.note)
+        self.assertEqual(self._events(), ["note_changed"])
+
+    async def test_async_update_sets_explicit_null_and_ignores_omitted_fields(self):
+        obj = await NullableHookModel.acreate({"name": "a", "note": "n"})
+        await NullableHookModel.aupdate(obj, {"name": "b"})
+        await obj.arefresh_from_db()
+        self.assertEqual((obj.name, obj.note), ("b", "n"))
+        self.assertEqual(self._events(), [])
+        await NullableHookModel.aupdate(obj, {"note": None})
+        await obj.arefresh_from_db()
+        self.assertIsNone(obj.note)
+        self.assertEqual(self._events(), ["note_changed"])
+
+    def test_sync_custom_actions_run_before_save(self):
+        obj = NullableHookModel.create({"name": "quiet"})
+        NullableHookModel.update(obj, {"shout": True})
+        obj.refresh_from_db()
+        self.assertEqual(obj.name, "QUIET")
+
+    async def test_async_custom_actions_run_before_save(self):
+        obj = await NullableHookModel.acreate({"name": "quiet"})
+        await NullableHookModel.aupdate(obj, {"shout": True})
+        await obj.arefresh_from_db()
+        self.assertEqual(obj.name, "QUIET")
+
+    async def test_public_serializer_save_fires_field_update_hooks(self):
+        obj = await HookPlainModel.objects.acreate(name="saved", status="draft")
+        obj.status = "published"
+        await HookPlainSerializer().save(obj)
+        self.assertEqual(self._events(), ["ser_update_status"])
+
+
+@tag("reactive_hooks")
+class ShadowedOnDeleteHookTestCase(TestCase):
+    """``@hooks.on_delete`` works on classes that also define an ``on_delete`` method."""
+
+    def setUp(self):
+        _reset()
+
+    def test_model_serializer_runs_both_delete_hooks(self):
+        obj = ShadowedHookModel.create({"name": "gone"})
+        ShadowedHookModel.destroy(obj)
+        self.assertIn(("lifecycle_delete", "gone"), _hook_calls)
+        self.assertIn(("reactive_delete", "gone"), _hook_calls)
+
+    async def test_serializer_runs_both_delete_hooks(self):
+        serializer = ShadowedHookSerializer()
+        obj = await serializer.acreate({"name": "gone", "status": "draft"})
+        await serializer.adestroy(obj)
+        self.assertIn(("ser_lifecycle_delete", "gone"), _hook_calls)
+        self.assertIn(("ser_reactive_delete", "gone"), _hook_calls)

@@ -1,10 +1,12 @@
 from typing import Any, Sequence, TypeVar
 
+from ninja import NinjaAPI
+from ninja.constants import NOT_SET, NOT_SET_TYPE
+from ninja.openapi.docs import DocsBase, Swagger
+from ninja.parser import Parser
+from ninja.renderers import BaseRenderer
 from ninja.router import Router
 from ninja.throttling import BaseThrottle
-from ninja import NinjaAPI
-from ninja.openapi.docs import DocsBase, Swagger
-from ninja.constants import NOT_SET, NOT_SET_TYPE
 from django.db import models
 
 from .parsers import ORJSONParser
@@ -23,7 +25,8 @@ RouterT = TypeVar("RouterT", bound=NinjaAIORouter)
 class NinjaAIO(NinjaAPI):
     branding: Branding
 
-    def __init__(
+    # Mirrors NinjaAPI's constructor on purpose, so the parameter count is inherited.
+    def __init__(  # NOSONAR
         self,
         title: str = "NinjaAPI",
         version: str = "1.0.0",
@@ -39,10 +42,13 @@ class NinjaAIO(NinjaAPI):
         default_router: Router | None = None,
         openapi_extra: dict[str, Any] | None = None,
         branding: Branding | None = None,
+        renderer: BaseRenderer | None = None,
+        parser: Parser | None = None,
     ):
         self.branding = branding or Branding()
         self._viewsets: list[APIViewSet] = []
         self._views: list[APIView] = []
+        self._aio_routers: list[NinjaAIORouter] = []
         if docs is None:
             docs = BrandedSwagger() if branding else Swagger()
         super().__init__(
@@ -59,13 +65,52 @@ class NinjaAIO(NinjaAPI):
             throttle=throttle,
             default_router=default_router,
             openapi_extra=openapi_extra,
-            renderer=ORJSONRenderer(),
-            parser=ORJSONParser(),
+            renderer=renderer or ORJSONRenderer(),
+            parser=parser or ORJSONParser(),
         )
 
     def set_default_exception_handlers(self):
         set_api_exception_handlers(self)
         super().set_default_exception_handlers()
+
+    def get_openapi_operation_id(self, operation) -> str:
+        """Unique ids even when the same viewset is mounted twice: repeats get ``_2``, ``_3``..."""
+        ids = self.__dict__.setdefault("_openapi_operation_ids", {})
+        if operation in ids:
+            return ids[operation]
+        base = super().get_openapi_operation_id(operation)
+        taken = set(ids.values())
+        # Explicit IDs bypass this method in Ninja's schema generator. Reserve
+        # them regardless of registration order before allocating a generated ID.
+        taken.update(
+            op.operation_id
+            for router in self._get_bound_routers()
+            for path_view in router.path_operations.values()
+            for op in path_view.operations
+            if op.include_in_schema and op.operation_id
+        )
+        candidate, count = base, 1
+        while candidate in taken:
+            count += 1
+            candidate = f"{base}_{count}"
+        ids[operation] = candidate
+        return candidate
+
+    def add_router(self, prefix: str, router: Router | str, *args: Any, **kwargs: Any) -> None:
+        super().add_router(prefix, router, *args, **kwargs)
+        if isinstance(router, NinjaAIORouter):
+            router._mount = (prefix, self)
+            self._aio_routers.append(router)
+
+    def registered_viewsets(self) -> list[APIViewSet]:
+        """Viewsets registered on this API, including those on attached NinjaAIORouters."""
+        nested = [vs for router in self._aio_routers for vs in router.registered_viewsets()]
+        return [*self._viewsets, *nested]
+
+    def registered_views(self) -> list[APIView]:
+        """Views registered on this API, including those on attached NinjaAIORouters."""
+        nested = [view for router in self._aio_routers for view in router.registered_views()]
+        return [*self._views, *nested]
 
     def view(self, prefix: str, tags: list[str] = None) -> Any:
         def wrapper(view: type[APIView]):
@@ -85,8 +130,8 @@ class NinjaAIO(NinjaAPI):
         """
         Decorator to register an APIViewSet with a specific model.
 
-        The decorator preserves the ViewSet's type, allowing type checkers
-        to infer that model_util is properly typed based on the model parameter.
+        The decorator preserves the ViewSet's type, so type checkers see the
+        concrete viewset class returned by the decorator.
 
         Usage:
             @api.viewset(MyModel)

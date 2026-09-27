@@ -1,288 +1,113 @@
-# :material-alert-circle: Exceptions
-
-Django Ninja AIO CRUD provides a structured exception hierarchy for consistent error handling across all API endpoints.
-
+---
+type: reference
+title: Exceptions
+description: Lookup page for the exception classes, their response bodies and the handlers NinjaAIO registers.
 ---
 
-## :material-format-list-bulleted: Overview
+# Exceptions
 
-All framework exceptions inherit from `BaseException` and carry a serializable error payload and an HTTP status code. Exception handlers registered on the `NinjaAIO` instance automatically convert them into JSON responses.
+Exceptions you can raise from views, hooks and permission methods. The API turns
+them into JSON responses. For how to use them, see [Errors](../guides/errors.md).
 
 ```python
 from ninja_aio.exceptions import (
     BaseException,
     SerializeError,
     AuthError,
-    ForbiddenError,
     NotFoundError,
+    MultipleObjectsError,
+    ForbiddenError,
     PydanticValidationError,
+    OperationValidationError,
 )
 ```
 
----
+## Classes
 
-## :material-code-braces: Exception Classes
+| Class | Constructor | Default status | `code` |
+| --- | --- | --- | --- |
+| `BaseException` | `(error=None, status_code=None, details=None)` | `400` | `"operation_error"` |
+| `SerializeError` | `(error=None, status_code=None, details=None)` | `400` | `"serialization_error"` |
+| `AuthError` | `(error=None, status_code=None, details=None)` | `401` | `"authentication_error"` |
+| `NotFoundError` | `(model, details=None)` | `404` | `"not_found"` |
+| `MultipleObjectsError` | `(model, details=None)` | `400` | `"multiple_objects"` |
+| `ForbiddenError` | `(error=None, details=None)` | `403` | `"forbidden"` |
+| `PydanticValidationError` | `(details=None)` | `400` | `"validation_error"` |
+| `OperationValidationError` | `(exc)` | `400` | `"validation_error"` |
 
-### `BaseException`
+All classes subclass `BaseException`. `OperationValidationError` subclasses
+`PydanticValidationError`.
 
-Base class for all framework exceptions.
+## Constructor parameters
 
-```python
-class BaseException(Exception):
-    error: str | dict = ""
-    status_code: int = 400
-```
+| Parameter | Type | Description |
+| --- | --- | --- |
+| `error` | `str \| dict \| None` | A string becomes `{"error": "..."}`. A dict is the body as it is. `None` uses the class `error` attribute |
+| `status_code` | `int \| None` | HTTP status. `None` uses the class default |
+| `details` | any | Added to the body under `"details"` when truthy |
+| `model` | model class | `NotFoundError` and `MultipleObjectsError` only. The model of the lookup |
+| `exc` | `pydantic.ValidationError` | `OperationValidationError` only. The error to wrap |
 
-**Constructor:**
+## Attributes
 
-```python
-BaseException(
-    error: str | dict = None,
-    status_code: int | None = None,
-    details: str | None = None,
-)
-```
+| Attribute | Type | Description |
+| --- | --- | --- |
+| `error` | `dict` | The response body |
+| `status_code` | `int` | HTTP status |
+| `status` | `int` | Read-only alias of `status_code` |
+| `code` | `str` | Stable error code, set per class |
+| `message` | `str` | `error["error"]`, or the first value of the body. Also the exception text |
+| `field_errors` | `dict[str, list[str]]` | Every body key except `error` and `details`, with its value as a one-item list |
 
-| Parameter     | Type            | Description |
-|---------------|-----------------|-------------|
-| `error`       | `str \| dict`   | Error payload. Strings are wrapped under the `"error"` key; dicts are used directly. |
-| `status_code` | `int \| None`   | HTTP status code. Defaults to `400`. |
-| `details`     | `str \| None`   | Optional detail message merged into the error dict under `"details"`. |
+`details` is not an attribute. Read it with `exc.error.get("details")`.
 
-**Example:**
+## Response bodies
 
-```python
-# String error
-exc = BaseException("Something went wrong", 400)
-print(exc.error)  # {"error": "Something went wrong"}
+| Raised as | Status | Body |
+| --- | --- | --- |
+| `BaseException("boom")` | `400` | `{"error": "boom"}` |
+| `SerializeError({"title": "taken"}, 409)` | `409` | `{"title": "taken"}` |
+| `AuthError("bad token", details="expired")` | `401` | `{"error": "bad token", "details": "expired"}` |
+| `NotFoundError(Article)` | `404` | `{"article": "not found"}` |
+| `MultipleObjectsError(Article)` | `400` | `{"article": "multiple objects match the lookup"}` |
+| `ForbiddenError()` | `403` | `{"error": "forbidden"}` |
+| `ForbiddenError(details="Only staff")` | `403` | `{"error": "forbidden", "details": "Only staff"}` |
+| `PydanticValidationError([...])` | `400` | `{"error": "Validation Error", "details": [...]}` |
 
-# Dict error with details
-exc = BaseException({"field": "invalid"}, details="must be positive")
-print(exc.error)  # {"field": "invalid", "details": "must be positive"}
-```
+`OperationValidationError` has the same body as `PydanticValidationError`. The
+details are the pydantic errors without the input values. Its `field_errors`
+maps each dotted `loc`, like `"title"`, to its messages.
 
----
+### `NotFoundError` key
 
-### `SerializeError`
+The key is the model `verbose_name` with spaces replaced by underscores. With
+`NINJA_AIO_NOT_FOUND_ERROR_USE_VERBOSE_NAMES = False` it is the class name in
+snake case (`BlogPost` -> `blog_post`). The default is `True`.
 
-Raised when serialization of request or response payloads fails. Inherits directly from `BaseException` with the same interface.
+To set the message yourself, add `not_found_name` to a `NinjaAIOMeta` inner
+class on the model:
 
-```python
-raise SerializeError("Invalid base64 encoding", 400)
-```
-
----
-
-### `AuthError`
-
-Raised when authentication or authorization fails. Inherits from `BaseException`.
-
-```python
-raise AuthError("Unauthorized", 401)
-```
-
----
-
-### `ForbiddenError`
-
-Raised when a user lacks permission for the requested operation. Always returns HTTP 403.
-
-```python
-class ForbiddenError(BaseException):
-    status_code = 403
-    error = "forbidden"
-```
-
-**Constructor:**
-
-```python
-ForbiddenError(
-    error: str | dict | None = None,
-    details: str | None = None,
-)
-```
-
-Used by `PermissionViewSetMixin` and `RoleBasedPermissionMixin` when `has_permission` or `has_object_permission` returns `False`.
-
-```python
-from ninja_aio.exceptions import ForbiddenError
-
-# Default
-raise ForbiddenError()
-# {"error": "forbidden"}
-
-# With details
-raise ForbiddenError(details="Permission denied for operation: delete")
-# {"error": "forbidden", "details": "Permission denied for operation: delete"}
-
-# Custom error
-raise ForbiddenError(error={"field": "not allowed"})
-# {"field": "not allowed"}
-```
-
----
-
-### `NotFoundError`
-
-Raised when a requested model instance cannot be found. Always returns HTTP 404.
-
-```python
-class NotFoundError(BaseException):
-    status_code = 404
-    error = "not found"
-    use_verbose_name = getattr(
-        settings, "NINJA_AIO_NOT_FOUND_ERROR_USE_VERBOSE_NAMES", True
-    )
-```
-
-**Constructor:**
-
-```python
-NotFoundError(model: Model, details=None)
-```
-
-**Error key format:**
-
-By default the error key is the model's `verbose_name` with spaces replaced by underscores:
-
-```python
-# Model with verbose_name = "blog post"
-raise NotFoundError(BlogPost)
-# {"blog_post": "not found"}
-```
-
-When `NINJA_AIO_NOT_FOUND_ERROR_USE_VERBOSE_NAMES = False` the error key is derived from the model class name converted to `snake_case`:
-
-```python
-# settings.py
-NINJA_AIO_NOT_FOUND_ERROR_USE_VERBOSE_NAMES = False
-
-raise NotFoundError(BlogPost)
-# {"blog_post": "not found"}
-
-raise NotFoundError(TestModelSerializer)
-# {"test_model_serializer": "not found"}
-```
-
-#### `NINJA_AIO_NOT_FOUND_ERROR_USE_VERBOSE_NAMES`
-
-| Value | Error key source | Example |
-|-------|-----------------|---------|
-| `True` (default) | `model._meta.verbose_name` with spaces → `_` | `{"blog_post": "not found"}` |
-| `False` | `model.__name__` converted to `snake_case` | `{"test_model_serializer": "not found"}` |
-
-Configure in `settings.py`:
-
-```python
-# Use snake_case model class name in not-found errors
-NINJA_AIO_NOT_FOUND_ERROR_USE_VERBOSE_NAMES = False
-```
-
-#### Per-model override with `NinjaAIOMeta`
-
-For full control over a specific model's error payload, define a `NinjaAIOMeta` inner class on the model with a `not_found_name` attribute. This takes precedence over both `verbose_name` and `NINJA_AIO_NOT_FOUND_ERROR_USE_VERBOSE_NAMES`.
-
-```python
-class BlogPost(Model):
-    title = models.CharField(max_length=255)
-
+```python title="blog/models.py"
+class Article(ModelSerializer):
     class NinjaAIOMeta:
-        not_found_name = "blog_post"
-
-raise NotFoundError(BlogPost)
-# {"error": "blog_post"}
+        not_found_name = "article missing"
 ```
 
-`NinjaAIOMeta` also supports `verbose_name` and `verbose_name_plural` for overriding API display names and route paths. See the [APIViewSet](views/api_view_set.md) documentation for details.
+The body is then `{"error": "article missing"}`.
 
-**Resolution order:**
+## Handlers registered by `NinjaAIO`
 
-| Priority | Source | Condition |
-|---|---|---|
-| 1 | `NinjaAIOMeta.not_found_name` | If set on model |
-| 2 | `model._meta.verbose_name` (spaces → `_`) | `use_verbose_name=True` (default) |
-| 3 | `snake_case(model.__name__)` | `use_verbose_name=False` |
+| Exception | Status | Body |
+| --- | --- | --- |
+| `ninja_aio.exceptions.BaseException` and subclasses | `exc.status_code` | `exc.error` |
+| `pydantic.ValidationError` | `400` | `{"error": "Validation Error", "details": [...]}` |
+| `joserfc.errors.JoseError` | `401` | `{"error": "<jose error>", "details": "<description>"}`. `details` only when the error has a description |
+| `django.db.IntegrityError` | `409` | `{"error": "conflict", "details": "The request violates a database constraint."}` |
 
----
+Register your own handler with `@api.exception_handler(...)` to replace one.
 
-### `PydanticValidationError`
+## See also
 
-Wraps a Pydantic `ValidationError` into a normalized 400 response.
-
-```python
-PydanticValidationError(details=None)
-```
-
-Response format:
-
-```json
-{
-  "error": "Validation Error",
-  "details": [...]
-}
-```
-
----
-
-## :material-shield-check: Exception Handlers
-
-Exception handlers are automatically registered when using `NinjaAIO`. You can also register them manually:
-
-```python
-from ninja_aio.exceptions import set_api_exception_handlers
-
-api = NinjaAIO()
-set_api_exception_handlers(api)
-```
-
-| Exception type        | Handler                      | Response code |
-|-----------------------|------------------------------|---------------|
-| `BaseException`       | `_default_error`             | From `exc.status_code` |
-| `JoseError`           | `_jose_error`                | `401` |
-| `ValidationError`     | `_pydantic_validation_error` | `400` |
-
----
-
-## :material-code-braces: Complete Example
-
-```python
-from ninja_aio.exceptions import NotFoundError, SerializeError
-
-async def get_article(request, pk: int):
-    try:
-        article = await Article.objects.aget(pk=pk)
-    except Article.DoesNotExist:
-        raise NotFoundError(Article)  # {"article": "not found"}, 404
-
-    return article
-
-
-async def create_article(request, data):
-    try:
-        payload, customs = await util.parse_input_data(request, data)
-    except SerializeError as e:
-        # Already handled by NinjaAIO exception handlers
-        raise
-
-    return await Article.objects.acreate(**payload)
-```
-
----
-
-## :material-bookshelf: See Also
-
-<div class="grid cards" markdown>
-
--   :material-cog-sync:{ .lg .middle } **ModelUtil**
-
-    ---
-
-    [:octicons-arrow-right-24: Error handling in CRUD operations](models/model_util.md)
-
--   :material-shield-lock:{ .lg .middle } **Authentication**
-
-    ---
-
-    [:octicons-arrow-right-24: JWT & AsyncJwtBearer](authentication.md)
-
-</div>
+- [Errors](../guides/errors.md)
+- [Permissions](../guides/permissions.md)
+- [Settings](settings.md)
