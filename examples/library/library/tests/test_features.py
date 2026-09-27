@@ -107,3 +107,24 @@ class TaskTests(LibraryTestCase):
 
     def test_members_exist(self):
         self.assertEqual(Member.objects.count(), 3)
+
+
+class MCPMemberContextTests(LibraryTestCase):
+    async def test_selected_reader_can_list_books_but_cannot_create_them(self):
+        from library.mcp_server import member_request_factory
+        from ninja_aio.mcp.invoke import ToolInvocationError
+
+        factory = await member_request_factory("rita")
+        tools = NinjaAIOMCPServer(api, name="library", request_factory=factory)._tools
+        for mode in ("sync", "async"):
+            result = await invoke_tool(tools[f"{mode}_books_book_list"], {"page_size": 2}, factory)
+            self.assertEqual((result["count"], len(result["items"])), (3, 2))
+            with self.assertRaises(ToolInvocationError) as refused:
+                await invoke_tool(tools[f"{mode}_books_book_create"],
+                                  {"title": "Forbidden", "isbn": "0000000000000", "author": self.shelley.pk}, factory)
+            self.assertEqual(refused.exception.status_code, 403)
+
+    async def test_missing_member_fails_before_starting_stdio(self):
+        from library.mcp_server import member_request_factory
+        with self.assertRaisesRegex(ValueError, "No active library member"):
+            await member_request_factory("does-not-exist")

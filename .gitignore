@@ -302,3 +302,7 @@ devdashboard/
 coverage.json
 .claude/
 graphify-out/
+
+# Ship the example app migrations so a fresh clone can run migrate.
+!examples/library/library/migrations/
+!examples/library/library/migrations/*.py
