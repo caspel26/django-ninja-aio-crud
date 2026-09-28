@@ -72,6 +72,24 @@ test("header exposes a labelled theme toggle and search", async ({ page }) => {
   await expect(page.locator('.md-header__option label[for^="__palette"]').first()).toHaveAttribute("title", /Switch to/);
 });
 
+test("theme icon stays centered when switching palettes", async ({ page }) => {
+  await page.goto(PAGES.installation);
+  const toggle = page.locator(".nac-header .md-header__option label.md-header__button:visible");
+  for (let i = 0; i < 3; i += 1) {
+    const offset = await toggle.evaluate((label) => {
+      const button = label.getBoundingClientRect();
+      const icon = label.querySelector("svg")!.getBoundingClientRect();
+      return {
+        x: icon.left + icon.width / 2 - (button.left + button.width / 2),
+        y: icon.top + icon.height / 2 - (button.top + button.height / 2),
+      };
+    });
+    expect(Math.abs(offset.x)).toBeLessThanOrEqual(0.5);
+    expect(Math.abs(offset.y)).toBeLessThanOrEqual(0.5);
+    await toggle.click();
+  }
+});
+
 test("horizontally scrollable code is reachable by keyboard", async ({ page }) => {
   await page.goto(PAGES.tutorial);
   const unreachable = await page.evaluate(() =>
@@ -112,4 +130,17 @@ test("showcase response follows endpoint selection by pointer and keyboard", asy
   await expect(status).toHaveText("204 No Content");
   await expect(body).toHaveText("No response body");
   await expect(route("delete")).toHaveAttribute("aria-pressed", "true");
+});
+
+test("release notes include the full history across major and patch versions", async ({ page }) => {
+  await page.goto(PAGES.releases);
+  const toggle = page.locator("#release-toggle");
+  const menu = page.locator("#release-menu");
+  for (const tag of ["v3.0.0", "v2.36.0", "v2.35.0", "v2.34.3", "v2.34.2", "v0.1.1"]) {
+    await toggle.click();
+    await menu.getByRole("button", { name: new RegExp(`^${tag.replaceAll(".", "\\.")}`) }).click();
+    const card = page.locator(`.release-card[data-version="${tag.replaceAll(".", "-")}"]`);
+    await expect(card).toBeVisible();
+    await expect(card.locator(".release-card-body")).not.toContainText("No release notes for this version.");
+  }
 });
