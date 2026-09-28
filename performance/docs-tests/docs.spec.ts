@@ -81,3 +81,35 @@ test("horizontally scrollable code is reachable by keyboard", async ({ page }) =
   );
   expect(unreachable).toBe(0);
 });
+
+test("showcase response follows endpoint selection by pointer and keyboard", async ({ page }) => {
+  await page.goto(PAGES.home);
+  const response = page.locator("#nac-route-response");
+  const status = response.locator(".nac-routes__status");
+  const body = response.locator("pre code");
+  const route = (example: string) => page.locator(`.nac-routes li[data-example="${example}"] button`);
+
+  await expect(status).toHaveText("200 OK");
+  await expect(body).toContainText('"count": 1');
+
+  await route("create").click();
+  await expect(route("create")).toHaveAttribute("aria-pressed", "true");
+  await expect(route("list")).toHaveAttribute("aria-pressed", "false");
+  await expect(status).toHaveText("201 Created");
+  await expect(body).toContainText('"New article"');
+
+  await route("retrieve").click();
+  await expect(status).toHaveText("200 OK");
+  await expect(body).toContainText('"Hello"');
+  await expect(body).not.toContainText('"items"');
+
+  await route("update").focus();
+  await page.keyboard.press("Enter");
+  await expect(body).toContainText('"Updated article"');
+
+  await route("delete").focus();
+  await page.keyboard.press("Space");
+  await expect(status).toHaveText("204 No Content");
+  await expect(body).toHaveText("No response body");
+  await expect(route("delete")).toHaveAttribute("aria-pressed", "true");
+});
