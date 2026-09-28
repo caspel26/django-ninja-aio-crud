@@ -144,6 +144,9 @@ def prepare(version: str, commit: str, root: pathlib.Path) -> pathlib.Path:
     shutil.rmtree(worktree / "overrides", ignore_errors=True)
     shutil.copytree(REPO / "overrides", worktree / "overrides", ignore=shutil.ignore_patterns("home.html"))
     (worktree / "overrides/legacy_home.html").write_text(render_home(worktree))
+    shutil.copy(REPO / "main.py", worktree / "main.py")
+    shutil.copy(REPO / "CHANGELOG.md", worktree / "CHANGELOG.md")
+    shutil.copy(REPO / "docs/release_notes.md", worktree / "docs/release_notes.md")
     (worktree / "docs/extra.css").unlink(missing_ok=True)
     for sub in ("stylesheets", "javascripts", "images/brand", "assets/fonts"):
         shutil.copytree(REPO / "docs" / sub, worktree / "docs" / sub, dirs_exist_ok=True)
