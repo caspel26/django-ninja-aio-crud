@@ -113,3 +113,16 @@ test("showcase response follows endpoint selection by pointer and keyboard", asy
   await expect(body).toHaveText("No response body");
   await expect(route("delete")).toHaveAttribute("aria-pressed", "true");
 });
+
+test("release notes include the full history across major and patch versions", async ({ page }) => {
+  await page.goto(PAGES.releases);
+  const toggle = page.locator("#release-toggle");
+  const menu = page.locator("#release-menu");
+  for (const tag of ["v3.0.0", "v2.36.0", "v2.35.0", "v2.34.3", "v2.34.2", "v0.1.1"]) {
+    await toggle.click();
+    await menu.getByRole("button", { name: new RegExp(`^${tag.replaceAll(".", "\\.")}`) }).click();
+    const card = page.locator(`.release-card[data-version="${tag.replaceAll(".", "-")}"]`);
+    await expect(card).toBeVisible();
+    await expect(card.locator(".release-card-body")).not.toContainText("No release notes for this version.");
+  }
+});
