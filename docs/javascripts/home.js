@@ -47,6 +47,28 @@
   const setupRoutes = (showcase, selectFile) => {
     const routes = [...showcase.querySelectorAll("[data-route]")];
     const modelsTab = showcase.querySelector('[data-file="models"]');
+    const response = showcase.querySelector(".nac-routes__response");
+    const status = response.querySelector(".nac-routes__status");
+    const code = response.querySelector("pre code");
+    const examples = {
+      list: {
+        status: "200 OK",
+        body: '{\n  "items": [{ "id": 1, "title": "Hello", "body": "..." }],\n  "count": 1\n}',
+      },
+      create: {
+        status: "201 Created",
+        body: '{\n  "id": 2,\n  "title": "New article",\n  "body": "..."\n}',
+      },
+      retrieve: {
+        status: "200 OK",
+        body: '{\n  "id": 1,\n  "title": "Hello",\n  "body": "..."\n}',
+      },
+      update: {
+        status: "200 OK",
+        body: '{\n  "id": 1,\n  "title": "Updated article",\n  "body": "..."\n}',
+      },
+      delete: { status: "204 No Content", body: "No response body" },
+    };
     let auto = !reduced();
     let index = 0;
 
@@ -57,20 +79,50 @@
       showcase.querySelector(`.hl[data-op="${route.dataset.route}"]`)?.classList.add("is-linked");
     };
 
+    const renderResponse = (route) => {
+      const example = examples[route.dataset.example];
+      status.textContent = example.status;
+      code.replaceChildren();
+      if (route.dataset.example === "delete") {
+        code.textContent = example.body;
+      } else {
+        const tokens = /"(?:\\.|[^"\\])*"|\b\d+\b/g;
+        let end = 0;
+        for (const match of example.body.matchAll(tokens)) {
+          code.append(document.createTextNode(example.body.slice(end, match.index)));
+          const token = document.createElement("span");
+          token.className = match[0].startsWith('"') ? "s" : "m";
+          token.textContent = match[0];
+          code.append(token);
+          end = match.index + match[0].length;
+        }
+        code.append(document.createTextNode(example.body.slice(end)));
+      }
+    };
+
+    const show = (route) => {
+      link(route);
+      renderResponse(route);
+      routes.forEach((other) => {
+        other.querySelector("button").setAttribute("aria-pressed", String(other === route));
+      });
+    };
+
     routes.forEach((route) => {
-      route.addEventListener("mouseenter", () => {
+      const select = () => {
         auto = false;
         if (modelsTab.getAttribute("aria-selected") !== "true") selectFile(modelsTab);
-        link(route);
-      });
-      route.addEventListener("mouseleave", () => link(null));
+        show(route);
+      };
+      route.addEventListener("mouseenter", select);
+      route.querySelector("button").addEventListener("click", select);
     });
 
     timers.push(
       setInterval(() => {
         if (!auto || !showcase.classList.contains("is-visible")) return;
         if (modelsTab.getAttribute("aria-selected") !== "true") return;
-        link(routes[index % routes.length]);
+        show(routes[index % routes.length]);
         index += 1;
       }, 2200),
     );
