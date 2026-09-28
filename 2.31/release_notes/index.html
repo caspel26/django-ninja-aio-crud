@@ -2,123 +2,123 @@
 <!doctype html>
 <html lang="en" class="no-js">
   <head>
-    
+
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
-      
+
         <meta name="description" content="Async CRUD utilities for Django Ninja with auth, filtering, pagination.">
-      
-      
-      
+
+
+
         <link rel="canonical" href="https://django-ninja-aio.com/2.31/release_notes/">
-      
-      
+
+
         <link rel="prev" href="../contributing/">
-      
-      
-      
+
+
+
       <link rel="icon" href="../images/favicon.ico">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.22">
-    
-    
-      
+
+
+
         <title>Release Notes - Django Ninja Aio CRUD</title>
-      
-    
-    
+
+
+
       <link rel="stylesheet" href="../assets/stylesheets/main.84d31ad4.min.css">
-      
-        
+
+
         <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
-      
-      
 
 
-    
-    
-      
-    
-    
-      
-    
-    
+
+
+
+
+
+
+
+
+
+
       <link rel="stylesheet" href="../assets/_mkdocstrings.css">
-    
+
       <link rel="stylesheet" href="../stylesheets/tokens.css">
-    
+
       <link rel="stylesheet" href="../stylesheets/shell.css">
-    
+
       <link rel="stylesheet" href="../stylesheets/components.css">
-    
+
       <link rel="stylesheet" href="../stylesheets/pages.css">
-    
+
       <link rel="stylesheet" href="../stylesheets/legacy.css">
-    
+
     <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
-    
-      
-  
 
 
-  
-  
+
+
+
+
+
 
 <script id="__analytics">function __md_analytics(){function e(){dataLayer.push(arguments)}window.dataLayer=window.dataLayer||[],e("js",new Date),e("config",""),document.addEventListener("DOMContentLoaded",(function(){document.forms.search&&document.forms.search.query.addEventListener("blur",(function(){this.value&&e("event","search",{search_term:this.value})}));document$.subscribe((function(){var t=document.forms.feedback;if(void 0!==t)for(var a of t.querySelectorAll("[type=submit]"))a.addEventListener("click",(function(a){a.preventDefault();var n=document.location.pathname,d=this.getAttribute("data-md-value");e("event","feedback",{page:n,data:d}),t.firstElementChild.disabled=!0;var r=t.querySelector(".md-feedback__note [data-md-value='"+d+"']");r&&(r.hidden=!1)})),t.hidden=!1})),location$.subscribe((function(t){e("config","",{page_path:t.pathname})}))}));var t=document.createElement("script");t.async=!0,t.src="https://www.googletagmanager.com/gtag/js?id=",document.getElementById("__analytics").insertAdjacentElement("afterEnd",t)}</script>
-  
-    <script>"undefined"!=typeof __md_analytics&&__md_analytics()</script>
-  
 
-    
-    
-    
+    <script>"undefined"!=typeof __md_analytics&&__md_analytics()</script>
+
+
+
+
+
 <meta name="theme-color" content="#0b0a10" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#fbfafc" media="(prefers-color-scheme: light)">
 <script>document.documentElement.classList.add("js")</script>
 
   </head>
-  
-  
-    
-    
-      
-    
-    
-    
-    
+
+
+
+
+
+
+
+
+
     <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom">
-  
-    
+
+
     <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
     <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
     <label class="md-overlay" for="__drawer"></label>
     <div data-md-component="skip">
-      
-        
+
+
         <a href="#release-notes" class="md-skip">
           Skip to content
         </a>
-      
+
     </div>
     <div data-md-component="announce">
-      
+
     </div>
-    
+
       <div data-md-color-scheme="default" data-md-component="outdated" hidden>
-        
+
           <aside class="md-banner md-banner--warning">
             <div class="md-banner__inner md-grid md-typeset">
-              
+
 <strong>You are reading documentation for a version that is not the latest release.</strong>
 <a href="../..">Go to the latest docs</a>
 
             </div>
             <script>var el=document.querySelector("[data-md-component=outdated]"),base=new URL("..",location),outdated=__md_get("__outdated",sessionStorage,base);outdated===true&&el&&(el.hidden=false)</script>
           </aside>
-        
+
       </div>
-    
-    
-      
+
+
+
 
 <header class="md-header nac-header" data-md-component="header">
   <nav class="nac-header__inner" aria-label="Header">
@@ -146,16 +146,16 @@
       </div>
     </div>
     <ul class="nac-nav">
-      
-        
-      
-        
-        
+
+
+
+
+
         <li class="nac-nav__item">
           <a class="nac-nav__link" href="../getting_started/installation/" aria-haspopup="true">Getting Started</a>
           <div class="nac-menu">
             <div class="nac-menu__panel">
-              
+
                 <div class="nac-menu__group">
                   <a class="nac-menu__link" href="../getting_started/installation/">
     <span class="nac-menu__title">Installation</span>
@@ -165,19 +165,19 @@
     <span class="nac-menu__title">Quick Start (Serializer)</span>
   </a>
                 </div>
-              
+
             </div>
           </div>
         </li>
-        
-      
-        
-        
+
+
+
+
         <li class="nac-nav__item">
           <a class="nac-nav__link" href="../tutorial/model/" aria-haspopup="true">Tutorial</a>
           <div class="nac-menu">
             <div class="nac-menu__panel">
-              
+
                 <div class="nac-menu__group">
                   <a class="nac-menu__link" href="../tutorial/model/">
     <span class="nac-menu__title">Step 1: Define Your Model</span>
@@ -195,30 +195,30 @@
     <span class="nac-menu__title">Step 6: Soft Delete</span>
   </a>
                 </div>
-              
+
             </div>
           </div>
         </li>
-        
-      
-        
-        
+
+
+
+
         <li class="nac-nav__item">
           <a class="nac-nav__link" href="../api/type_hints/" aria-haspopup="true">API Reference</a>
           <div class="nac-menu nac-menu--wide">
             <div class="nac-menu__panel">
-              
-                
+
+
                   <div class="nac-menu__group">
-                    
+
                       <a class="nac-menu__link" href="../api/type_hints/">
     <span class="nac-menu__title">Type Hints & Type Safety</span>
   </a>
-                    
+
                   </div>
-                
+
                   <div class="nac-menu__group">
-                    
+
                       <p class="nac-menu__heading">Views</p>
                       <a class="nac-menu__link" href="../api/views/api_view/">
     <span class="nac-menu__title">APIView</span>
@@ -229,11 +229,11 @@
   </a><a class="nac-menu__link" href="../api/views/mixins/">
     <span class="nac-menu__title">Mixins</span>
   </a>
-                    
+
                   </div>
-                
+
                   <div class="nac-menu__group">
-                    
+
                       <p class="nac-menu__heading">Models</p>
                       <a class="nac-menu__link" href="../api/models/model_serializer/">
     <span class="nac-menu__title">ModelSerializer</span>
@@ -244,70 +244,70 @@
   </a><a class="nac-menu__link" href="../api/models/validators/">
     <span class="nac-menu__title">Validators</span>
   </a>
-                    
+
                   </div>
-                
+
                   <div class="nac-menu__group">
-                    
+
                       <a class="nac-menu__link" href="../api/admin/">
     <span class="nac-menu__title">Auto Admin</span>
   </a>
-                    
+
                   </div>
-                
+
                   <div class="nac-menu__group">
-                    
+
                       <a class="nac-menu__link" href="../api/branding/">
     <span class="nac-menu__title">Swagger UI</span>
   </a>
-                    
+
                   </div>
-                
+
                   <div class="nac-menu__group">
-                    
+
                       <a class="nac-menu__link" href="../api/authentication/">
     <span class="nac-menu__title">Authentication</span>
   </a>
-                    
+
                   </div>
-                
+
                   <div class="nac-menu__group">
-                    
+
                       <a class="nac-menu__link" href="../api/exceptions/">
     <span class="nac-menu__title">Exceptions</span>
   </a>
-                    
+
                   </div>
-                
+
                   <div class="nac-menu__group">
-                    
+
                       <a class="nac-menu__link" href="../api/pagination/">
     <span class="nac-menu__title">Pagination</span>
   </a>
-                    
+
                   </div>
-                
+
                   <div class="nac-menu__group">
-                    
+
                       <a class="nac-menu__link" href="../api/renderers/orjson_renderer/">
     <span class="nac-menu__title">Renderers</span>
   </a>
-                    
+
                   </div>
-                
-              
+
+
             </div>
           </div>
         </li>
-        
-      
-        
-        
+
+
+
+
         <li class="nac-nav__item">
           <a class="nac-nav__link" href="../auth/" aria-haspopup="true">Authentication</a>
           <div class="nac-menu">
             <div class="nac-menu__panel">
-              
+
                 <div class="nac-menu__group">
                   <a class="nac-menu__link" href="../auth/">
     <span class="nac-menu__title">JWT & AsyncJwtBearer</span>
@@ -315,19 +315,19 @@
     <span class="nac-menu__title">Cookie Auth (BFF)</span>
   </a>
                 </div>
-              
+
             </div>
           </div>
         </li>
-        
-      
-        
-        
+
+
+
+
         <li class="nac-nav__item">
           <a class="nac-nav__link" href="../comparison/" aria-haspopup="true">Benchmarks</a>
           <div class="nac-menu">
             <div class="nac-menu__panel">
-              
+
                 <div class="nac-menu__group">
                   <a class="nac-menu__link" href="../comparison/">
     <span class="nac-menu__title">Framework Comparison</span>
@@ -335,79 +335,79 @@
     <span class="nac-menu__title">Performance</span>
   </a>
                 </div>
-              
+
             </div>
           </div>
         </li>
-        
-      
-        
+
+
+
         <li class="nac-nav__item">
           <a class="nac-nav__link" href="../logging/">Logging</a>
         </li>
-        
-      
-        
+
+
+
         <li class="nac-nav__item">
           <a class="nac-nav__link" href="../deployment/">Deployment</a>
         </li>
-        
-      
-        
+
+
+
         <li class="nac-nav__item">
           <a class="nac-nav__link" href="../troubleshooting/">Troubleshooting</a>
         </li>
-        
-      
-        
+
+
+
         <li class="nac-nav__item">
           <a class="nac-nav__link" href="../contributing/">Contributing</a>
         </li>
-        
-      
-        
+
+
+
         <li class="nac-nav__item is-active">
           <a class="nac-nav__link" href="./">Release Notes</a>
         </li>
-        
-      
+
+
     </ul>
     <div class="nac-header__actions">
-      
-      
-        
-        
-          
+
+
+
+
+
             <label class="md-header__button md-icon nac-search-toggle" for="__search" aria-label="Search">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
             </label>
-          
+
           <div class="md-search" data-md-component="search" role="dialog">
   <label class="md-search__overlay" for="__search"></label>
   <div class="md-search__inner" role="search">
     <form class="md-search__form" name="search">
       <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
       <label class="md-search__icon md-icon" for="__search">
-        
+
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
-        
+
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
       </label>
       <nav class="md-search__options" aria-label="Search">
-        
+
           <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
-            
+
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
           </a>
-        
+
         <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
-          
+
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
         </button>
       </nav>
-      
+
         <div class="md-search__suggest" data-md-component="search-suggest"></div>
-      
+
     </form>
     <div class="md-search__output">
       <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
@@ -421,66 +421,66 @@
     </div>
   </div>
 </div>
-        
-      
-      
+
+
+
         <form class="md-header__option" data-md-component="palette">
-  
-    
-    
-    
+
+
+
+
     <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light theme"  type="radio" name="__palette" id="__palette_0">
-    
+
       <label class="md-header__button md-icon" title="Switch to light theme" for="__palette_1" hidden>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
       </label>
-    
-  
-    
-    
-    
+
+
+
+
+
     <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark theme"  type="radio" name="__palette" id="__palette_1">
-    
+
       <label class="md-header__button md-icon" title="Switch to dark theme" for="__palette_0" hidden>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
       </label>
-    
-  
+
+
 </form>
-      
-      
+
+
         <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
-      
-      
+
+
         <a class="nac-header__icon" href="https://github.com/caspel26/django-ninja-aio-crud" aria-label="GitHub repository" title="GitHub">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.56-1.11-4.56-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2Z"/></svg>
         </a>
-      
+
     </div>
   </nav>
 </header>
-    
+
     <div class="md-container" data-md-component="container">
-      
-      
-        
-          
-            
-          
-        
-      
+
+
+
+
+
+
+
+
       <main class="md-main" data-md-component="main">
         <div class="md-main__inner md-grid">
-          
-            
-              
+
+
+
               <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
                 <div class="md-sidebar__scrollwrap">
                   <div class="md-sidebar__inner">
-                    
 
 
-  
+
+
 
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
@@ -491,11 +491,11 @@
     </a>
     Django Ninja Aio CRUD
   </label>
-  
+
     <div class="md-nav__source">
       <a href="https://github.com/caspel26/django-ninja-aio-crud" title="Go to repository" class="md-source" data-md-component="source">
   <div class="md-source__icon md-icon">
-    
+
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
   </div>
   <div class="md-source__repository">
@@ -503,1301 +503,1957 @@
   </div>
 </a>
     </div>
-  
+
   <ul class="md-nav__list" data-md-scrollfix>
-    
-      
-      
-  
-  
-  
-  
+
+
+
+
+
+
+
     <li class="md-nav__item">
       <a href=".." class="md-nav__link">
-        
-  
-  
+
+
+
   <span class="md-ellipsis">
     Home
-    
+
   </span>
-  
+
 
       </a>
     </li>
-  
 
-    
-      
-      
-  
-  
-  
-  
-    
-    
-      
-        
-      
-        
-      
-        
-      
-    
-    
-    
-      
-      
-        
-      
-    
-    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
+
+
+
+
+
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
-        
-          
+
+
           <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
-            
-  
-  
+
+
+
   <span class="md-ellipsis">
     Getting Started
-    
+
   </span>
-  
+
 
             <span class="md-nav__icon md-icon"></span>
           </label>
-        
+
         <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             Getting Started
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
+
+
+
+
+
+
+
     <li class="md-nav__item">
       <a href="../getting_started/installation/" class="md-nav__link">
-        
-  
-  
+
+
+
   <span class="md-ellipsis">
     Installation
-    
+
   </span>
-  
+
 
       </a>
     </li>
-  
 
-              
-            
-              
-                
-  
-  
-  
-  
+
+
+
+
+
+
+
+
+
     <li class="md-nav__item">
       <a href="../getting_started/quick_start/" class="md-nav__link">
-        
-  
-  
+
+
+
   <span class="md-ellipsis">
     Quick Start (ModelSerializer)
-    
+
   </span>
-  
+
 
       </a>
     </li>
-  
 
-              
-            
-              
-                
-  
-  
-  
-  
+
+
+
+
+
+
+
+
+
     <li class="md-nav__item">
       <a href="../getting_started/quick_start_serializer/" class="md-nav__link">
-        
-  
-  
+
+
+
   <span class="md-ellipsis">
     Quick Start (Serializer)
-    
+
   </span>
-  
+
 
       </a>
     </li>
-  
 
-              
-            
+
+
+
           </ul>
         </nav>
-      
-    </li>
-  
 
-    
-      
-      
-  
-  
-  
-  
-    
-    
-      
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-    
-    
-    
-      
-      
-        
-      
-    
-    
+    </li>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
+
+
+
+
+
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
-        
-          
+
+
           <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
-            
-  
-  
+
+
+
   <span class="md-ellipsis">
     Tutorial
-    
+
   </span>
-  
+
 
             <span class="md-nav__icon md-icon"></span>
           </label>
-        
+
         <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             Tutorial
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
+
+
+
+
+
+
+
     <li class="md-nav__item">
       <a href="../tutorial/model/" class="md-nav__link">
-        
-  
-  
+
+
+
   <span class="md-ellipsis">
     Step 1: Define Your Model
-    
+
   </span>
-  
+
 
       </a>
     </li>
-  
 
-              
-            
-              
-                
-  
-  
-  
-  
+
+
+
+
+
+
+
+
+
     <li class="md-nav__item">
       <a href="../tutorial/serializer/" class="md-nav__link">
-        
-  
-  
+
+
+
   <span class="md-ellipsis">
     Alternative: Define Your Serializer
-    
+
   </span>
-  
+
 
       </a>
     </li>
-  
 
-              
-            
-              
-                
-  
-  
-  
-  
+
+
+
+
+
+
+
+
+
     <li class="md-nav__item">
       <a href="../tutorial/crud/" class="md-nav__link">
-        
-  
-  
+
+
+
   <span class="md-ellipsis">
     Step 2: Create CRUD Views
-    
+
   </span>
-  
+
 
       </a>
     </li>
-  
 
-              
-            
-              
-                
-  
-  
-  
-  
+
+
+
+
+
+
+
+
+
     <li class="md-nav__item">
       <a href="../tutorial/authentication/" class="md-nav__link">
-        
-  
-  
+
+
+
   <span class="md-ellipsis">
     Step 3: Add Authentication
-    
+
   </span>
-  
+
 
       </a>
     </li>
-  
 
-              
-            
-              
-                
-  
-  
-  
-  
+
+
+
+
+
+
+
+
+
     <li class="md-nav__item">
       <a href="../tutorial/filtering/" class="md-nav__link">
-        
-  
-  
+
+
+
   <span class="md-ellipsis">
     Step 4: Add Filtering & Pagination
-    
+
   </span>
-  
+
 
       </a>
     </li>
-  
 
-              
-            
-              
-                
-  
-  
-  
-  
+
+
+
+
+
+
+
+
+
     <li class="md-nav__item">
       <a href="../tutorial/permissions/" class="md-nav__link">
-        
-  
-  
+
+
+
   <span class="md-ellipsis">
     Step 5: Add Permissions
-    
+
   </span>
-  
+
 
       </a>
     </li>
-  
 
-              
-            
-              
-                
-  
-  
-  
-  
+
+
+
+
+
+
+
+
+
     <li class="md-nav__item">
       <a href="../tutorial/soft_delete/" class="md-nav__link">
-        
-  
-  
+
+
+
   <span class="md-ellipsis">
     Step 6: Soft Delete
-    
+
   </span>
-  
+
 
       </a>
     </li>
-  
 
-              
-            
+
+
+
           </ul>
         </nav>
-      
-    </li>
-  
 
-    
-      
-      
-  
-  
-  
-  
-    
-    
-      
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-    
-    
-    
-      
-      
-        
-      
-    
-    
+    </li>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
+
+
+
+
+
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
-        
-          
+
+
           <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
-            
-  
-  
+
+
+
   <span class="md-ellipsis">
     API Reference
-    
+
   </span>
-  
+
 
             <span class="md-nav__icon md-icon"></span>
           </label>
-        
+
         <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
             API Reference
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
+
+
+
+
+
+
+
     <li class="md-nav__item">
       <a href="../api/type_hints/" class="md-nav__link">
-        
-  
-  
+
+
+
   <span class="md-ellipsis">
     Type Hints & Type Safety
-    
+
   </span>
-  
+
 
       </a>
     </li>
-  
 
-              
-            
-              
-                
-  
-  
-  
-  
-    
-    
-      
-        
-      
-        
-      
-        
-      
-        
-      
-    
-    
-    
-      
-      
-        
-      
-    
-    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
+
+
+
+
+
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_2" >
-        
-          
+
+
           <label class="md-nav__link" for="__nav_4_2" id="__nav_4_2_label" tabindex="0">
-            
-  
-  
+
+
+
   <span class="md-ellipsis">
     Views
-    
+
   </span>
-  
+
 
             <span class="md-nav__icon md-icon"></span>
           </label>
-        
+
         <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_2_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_4_2">
             <span class="md-nav__icon md-icon"></span>
             Views
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
+
+
+
+
+
+
+
     <li class="md-nav__item">
       <a href="../api/views/api_view/" class="md-nav__link">
-        
-  
-  
+
+
+
   <span class="md-ellipsis">
     APIView
-    
+
   </span>
-  
+
 
       </a>
     </li>
-  
 
-              
-            
-              
-                
-  
-  
-  
-  
+
+
+
+
+
+
+
+
+
     <li class="md-nav__item">
       <a href="../api/views/api_view_set/" class="md-nav__link">
-        
-  
-  
+
+
+
   <span class="md-ellipsis">
     APIViewSet
-    
+
   </span>
-  
+
 
       </a>
     </li>
-  
 
-              
-            
-              
-                
-  
-  
-  
-  
+
+
+
+
+
+
+
+
+
     <li class="md-nav__item">
       <a href="../api/views/decorators/" class="md-nav__link">
-        
-  
-  
+
+
+
   <span class="md-ellipsis">
     Decorators
-    
+
   </span>
-  
+
 
       </a>
     </li>
-  
 
-              
-            
-              
-                
-  
-  
-  
-  
+
+
+
+
+
+
+
+
+
     <li class="md-nav__item">
       <a href="../api/views/mixins/" class="md-nav__link">
-        
-  
-  
+
+
+
   <span class="md-ellipsis">
     Mixins
-    
+
   </span>
-  
+
 
       </a>
     </li>
-  
 
-              
-            
+
+
+
           </ul>
         </nav>
-      
-    </li>
-  
 
-              
-            
-              
-                
-  
-  
-  
-  
-    
-    
-      
-        
-      
-        
-      
-        
-      
-        
-      
-    
-    
-    
-      
-      
-        
-      
-    
-    
+    </li>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
+
+
+
+
+
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_3" >
-        
-          
+
+
           <label class="md-nav__link" for="__nav_4_3" id="__nav_4_3_label" tabindex="0">
-            
-  
-  
+
+
+
   <span class="md-ellipsis">
     Models
-    
+
   </span>
-  
+
 
             <span class="md-nav__icon md-icon"></span>
           </label>
-        
+
         <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_4_3">
             <span class="md-nav__icon md-icon"></span>
             Models
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
+
+
+
+
+
+
+
     <li class="md-nav__item">
       <a href="../api/models/model_serializer/" class="md-nav__link">
-        
-  
-  
+
+
+
   <span class="md-ellipsis">
     ModelSerializer
-    
+
   </span>
-  
+
 
       </a>
     </li>
-  
 
-              
-            
-              
-                
-  
-  
-  
-  
+
+
+
+
+
+
+
+
+
     <li class="md-nav__item">
       <a href="../api/models/model_util/" class="md-nav__link">
-        
-  
-  
+
+
+
   <span class="md-ellipsis">
     ModelUtil
-    
+
   </span>
-  
+
 
       </a>
     </li>
-  
 
-              
-            
-              
-                
-  
-  
-  
-  
+
+
+
+
+
+
+
+
+
     <li class="md-nav__item">
       <a href="../api/models/serializers/" class="md-nav__link">
-        
-  
-  
+
+
+
   <span class="md-ellipsis">
     Serializer (Meta-driven)
-    
+
   </span>
-  
+
 
       </a>
     </li>
-  
 
-              
-            
-              
-                
-  
-  
-  
-  
+
+
+
+
+
+
+
+
+
     <li class="md-nav__item">
       <a href="../api/models/validators/" class="md-nav__link">
-        
-  
-  
+
+
+
   <span class="md-ellipsis">
     Validators
-    
+
   </span>
-  
+
 
       </a>
     </li>
-  
 
-              
-            
+
+
+
           </ul>
         </nav>
-      
-    </li>
-  
 
-              
-            
-              
-                
-  
-  
-  
-  
+    </li>
+
+
+
+
+
+
+
+
+
+
     <li class="md-nav__item">
       <a href="../api/admin/" class="md-nav__link">
-        
-  
-  
+
+
+
   <span class="md-ellipsis">
     Auto Admin
-    
+
   </span>
-  
+
 
       </a>
     </li>
-  
 
-              
-            
-              
-                
-  
-  
-  
-  
+
+
+
+
+
+
+
+
+
     <li class="md-nav__item">
       <a href="../api/branding/" class="md-nav__link">
-        
-  
-  
+
+
+
   <span class="md-ellipsis">
     Swagger UI
-    
+
   </span>
-  
+
 
       </a>
     </li>
-  
 
-              
-            
-              
-                
-  
-  
-  
-  
+
+
+
+
+
+
+
+
+
     <li class="md-nav__item">
       <a href="../api/authentication/" class="md-nav__link">
-        
-  
-  
+
+
+
   <span class="md-ellipsis">
     Authentication
-    
+
   </span>
-  
+
 
       </a>
     </li>
-  
 
-              
-            
-              
-                
-  
-  
-  
-  
+
+
+
+
+
+
+
+
+
     <li class="md-nav__item">
       <a href="../api/exceptions/" class="md-nav__link">
-        
-  
-  
+
+
+
   <span class="md-ellipsis">
     Exceptions
-    
+
   </span>
-  
+
 
       </a>
     </li>
-  
 
-              
-            
-              
-                
-  
-  
-  
-  
+
+
+
+
+
+
+
+
+
     <li class="md-nav__item">
       <a href="../api/pagination/" class="md-nav__link">
-        
-  
-  
+
+
+
   <span class="md-ellipsis">
     Pagination
-    
+
   </span>
-  
+
 
       </a>
     </li>
-  
 
-              
-            
-              
-                
-  
-  
-  
-  
+
+
+
+
+
+
+
+
+
     <li class="md-nav__item">
       <a href="../api/renderers/orjson_renderer/" class="md-nav__link">
-        
-  
-  
+
+
+
   <span class="md-ellipsis">
     Renderers
-    
+
   </span>
-  
+
 
       </a>
     </li>
-  
 
-              
-            
+
+
+
           </ul>
         </nav>
-      
-    </li>
-  
 
-    
-      
-      
-  
-  
-  
-  
-    
-    
-      
-        
-      
-        
-      
-    
-    
-    
-      
-      
-        
-      
-    
-    
+    </li>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
+
+
+
+
+
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
-        
-          
+
+
           <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
-            
-  
-  
+
+
+
   <span class="md-ellipsis">
     Authentication
-    
+
   </span>
-  
+
 
             <span class="md-nav__icon md-icon"></span>
           </label>
-        
+
         <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
             Authentication
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
+
+
+
+
+
+
+
     <li class="md-nav__item">
       <a href="../auth/" class="md-nav__link">
-        
-  
-  
+
+
+
   <span class="md-ellipsis">
     JWT & AsyncJwtBearer
-    
+
   </span>
-  
+
 
       </a>
     </li>
-  
 
-              
-            
-              
-                
-  
-  
-  
-  
+
+
+
+
+
+
+
+
+
     <li class="md-nav__item">
       <a href="../auth_cookie/" class="md-nav__link">
-        
-  
-  
+
+
+
   <span class="md-ellipsis">
     Cookie Auth (BFF)
-    
+
   </span>
-  
+
 
       </a>
     </li>
-  
 
-              
-            
+
+
+
           </ul>
         </nav>
-      
-    </li>
-  
 
-    
-      
-      
-  
-  
-  
-  
-    
-    
-      
-        
-      
-        
-      
-    
-    
-    
-      
-      
-        
-      
-    
-    
+    </li>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
+
+
+
+
+
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
-        
-          
+
+
           <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
-            
-  
-  
+
+
+
   <span class="md-ellipsis">
     Benchmarks
-    
+
   </span>
-  
+
 
             <span class="md-nav__icon md-icon"></span>
           </label>
-        
+
         <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
             Benchmarks
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
+
+
+
+
+
+
+
     <li class="md-nav__item">
       <a href="../comparison/" class="md-nav__link">
-        
-  
-  
+
+
+
   <span class="md-ellipsis">
     Framework Comparison
-    
+
   </span>
-  
+
 
       </a>
     </li>
-  
 
-              
-            
-              
-                
-  
-  
-  
-  
+
+
+
+
+
+
+
+
+
     <li class="md-nav__item">
       <a href="../performance/" class="md-nav__link">
-        
-  
-  
+
+
+
   <span class="md-ellipsis">
     Performance
-    
+
   </span>
-  
+
 
       </a>
     </li>
-  
 
-              
-            
+
+
+
           </ul>
         </nav>
-      
-    </li>
-  
 
-    
-      
-      
-  
-  
-  
-  
+    </li>
+
+
+
+
+
+
+
+
+
     <li class="md-nav__item">
       <a href="../logging/" class="md-nav__link">
-        
-  
-  
+
+
+
   <span class="md-ellipsis">
     Logging
-    
+
   </span>
-  
+
 
       </a>
     </li>
-  
 
-    
-      
-      
-  
-  
-  
-  
+
+
+
+
+
+
+
+
     <li class="md-nav__item">
       <a href="../deployment/" class="md-nav__link">
-        
-  
-  
+
+
+
   <span class="md-ellipsis">
     Deployment
-    
+
   </span>
-  
+
 
       </a>
     </li>
-  
 
-    
-      
-      
-  
-  
-  
-  
+
+
+
+
+
+
+
+
     <li class="md-nav__item">
       <a href="../troubleshooting/" class="md-nav__link">
-        
-  
-  
+
+
+
   <span class="md-ellipsis">
     Troubleshooting
-    
+
   </span>
-  
+
 
       </a>
     </li>
-  
 
-    
-      
-      
-  
-  
-  
-  
+
+
+
+
+
+
+
+
     <li class="md-nav__item">
       <a href="../contributing/" class="md-nav__link">
-        
-  
-  
+
+
+
   <span class="md-ellipsis">
     Contributing
-    
+
   </span>
-  
+
 
       </a>
     </li>
-  
 
-    
-      
-      
-  
-  
-    
-  
-  
-  
+
+
+
+
+
+
+
+
+
+
     <li class="md-nav__item md-nav__item--active">
-      
+
       <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
+
+
+
+
+
       <a href="./" class="md-nav__link md-nav__link--active">
-        
-  
-  
+
+
+
   <span class="md-ellipsis">
     Release Notes
-    
+
   </span>
-  
+
 
       </a>
-      
-    </li>
-  
 
-    
+    </li>
+
+
+
   </ul>
 </nav>
                   </div>
                 </div>
               </div>
-            
-            
-              
+
+
+
               <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
                 <div class="md-sidebar__scrollwrap">
                   <div class="md-sidebar__inner">
-                    
+
 
 <nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
+
+
+
+
+
+
 </nav>
                   </div>
                 </div>
               </div>
-            
-          
-          
+
+
+
             <div class="md-content" data-md-component="content">
               <article class="md-content__inner md-typeset">
-                
-                  
-  
-  
+
+
+
+
 
 
 
 
 
 <h1 id="release-notes"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M5.5 9A1.5 1.5 0 0 0 7 7.5 1.5 1.5 0 0 0 5.5 6 1.5 1.5 0 0 0 4 7.5 1.5 1.5 0 0 0 5.5 9m11.91 2.58c.36.36.59.86.59 1.42 0 .55-.22 1.05-.59 1.41l-5 5a1.996 1.996 0 0 1-2.83 0l-6.99-6.99C2.22 12.05 2 11.55 2 11V6c0-1.11.89-2 2-2h5c.55 0 1.05.22 1.41.58zm-3.87-5.87 1-1 6.87 6.87c.37.36.59.87.59 1.42s-.22 1.05-.58 1.41l-5.38 5.38-1-1L20.75 13z"/></svg></span> Release Notes<a class="headerlink" href="#release-notes" title="Permanent link">&para;</a></h1>
-<div class="release-selector"><label class="release-selector-label">Select version</label><div class="release-dropdown" id="release-dropdown"><button class="release-dropdown-toggle" id="release-toggle" type="button"><span class="release-dropdown-toggle-text">v2.31.0  —  May 15, 2026</span><svg class="release-dropdown-chevron" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M7 10l5 5 5-5z"/></svg></button><div class="release-dropdown-menu" id="release-menu"><button class="release-dropdown-item release-dropdown-item--active" data-value="v2-31-0" type="button"><span class="release-dropdown-item-tag">v2.31.0</span><span class="release-dropdown-latest">Latest</span><span class="release-dropdown-item-date">May 15, 2026</span></button><button class="release-dropdown-item" data-value="v2-30-6" type="button"><span class="release-dropdown-item-tag">v2.30.6</span><span class="release-dropdown-item-date">May 11, 2026</span></button><button class="release-dropdown-item" data-value="v2-30-5" type="button"><span class="release-dropdown-item-tag">v2.30.5</span><span class="release-dropdown-item-date">May 11, 2026</span></button><button class="release-dropdown-item" data-value="v2-30-4" type="button"><span class="release-dropdown-item-tag">v2.30.4</span><span class="release-dropdown-item-date">Apr 30, 2026</span></button><button class="release-dropdown-item" data-value="v2-30-3" type="button"><span class="release-dropdown-item-tag">v2.30.3</span><span class="release-dropdown-item-date">Apr 24, 2026</span></button><button class="release-dropdown-item" data-value="v2-30-2" type="button"><span class="release-dropdown-item-tag">v2.30.2</span><span class="release-dropdown-item-date">Apr 09, 2026</span></button><button class="release-dropdown-item" data-value="v2-30-1" type="button"><span class="release-dropdown-item-tag">v2.30.1</span><span class="release-dropdown-item-date">Apr 01, 2026</span></button><button class="release-dropdown-item" data-value="v2-30-0" type="button"><span class="release-dropdown-item-tag">v2.30.0</span><span class="release-dropdown-item-date">Apr 01, 2026</span></button><button class="release-dropdown-item" data-value="v2-29-0" type="button"><span class="release-dropdown-item-tag">v2.29.0</span><span class="release-dropdown-item-date">Mar 25, 2026</span></button><button class="release-dropdown-item" data-value="v2-28-0" type="button"><span class="release-dropdown-item-tag">v2.28.0</span><span class="release-dropdown-item-date">Mar 23, 2026</span></button><button class="release-dropdown-item" data-value="v2-27-0" type="button"><span class="release-dropdown-item-tag">v2.27.0</span><span class="release-dropdown-item-date">Mar 18, 2026</span></button><button class="release-dropdown-item" data-value="v2-26-0" type="button"><span class="release-dropdown-item-tag">v2.26.0</span><span class="release-dropdown-item-date">Mar 13, 2026</span></button><button class="release-dropdown-item" data-value="v2-25-0" type="button"><span class="release-dropdown-item-tag">v2.25.0</span><span class="release-dropdown-item-date">Mar 12, 2026</span></button><button class="release-dropdown-item" data-value="v2-24-0" type="button"><span class="release-dropdown-item-tag">v2.24.0</span><span class="release-dropdown-item-date">Mar 09, 2026</span></button><button class="release-dropdown-item" data-value="v2-23-1" type="button"><span class="release-dropdown-item-tag">v2.23.1</span><span class="release-dropdown-item-date">Feb 23, 2026</span></button><button class="release-dropdown-item" data-value="v2-23-0" type="button"><span class="release-dropdown-item-tag">v2.23.0</span><span class="release-dropdown-item-date">Feb 23, 2026</span></button><button class="release-dropdown-item" data-value="v2-22-0" type="button"><span class="release-dropdown-item-tag">v2.22.0</span><span class="release-dropdown-item-date">Feb 23, 2026</span></button><button class="release-dropdown-item" data-value="v2-21-0" type="button"><span class="release-dropdown-item-tag">v2.21.0</span><span class="release-dropdown-item-date">Feb 10, 2026</span></button><button class="release-dropdown-item" data-value="v2-20-0" type="button"><span class="release-dropdown-item-tag">v2.20.0</span><span class="release-dropdown-item-date">Feb 09, 2026</span></button><button class="release-dropdown-item" data-value="v2-19-0" type="button"><span class="release-dropdown-item-tag">v2.19.0</span><span class="release-dropdown-item-date">Feb 04, 2026</span></button><button class="release-dropdown-item" data-value="v2-18-3" type="button"><span class="release-dropdown-item-tag">v2.18.3</span><span class="release-dropdown-item-date">Feb 02, 2026</span></button><button class="release-dropdown-item" data-value="v2-18-2" type="button"><span class="release-dropdown-item-tag">v2.18.2</span><span class="release-dropdown-item-date">Feb 02, 2026</span></button><button class="release-dropdown-item" data-value="v2-18-1" type="button"><span class="release-dropdown-item-tag">v2.18.1</span><span class="release-dropdown-item-date">Feb 01, 2026</span></button><button class="release-dropdown-item" data-value="v2-18-0" type="button"><span class="release-dropdown-item-tag">v2.18.0</span><span class="release-dropdown-item-date">Feb 01, 2026</span></button><button class="release-dropdown-item" data-value="v2-17-0" type="button"><span class="release-dropdown-item-tag">v2.17.0</span><span class="release-dropdown-item-date">Jan 28, 2026</span></button><button class="release-dropdown-item" data-value="v2-16-2" type="button"><span class="release-dropdown-item-tag">v2.16.2</span><span class="release-dropdown-item-date">Jan 27, 2026</span></button><button class="release-dropdown-item" data-value="v2-16-1" type="button"><span class="release-dropdown-item-tag">v2.16.1</span><span class="release-dropdown-item-date">Jan 27, 2026</span></button><button class="release-dropdown-item" data-value="v2-16-0" type="button"><span class="release-dropdown-item-tag">v2.16.0</span><span class="release-dropdown-item-date">Jan 26, 2026</span></button><button class="release-dropdown-item" data-value="v2-15-1" type="button"><span class="release-dropdown-item-tag">v2.15.1</span><span class="release-dropdown-item-date">Jan 26, 2026</span></button><button class="release-dropdown-item" data-value="v2-15-0" type="button"><span class="release-dropdown-item-tag">v2.15.0</span><span class="release-dropdown-item-date">Jan 22, 2026</span></button><button class="release-dropdown-item" data-value="v2-14-0" type="button"><span class="release-dropdown-item-tag">v2.14.0</span><span class="release-dropdown-item-date">Jan 22, 2026</span></button><button class="release-dropdown-item" data-value="v2-13-0" type="button"><span class="release-dropdown-item-tag">v2.13.0</span><span class="release-dropdown-item-date">Jan 21, 2026</span></button><button class="release-dropdown-item" data-value="v2-12-3" type="button"><span class="release-dropdown-item-tag">v2.12.3</span><span class="release-dropdown-item-date">Jan 21, 2026</span></button><button class="release-dropdown-item" data-value="v2-12-2" type="button"><span class="release-dropdown-item-tag">v2.12.2</span><span class="release-dropdown-item-date">Jan 21, 2026</span></button><button class="release-dropdown-item" data-value="v2-12-1" type="button"><span class="release-dropdown-item-tag">v2.12.1</span><span class="release-dropdown-item-date">Jan 21, 2026</span></button><button class="release-dropdown-item" data-value="v2-12-0" type="button"><span class="release-dropdown-item-tag">v2.12.0</span><span class="release-dropdown-item-date">Jan 21, 2026</span></button><button class="release-dropdown-item" data-value="v2-11-2" type="button"><span class="release-dropdown-item-tag">v2.11.2</span><span class="release-dropdown-item-date">Jan 19, 2026</span></button><button class="release-dropdown-item" data-value="v2-11-1" type="button"><span class="release-dropdown-item-tag">v2.11.1</span><span class="release-dropdown-item-date">Jan 19, 2026</span></button><button class="release-dropdown-item" data-value="v2-11-0" type="button"><span class="release-dropdown-item-tag">v2.11.0</span><span class="release-dropdown-item-date">Jan 19, 2026</span></button><button class="release-dropdown-item" data-value="v2-10-1" type="button"><span class="release-dropdown-item-tag">v2.10.1</span><span class="release-dropdown-item-date">Jan 16, 2026</span></button><button class="release-dropdown-item" data-value="v2-10-0" type="button"><span class="release-dropdown-item-tag">v2.10.0</span><span class="release-dropdown-item-date">Jan 16, 2026</span></button><button class="release-dropdown-item" data-value="v2-9-0" type="button"><span class="release-dropdown-item-tag">v2.9.0</span><span class="release-dropdown-item-date">Jan 14, 2026</span></button><button class="release-dropdown-item" data-value="v2-8-0" type="button"><span class="release-dropdown-item-tag">v2.8.0</span><span class="release-dropdown-item-date">Jan 14, 2026</span></button><button class="release-dropdown-item" data-value="v2-7-0" type="button"><span class="release-dropdown-item-tag">v2.7.0</span><span class="release-dropdown-item-date">Jan 13, 2026</span></button><button class="release-dropdown-item" data-value="v2-6-1" type="button"><span class="release-dropdown-item-tag">v2.6.1</span><span class="release-dropdown-item-date">Jan 12, 2026</span></button><button class="release-dropdown-item" data-value="v2-5-0" type="button"><span class="release-dropdown-item-tag">v2.5.0</span><span class="release-dropdown-item-date">Jan 12, 2026</span></button><button class="release-dropdown-item" data-value="v2-4-0" type="button"><span class="release-dropdown-item-tag">v2.4.0</span><span class="release-dropdown-item-date">Jan 09, 2026</span></button><button class="release-dropdown-item" data-value="v2-3-2" type="button"><span class="release-dropdown-item-tag">v2.3.2</span><span class="release-dropdown-item-date">Jan 08, 2026</span></button><button class="release-dropdown-item" data-value="v2-3-1" type="button"><span class="release-dropdown-item-tag">v2.3.1</span><span class="release-dropdown-item-date">Jan 07, 2026</span></button><button class="release-dropdown-item" data-value="v2-3-0" type="button"><span class="release-dropdown-item-tag">v2.3.0</span><span class="release-dropdown-item-date">Jan 04, 2026</span></button><button class="release-dropdown-item" data-value="v2-2-0" type="button"><span class="release-dropdown-item-tag">v2.2.0</span><span class="release-dropdown-item-date">Jan 03, 2026</span></button><button class="release-dropdown-item" data-value="v2-1-0" type="button"><span class="release-dropdown-item-tag">v2.1.0</span><span class="release-dropdown-item-date">Jan 01, 2026</span></button><button class="release-dropdown-item" data-value="v2-0-0" type="button"><span class="release-dropdown-item-tag">v2.0.0</span><span class="release-dropdown-item-date">Dec 16, 2025</span></button><button class="release-dropdown-item" data-value="v1-0-5" type="button"><span class="release-dropdown-item-tag">v1.0.5</span><span class="release-dropdown-item-date">Dec 07, 2025</span></button><button class="release-dropdown-item" data-value="v1-0-4" type="button"><span class="release-dropdown-item-tag">v1.0.4</span><span class="release-dropdown-item-date">Nov 03, 2025</span></button><button class="release-dropdown-item" data-value="v1-0-3" type="button"><span class="release-dropdown-item-tag">v1.0.3</span><span class="release-dropdown-item-date">Nov 03, 2025</span></button><button class="release-dropdown-item" data-value="v1-0-2" type="button"><span class="release-dropdown-item-tag">v1.0.2</span><span class="release-dropdown-item-date">Nov 01, 2025</span></button><button class="release-dropdown-item" data-value="v1-0-1" type="button"><span class="release-dropdown-item-tag">v1.0.1</span><span class="release-dropdown-item-date">Oct 30, 2025</span></button><button class="release-dropdown-item" data-value="v1-0-0" type="button"><span class="release-dropdown-item-tag">v1.0.0</span><span class="release-dropdown-item-date">Oct 28, 2025</span></button><button class="release-dropdown-item" data-value="v0-11-4" type="button"><span class="release-dropdown-item-tag">v0.11.4</span><span class="release-dropdown-item-date">Oct 28, 2025</span></button><button class="release-dropdown-item" data-value="v0-11-3" type="button"><span class="release-dropdown-item-tag">v0.11.3</span><span class="release-dropdown-item-date">Oct 28, 2025</span></button><button class="release-dropdown-item" data-value="v0-11-1" type="button"><span class="release-dropdown-item-tag">v0.11.1</span><span class="release-dropdown-item-date">Oct 28, 2025</span></button><button class="release-dropdown-item" data-value="v0-11-0" type="button"><span class="release-dropdown-item-tag">v0.11.0</span><span class="release-dropdown-item-date">Oct 26, 2025</span></button><button class="release-dropdown-item" data-value="v0-10-3" type="button"><span class="release-dropdown-item-tag">v0.10.3</span><span class="release-dropdown-item-date">Sep 23, 2025</span></button><button class="release-dropdown-item" data-value="v0-10-2" type="button"><span class="release-dropdown-item-tag">v0.10.2</span><span class="release-dropdown-item-date">Sep 18, 2025</span></button><button class="release-dropdown-item" data-value="v0-10-1" type="button"><span class="release-dropdown-item-tag">v0.10.1</span><span class="release-dropdown-item-date">Sep 18, 2025</span></button><button class="release-dropdown-item" data-value="v0-10-0" type="button"><span class="release-dropdown-item-tag">v0.10.0</span><span class="release-dropdown-item-date">Sep 15, 2025</span></button><button class="release-dropdown-item" data-value="v0-9-2" type="button"><span class="release-dropdown-item-tag">v0.9.2</span><span class="release-dropdown-item-date">Aug 25, 2025</span></button><button class="release-dropdown-item" data-value="v0-9-1" type="button"><span class="release-dropdown-item-tag">v0.9.1</span><span class="release-dropdown-item-date">Aug 25, 2025</span></button><button class="release-dropdown-item" data-value="v0-9-0" type="button"><span class="release-dropdown-item-tag">v0.9.0</span><span class="release-dropdown-item-date">Jul 17, 2025</span></button><button class="release-dropdown-item" data-value="v0-8-4" type="button"><span class="release-dropdown-item-tag">v0.8.4</span><span class="release-dropdown-item-date">Jun 20, 2025</span></button><button class="release-dropdown-item" data-value="v0-8-3" type="button"><span class="release-dropdown-item-tag">v0.8.3</span><span class="release-dropdown-item-date">Jun 18, 2025</span></button><button class="release-dropdown-item" data-value="v0-8-2" type="button"><span class="release-dropdown-item-tag">v0.8.2</span><span class="release-dropdown-item-date">Jun 18, 2025</span></button><button class="release-dropdown-item" data-value="v0-8-1" type="button"><span class="release-dropdown-item-tag">v0.8.1</span><span class="release-dropdown-item-date">Jun 18, 2025</span></button><button class="release-dropdown-item" data-value="v0-8-0" type="button"><span class="release-dropdown-item-tag">v0.8.0</span><span class="release-dropdown-item-date">May 15, 2025</span></button><button class="release-dropdown-item" data-value="v0-7-8" type="button"><span class="release-dropdown-item-tag">v0.7.8</span><span class="release-dropdown-item-date">Mar 21, 2025</span></button><button class="release-dropdown-item" data-value="v0-7-7" type="button"><span class="release-dropdown-item-tag">v0.7.7</span><span class="release-dropdown-item-date">Mar 05, 2025</span></button><button class="release-dropdown-item" data-value="v0-7-6" type="button"><span class="release-dropdown-item-tag">v0.7.6</span><span class="release-dropdown-item-date">Feb 24, 2025</span></button><button class="release-dropdown-item" data-value="v0-7-5" type="button"><span class="release-dropdown-item-tag">v0.7.5</span><span class="release-dropdown-item-date">Feb 22, 2025</span></button><button class="release-dropdown-item" data-value="v0-7-4" type="button"><span class="release-dropdown-item-tag">v0.7.4</span><span class="release-dropdown-item-date">Feb 20, 2025</span></button><button class="release-dropdown-item" data-value="v0-7-3" type="button"><span class="release-dropdown-item-tag">v0.7.3</span><span class="release-dropdown-item-date">Feb 19, 2025</span></button><button class="release-dropdown-item" data-value="v0-7-2" type="button"><span class="release-dropdown-item-tag">v0.7.2</span><span class="release-dropdown-item-date">Jan 30, 2025</span></button><button class="release-dropdown-item" data-value="v0-7-1" type="button"><span class="release-dropdown-item-tag">v0.7.1</span><span class="release-dropdown-item-date">Jan 29, 2025</span></button><button class="release-dropdown-item" data-value="v0-6-4" type="button"><span class="release-dropdown-item-tag">v0.6.4</span><span class="release-dropdown-item-date">Jan 22, 2025</span></button><button class="release-dropdown-item" data-value="v0-6-3" type="button"><span class="release-dropdown-item-tag">v0.6.3</span><span class="release-dropdown-item-date">Jan 22, 2025</span></button><button class="release-dropdown-item" data-value="v0-6-2" type="button"><span class="release-dropdown-item-tag">v0.6.2</span><span class="release-dropdown-item-date">Jan 19, 2025</span></button><button class="release-dropdown-item" data-value="v0-6-1" type="button"><span class="release-dropdown-item-tag">v0.6.1</span><span class="release-dropdown-item-date">Jan 13, 2025</span></button><button class="release-dropdown-item" data-value="v0-6-0" type="button"><span class="release-dropdown-item-tag">v0.6.0</span><span class="release-dropdown-item-date">Jan 12, 2025</span></button><button class="release-dropdown-item" data-value="v0-5-0" type="button"><span class="release-dropdown-item-tag">v0.5.0</span><span class="release-dropdown-item-date">Jan 09, 2025</span></button><button class="release-dropdown-item" data-value="v0-4-0" type="button"><span class="release-dropdown-item-tag">v0.4.0</span><span class="release-dropdown-item-date">Jan 08, 2025</span></button><button class="release-dropdown-item" data-value="v0-3-1" type="button"><span class="release-dropdown-item-tag">v0.3.1</span><span class="release-dropdown-item-date">Nov 07, 2024</span></button><button class="release-dropdown-item" data-value="v0-3-0" type="button"><span class="release-dropdown-item-tag">v0.3.0</span><span class="release-dropdown-item-date">Oct 09, 2024</span></button><button class="release-dropdown-item" data-value="v0-2-2" type="button"><span class="release-dropdown-item-tag">v0.2.2</span><span class="release-dropdown-item-date">Oct 03, 2024</span></button><button class="release-dropdown-item" data-value="v0-2-1" type="button"><span class="release-dropdown-item-tag">v0.2.1</span><span class="release-dropdown-item-date">Oct 01, 2024</span></button><button class="release-dropdown-item" data-value="v0-2-0" type="button"><span class="release-dropdown-item-tag">v0.2.0</span><span class="release-dropdown-item-date">Sep 30, 2024</span></button><button class="release-dropdown-item" data-value="v0-1-4" type="button"><span class="release-dropdown-item-tag">v0.1.4</span><span class="release-dropdown-item-date">Sep 29, 2024</span></button><button class="release-dropdown-item" data-value="v0-1-3" type="button"><span class="release-dropdown-item-tag">v0.1.3</span><span class="release-dropdown-item-date">Sep 27, 2024</span></button><button class="release-dropdown-item" data-value="v0-1-2" type="button"><span class="release-dropdown-item-tag">v0.1.2</span><span class="release-dropdown-item-date">Sep 26, 2024</span></button><button class="release-dropdown-item" data-value="v0-1-1" type="button"><span class="release-dropdown-item-tag">v0.1.1</span><span class="release-dropdown-item-date">Sep 26, 2024</span></button></div></div></div>
-<div class="release-display"><div class="release-card release-card--latest" data-version="v2-31-0"><div class="release-card-header"><h4><a href="https://github.com/caspel26/django-ninja-aio-crud/releases/tag/v2.31.0">v2.31.0</a> <span class="release-badge release-badge--latest">Latest</span></h4><span class="release-card-date">May 15, 2026</span></div><div class="release-card-body"><hr />
+<div class="release-selector"><label class="release-selector-label">Select version</label><div class="release-dropdown" id="release-dropdown"><button class="release-dropdown-toggle" id="release-toggle" type="button"><span class="release-dropdown-toggle-text">v3.0.0  —  Sep 27, 2026</span><svg class="release-dropdown-chevron" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M7 10l5 5 5-5z"/></svg></button><div class="release-dropdown-menu" id="release-menu"><button class="release-dropdown-item release-dropdown-item--active" data-value="v3-0-0" type="button"><span class="release-dropdown-item-tag">v3.0.0</span><span class="release-dropdown-latest">Latest</span><span class="release-dropdown-item-date">Sep 27, 2026</span></button><button class="release-dropdown-item" data-value="v2-36-0" type="button"><span class="release-dropdown-item-tag">v2.36.0</span><span class="release-dropdown-item-date">Sep 21, 2026</span></button><button class="release-dropdown-item" data-value="v2-35-0" type="button"><span class="release-dropdown-item-tag">v2.35.0</span><span class="release-dropdown-item-date">Sep 14, 2026</span></button><button class="release-dropdown-item" data-value="v2-34-3" type="button"><span class="release-dropdown-item-tag">v2.34.3</span><span class="release-dropdown-item-date">Sep 02, 2026</span></button><button class="release-dropdown-item" data-value="v2-34-2" type="button"><span class="release-dropdown-item-tag">v2.34.2</span><span class="release-dropdown-item-date">Aug 13, 2026</span></button><button class="release-dropdown-item" data-value="v2-34-1" type="button"><span class="release-dropdown-item-tag">v2.34.1</span><span class="release-dropdown-item-date">Aug 12, 2026</span></button><button class="release-dropdown-item" data-value="v2-34-0" type="button"><span class="release-dropdown-item-tag">v2.34.0</span><span class="release-dropdown-item-date">Aug 11, 2026</span></button><button class="release-dropdown-item" data-value="v2-33-0" type="button"><span class="release-dropdown-item-tag">v2.33.0</span><span class="release-dropdown-item-date">Jun 26, 2026</span></button><button class="release-dropdown-item" data-value="v2-32-0" type="button"><span class="release-dropdown-item-tag">v2.32.0</span><span class="release-dropdown-item-date">May 27, 2026</span></button><button class="release-dropdown-item" data-value="v2-31-0" type="button"><span class="release-dropdown-item-tag">v2.31.0</span><span class="release-dropdown-item-date">May 15, 2026</span></button><button class="release-dropdown-item" data-value="v2-30-6" type="button"><span class="release-dropdown-item-tag">v2.30.6</span><span class="release-dropdown-item-date">May 11, 2026</span></button><button class="release-dropdown-item" data-value="v2-30-5" type="button"><span class="release-dropdown-item-tag">v2.30.5</span><span class="release-dropdown-item-date">May 11, 2026</span></button><button class="release-dropdown-item" data-value="v2-30-4" type="button"><span class="release-dropdown-item-tag">v2.30.4</span><span class="release-dropdown-item-date">Apr 30, 2026</span></button><button class="release-dropdown-item" data-value="v2-30-3" type="button"><span class="release-dropdown-item-tag">v2.30.3</span><span class="release-dropdown-item-date">Apr 24, 2026</span></button><button class="release-dropdown-item" data-value="v2-30-2" type="button"><span class="release-dropdown-item-tag">v2.30.2</span><span class="release-dropdown-item-date">Apr 09, 2026</span></button><button class="release-dropdown-item" data-value="v2-30-1" type="button"><span class="release-dropdown-item-tag">v2.30.1</span><span class="release-dropdown-item-date">Apr 01, 2026</span></button><button class="release-dropdown-item" data-value="v2-30-0" type="button"><span class="release-dropdown-item-tag">v2.30.0</span><span class="release-dropdown-item-date">Apr 01, 2026</span></button><button class="release-dropdown-item" data-value="v2-29-0" type="button"><span class="release-dropdown-item-tag">v2.29.0</span><span class="release-dropdown-item-date">Mar 25, 2026</span></button><button class="release-dropdown-item" data-value="v2-28-0" type="button"><span class="release-dropdown-item-tag">v2.28.0</span><span class="release-dropdown-item-date">Mar 23, 2026</span></button><button class="release-dropdown-item" data-value="v2-27-0" type="button"><span class="release-dropdown-item-tag">v2.27.0</span><span class="release-dropdown-item-date">Mar 18, 2026</span></button><button class="release-dropdown-item" data-value="v2-26-0" type="button"><span class="release-dropdown-item-tag">v2.26.0</span><span class="release-dropdown-item-date">Mar 13, 2026</span></button><button class="release-dropdown-item" data-value="v2-25-0" type="button"><span class="release-dropdown-item-tag">v2.25.0</span><span class="release-dropdown-item-date">Mar 12, 2026</span></button><button class="release-dropdown-item" data-value="v2-24-0" type="button"><span class="release-dropdown-item-tag">v2.24.0</span><span class="release-dropdown-item-date">Mar 09, 2026</span></button><button class="release-dropdown-item" data-value="v2-23-1" type="button"><span class="release-dropdown-item-tag">v2.23.1</span><span class="release-dropdown-item-date">Feb 23, 2026</span></button><button class="release-dropdown-item" data-value="v2-23-0" type="button"><span class="release-dropdown-item-tag">v2.23.0</span><span class="release-dropdown-item-date">Feb 23, 2026</span></button><button class="release-dropdown-item" data-value="v2-22-0" type="button"><span class="release-dropdown-item-tag">v2.22.0</span><span class="release-dropdown-item-date">Feb 23, 2026</span></button><button class="release-dropdown-item" data-value="v2-21-0" type="button"><span class="release-dropdown-item-tag">v2.21.0</span><span class="release-dropdown-item-date">Feb 10, 2026</span></button><button class="release-dropdown-item" data-value="v2-20-0" type="button"><span class="release-dropdown-item-tag">v2.20.0</span><span class="release-dropdown-item-date">Feb 09, 2026</span></button><button class="release-dropdown-item" data-value="v2-19-0" type="button"><span class="release-dropdown-item-tag">v2.19.0</span><span class="release-dropdown-item-date">Feb 04, 2026</span></button><button class="release-dropdown-item" data-value="v2-18-3" type="button"><span class="release-dropdown-item-tag">v2.18.3</span><span class="release-dropdown-item-date">Feb 02, 2026</span></button><button class="release-dropdown-item" data-value="v2-18-2" type="button"><span class="release-dropdown-item-tag">v2.18.2</span><span class="release-dropdown-item-date">Feb 02, 2026</span></button><button class="release-dropdown-item" data-value="v2-18-1" type="button"><span class="release-dropdown-item-tag">v2.18.1</span><span class="release-dropdown-item-date">Feb 01, 2026</span></button><button class="release-dropdown-item" data-value="v2-18-0" type="button"><span class="release-dropdown-item-tag">v2.18.0</span><span class="release-dropdown-item-date">Feb 01, 2026</span></button><button class="release-dropdown-item" data-value="v2-17-0" type="button"><span class="release-dropdown-item-tag">v2.17.0</span><span class="release-dropdown-item-date">Jan 28, 2026</span></button><button class="release-dropdown-item" data-value="v2-16-2" type="button"><span class="release-dropdown-item-tag">v2.16.2</span><span class="release-dropdown-item-date">Jan 27, 2026</span></button><button class="release-dropdown-item" data-value="v2-16-1" type="button"><span class="release-dropdown-item-tag">v2.16.1</span><span class="release-dropdown-item-date">Jan 27, 2026</span></button><button class="release-dropdown-item" data-value="v2-16-0" type="button"><span class="release-dropdown-item-tag">v2.16.0</span><span class="release-dropdown-item-date">Jan 26, 2026</span></button><button class="release-dropdown-item" data-value="v2-15-1" type="button"><span class="release-dropdown-item-tag">v2.15.1</span><span class="release-dropdown-item-date">Jan 26, 2026</span></button><button class="release-dropdown-item" data-value="v2-15-0" type="button"><span class="release-dropdown-item-tag">v2.15.0</span><span class="release-dropdown-item-date">Jan 22, 2026</span></button><button class="release-dropdown-item" data-value="v2-14-0" type="button"><span class="release-dropdown-item-tag">v2.14.0</span><span class="release-dropdown-item-date">Jan 22, 2026</span></button><button class="release-dropdown-item" data-value="v2-13-0" type="button"><span class="release-dropdown-item-tag">v2.13.0</span><span class="release-dropdown-item-date">Jan 21, 2026</span></button><button class="release-dropdown-item" data-value="v2-12-3" type="button"><span class="release-dropdown-item-tag">v2.12.3</span><span class="release-dropdown-item-date">Jan 21, 2026</span></button><button class="release-dropdown-item" data-value="v2-12-2" type="button"><span class="release-dropdown-item-tag">v2.12.2</span><span class="release-dropdown-item-date">Jan 21, 2026</span></button><button class="release-dropdown-item" data-value="v2-12-1" type="button"><span class="release-dropdown-item-tag">v2.12.1</span><span class="release-dropdown-item-date">Jan 21, 2026</span></button><button class="release-dropdown-item" data-value="v2-12-0" type="button"><span class="release-dropdown-item-tag">v2.12.0</span><span class="release-dropdown-item-date">Jan 21, 2026</span></button><button class="release-dropdown-item" data-value="v2-11-2" type="button"><span class="release-dropdown-item-tag">v2.11.2</span><span class="release-dropdown-item-date">Jan 19, 2026</span></button><button class="release-dropdown-item" data-value="v2-11-1" type="button"><span class="release-dropdown-item-tag">v2.11.1</span><span class="release-dropdown-item-date">Jan 19, 2026</span></button><button class="release-dropdown-item" data-value="v2-11-0" type="button"><span class="release-dropdown-item-tag">v2.11.0</span><span class="release-dropdown-item-date">Jan 19, 2026</span></button><button class="release-dropdown-item" data-value="v2-10-1" type="button"><span class="release-dropdown-item-tag">v2.10.1</span><span class="release-dropdown-item-date">Jan 16, 2026</span></button><button class="release-dropdown-item" data-value="v2-10-0" type="button"><span class="release-dropdown-item-tag">v2.10.0</span><span class="release-dropdown-item-date">Jan 16, 2026</span></button><button class="release-dropdown-item" data-value="v2-9-0" type="button"><span class="release-dropdown-item-tag">v2.9.0</span><span class="release-dropdown-item-date">Jan 14, 2026</span></button><button class="release-dropdown-item" data-value="v2-8-0" type="button"><span class="release-dropdown-item-tag">v2.8.0</span><span class="release-dropdown-item-date">Jan 14, 2026</span></button><button class="release-dropdown-item" data-value="v2-7-0" type="button"><span class="release-dropdown-item-tag">v2.7.0</span><span class="release-dropdown-item-date">Jan 13, 2026</span></button><button class="release-dropdown-item" data-value="v2-6-1" type="button"><span class="release-dropdown-item-tag">v2.6.1</span><span class="release-dropdown-item-date">Jan 12, 2026</span></button><button class="release-dropdown-item" data-value="v2-5-0" type="button"><span class="release-dropdown-item-tag">v2.5.0</span><span class="release-dropdown-item-date">Jan 12, 2026</span></button><button class="release-dropdown-item" data-value="v2-4-0" type="button"><span class="release-dropdown-item-tag">v2.4.0</span><span class="release-dropdown-item-date">Jan 09, 2026</span></button><button class="release-dropdown-item" data-value="v2-3-2" type="button"><span class="release-dropdown-item-tag">v2.3.2</span><span class="release-dropdown-item-date">Jan 08, 2026</span></button><button class="release-dropdown-item" data-value="v2-3-1" type="button"><span class="release-dropdown-item-tag">v2.3.1</span><span class="release-dropdown-item-date">Jan 07, 2026</span></button><button class="release-dropdown-item" data-value="v2-3-0" type="button"><span class="release-dropdown-item-tag">v2.3.0</span><span class="release-dropdown-item-date">Jan 04, 2026</span></button><button class="release-dropdown-item" data-value="v2-2-0" type="button"><span class="release-dropdown-item-tag">v2.2.0</span><span class="release-dropdown-item-date">Jan 03, 2026</span></button><button class="release-dropdown-item" data-value="v2-1-0" type="button"><span class="release-dropdown-item-tag">v2.1.0</span><span class="release-dropdown-item-date">Jan 01, 2026</span></button><button class="release-dropdown-item" data-value="v2-0-0" type="button"><span class="release-dropdown-item-tag">v2.0.0</span><span class="release-dropdown-item-date">Dec 16, 2025</span></button><button class="release-dropdown-item" data-value="v1-0-5" type="button"><span class="release-dropdown-item-tag">v1.0.5</span><span class="release-dropdown-item-date">Dec 07, 2025</span></button><button class="release-dropdown-item" data-value="v1-0-4" type="button"><span class="release-dropdown-item-tag">v1.0.4</span><span class="release-dropdown-item-date">Nov 03, 2025</span></button><button class="release-dropdown-item" data-value="v1-0-3" type="button"><span class="release-dropdown-item-tag">v1.0.3</span><span class="release-dropdown-item-date">Nov 03, 2025</span></button><button class="release-dropdown-item" data-value="v1-0-2" type="button"><span class="release-dropdown-item-tag">v1.0.2</span><span class="release-dropdown-item-date">Nov 01, 2025</span></button><button class="release-dropdown-item" data-value="v1-0-1" type="button"><span class="release-dropdown-item-tag">v1.0.1</span><span class="release-dropdown-item-date">Oct 30, 2025</span></button><button class="release-dropdown-item" data-value="v1-0-0" type="button"><span class="release-dropdown-item-tag">v1.0.0</span><span class="release-dropdown-item-date">Oct 28, 2025</span></button><button class="release-dropdown-item" data-value="v0-11-4" type="button"><span class="release-dropdown-item-tag">v0.11.4</span><span class="release-dropdown-item-date">Oct 28, 2025</span></button><button class="release-dropdown-item" data-value="v0-11-3" type="button"><span class="release-dropdown-item-tag">v0.11.3</span><span class="release-dropdown-item-date">Oct 28, 2025</span></button><button class="release-dropdown-item" data-value="v0-11-1" type="button"><span class="release-dropdown-item-tag">v0.11.1</span><span class="release-dropdown-item-date">Oct 28, 2025</span></button><button class="release-dropdown-item" data-value="v0-11-0" type="button"><span class="release-dropdown-item-tag">v0.11.0</span><span class="release-dropdown-item-date">Oct 26, 2025</span></button><button class="release-dropdown-item" data-value="v0-10-3" type="button"><span class="release-dropdown-item-tag">v0.10.3</span><span class="release-dropdown-item-date">Sep 23, 2025</span></button><button class="release-dropdown-item" data-value="v0-10-2" type="button"><span class="release-dropdown-item-tag">v0.10.2</span><span class="release-dropdown-item-date">Sep 18, 2025</span></button><button class="release-dropdown-item" data-value="v0-10-1" type="button"><span class="release-dropdown-item-tag">v0.10.1</span><span class="release-dropdown-item-date">Sep 18, 2025</span></button><button class="release-dropdown-item" data-value="v0-10-0" type="button"><span class="release-dropdown-item-tag">v0.10.0</span><span class="release-dropdown-item-date">Sep 15, 2025</span></button><button class="release-dropdown-item" data-value="v0-9-2" type="button"><span class="release-dropdown-item-tag">v0.9.2</span><span class="release-dropdown-item-date">Aug 25, 2025</span></button><button class="release-dropdown-item" data-value="v0-9-1" type="button"><span class="release-dropdown-item-tag">v0.9.1</span><span class="release-dropdown-item-date">Aug 25, 2025</span></button><button class="release-dropdown-item" data-value="v0-9-0" type="button"><span class="release-dropdown-item-tag">v0.9.0</span><span class="release-dropdown-item-date">Jul 17, 2025</span></button><button class="release-dropdown-item" data-value="v0-8-4" type="button"><span class="release-dropdown-item-tag">v0.8.4</span><span class="release-dropdown-item-date">Jun 20, 2025</span></button><button class="release-dropdown-item" data-value="v0-8-3" type="button"><span class="release-dropdown-item-tag">v0.8.3</span><span class="release-dropdown-item-date">Jun 18, 2025</span></button><button class="release-dropdown-item" data-value="v0-8-2" type="button"><span class="release-dropdown-item-tag">v0.8.2</span><span class="release-dropdown-item-date">Jun 18, 2025</span></button><button class="release-dropdown-item" data-value="v0-8-1" type="button"><span class="release-dropdown-item-tag">v0.8.1</span><span class="release-dropdown-item-date">Jun 18, 2025</span></button><button class="release-dropdown-item" data-value="v0-8-0" type="button"><span class="release-dropdown-item-tag">v0.8.0</span><span class="release-dropdown-item-date">May 15, 2025</span></button><button class="release-dropdown-item" data-value="v0-7-8" type="button"><span class="release-dropdown-item-tag">v0.7.8</span><span class="release-dropdown-item-date">Mar 21, 2025</span></button><button class="release-dropdown-item" data-value="v0-7-7" type="button"><span class="release-dropdown-item-tag">v0.7.7</span><span class="release-dropdown-item-date">Mar 05, 2025</span></button><button class="release-dropdown-item" data-value="v0-7-6" type="button"><span class="release-dropdown-item-tag">v0.7.6</span><span class="release-dropdown-item-date">Feb 24, 2025</span></button><button class="release-dropdown-item" data-value="v0-7-5" type="button"><span class="release-dropdown-item-tag">v0.7.5</span><span class="release-dropdown-item-date">Feb 22, 2025</span></button><button class="release-dropdown-item" data-value="v0-7-4" type="button"><span class="release-dropdown-item-tag">v0.7.4</span><span class="release-dropdown-item-date">Feb 20, 2025</span></button><button class="release-dropdown-item" data-value="v0-7-3" type="button"><span class="release-dropdown-item-tag">v0.7.3</span><span class="release-dropdown-item-date">Feb 19, 2025</span></button><button class="release-dropdown-item" data-value="v0-7-2" type="button"><span class="release-dropdown-item-tag">v0.7.2</span><span class="release-dropdown-item-date">Jan 30, 2025</span></button><button class="release-dropdown-item" data-value="v0-7-1" type="button"><span class="release-dropdown-item-tag">v0.7.1</span><span class="release-dropdown-item-date">Jan 29, 2025</span></button><button class="release-dropdown-item" data-value="v0-6-4" type="button"><span class="release-dropdown-item-tag">v0.6.4</span><span class="release-dropdown-item-date">Jan 22, 2025</span></button><button class="release-dropdown-item" data-value="v0-6-3" type="button"><span class="release-dropdown-item-tag">v0.6.3</span><span class="release-dropdown-item-date">Jan 22, 2025</span></button><button class="release-dropdown-item" data-value="v0-6-2" type="button"><span class="release-dropdown-item-tag">v0.6.2</span><span class="release-dropdown-item-date">Jan 19, 2025</span></button><button class="release-dropdown-item" data-value="v0-6-1" type="button"><span class="release-dropdown-item-tag">v0.6.1</span><span class="release-dropdown-item-date">Jan 13, 2025</span></button><button class="release-dropdown-item" data-value="v0-6-0" type="button"><span class="release-dropdown-item-tag">v0.6.0</span><span class="release-dropdown-item-date">Jan 12, 2025</span></button><button class="release-dropdown-item" data-value="v0-5-0" type="button"><span class="release-dropdown-item-tag">v0.5.0</span><span class="release-dropdown-item-date">Jan 09, 2025</span></button><button class="release-dropdown-item" data-value="v0-4-0" type="button"><span class="release-dropdown-item-tag">v0.4.0</span><span class="release-dropdown-item-date">Jan 08, 2025</span></button><button class="release-dropdown-item" data-value="v0-3-1" type="button"><span class="release-dropdown-item-tag">v0.3.1</span><span class="release-dropdown-item-date">Nov 07, 2024</span></button><button class="release-dropdown-item" data-value="v0-3-0" type="button"><span class="release-dropdown-item-tag">v0.3.0</span><span class="release-dropdown-item-date">Oct 09, 2024</span></button><button class="release-dropdown-item" data-value="v0-2-2" type="button"><span class="release-dropdown-item-tag">v0.2.2</span><span class="release-dropdown-item-date">Oct 03, 2024</span></button><button class="release-dropdown-item" data-value="v0-2-1" type="button"><span class="release-dropdown-item-tag">v0.2.1</span><span class="release-dropdown-item-date">Oct 01, 2024</span></button><button class="release-dropdown-item" data-value="v0-2-0" type="button"><span class="release-dropdown-item-tag">v0.2.0</span><span class="release-dropdown-item-date">Sep 30, 2024</span></button><button class="release-dropdown-item" data-value="v0-1-4" type="button"><span class="release-dropdown-item-tag">v0.1.4</span><span class="release-dropdown-item-date">Sep 29, 2024</span></button><button class="release-dropdown-item" data-value="v0-1-3" type="button"><span class="release-dropdown-item-tag">v0.1.3</span><span class="release-dropdown-item-date">Sep 27, 2024</span></button><button class="release-dropdown-item" data-value="v0-1-2" type="button"><span class="release-dropdown-item-tag">v0.1.2</span><span class="release-dropdown-item-date">Sep 26, 2024</span></button><button class="release-dropdown-item" data-value="v0-1-1" type="button"><span class="release-dropdown-item-tag">v0.1.1</span><span class="release-dropdown-item-date">Sep 26, 2024</span></button></div></div></div>
+<div class="release-display"><div class="release-card release-card--latest" data-version="v3-0-0"><div class="release-card-header"><h4><a href="https://github.com/caspel26/django-ninja-aio-crud/releases/tag/v3.0.0">v3.0.0</a> <span class="release-badge release-badge--latest">Latest</span></h4><span class="release-card-date">Sep 27, 2026</span></div><div class="release-card-body"><hr />
+<h3 id="new-features">✨ New Features</h3>
+<h4 id="explicit-sync-and-async-apis">🔄 Explicit Sync and Async APIs</h4>
+<blockquote>
+<p><code>ninja_aio/models/serializers.py</code>, <code>ninja_aio/views/api.py</code></p>
+</blockquote>
+<p>Version 3 gives <code>ModelSerializer</code> and standalone <code>Serializer</code> the same class-based CRUD facade. Plain method names run synchronously; methods prefixed with <code>a</code> run asynchronously. Viewsets can serve either execution mode while retaining the same response contracts and hooks:</p>
+<div class="highlight"><pre><span></span><code><span class="nd">@api</span><span class="o">.</span><span class="n">viewset</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">Article</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">ArticleViewSet</span><span class="p">(</span><span class="n">APIViewSet</span><span class="p">):</span>
+    <span class="n">execution_mode</span> <span class="o">=</span> <span class="s2">"sync"</span>  <span class="c1"># async remains the default</span>
+</code></pre></div>
+
+<p>Use <code>Article.create(data)</code> in sync code and <code>await Article.acreate(data)</code> in async code. The same naming applies to updates, serialization, lookups, and bulk operations. This supports WSGI applications, ASGI applications, management commands, and background tasks through one public API.</p>
+<h4 id="declarative-schemas">🧩 Declarative Schemas</h4>
+<blockquote>
+<p><code>ninja_aio/models/config.py</code>, <code>ninja_aio/models/serializers.py</code>, <code>ninja_aio/models/checks.py</code></p>
+</blockquote>
+<p>The <code>Schemas</code> declaration and <code>SchemaConfig</code> replace scattered inner serializer declarations. Create, update, read, and detail schemas are generated lazily, cached, and validated by Django's system checks:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">django.db</span><span class="w"> </span><span class="kn">import</span> <span class="n">models</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">ninja_aio</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModelSerializer</span><span class="p">,</span> <span class="n">SchemaConfig</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Article</span><span class="p">(</span><span class="n">ModelSerializer</span><span class="p">):</span>
+    <span class="n">title</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">CharField</span><span class="p">(</span><span class="n">max_length</span><span class="o">=</span><span class="mi">200</span><span class="p">)</span>
+
+    <span class="k">class</span><span class="w"> </span><span class="nc">Schemas</span><span class="p">:</span>
+        <span class="n">create</span> <span class="o">=</span> <span class="n">SchemaConfig</span><span class="p">(</span><span class="n">fields</span><span class="o">=</span><span class="p">[</span><span class="s2">"title"</span><span class="p">])</span>
+        <span class="n">update</span> <span class="o">=</span> <span class="n">SchemaConfig</span><span class="p">(</span><span class="n">optionals</span><span class="o">=</span><span class="p">[(</span><span class="s2">"title"</span><span class="p">,</span> <span class="nb">str</span><span class="p">)])</span>
+        <span class="n">read</span> <span class="o">=</span> <span class="n">SchemaConfig</span><span class="p">(</span><span class="n">fields</span><span class="o">=</span><span class="p">[</span><span class="s2">"id"</span><span class="p">,</span> <span class="s2">"title"</span><span class="p">])</span>
+</code></pre></div>
+
+<p>Foreign-key inputs accept both the field name and its <code>_id</code> spelling while preserving custom aliases. The public package also ships type information and a <code>py.typed</code> marker.</p>
+<h4 id="structured-bulk-results">📦 Structured Bulk Results</h4>
+<blockquote>
+<p><code>ninja_aio/models/utils.py</code>, <code>ninja_aio/types.py</code></p>
+</blockquote>
+<p>Bulk writes expose typed success/error results and protect each item independently. If an item's hook fails after writing to the database, that item's row and hook writes roll back; other successful items remain saved. Bulk delete runs delete hooks for every object, and bulk update/delete apply object permissions to each item.</p>
+<h4 id="api-mounts-mcp-and-admin">🤖 API Mounts, MCP, and Admin</h4>
+<blockquote>
+<p><code>ninja_aio/mcp/</code>, <code>ninja_aio/admin.py</code>, <code>ninja_aio/api.py</code></p>
+</blockquote>
+<p>Repeated API mounts receive unique OpenAPI operation IDs and distinct MCP tool names derived from their routes. Generated admin forms include optional update fields, making the serializer's editable field contract available in Django Admin too.</p>
+<hr />
+<h3 id="bug-fixes-and-hardening">🐛 Bug Fixes and Hardening</h3>
+<h4 id="transactions-and-hook-parity">🛡️ Transactions and Hook Parity</h4>
+<blockquote>
+<p><code>ninja_aio/models/hooks.py</code>, <code>ninja_aio/models/utils.py</code></p>
+</blockquote>
+<p>Sync and async operations now run equivalent hooks in a consistent order. Writes with post-write hooks and nested writes roll back when a hook fails. Field update hooks run only when the client supplies a field and its value changes. Async hooks use the <code>a</code> prefix; incompatible declarations fail during startup checks.</p>
+<h4 id="patch-and-error-handling">📝 PATCH and Error Handling</h4>
+<blockquote>
+<p><code>ninja_aio/models/serializers.py</code>, <code>ninja_aio/exceptions.py</code></p>
+</blockquote>
+<p>PATCH changes only supplied fields, so omitted fields retain their values. An explicit <code>null</code> is saved when the update schema permits it. Database constraint failures return <code>409</code>, ambiguous object lookups return <code>400</code>, and authentication failures return <code>401</code> by default.</p>
+<h4 id="authentication-and-object-permissions">🔐 Authentication and Object Permissions</h4>
+<blockquote>
+<p><code>ninja_aio/auth.py</code>, <code>ninja_aio/views/mixins.py</code>, <code>ninja_aio/helpers/api.py</code></p>
+</blockquote>
+<p>JWT authentication keeps decoded claims local to each request, including concurrent requests from different users. Sync endpoints can use async authentication handlers. Detail actions, bulk operations, and many-to-many endpoints enforce object permissions; soft-delete visibility and restore/delete permissions apply consistently across endpoint styles.</p>
+<hr />
+<h3 id="performance-improvements">⚡ Performance Improvements</h3>
+<blockquote>
+<p><code>ninja_aio/models/utils.py</code>, <code>ninja_aio/models/serializers.py</code>, <code>ninja_aio/models/transformations.py</code></p>
+</blockquote>
+<p>Eligible simple async bulk creates use a single sync bridge while retaining per-item transactions. Models with async hooks or custom relation handling continue through the async path. Relation serialization reuses populated caches, and foreign-key input schemas are built in one pass.</p>
+<p>Compared with the previous v3 implementation, recorded benchmark runs measured roughly <strong>39–42% less cold FK schema time</strong> and <strong>64–77% less simple bulk-create time</strong> across SQLite and PostgreSQL. These are microbenchmarks, not production latency guarantees; see the <a href="benchmarks/README.md">benchmark methodology</a>.</p>
+<hr />
+<h3 id="documentation-and-examples">📚 Documentation and Examples</h3>
+<p>The rebuilt docs cover sync/async APIs, schemas, hooks, transactions, permissions, and integrations, with executable examples and migration recipes. Older documentation versions retain their historical content and use the new site style.</p>
+<p>The runnable library app mounts the same domain through sync and async APIs, including authentication, permissions, relations, bulk writes, Admin, background tasks, and MCP. Its <strong>63 tests</strong> cover request parity, complete user journeys, rollback, concurrent user isolation, and query scaling. A real blog migration is documented with a reproducible patch.</p>
+<p>CI covers Python/Django combinations, PostgreSQL, browser checks, and hash-verified dependency locks. Publishing uses a verified Flit CLI/backend pair.</p>
+<hr />
+<h3 id="breaking-changes-and-migration">⚠️ Breaking Changes and Migration</h3>
+<p>This is a major release. Some async methods previously used plain names: change awaited calls to their <code>a</code> counterparts, and rename async hooks similarly. Review the changed PATCH, authentication, permission, and error behavior before upgrading.</p>
+<p>Compatibility aliases emit <code>DeprecationWarning</code> and are scheduled for removal in version 4. Python <strong>3.10–3.14</strong>, Django <strong>5.2–6.0</strong>, and Django Ninja <strong>1.7.x</strong> are supported.</p>
+<p>See the <a href="docs/migration/index.md">migration guide</a>, <a href="docs/migration/breaking-changes.md">breaking changes</a>, <a href="docs/migration/deprecations.md">deprecations</a>, and <a href="docs/migration/recipes.md">migration recipes</a>.</p>
+<hr />
+<h3 id="summary">🎯 Summary</h3>
+<p>Version 3 makes sync and async APIs explicit, unifies schema declarations and hook behavior, and strengthens transaction and permission handling. Migration guidance and a tested example application accompany the public API changes.</p>
+<p><strong>Key benefits:</strong></p>
+<ul>
+<li>🔄 Matching sync and async APIs across viewsets, serializers, commands, and tasks.</li>
+<li>🧩 Lazy, cached schemas with clear declarations and foreign-key aliases.</li>
+<li>🛡️ Transaction-protected hooks and per-item bulk rollback.</li>
+<li>🔐 Consistent object permissions and request-local JWT state.</li>
+<li>⚡ Faster eligible bulk writes and cold foreign-key schema generation.</li>
+<li>📚 Rebuilt documentation, migration recipes, and a runnable application.</li>
+</ul></div><div class="release-card-footer"><a href="https://github.com/caspel26/django-ninja-aio-crud/releases/tag/v3.0.0">GitHub Release</a> · <a href="https://github.com/caspel26/django-ninja-aio-crud/compare/v2.36.0...v3.0.0">Diff</a></div></div>
+<div class="release-card" data-version="v2-36-0" style="display:none"><div class="release-card-header"><h4><a href="https://github.com/caspel26/django-ninja-aio-crud/releases/tag/v2.36.0">v2.36.0</a></h4><span class="release-card-date">Sep 21, 2026</span></div><div class="release-card-body"><hr />
+<h3 id="new-features">✨ New Features</h3>
+<h4 id="configurable-error-schema">🧩 Configurable Error Schema</h4>
+<blockquote>
+<p><code>ninja_aio/views/api.py</code>, <code>ninja_aio/views/mixins.py</code>, <code>ninja_aio/helpers/api.py</code></p>
+</blockquote>
+<p>Every generated CRUD/M2M endpoint documents its error responses with a fixed <code>GenericMessageSchema</code> for the codes in <code>error_codes</code> (400/401/403/404), with no override point — a project with its own error contract had to hand-redeclare <code>response=</code> on every single view just to fix the OpenAPI schema.</p>
+<p><code>API.error_schema</code> (default <code>GenericMessageSchema</code>, fully backward compatible) replaces that hardcoding: every <code>self.error_codes: GenericMessageSchema</code> declaration across <code>views/api.py</code>, <code>views/mixins.py</code>, and the M2M helpers in <code>helpers/api.py</code> now reads <code>self.error_codes: self.error_schema</code>. Override it once on a shared base class and every generated endpoint documents your own error contract project-wide:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">ninja</span><span class="w"> </span><span class="kn">import</span> <span class="n">Schema</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">ninja_aio.views</span><span class="w"> </span><span class="kn">import</span> <span class="n">APIViewSet</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">ErrorResponse</span><span class="p">(</span><span class="n">Schema</span><span class="p">):</span>
+    <span class="n">error_id</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">error_description</span><span class="p">:</span> <span class="nb">str</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">MyBaseViewSet</span><span class="p">(</span><span class="n">APIViewSet</span><span class="p">):</span>
+    <span class="n">error_schema</span> <span class="o">=</span> <span class="n">ErrorResponse</span>  <span class="c1"># every generated endpoint documents this instead</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">BookAPI</span><span class="p">(</span><span class="n">MyBaseViewSet</span><span class="p">):</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">Book</span>
+</code></pre></div>
+
+<p>This only changes what the OpenAPI/Swagger schema documents for those status codes — it has no effect on the response your own exception handlers actually produce at runtime.</p>
+<hr />
+<h3 id="documentation">📚 Documentation</h3>
+<p>Expanded the <code>APIViewSet</code> "Error Handling" section with the <code>error_schema</code> override mechanism and an example, and fixed a pre-existing omission (403 was missing from the listed error codes).</p>
+<hr />
+<h3 id="summary">🎯 Summary</h3>
+<p>A small, fully backward-compatible extension point closes a real documentation gap: projects with their own error contract can now make generated CRUD/M2M endpoints document it accurately, without redeclaring <code>response=</code> by hand on every view. The full suite passes with 1,156 tests, including 3 new tests covering the default schema, subclass overrides across every generated action, and availability on <code>APIView</code>.</p>
+<p><strong>Key benefits:</strong></p>
+<ul>
+<li>🧩 One attribute, one place, applies to every generated endpoint.</li>
+<li>🔄 Fully backward compatible — default behavior is unchanged.</li>
+<li>📄 Swagger/OpenAPI finally reflects a project's real error contract instead of a generic placeholder.</li>
+</ul></div><div class="release-card-footer"><a href="https://github.com/caspel26/django-ninja-aio-crud/releases/tag/v2.36.0">GitHub Release</a> · <a href="https://github.com/caspel26/django-ninja-aio-crud/compare/v2.35.0...v2.36.0">Diff</a></div></div>
+<div class="release-card" data-version="v2-35-0" style="display:none"><div class="release-card-header"><h4><a href="https://github.com/caspel26/django-ninja-aio-crud/releases/tag/v2.35.0">v2.35.0</a></h4><span class="release-card-date">Sep 14, 2026</span></div><div class="release-card-body"><hr />
+<h3 id="new-features">✨ New Features</h3>
+<h4 id="nested-creation">🌳 Nested Creation</h4>
+<blockquote>
+<p><code>ninja_aio/models/serializers.py</code>, <code>ninja_aio/models/utils.py</code></p>
+</blockquote>
+<p>Declare owned reverse-FK children with <code>CreateSerializer.nested</code> to create a parent and its children in one request. The generated child input schema excludes the parent FK automatically; persistence injects the newly created parent.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">django.db</span><span class="w"> </span><span class="kn">import</span> <span class="n">models</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">ninja_aio.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModelSerializer</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">OrderItem</span><span class="p">(</span><span class="n">ModelSerializer</span><span class="p">):</span>
+    <span class="n">order</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">ForeignKey</span><span class="p">(</span>
+        <span class="s2">"Order"</span><span class="p">,</span> <span class="n">on_delete</span><span class="o">=</span><span class="n">models</span><span class="o">.</span><span class="n">CASCADE</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s2">"items"</span>
+    <span class="p">)</span>
+    <span class="n">quantity</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">PositiveIntegerField</span><span class="p">()</span>
+
+    <span class="k">class</span><span class="w"> </span><span class="nc">CreateSerializer</span><span class="p">:</span>
+        <span class="n">fields</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"order"</span><span class="p">,</span> <span class="s2">"quantity"</span><span class="p">]</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Order</span><span class="p">(</span><span class="n">ModelSerializer</span><span class="p">):</span>
+    <span class="n">reference</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">CharField</span><span class="p">(</span><span class="n">max_length</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
+
+    <span class="k">class</span><span class="w"> </span><span class="nc">CreateSerializer</span><span class="p">:</span>
+        <span class="n">fields</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"reference"</span><span class="p">]</span>
+        <span class="n">nested</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"items"</span><span class="p">:</span> <span class="n">OrderItem</span><span class="p">}</span>
+</code></pre></div>
+
+<p>The parent's create input accepts:</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span><span class="nt">"reference"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ORD-001"</span><span class="p">,</span><span class="w"> </span><span class="nt">"items"</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span><span class="nt">"quantity"</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">},</span><span class="w"> </span><span class="p">{</span><span class="nt">"quantity"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">}]}</span>
+</code></pre></div>
+
+<p>Child validators, model configuration, custom input fields, and lifecycle hooks are preserved. Omitted child lists default to independent empty lists; grandchildren are supported. Each owned graph is transactional: validation, persistence, or hook failures roll back its parent and children, including direct utility calls and per-parent isolation during bulk creation.</p>
+<p><strong>Scope:</strong> create-only, <code>ModelSerializer</code> reverse-FK relations on one database. Nested updates, deletes, and cyclic configurations are unsupported. Child ViewSet permissions are not invoked: the parent endpoint authorizes the operation, while normal request-scoped FK resolution still applies. External hook side effects cannot be rolled back; defer them with <code>transaction.on_commit</code> when appropriate.</p>
+<hr />
+<h4 id="automatic-admin-relations">🛠️ Automatic Admin Relations</h4>
+<blockquote>
+<p><code>ninja_aio/admin.py</code></p>
+</blockquote>
+<p><code>register_admin</code> and <code>model_admin_factory</code> now generate relation-aware admin configuration without hand-written inline classes.</p>
+<table>
+<thead>
+<tr>
+<th>🔗 Relation</th>
+<th>🛠️ Generated configuration</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Reverse ForeignKey</td>
+<td><code>TabularInline</code></td>
+</tr>
+<tr>
+<td>Reverse one-to-one</td>
+<td><code>StackedInline</code></td>
+</tr>
+<tr>
+<td>Editable forward M2M with an automatic through table</td>
+<td><code>filter_horizontal</code></td>
+</tr>
+<tr>
+<td>Reverse M2M or custom-through M2M widgets</td>
+<td>Not generated automatically</td>
+</tr>
+</tbody>
+</table>
+<p>Inlines set an explicit <code>fk_name</code>, handling multiple FKs from the same child model. Editable fields prefer <code>UpdateSerializer</code>, then <code>CreateSerializer</code>; parent FKs, primary keys, non-editable fields, and synthetic fields are excluded. Plain Django children use Django's normal editable-field defaults.</p>
+<p>Explicit overrides remain authoritative:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">ninja_aio</span><span class="w"> </span><span class="kn">import</span> <span class="n">register_admin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">ninja_aio.admin</span><span class="w"> </span><span class="kn">import</span> <span class="n">model_admin_factory</span>
+
+<span class="n">register_admin</span><span class="p">(</span><span class="n">Order</span><span class="p">)</span>
+<span class="n">CustomOrderAdmin</span> <span class="o">=</span> <span class="n">model_admin_factory</span><span class="p">(</span>
+    <span class="n">Order</span><span class="p">,</span> <span class="n">inlines</span><span class="o">=</span><span class="p">(),</span> <span class="n">filter_horizontal</span><span class="o">=</span><span class="p">(),</span> <span class="n">list_per_page</span><span class="o">=</span><span class="mi">50</span>
+<span class="p">)</span>
+</code></pre></div>
+
+<hr />
+<h3 id="improvements">🔧 Improvements</h3>
+<h4 id="startup-safe-admin-discovery">⏳ Startup-Safe Admin Discovery</h4>
+<blockquote>
+<p><code>ninja_aio/admin.py</code></p>
+</blockquote>
+<p>Field and relation discovery is deferred until Django's model registry is ready, so model decorators discover children declared later and reverse relations are not misclassified as list cells or read-only form fields.</p>
+<h4 id="performance-ci-maintenance">🔄 Performance CI Maintenance</h4>
+<blockquote>
+<p><code>.github/workflows/performance.yml</code></p>
+</blockquote>
+<p>Updated the pinned baseline artifact download action from v21 to v24.</p>
+<hr />
+<h3 id="documentation">📚 Documentation</h3>
+<p>Updated the README and serializer/admin API guides with nested creation, transaction and authorization boundaries, generated relation configuration, and override examples; marked both features complete in the roadmap.</p>
+<hr />
+<h3 id="summary">🎯 Summary</h3>
+<p>Two declarative features reduce boilerplate for owned-object creation and relation editing in Django Admin. The full suite passes with 1,153 tests, including 45 new tests; all three changed runtime modules retain 100% coverage, and the five-run baseline comparison detected no significant performance regressions.</p>
+<p><strong>Key benefits:</strong></p>
+<ul>
+<li>🌳 Create parents, children, and grandchildren atomically.</li>
+<li>✅ Preserve child validation and hooks without accepting client-supplied parent FKs.</li>
+<li>🛠️ Edit related objects through generated, overridable admin inlines.</li>
+<li>⏳ Discover relations safely during Django application startup.</li>
+</ul></div><div class="release-card-footer"><a href="https://github.com/caspel26/django-ninja-aio-crud/releases/tag/v2.35.0">GitHub Release</a> · <a href="https://github.com/caspel26/django-ninja-aio-crud/compare/v2.34.3...v2.35.0">Diff</a></div></div>
+<div class="release-card" data-version="v2-34-3" style="display:none"><div class="release-card-header"><h4><a href="https://github.com/caspel26/django-ninja-aio-crud/releases/tag/v2.34.3">v2.34.3</a></h4><span class="release-card-date">Sep 02, 2026</span></div><div class="release-card-body"><hr />
+<h3 id="maintenance">🔧 Maintenance</h3>
+<ul>
+<li>Added Django Ninja 1.7 support, widened the supported dependency range to<br />
+<code>django-ninja&gt;=1.3.0,&lt;1.8.0</code>, and refreshed <code>uv.lock</code> to resolve 1.7.0.</li>
+</ul></div><div class="release-card-footer"><a href="https://github.com/caspel26/django-ninja-aio-crud/releases/tag/v2.34.3">GitHub Release</a> · <a href="https://github.com/caspel26/django-ninja-aio-crud/compare/v2.34.2...v2.34.3">Diff</a></div></div>
+<div class="release-card" data-version="v2-34-2" style="display:none"><div class="release-card-header"><h4><a href="https://github.com/caspel26/django-ninja-aio-crud/releases/tag/v2.34.2">v2.34.2</a></h4><span class="release-card-date">Aug 13, 2026</span></div><div class="release-card-body"><hr />
+<h3 id="bug-fix">🐛 Bug Fix</h3>
+<h4 id="n1-query-on-every-listretrieve-using-select_relatedprefetch_related">⚡ N+1 query on every list/retrieve using <code>select_related</code>/<code>prefetch_related</code></h4>
+<blockquote>
+<p><code>ninja_aio/models/utils.py</code></p>
+</blockquote>
+<p><code>_get_base_queryset</code> applied the <code>read</code>/<code>detail</code>-scoped <code>select_related</code>/<code>prefetch_related</code> optimizations and then unconditionally replaced the queryset with whatever the default <code>queryset_request</code> hook returned — silently discarding those optimizations for any <code>ModelSerializer</code> that declares <code>QuerySet.read</code>/<code>QuerySet.detail</code> without also duplicating the same config under <code>QuerySet.queryset_request</code>. Every row with a serialized relation field paid one extra query. Fixed by applying the scoped optimizations <em>after</em> the hook runs, on top of its result (<code>select_related</code>/<code>prefetch_related</code> are additive, so this is safe either way).</p>
+<p>Profiled repro (300 list calls, 50 rows/page, one relation field): <strong>3.54s → 0.635s (~5.6x faster)</strong>. Benchmark suite: <code>FilterPerformanceTest.relation_filter</code> <strong>-63.09%</strong> (2.72ms → 1.00ms).</p>
+<hr />
+<h4 id="duplicate-fk-resolution-query-on-every-item-in-bulk-createupdate">⚡ Duplicate FK resolution query on every item in bulk create/update</h4>
+<blockquote>
+<p><code>ninja_aio/models/utils.py</code></p>
+</blockquote>
+<p><code>_resolve_fk</code> re-resolved a foreign key ID to its related instance independently for every item in a <code>bulk_create_s</code>/<code>bulk_update_s</code> batch, even when many items shared the same FK value (e.g. a batch of rows all pointing at the same category or tenant). Fixed with a request-scoped <code>fk_cache</code> dict shared across the items of a single bulk call — a repeated <code>(model, pk)</code> pair now resolves once instead of once per item. Single <code>create_s</code>/<code>update_s</code> calls are unaffected (<code>fk_cache=None</code> by default).</p>
+<p>Benchmark suite: <code>MultiFKPerformanceTest.bulk_create_50x3fk</code> <strong>-33.01%</strong> (26.35ms → 17.66ms).</p>
+<hr />
+<h4 id="duplicate-object-fetch-on-delete-when-schema_delete_out-is-set">⚡ Duplicate object fetch on delete when <code>schema_delete_out</code> is set</h4>
+<blockquote>
+<p><code>ninja_aio/views/api.py</code>, <code>ninja_aio/models/utils.py</code></p>
+</blockquote>
+<p><code>delete_view</code> fetched the target object once to serialize it for the <code>schema_delete_out</code> response, then <code>delete_s</code> fetched the <em>same</em> object again internally just to call <code>.adelete()</code> on it. <code>delete_s</code> now accepts an optional <code>instance=</code> — when the caller already has the object, it deletes it directly instead of re-querying. Default behavior (<code>instance=None</code>, used by <code>hard_delete</code>, plain <code>DELETE</code>, and every other caller) is unchanged. Verified via a <code>get_object</code> call-count spy: 2 → 1 fetch per request.</p>
+<hr />
+<h3 id="summary">🎯 Summary</h3>
+<p>Three targeted bug fixes, all the same shape: redundant or dropped database work in the framework's own query/serialization glue, found and confirmed with <code>cProfile</code> and the project's own benchmark suite rather than assumed. No public API changes; all fixes are backward compatible (new parameters default to prior behavior).</p>
+<p><strong>Key benefits:</strong><br />
+- ⚡ List/retrieve endpoints serializing relations no longer pay an extra query per row<br />
+- ⚡ Bulk create/update with repeated FK values no longer re-resolves the same related object per item<br />
+- ⚡ Delete-with-response (<code>schema_delete_out</code>) no longer fetches the object twice<br />
+- ✅ Full regression coverage added for all three fixes; 100% coverage maintained on both changed files; zero performance regressions detected by the statistical regression tool</p>
+<hr /></div><div class="release-card-footer"><a href="https://github.com/caspel26/django-ninja-aio-crud/releases/tag/v2.34.2">GitHub Release</a> · <a href="https://github.com/caspel26/django-ninja-aio-crud/compare/v2.34.1...v2.34.2">Diff</a></div></div>
+<div class="release-card" data-version="v2-34-1" style="display:none"><div class="release-card-header"><h4><a href="https://github.com/caspel26/django-ninja-aio-crud/releases/tag/v2.34.1">v2.34.1</a></h4><span class="release-card-date">Aug 12, 2026</span></div><div class="release-card-body"><hr />
+<h3 id="security">🔒 Security</h3>
+<h4 id="raised-minimum-mcp-version-to-1281">⬆️ Raised minimum <code>mcp</code> version to <code>1.28.1</code></h4>
+<blockquote>
+<p><code>pyproject.toml</code></p>
+</blockquote>
+<p>The optional <code>mcp</code> extra's floor (<code>mcp&gt;=1.2.0, &lt;2.0.0</code>) allowed installing versions affected by six published GitHub Security Advisories against the <code>mcp</code> PyPI package — all <strong>High</strong> severity (CVSS 7.1–8.7): denial-of-service via uncaught exceptions (<a href="https://github.com/advisories/GHSA-j975-95f5-7wqh">CVE-2025-53365</a>, <a href="https://github.com/advisories/GHSA-3qhf-m339-9g5v">CVE-2025-53366</a>), DNS-rebinding auth bypass on HTTP transports (<a href="https://github.com/advisories/GHSA-9h52-p55h-vw2f">CVE-2025-66416</a>), cross-client access to the opt-in experimental task-handler feature (<a href="https://github.com/advisories/GHSA-hvrp-rf83-w775">CVE-2026-52870</a>), session hijacking via guessable session IDs (<a href="https://github.com/advisories/GHSA-jpw9-pfvf-9f58">CVE-2026-52869</a>), and missing origin validation on the deprecated websocket transport (<a href="https://github.com/advisories/GHSA-vj7q-gjh5-988w">CVE-2026-59950</a>).</p>
+<p><code>ninja_aio.mcp</code> only uses stdio transport with no experimental features enabled, so none of these were reachable through this project's code path — but the permissive floor still allowed installing vulnerable versions. The <code>mcp</code> extra now requires <code>mcp&gt;=1.28.1, &lt;2.0.0</code>, which is patched against all six.</p>
+<hr />
+<h3 id="summary">🎯 Summary</h3>
+<p>Dependency-floor security patch — no functional or API changes. If you installed <code>django-ninja-aio-crud[mcp]</code> previously, run <code>pip install -U "django-ninja-aio-crud[mcp]"</code> to pick up a patched <code>mcp</code> version.</p>
+<hr /></div><div class="release-card-footer"><a href="https://github.com/caspel26/django-ninja-aio-crud/releases/tag/v2.34.1">GitHub Release</a> · <a href="https://github.com/caspel26/django-ninja-aio-crud/compare/v2.34.0...v2.34.1">Diff</a></div></div>
+<div class="release-card" data-version="v2-34-0" style="display:none"><div class="release-card-header"><h4><a href="https://github.com/caspel26/django-ninja-aio-crud/releases/tag/v2.34.0">v2.34.0</a></h4><span class="release-card-date">Aug 11, 2026</span></div><div class="release-card-body"><hr />
+<h3 id="new-features">✨ New Features</h3>
+<h4 id="ai-agent-integration-mcp">🤖 AI Agent Integration (MCP)</h4>
+<blockquote>
+<p><code>ninja_aio/mcp/</code>, <code>ninja_aio/apps.py</code>, <code>ninja_aio/management/commands/mcp_server.py</code></p>
+</blockquote>
+<p>Every registered <code>APIViewSet</code> (CRUD, bulk operations, <code>@action</code>/<code>@on</code> custom endpoints) and <code>APIView</code> (custom hand-registered endpoints) can now be exposed as <a href="https://modelcontextprotocol.io">MCP</a> (Model Context Protocol) tools, so any MCP client — Claude Code, Claude Desktop, or any other client speaking the protocol — can list and call them directly against a real project. No glue code required: tools are generated from the ViewSets/Views you already wrote and stay in sync automatically.</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># my_project/api.py</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">ninja_aio</span><span class="w"> </span><span class="kn">import</span> <span class="n">NinjaAIO</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">ninja_aio.views</span><span class="w"> </span><span class="kn">import</span> <span class="n">APIViewSet</span>
+
+<span class="n">api</span> <span class="o">=</span> <span class="n">NinjaAIO</span><span class="p">()</span>
+
+<span class="nd">@api</span><span class="o">.</span><span class="n">viewset</span><span class="p">(</span><span class="n">Book</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">BookViewSet</span><span class="p">(</span><span class="n">APIViewSet</span><span class="p">):</span>
+    <span class="n">bulk_operations</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"create"</span><span class="p">,</span> <span class="s2">"update"</span><span class="p">,</span> <span class="s2">"delete"</span><span class="p">]</span>
+
+    <span class="nd">@action</span><span class="p">(</span><span class="n">detail</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">methods</span><span class="o">=</span><span class="p">[</span><span class="s2">"post"</span><span class="p">],</span> <span class="n">url_path</span><span class="o">=</span><span class="s2">"publish"</span><span class="p">)</span>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">publish</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">request</span><span class="p">,</span> <span class="n">pk</span><span class="p">):</span>
+        <span class="n">book</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_util</span><span class="o">.</span><span class="n">get_object</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="n">pk</span><span class="p">)</span>
+        <span class="n">book</span><span class="o">.</span><span class="n">published</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">await</span> <span class="n">book</span><span class="o">.</span><span class="n">asave</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">Status</span><span class="p">(</span><span class="mi">200</span><span class="p">,</span> <span class="p">{</span><span class="s2">"message"</span><span class="p">:</span> <span class="s2">"published"</span><span class="p">})</span>
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"django-ninja-aio-crud[mcp]"</span>
+python<span class="w"> </span>manage.py<span class="w"> </span>mcp_server<span class="w"> </span>my_project.api.api
+</code></pre></div>
+
+<p>Exposes <code>book_create</code>, <code>book_list</code>, <code>book_retrieve</code>, <code>book_update</code>, <code>book_delete</code>, <code>book_bulk_create</code>, <code>book_bulk_update</code>, <code>book_bulk_delete</code>, and <code>book_publish</code> as MCP tools — each with a JSON Schema <code>inputSchema</code> built straight from the viewset's own serializers/filters.</p>
+<p>Tool calls invoke the <em>exact same</em> registered handler functions the HTTP layer uses — pagination, filters, and <code>on_before_operation</code>/<code>on_before_object_operation</code>/<code>query_params_handler</code>/<code>on_list_queryset</code> hooks all run identically, not a re-implementation. Framework errors (<code>ninja_aio.exceptions.BaseException</code> subclasses, pydantic <code>ValidationError</code>) are converted to structured MCP error results instead of crashing the server.</p>
+<p><strong>Running the server:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Usage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>manage.py mcp_server</code> (recommended)</td>
+<td>Add <code>"ninja_aio"</code> to <code>INSTALLED_APPS</code>, then <code>python manage.py mcp_server myproject.api.api</code></td>
+</tr>
+<tr>
+<td>Standalone script</td>
+<td><code>django.setup()</code> + <code>asyncio.run(run_mcp_server(api))</code> — no <code>INSTALLED_APPS</code> changes needed</td>
+</tr>
+</tbody>
+</table>
+<p><strong>New public API:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>NinjaAIOMCPServer</code></td>
+<td>Builds and runs the MCP server; auto-discovers <code>@api.viewset(...)</code>/<code>@api.view(...)</code> registrations via <code>api._viewsets</code>/<code>api._views</code>, or accepts explicit <code>viewsets=</code>/<code>views=</code></td>
+</tr>
+<tr>
+<td><code>run_mcp_server(api, **kwargs)</code></td>
+<td>One-line coroutine wrapping <code>NinjaAIOMCPServer(...).run_stdio()</code></td>
+</tr>
+<tr>
+<td><code>describe_viewset(viewset)</code> / <code>describe_api_view(view)</code></td>
+<td>Build the list of <code>ToolSpec</code>s a viewset/view exposes, for programmatic use</td>
+</tr>
+<tr>
+<td><code>invoke_tool(spec, arguments)</code></td>
+<td>Invoke a single tool call outside the MCP protocol layer (e.g. in tests)</td>
+</tr>
+<tr>
+<td><code>ToolInvocationError</code></td>
+<td>Raised with a structured, JSON-serializable <code>.payload</code>/<code>.status_code</code> instead of letting framework exceptions propagate raw</td>
+</tr>
+</tbody>
+</table>
+<p>⚠️ <strong>Auth caveat:</strong> tool calls bypass django-ninja's router-level <code>auth=</code> wiring, since that check happens in <code>Operation.run</code>, not inside the handler itself. Pass <code>request_factory</code> to <code>NinjaAIOMCPServer</code> to attach your own <code>request.user</code>/auth context for <code>on_before_operation</code> hooks to check. See <code>docs/mcp.md</code> for the full write-up, including the auth caveat, protocol-level JSON examples, and an end-to-end agent transcript.</p>
+<hr />
+<h3 id="improvements">🔧 Improvements</h3>
+<h4 id="ninja_aio-can-now-be-installed-as-a-django-app">📦 <code>ninja_aio</code> can now be installed as a Django app</h4>
+<blockquote>
+<p><code>ninja_aio/__init__.py</code>, <code>ninja_aio/apps.py</code></p>
+</blockquote>
+<p><code>ninja_aio</code>'s public names (<code>NinjaAIO</code>, <code>APIViewSet</code>, <code>register_admin</code>, <code>Branding</code>, ...) now resolve lazily instead of being imported eagerly at package load. This is what makes <code>manage.py mcp_server</code> possible: previously, listing <code>"ninja_aio"</code> in <code>INSTALLED_APPS</code> raised <code>AppRegistryNotReady</code> (<code>ModelSerializer</code> is a <code>django.db.models.Model</code> subclass defined at import time, and Django imports the app module before its own registry is ready). It's also a prerequisite for overriding <code>BrandedSwagger</code>'s bundled Swagger UI template via Django's standard app-directories template loader — previously only achievable by subclassing in Python. Existing <code>from ninja_aio import NinjaAIO</code>-style usage is unaffected.</p>
+<h4 id="more-stable-performance-ci">🧪 More stable performance CI</h4>
+<blockquote>
+<p><code>tests/performance/test_scalability.py</code>, <code>tests/performance/check_regression.py</code>, <code>.github/workflows/performance.yml</code></p>
+</blockquote>
+<p><code>test_async_overhead_within_threshold</code> now compares the median of 3 timing iterations instead of a single unaveraged sample, which was too noise-sensitive on shared CI hardware to reliably distinguish a real regression from runner jitter. <code>check_regression.py</code> (the CI-only regression gate) now skips sub-microsecond benchmarks, where percentage swings are pure measurement noise rather than signal.</p>
+<hr />
+<h3 id="documentation">📚 Documentation</h3>
+<ul>
+<li>New <code>docs/mcp.md</code> — full MCP integration guide: setup (both the management command and standalone-script options), tool naming/discovery rules for ViewSets and Views, protocol-level JSON examples (<code>tools/list</code>/<code>tools/call</code>), an end-to-end agent transcript, the auth caveat, and the <code>NinjaAIOMCPServer</code> API reference.</li>
+<li>README — new "AI Agent Integration (MCP)" section and Features table entry.</li>
+<li><code>.github/workflows/coverage.yml</code>/<code>performance.yml</code>/<code>publish.yml</code> — pinned <code>flit_core&lt;4</code> after an upstream <code>flit</code> release dropped support for this project's <code>[tool.flit.metadata]</code> table, which was breaking dependency installation in CI.</li>
+</ul>
+<hr />
+<h3 id="summary">🎯 Summary</h3>
+<p>v2.34.0's headline feature is AI agent integration via MCP: any project built on django-ninja-aio-crud can now be operated on directly by an MCP client, with zero custom integration code — the same ViewSets and Views already serving HTTP traffic become the agent's tools.</p>
+<p><strong>Key benefits:</strong><br />
+- 🤖 <strong>Zero-config discovery</strong> — <code>@api.viewset(...)</code>/<code>@api.view(...)</code> registrations are picked up automatically<br />
+- 🔁 <strong>Real behavior, not a re-implementation</strong> — tool calls reuse the exact registered handlers, hooks included<br />
+- 🧩 <strong>Everything is covered</strong> — CRUD, bulk operations, <code>@action</code>/<code>@on</code> custom endpoints, and plain <code>APIView</code> endpoints<br />
+- 📦 <strong>Convenient to run</strong> — <code>manage.py mcp_server</code> once <code>ninja_aio</code> is an installed app, or a standalone script otherwise<br />
+- 🛡️ <strong>Auth caveat documented up front</strong> — router-level <code>auth=</code> doesn't apply to tool calls; <code>request_factory</code> + viewset hooks are the documented way to enforce it</p>
+<hr /></div><div class="release-card-footer"><a href="https://github.com/caspel26/django-ninja-aio-crud/releases/tag/v2.34.0">GitHub Release</a> · <a href="https://github.com/caspel26/django-ninja-aio-crud/compare/v2.33.0...v2.34.0">Diff</a></div></div>
+<div class="release-card" data-version="v2-33-0" style="display:none"><div class="release-card-header"><h4><a href="https://github.com/caspel26/django-ninja-aio-crud/releases/tag/v2.33.0">v2.33.0</a></h4><span class="release-card-date">Jun 26, 2026</span></div><div class="release-card-body"><hr />
+<h3 id="new-features">✨ New Features</h3>
+<h4 id="fieldselectionviewsetmixin-dynamic-field-selection-via-fields">🎛️ FieldSelectionViewSetMixin — Dynamic Field Selection via <code>?fields=</code></h4>
+<blockquote>
+<p><code>ninja_aio/views/mixins.py</code></p>
+</blockquote>
+<p><code>FieldSelectionViewSetMixin</code> adds a <code>?fields=</code> query parameter to <code>list</code> and <code>retrieve</code> endpoints, letting clients request only the fields they need. Unrequested fields are stripped from the response without altering the declared Pydantic schema.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">ninja_aio.views</span><span class="w"> </span><span class="kn">import</span> <span class="n">APIViewSet</span><span class="p">,</span> <span class="n">mixins</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">ArticleViewSet</span><span class="p">(</span><span class="n">mixins</span><span class="o">.</span><span class="n">FieldSelectionViewSetMixin</span><span class="p">,</span> <span class="n">APIViewSet</span><span class="p">):</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">Article</span>
+    <span class="n">schema_out</span> <span class="o">=</span> <span class="n">ArticleOut</span>
+    <span class="n">schema_in</span> <span class="o">=</span> <span class="n">ArticleIn</span>
+    <span class="n">schema_update</span> <span class="o">=</span> <span class="n">ArticlePatch</span>
+</code></pre></div>
+
+<p>Clients can then filter fields per request:</p>
+<div class="highlight"><pre><span></span><code><span class="err">GET /api/articles/?fields=id,title</span>
+<span class="err">GET /api/articles/42/?fields=id,title,author</span>
+</code></pre></div>
+
+<p><strong>Behaviour:</strong><br />
+- Unknown field names are silently ignored<br />
+- If all requested fields are unknown, the full response is returned<br />
+- Field selection is post-serialization — the queryset is not modified<br />
+- The <code>?fields</code> parameter does <strong>not</strong> interfere with filter mixins (e.g. <code>IcontainsFilterViewSetMixin</code>)<br />
+- The mixin is composable with <code>PermissionViewSetMixin</code>, filter mixins, and other mixins in any order</p>
+<p><strong>How it works:</strong> When a valid <code>?fields</code> value is detected, the mixin returns a <code>JsonResponse</code> directly instead of a <code>Status</code> tuple. Django Ninja passes <code>HttpResponse</code> subclasses through without Pydantic re-validation, so partial dicts do not break strict schema checks. The OpenAPI docs continue to show the full schema.</p>
+<p>The <code>_fields_param</code> class attribute (<code>"fields"</code> by default) can be overridden if the name conflicts with a model field.</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MyViewSet</span><span class="p">(</span><span class="n">mixins</span><span class="o">.</span><span class="n">FieldSelectionViewSetMixin</span><span class="p">,</span> <span class="n">APIViewSet</span><span class="p">):</span>
+    <span class="n">_fields_param</span> <span class="o">=</span> <span class="s2">"select"</span>  <span class="c1"># use ?select=id,name instead</span>
+    <span class="o">...</span>
+</code></pre></div>
+
+<hr />
+<h4 id="on-detail-action-shorthand-with-auto-object-prefetch">⚡ <code>@on</code> — Detail Action Shorthand with Auto Object Prefetch</h4>
+<blockquote>
+<p><code>ninja_aio/decorators/actions.py</code></p>
+</blockquote>
+<p><code>@on</code> is a new decorator for defining detail actions on <code>APIViewSet</code> that automatically fetches the target object before calling the handler. Unlike <code>@action(detail=True)</code>, the handler receives the <strong>model instance</strong> directly — no manual <code>get_object_or_404</code> required.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">ninja_aio.decorators</span><span class="w"> </span><span class="kn">import</span> <span class="n">on</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">ninja_aio.views</span><span class="w"> </span><span class="kn">import</span> <span class="n">APIViewSet</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">ArticleViewSet</span><span class="p">(</span><span class="n">APIViewSet</span><span class="p">):</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">Article</span>
+    <span class="n">schema_out</span> <span class="o">=</span> <span class="n">ArticleOut</span>
+    <span class="n">schema_in</span> <span class="o">=</span> <span class="n">ArticleIn</span>
+    <span class="n">schema_update</span> <span class="o">=</span> <span class="n">ArticlePatch</span>
+
+    <span class="nd">@on</span><span class="p">(</span><span class="s2">"publish"</span><span class="p">,</span> <span class="n">methods</span><span class="o">=</span><span class="p">[</span><span class="s2">"post"</span><span class="p">])</span>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">publish</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">request</span><span class="p">,</span> <span class="n">obj</span><span class="p">):</span>
+        <span class="n">obj</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="s2">"published"</span>
+        <span class="k">await</span> <span class="n">obj</span><span class="o">.</span><span class="n">asave</span><span class="p">(</span><span class="n">update_fields</span><span class="o">=</span><span class="p">[</span><span class="s2">"status"</span><span class="p">])</span>
+        <span class="k">return</span> <span class="n">Status</span><span class="p">(</span><span class="mi">200</span><span class="p">,</span> <span class="p">{</span><span class="s2">"message"</span><span class="p">:</span> <span class="s2">"published"</span><span class="p">,</span> <span class="s2">"id"</span><span class="p">:</span> <span class="n">obj</span><span class="o">.</span><span class="n">id</span><span class="p">})</span>
+
+    <span class="nd">@on</span><span class="p">(</span><span class="s2">"archive"</span><span class="p">,</span> <span class="n">methods</span><span class="o">=</span><span class="p">[</span><span class="s2">"patch"</span><span class="p">],</span> <span class="n">url_path</span><span class="o">=</span><span class="s2">"move-to-archive"</span><span class="p">)</span>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">archive</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">request</span><span class="p">,</span> <span class="n">obj</span><span class="p">):</span>
+        <span class="n">obj</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="s2">"archived"</span>
+        <span class="k">await</span> <span class="n">obj</span><span class="o">.</span><span class="n">asave</span><span class="p">(</span><span class="n">update_fields</span><span class="o">=</span><span class="p">[</span><span class="s2">"status"</span><span class="p">])</span>
+        <span class="k">return</span> <span class="n">Status</span><span class="p">(</span><span class="mi">200</span><span class="p">,</span> <span class="p">{</span><span class="s2">"message"</span><span class="p">:</span> <span class="s2">"archived"</span><span class="p">})</span>
+</code></pre></div>
+
+<p><strong>What <code>@on</code> does automatically:</strong><br />
+- Registers the endpoint as a <strong>detail action</strong> (URL includes <code>/{pk}/</code>)<br />
+- Calls <code>on_before_operation(request, action_name)</code> before any other work<br />
+- Fetches the model instance by pk via <code>get_object</code> — raises <strong>404</strong> if not found<br />
+- Calls <code>on_before_object_operation(request, action_name, obj)</code> with the fetched instance<br />
+- Passes the instance as <code>obj</code> to your handler</p>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>action_name</code></td>
+<td><code>str</code></td>
+<td>required</td>
+<td>Name of the action (used as url_path by default)</td>
+</tr>
+<tr>
+<td><code>methods</code></td>
+<td><code>list[str]</code></td>
+<td><code>["post"]</code></td>
+<td>HTTP methods to register</td>
+</tr>
+<tr>
+<td><code>url_path</code></td>
+<td><code>str \| None</code></td>
+<td><code>action_name</code></td>
+<td>URL path segment after <code>/{pk}/</code></td>
+</tr>
+<tr>
+<td><code>auth</code></td>
+<td>any</td>
+<td><code>NOT_SET</code></td>
+<td>Override default authentication</td>
+</tr>
+<tr>
+<td><code>response</code></td>
+<td>any</td>
+<td><code>NOT_SET</code></td>
+<td>Override response schema</td>
+</tr>
+<tr>
+<td><code>tags</code></td>
+<td><code>list[str] \| None</code></td>
+<td><code>None</code></td>
+<td>OpenAPI tags</td>
+</tr>
+<tr>
+<td><code>summary</code></td>
+<td><code>str \| None</code></td>
+<td><code>None</code></td>
+<td>OpenAPI summary</td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td><code>str \| None</code></td>
+<td><code>None</code></td>
+<td>OpenAPI description</td>
+</tr>
+<tr>
+<td><code>deprecated</code></td>
+<td><code>bool</code></td>
+<td><code>False</code></td>
+<td>Mark as deprecated in OpenAPI</td>
+</tr>
+</tbody>
+</table>
+<p><strong><code>@on</code> vs <code>@action</code>:</strong></p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th><code>@action</code></th>
+<th><code>@on</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Object pre-fetch</td>
+<td>❌ manual</td>
+<td>✅ automatic</td>
+</tr>
+<tr>
+<td>Hook chain</td>
+<td>✅</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>Default method</td>
+<td><code>get</code></td>
+<td><code>post</code></td>
+</tr>
+<tr>
+<td><code>detail</code></td>
+<td>configurable</td>
+<td>always <code>True</code></td>
+</tr>
+<tr>
+<td>Handler receives</td>
+<td><code>request, **kwargs</code></td>
+<td><code>request, obj</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="documentation">📚 Documentation</h3>
+<ul>
+<li><code>docs/api/views/mixins.md</code> — new <code>FieldSelectionViewSetMixin</code> section with attribute reference, tabbed examples, composability notes, and OpenAPI behaviour</li>
+<li><code>docs/api/views/decorators.md</code> — new <code>@on</code> section with parameter table, <code>@on</code> vs <code>@action</code> comparison, and worked examples</li>
+</ul>
+<hr />
+<h3 id="summary">🎯 Summary</h3>
+<p>v2.33.0 adds two quality-of-life features for <code>APIViewSet</code> users: field selection and object-aware detail actions.</p>
+<p><code>FieldSelectionViewSetMixin</code> lets API clients trim response payloads on the fly without any per-field schema boilerplate — useful for mobile clients, dashboards, or any consumer that only needs a subset of a large model's fields.</p>
+<p><code>@on</code> removes the repetitive pattern of pk-lookup + permission check + object fetch from custom detail actions. Declare the handler, receive the object, do the work — the framework handles the rest.</p>
+<p><strong>Key benefits:</strong><br />
+- 🎛️ <strong>Field selection</strong> — <code>?fields=id,name</code> on any list or retrieve endpoint, zero schema changes required<br />
+- ⚡ <strong><code>@on</code> shorthand</strong> — detail actions receive the model instance directly, with full hook chain support<br />
+- 🔌 <strong>Composable</strong> — both features work alongside existing mixins (<code>PermissionViewSetMixin</code>, filter mixins, etc.)<br />
+- 📄 <strong>OpenAPI-accurate</strong> — full schema is always visible in docs regardless of runtime field filtering<br />
+- 🛡️ <strong>404 by default</strong> — <code>@on</code> raises <code>NotFoundError</code> automatically when the pk is not found</p>
+<hr /></div><div class="release-card-footer"><a href="https://github.com/caspel26/django-ninja-aio-crud/releases/tag/v2.33.0">GitHub Release</a> · <a href="https://github.com/caspel26/django-ninja-aio-crud/compare/v2.32.0...v2.33.0">Diff</a></div></div>
+<div class="release-card" data-version="v2-32-0" style="display:none"><div class="release-card-header"><h4><a href="https://github.com/caspel26/django-ninja-aio-crud/releases/tag/v2.32.0">v2.32.0</a></h4><span class="release-card-date">May 27, 2026</span></div><div class="release-card-body"><hr />
+<h3 id="new-features">✨ New Features</h3>
+<h4 id="ninjaaiorouter-composable-router-with-view-and-viewset">🔀 NinjaAIORouter — Composable Router with <code>.view()</code> and <code>.viewset()</code></h4>
+<blockquote>
+<p><code>ninja_aio/router.py</code>, <code>ninja_aio/api.py</code></p>
+</blockquote>
+<p><code>NinjaAIORouter</code> is a new class that extends Django Ninja's <code>Router</code> with the same <code>.view()</code> and <code>.viewset()</code> decorators found on <code>NinjaAIO</code>. It lets you group related views and viewsets into a self-contained, nestable unit — then attach the whole tree to the main API with a single call.</p>
+<p>Each view or viewset registered on a <code>NinjaAIORouter</code> gets its own sub-router mounted at the given prefix (nested routing), so the full path hierarchy is preserved in the OpenAPI docs.</p>
+<p><strong>Two attachment styles are supported:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">ninja_aio</span><span class="w"> </span><span class="kn">import</span> <span class="n">NinjaAIO</span><span class="p">,</span> <span class="n">NinjaAIORouter</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">ninja_aio.views</span><span class="w"> </span><span class="kn">import</span> <span class="n">APIView</span><span class="p">,</span> <span class="n">APIViewSet</span>
+
+<span class="n">api</span> <span class="o">=</span> <span class="n">NinjaAIO</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">"My API"</span><span class="p">)</span>
+
+<span class="c1"># Style 1 — instantiate and attach with api.add_router()</span>
+<span class="n">router</span> <span class="o">=</span> <span class="n">NinjaAIORouter</span><span class="p">()</span>
+
+<span class="nd">@router</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">prefix</span><span class="o">=</span><span class="s2">"/health"</span><span class="p">,</span> <span class="n">tags</span><span class="o">=</span><span class="p">[</span><span class="s2">"Health"</span><span class="p">])</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">HealthView</span><span class="p">(</span><span class="n">APIView</span><span class="p">):</span>
+    <span class="o">...</span>
+
+<span class="nd">@router</span><span class="o">.</span><span class="n">viewset</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">Article</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="s2">"/articles"</span><span class="p">,</span> <span class="n">tags</span><span class="o">=</span><span class="p">[</span><span class="s2">"Articles"</span><span class="p">])</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">ArticleViewSet</span><span class="p">(</span><span class="n">APIViewSet</span><span class="p">):</span>
+    <span class="n">schema_in</span> <span class="o">=</span> <span class="n">ArticleIn</span>
+    <span class="n">schema_out</span> <span class="o">=</span> <span class="n">ArticleOut</span>
+    <span class="n">schema_update</span> <span class="o">=</span> <span class="n">ArticlePatch</span>
+
+<span class="n">api</span><span class="o">.</span><span class="n">add_router</span><span class="p">(</span><span class="s2">"/v1"</span><span class="p">,</span> <span class="n">router</span><span class="p">)</span>
+
+<span class="c1"># Style 2 — subclass with @api.router() decorator</span>
+<span class="nd">@api</span><span class="o">.</span><span class="n">router</span><span class="p">(</span><span class="s2">"/v2"</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">V2Router</span><span class="p">(</span><span class="n">NinjaAIORouter</span><span class="p">):</span>
+    <span class="k">pass</span>
+
+<span class="nd">@V2Router</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">prefix</span><span class="o">=</span><span class="s2">"/health"</span><span class="p">,</span> <span class="n">tags</span><span class="o">=</span><span class="p">[</span><span class="s2">"Health"</span><span class="p">])</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">HealthV2View</span><span class="p">(</span><span class="n">APIView</span><span class="p">):</span>
+    <span class="o">...</span>
+
+<span class="nd">@V2Router</span><span class="o">.</span><span class="n">viewset</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">Article</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="s2">"/articles"</span><span class="p">,</span> <span class="n">tags</span><span class="o">=</span><span class="p">[</span><span class="s2">"Articles"</span><span class="p">])</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">ArticleV2ViewSet</span><span class="p">(</span><span class="n">APIViewSet</span><span class="p">):</span>
+    <span class="o">...</span>
+</code></pre></div>
+
+<p>The <code>@api.router()</code> decorator on <code>NinjaAIO</code> instantiates the router class and mounts it in one step. Any keyword arguments (<code>auth</code>, <code>tags</code>, etc.) are forwarded to <code>api.add_router()</code>.</p>
+<p><strong><code>NinjaAIORouter</code> is exported from the top-level package:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">ninja_aio</span><span class="w"> </span><span class="kn">import</span> <span class="n">NinjaAIORouter</span>
+</code></pre></div>
+
+<p><strong>Versioned API example:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="nd">@api</span><span class="o">.</span><span class="n">router</span><span class="p">(</span><span class="s2">"/v1"</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">V1Router</span><span class="p">(</span><span class="n">NinjaAIORouter</span><span class="p">):</span>
+    <span class="k">pass</span>
+
+<span class="nd">@api</span><span class="o">.</span><span class="n">router</span><span class="p">(</span><span class="s2">"/v2"</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">V2Router</span><span class="p">(</span><span class="n">NinjaAIORouter</span><span class="p">):</span>
+    <span class="k">pass</span>
+
+<span class="nd">@V1Router</span><span class="o">.</span><span class="n">viewset</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">Article</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="s2">"/articles"</span><span class="p">,</span> <span class="n">tags</span><span class="o">=</span><span class="p">[</span><span class="s2">"v1 - Articles"</span><span class="p">])</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">ArticleV1ViewSet</span><span class="p">(</span><span class="n">APIViewSet</span><span class="p">):</span>
+    <span class="n">schema_out</span> <span class="o">=</span> <span class="n">ArticleV1Out</span>
+    <span class="o">...</span>
+
+<span class="nd">@V2Router</span><span class="o">.</span><span class="n">viewset</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">Article</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="s2">"/articles"</span><span class="p">,</span> <span class="n">tags</span><span class="o">=</span><span class="p">[</span><span class="s2">"v2 - Articles"</span><span class="p">])</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">ArticleV2ViewSet</span><span class="p">(</span><span class="n">APIViewSet</span><span class="p">):</span>
+    <span class="n">schema_out</span> <span class="o">=</span> <span class="n">ArticleV2Out</span>
+    <span class="o">...</span>
+</code></pre></div>
+
+<hr />
+<h3 id="documentation">📚 Documentation</h3>
+<ul>
+<li><code>docs/api/views/router.md</code> — new reference page for <code>NinjaAIORouter</code> covering both attachment styles, the versioned API pattern, and a when-to-use guidance table</li>
+<li><code>mkdocs.yml</code> — <code>NinjaAIORouter</code> added to the <strong>Views</strong> section of the API Reference nav</li>
+</ul>
+<hr />
+<h3 id="summary">🎯 Summary</h3>
+<p>v2.32.0 introduces <code>NinjaAIORouter</code>, a composable building block for organizing larger APIs. Instead of registering every view and viewset directly on the <code>NinjaAIO</code> instance, you can now group them by version (<code>/v1</code>, <code>/v2</code>) or domain (auth, billing, catalog) into isolated router objects, then attach the whole group with a single line.</p>
+<p><strong>Key benefits:</strong><br />
+- 🗂️ <strong>Domain grouping</strong> — keep related views and viewsets together, out of the top-level <code>api.py</code><br />
+- 🔢 <strong>API versioning</strong> — one <code>NinjaAIORouter</code> per version, attached under <code>/v1</code>, <code>/v2</code>, etc.<br />
+- 📦 <strong>Reusable routers</strong> — define a router in isolation and let consumers attach it to their own API instance<br />
+- 🔌 <strong>Two attachment styles</strong> — <code>api.add_router()</code> for plain compatibility, <code>@api.router()</code> for the decorator-first style consistent with <code>.view()</code> and <code>.viewset()</code><br />
+- ✅ <strong>Fully backwards-compatible</strong> — no changes to existing code required</p>
+<hr /></div><div class="release-card-footer"><a href="https://github.com/caspel26/django-ninja-aio-crud/releases/tag/v2.32.0">GitHub Release</a> · <a href="https://github.com/caspel26/django-ninja-aio-crud/compare/v2.31.0...v2.32.0">Diff</a></div></div>
+<div class="release-card" data-version="v2-31-0" style="display:none"><div class="release-card-header"><h4><a href="https://github.com/caspel26/django-ninja-aio-crud/releases/tag/v2.31.0">v2.31.0</a></h4><span class="release-card-date">May 15, 2026</span></div><div class="release-card-body"><hr />
 <h3 id="new-features">✨ New Features</h3>
 <h4 id="per-operation-response-schemas-schema_create_out-schema_update_out-schema_delete_out">🔀 Per-Operation Response Schemas (<code>schema_create_out</code>, <code>schema_update_out</code>, <code>schema_delete_out</code>)</h4>
 <blockquote>
@@ -10784,7 +11440,7 @@
 <p>Added proper line spacing for better code organization</p>
 </li>
 <li>
-<p><strong>Dynamic M2M Endpoint Documentation</strong>: </p>
+<p><strong>Dynamic M2M Endpoint Documentation</strong>:</p>
 </li>
 <li>Enhanced summary and description generation for M2M endpoints based on available operations</li>
 <li>Summary now dynamically shows "Add", "Remove", or "Add or Remove" based on configuration</li>
@@ -10828,7 +11484,7 @@
 <p>Added proper line spacing for better code organization</p>
 </li>
 <li>
-<p><strong>Dynamic M2M Endpoint Documentation</strong>: </p>
+<p><strong>Dynamic M2M Endpoint Documentation</strong>:</p>
 </li>
 <li>Enhanced summary and description generation for M2M endpoints based on available operations</li>
 <li>Summary now dynamically shows "Add", "Remove", or "Add or Remove" based on configuration</li>
@@ -10902,7 +11558,7 @@
 <h3 id="changed">Changed</h3>
 <ul>
 <li><strong>BREAKING</strong>: Refactored route registration system in <code>APIViewSet</code></li>
-<li>All CRUD views now use <code>@self.router</code> decorators instead of <code>@self.api</code> </li>
+<li>All CRUD views now use <code>@self.router</code> decorators instead of <code>@self.api</code></li>
 <li>Simplified path handling by using class properties (<code>self.path</code>, <code>self.get_path</code>, etc.) instead of string concatenation</li>
 <li>Removed explicit <code>tags</code> parameter from individual view decorators (now handled at router level)</li>
 <li>Streamlined <code>add_views_to_route()</code> method to directly return router registration</li>
@@ -10928,11 +11584,11 @@
 <div class="release-card" data-version="v0-9-1" style="display:none"><div class="release-card-header"><h4><a href="https://github.com/caspel26/django-ninja-aio-crud/releases/tag/v0.9.1">v0.9.1</a></h4><span class="release-card-date">Aug 25, 2025</span></div><div class="release-card-body"><hr />
 <h3 id="changed">Changed</h3>
 <ul>
-<li>Bumped version from 0.9.0 to 0.9.1 by @caspel26 </li>
+<li>Bumped version from 0.9.0 to 0.9.1 by @caspel26</li>
 </ul>
 <h3 id="removed">Removed</h3>
 <ul>
-<li>Removed <code>test_crud_routes()</code> method from test suite in <code>tests/generics/views.py</code> by @caspel26 </li>
+<li>Removed <code>test_crud_routes()</code> method from test suite in <code>tests/generics/views.py</code> by @caspel26</li>
 </ul>
 <h3 id="fixed">Fixed</h3>
 <ul>
@@ -10940,7 +11596,7 @@
 </ul>
 <h3 id="technical-details">Technical Details</h3>
 <ul>
-<li>Cleaned up test code by removing redundant route testing logic by @caspel26 </li>
+<li>Cleaned up test code by removing redundant route testing logic by @caspel26</li>
 <li>Improved test reliability by ensuring proper API context in relation creation helper method by @caspel26</li>
 </ul>
 <hr /></div><div class="release-card-footer"><a href="https://github.com/caspel26/django-ninja-aio-crud/releases/tag/v0.9.1">GitHub Release</a> · <a href="https://github.com/caspel26/django-ninja-aio-crud/compare/v0.9.0...v0.9.1">Diff</a></div></div>
@@ -10948,21 +11604,21 @@
 <h1 id="changelog">Changelog</h1>
 <h3 id="changed">Changed</h3>
 <ul>
-<li>Removed trailing slashes from base API routes by @caspel26 </li>
-<li>Renamed <code>add_views()</code> to <code>_add_views()</code> (now private implementation method) by @caspel26 </li>
-<li>Added comprehensive docstrings to <code>APIViewSet</code> class by @caspel26 </li>
+<li>Removed trailing slashes from base API routes by @caspel26</li>
+<li>Renamed <code>add_views()</code> to <code>_add_views()</code> (now private implementation method) by @caspel26</li>
+<li>Added comprehensive docstrings to <code>APIViewSet</code> class by @caspel26</li>
 <li>Added view-specific documentation properties by @caspel26 :</li>
 <li><code>list_docs</code></li>
 <li><code>create_docs</code></li>
 <li><code>retrieve_docs</code></li>
 <li><code>update_docs</code></li>
 <li><code>delete_docs</code></li>
-<li>Added automatic endpoint summaries and descriptions based on model metadata by @caspel26 </li>
+<li>Added automatic endpoint summaries and descriptions based on model metadata by @caspel26</li>
 <li>Improved path handling with new properties by @caspel26 :</li>
 <li><code>get_path</code></li>
 <li><code>get_path_retrieve</code></li>
-<li>Added <code>model_verbose_name</code> property for consistent naming by @caspel26 </li>
-<li>Updated test paths to match new URL structure by @caspel26 </li>
+<li>Added <code>model_verbose_name</code> property for consistent naming by @caspel26</li>
+<li>Updated test paths to match new URL structure by @caspel26</li>
 <li>Added trailing slash to <code>api_route_path</code> in test view classes by @caspel26</li>
 </ul>
 <hr /></div><div class="release-card-footer"><a href="https://github.com/caspel26/django-ninja-aio-crud/releases/tag/v0.9.0">GitHub Release</a> · <a href="https://github.com/caspel26/django-ninja-aio-crud/compare/v0.8.4...v0.9.0">Diff</a></div></div>
@@ -10973,7 +11629,7 @@
 <li>Updated <code>self.router_tag</code> assignment:</li>
 <li><strong>Before:</strong> <code>self.router_tag = self.model_util.model_name.capitalize()</code></li>
 <li><strong>After:</strong> <code>self.router_tag = " ".join(self.model._meta.verbose_name.capitalize().split(" "))</code></li>
-<li>This change improves the readability of the router tag by using the model's <code>verbose_name</code>, preserving spacing between words. by @caspel26 </li>
+<li>This change improves the readability of the router tag by using the model's <code>verbose_name</code>, preserving spacing between words. by @caspel26</li>
 </ul>
 <h4 id="minor-fixes">Minor Fixes</h4>
 <ul>
@@ -10983,7 +11639,7 @@
 <div class="release-card" data-version="v0-8-3" style="display:none"><div class="release-card-header"><h4><a href="https://github.com/caspel26/django-ninja-aio-crud/releases/tag/v0.8.3">v0.8.3</a></h4><span class="release-card-date">Jun 18, 2025</span></div><div class="release-card-body"><hr />
 <h3 id="changed">Changed</h3>
 <ul>
-<li>Updated version number from <code>0.8.2</code> to <code>0.8.3</code>. by @caspel26 </li>
+<li>Updated version number from <code>0.8.2</code> to <code>0.8.3</code>. by @caspel26</li>
 </ul>
 <h3 id="fixed">Fixed</h3>
 <ul>
@@ -10997,17 +11653,17 @@
 <li><code>get_auth</code></li>
 <li><code>post_auth</code></li>
 <li><code>patch_auth</code></li>
-<li><code>delete_auth</code> by @caspel26 </li>
+<li><code>delete_auth</code> by @caspel26</li>
 <li>Added helper methods to resolve per-method auth:</li>
 <li><code>get_view_auth()</code></li>
 <li><code>post_view_auth()</code></li>
 <li><code>patch_view_auth()</code></li>
-<li><code>delete_view_auth()</code> by @caspel26 </li>
+<li><code>delete_view_auth()</code> by @caspel26</li>
 </ul>
 <h3 id="changed">Changed</h3>
 <ul>
-<li>All route decorators (<code>@router.get</code>, <code>@router.post</code>, etc.) now use the new per-method auth resolution instead of the global <code>auth</code> attribute. by @caspel26 </li>
-<li>Minor type ignore hints (<code># type: ignore</code>) added for compatibility and typing support. by @caspel26 </li>
+<li>All route decorators (<code>@router.get</code>, <code>@router.post</code>, etc.) now use the new per-method auth resolution instead of the global <code>auth</code> attribute. by @caspel26</li>
+<li>Minor type ignore hints (<code># type: ignore</code>) added for compatibility and typing support. by @caspel26</li>
 </ul>
 <h3 id="fixed">Fixed</h3>
 <ul>
@@ -11018,7 +11674,7 @@
 <h1 id="whats-changed">What's Changed</h1>
 <h2 id="news">News:</h2>
 <ul>
-<li>Added support for IPAddress serialization by @caspel26 </li>
+<li>Added support for IPAddress serialization by @caspel26</li>
 </ul>
 <p><strong>Full Changelog</strong>: https://github.com/caspel26/django-ninja-aio-crud/compare/v0.8.0...v0.8.1</p>
 <hr /></div><div class="release-card-footer"><a href="https://github.com/caspel26/django-ninja-aio-crud/releases/tag/v0.8.1">GitHub Release</a> · <a href="https://github.com/caspel26/django-ninja-aio-crud/compare/v0.8.0...v0.8.1">Diff</a></div></div>
@@ -11076,7 +11732,7 @@
 <h1 id="whats-changed">What's Changed</h1>
 <h2 id="news">News:</h2>
 <ul>
-<li>Queryset request method is called while serializing output data by @caspel26 </li>
+<li>Queryset request method is called while serializing output data by @caspel26</li>
 </ul>
 <p><strong>Full Changelog</strong>: https://github.com/caspel26/django-ninja-aio-crud/compare/v0.7.6...v0.7.7</p>
 <hr /></div><div class="release-card-footer"><a href="https://github.com/caspel26/django-ninja-aio-crud/releases/tag/v0.7.7">GitHub Release</a> · <a href="https://github.com/caspel26/django-ninja-aio-crud/compare/v0.7.6...v0.7.7">Diff</a></div></div>
@@ -11084,7 +11740,7 @@
 <h1 id="whats-changed">What's Changed</h1>
 <h2 id="news">News:</h2>
 <ul>
-<li>Schema from orm method called async while serializing by @caspel26 </li>
+<li>Schema from orm method called async while serializing by @caspel26</li>
 </ul>
 <p><strong>Full Changelog</strong>: https://github.com/caspel26/django-ninja-aio-crud/compare/v0.7.5...v0.7.6</p>
 <hr /></div><div class="release-card-footer"><a href="https://github.com/caspel26/django-ninja-aio-crud/releases/tag/v0.7.6">GitHub Release</a> · <a href="https://github.com/caspel26/django-ninja-aio-crud/compare/v0.7.5...v0.7.6">Diff</a></div></div>
@@ -11092,7 +11748,7 @@
 <h1 id="whats-changed">What's Changed</h1>
 <h2 id="news">News:</h2>
 <ul>
-<li>During serialization model fields are get asynchronously by @caspel26 </li>
+<li>During serialization model fields are get asynchronously by @caspel26</li>
 </ul>
 <p><strong>Full Changelog</strong>: https://github.com/caspel26/django-ninja-aio-crud/compare/v0.7.4...v0.7.5</p>
 <hr /></div><div class="release-card-footer"><a href="https://github.com/caspel26/django-ninja-aio-crud/releases/tag/v0.7.5">GitHub Release</a> · <a href="https://github.com/caspel26/django-ninja-aio-crud/compare/v0.7.4...v0.7.5">Diff</a></div></div>
@@ -11100,7 +11756,7 @@
 <h1 id="whats-changed">What's Changed</h1>
 <h2 id="news">News:</h2>
 <ul>
-<li>Added to ModelSerializer related schema. can obtain it by generate_related_s method by @caspel26 </li>
+<li>Added to ModelSerializer related schema. can obtain it by generate_related_s method by @caspel26</li>
 <li>General serialization refactor by @caspel26</li>
 </ul>
 <h2 id="bug-fix">Bug Fix:</h2>
@@ -11113,7 +11769,7 @@
 <h1 id="whats-changed">What's Changed</h1>
 <h2 id="news">News:</h2>
 <ul>
-<li>Added to ModelSerializer related schema. can obtain it by generate_related_s method by @caspel26 </li>
+<li>Added to ModelSerializer related schema. can obtain it by generate_related_s method by @caspel26</li>
 <li>General serialization refactor by @caspel26</li>
 </ul>
 <h2 id="bug-fix">Bug Fix:</h2>
@@ -11171,7 +11827,7 @@
 <h2 id="news">News:</h2>
 <ul>
 <li>fix optionals Create and Update serializers , they didn't work properly with relations by @caspel26.</li>
-<li>now if the relation declared has a read serializer it will be used properly into serialization by @caspel26 </li>
+<li>now if the relation declared has a read serializer it will be used properly into serialization by @caspel26</li>
 </ul>
 <p><strong>Full Changelog</strong>: https://github.com/caspel26/django-ninja-aio-crud/compare/v0.6.3...v0.7.1</p>
 <hr /></div><div class="release-card-footer"><a href="https://github.com/caspel26/django-ninja-aio-crud/releases/tag/v0.7.1">GitHub Release</a> · <a href="https://github.com/caspel26/django-ninja-aio-crud/compare/v0.6.4...v0.7.1">Diff</a></div></div>
@@ -11179,7 +11835,7 @@
 <h1 id="whats-changed">What's Changed</h1>
 <h2 id="news">News:</h2>
 <ul>
-<li>Added with_qs_request param to ModelUtil get_object function by @caspel26. </li>
+<li>Added with_qs_request param to ModelUtil get_object function by @caspel26.</li>
 </ul>
 <p><strong>Full Changelog</strong>: https://github.com/caspel26/django-ninja-aio-crud/compare/v0.6.2...v0.6.3</p>
 <ul>
@@ -11191,7 +11847,7 @@
 <h1 id="whats-changed">What's Changed</h1>
 <h2 id="news">News:</h2>
 <ul>
-<li>Added with_qs_request param to ModelUtil get_object function by @caspel26. </li>
+<li>Added with_qs_request param to ModelUtil get_object function by @caspel26.</li>
 </ul>
 <p><strong>Full Changelog</strong>: https://github.com/caspel26/django-ninja-aio-crud/compare/v0.6.2...v0.6.3</p>
 <ul>
@@ -11312,7 +11968,7 @@
 <h2 id="news">News:</h2>
 <ul>
 <li>Added support for optional fields into serialization schemas by @caspel26.</li>
-<li>Better code error handling using Django Ninja exception handlers by @caspel26 </li>
+<li>Better code error handling using Django Ninja exception handlers by @caspel26</li>
 </ul>
 <p><strong>Full Changelog</strong>: https://github.com/caspel26/django-ninja-aio-crud/compare/v0.3.1...v0.4.0</p>
 <h1 id="schema-optional-fields-support">🚀  Schema optional fields support</h1>
@@ -11660,39 +12316,42 @@ BarAPI().add_views_to_route()</p>
 
 
 
-  
 
 
 
 
-                
+
+
+
+
+
               </article>
             </div>
-          
-          
+
+
   <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
 
 <script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
         </div>
-        
+
           <button type="button" class="md-top md-icon" data-md-component="top" hidden>
-  
+
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
   Back to top
 </button>
-        
+
       </main>
-      
+
         <footer class="md-footer">
-  
-    
-      
+
+
+
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
-        
-          
+
+
           <a href="../contributing/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Contributing">
             <div class="md-footer__button md-icon">
-              
+
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
             </div>
             <div class="md-footer__title">
@@ -11704,71 +12363,71 @@ BarAPI().add_views_to_route()</p>
               </div>
             </div>
           </a>
-        
-        
+
+
       </nav>
-    
-  
+
+
   <div class="md-footer-meta md-typeset">
     <div class="md-footer-meta__inner md-grid">
       <div class="md-copyright">
-  
+
     <div class="md-copyright__highlight">
       Copyright &copy; 2024 – 2026 caspel26
     </div>
-  
-  
+
+
     Made with
     <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
       Material for MkDocs
     </a>
-  
+
 </div>
-      
-        
+
+
 <div class="md-social">
-  
-    
-    
-    
-    
+
+
+
+
+
     <a href="https://github.com/caspel26/django-ninja-aio-crud" target="_blank" rel="noopener" title="GitHub" class="md-social__link">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
     </a>
-  
-    
-    
-    
-    
+
+
+
+
+
     <a href="https://pypi.org/project/django-ninja-aio-crud/" target="_blank" rel="noopener" title="PyPI" class="md-social__link">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.8 200.5c-7.7-30.9-22.3-54.2-53.4-54.2h-40.1v47.4c0 36.8-31.2 67.8-66.8 67.8H172.7c-29.2 0-53.4 25-53.4 54.3v101.8c0 29 25.2 46 53.4 54.3 33.8 9.9 66.3 11.7 106.8 0 26.9-7.8 53.4-23.5 53.4-54.3v-40.7H226.2v-13.6h160.2c31.1 0 42.6-21.7 53.4-54.2 11.2-33.5 10.7-65.7 0-108.6M286.2 444.7a20.4 20.4 0 1 1 0-40.7 20.4 20.4 0 1 1 0 40.7M167.8 248.1h106.8c29.7 0 53.4-24.5 53.4-54.3V91.9c0-29-24.4-50.7-53.4-55.6-35.8-5.9-74.7-5.6-106.8.1-45.2 8-53.4 24.7-53.4 55.6v40.7h106.9v13.6h-147c-31.1 0-58.3 18.7-66.8 54.2-9.8 40.7-10.2 66.1 0 108.6 7.6 31.6 25.7 54.2 56.8 54.2H101v-48.8c0-35.3 30.5-66.4 66.8-66.4m-6.6-183.4a20.4 20.4 0 1 1 0 40.8 20.4 20.4 0 1 1 0-40.8"/></svg>
     </a>
-  
+
 </div>
-      
+
     </div>
   </div>
 </footer>
-      
+
     </div>
     <div class="md-dialog" data-md-component="dialog">
       <div class="md-dialog__inner md-typeset"></div>
     </div>
-    
-    
-    
-      
+
+
+
+
       <script id="__config" type="application/json">{"base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.top", "navigation.footer", "navigation.sections", "navigation.indexes", "navigation.expand", "navigation.path", "toc.follow", "content.code.copy", "content.code.select", "content.code.annotate", "content.tabs.link", "content.tooltips", "content.footnote.tooltips", "search.suggest", "search.highlight", "search.share"], "search": "../assets/javascripts/workers/search.973d3a69.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"default": "latest", "provider": "mike", "repo": "caspel26/django-ninja-aio-crud"}}</script>
-    
-    
+
+
       <script src="../assets/javascripts/bundle.f55a23d4.min.js"></script>
-      
+
         <script src="../javascripts/theme.js"></script>
-      
+
         <script src="../javascripts/a11y.js"></script>
-      
+
         <script src="../javascripts/home.js"></script>
-      
-    
+
+
   </body>
 </html>
