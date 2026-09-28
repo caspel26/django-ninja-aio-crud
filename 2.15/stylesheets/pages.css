@@ -479,15 +479,30 @@
 }
 
 .md-typeset .nac-routes li {
+  margin: 0;
+  border-radius: 10px;
+  transition: background 0.2s var(--nac-ease), transform 0.2s var(--nac-ease);
+}
+
+.md-typeset .nac-route__button {
   display: grid;
   grid-template-columns: 64px minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
-  margin: 0;
+  width: 100%;
   padding: 9px 8px;
+  border: 0;
   border-radius: 10px;
-  cursor: default;
-  transition: background 0.2s var(--nac-ease), transform 0.2s var(--nac-ease);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.md-typeset .nac-route__button:focus-visible {
+  outline: 2px solid var(--nac-brand);
+  outline-offset: 2px;
 }
 
 .js .md-typeset .nac-routes li {
@@ -1044,7 +1059,7 @@
     display: none;
   }
 
-  .md-typeset .nac-routes li {
+  .md-typeset .nac-route__button {
     grid-template-columns: 64px minmax(0, 1fr);
   }
 
