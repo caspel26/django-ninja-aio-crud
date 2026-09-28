@@ -474,6 +474,10 @@ a.nac-version__item:hover {
   transition: color 0.2s var(--nac-ease), background 0.2s var(--nac-ease), transform 0.3s var(--nac-ease);
 }
 
+.nac-header .md-header__option label.md-header__button:not([hidden]) {
+  display: inline-flex;
+}
+
 .nac-header .md-header__option .md-header__button:hover,
 .nac-header__icon:hover {
   color: var(--nac-text);
