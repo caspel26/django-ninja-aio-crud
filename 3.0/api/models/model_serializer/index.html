@@ -4071,7 +4071,9 @@ running any query.</p>
   </span>
 
 <a href="#ninja_aio.models.serializers.ModelSerializer.create" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="language-python doc-signature highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-0-1"><span class="nf">create</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n"><span title="ninja_aio.types.InputData">InputData</span></span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">request</span><span class="p">:</span> <span class="n"><span title="django.http.HttpRequest">HttpRequest</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="ninja_aio.models.serializers.ModelSerializerT">ModelSerializerT</span></span>
+<div class="language-python doc-signature highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-0-1"><span class="nf">create</span><span class="p">(</span>
+</span><span id="__span-0-2">    <span class="n">data</span><span class="p">:</span> <span class="n"><span title="ninja_aio.types.InputData">InputData</span></span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">request</span><span class="p">:</span> <span class="n"><span title="django.http.HttpRequest">HttpRequest</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="__span-0-3"><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="ninja_aio.models.serializers.ModelSerializerT">ModelSerializerT</span></span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -4096,7 +4098,9 @@ running any query.</p>
   </span>
 
 <a href="#ninja_aio.models.serializers.ModelSerializer.acreate" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="language-python doc-signature highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-0-1"><span class="nf">acreate</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n"><span title="ninja_aio.types.InputData">InputData</span></span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">request</span><span class="p">:</span> <span class="n"><span title="django.http.HttpRequest">HttpRequest</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="ninja_aio.models.serializers.ModelSerializerT">ModelSerializerT</span></span>
+<div class="language-python doc-signature highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-0-1"><span class="nf">acreate</span><span class="p">(</span>
+</span><span id="__span-0-2">    <span class="n">data</span><span class="p">:</span> <span class="n"><span title="ninja_aio.types.InputData">InputData</span></span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">request</span><span class="p">:</span> <span class="n"><span title="django.http.HttpRequest">HttpRequest</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="__span-0-3"><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="ninja_aio.models.serializers.ModelSerializerT">ModelSerializerT</span></span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -4120,7 +4124,13 @@ running any query.</p>
   </span>
 
 <a href="#ninja_aio.models.serializers.ModelSerializer.get" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="language-python doc-signature highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-0-1"><span class="nf">get</span><span class="p">(</span><span class="n">pk</span><span class="p">:</span> <span class="n"><span title="ninja_aio.types.PrimaryKey">PrimaryKey</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">request</span><span class="p">:</span> <span class="n"><span title="django.http.HttpRequest">HttpRequest</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">optimize_for</span><span class="p">:</span> <span class="n"><span title="ninja_aio.types.QueryPurpose">QueryPurpose</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">lookups</span><span class="p">:</span> <span class="n"><span title="typing.Any">Any</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="ninja_aio.models.serializers.ModelSerializerT">ModelSerializerT</span></span>
+<div class="language-python doc-signature highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-0-1"><span class="nf">get</span><span class="p">(</span>
+</span><span id="__span-0-2">    <span class="n">pk</span><span class="p">:</span> <span class="n"><span title="ninja_aio.types.PrimaryKey">PrimaryKey</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-3">    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-4">    <span class="n">request</span><span class="p">:</span> <span class="n"><span title="django.http.HttpRequest">HttpRequest</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-5">    <span class="n">optimize_for</span><span class="p">:</span> <span class="n"><span title="ninja_aio.types.QueryPurpose">QueryPurpose</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-6">    <span class="o">**</span><span class="n">lookups</span><span class="p">:</span> <span class="n"><span title="typing.Any">Any</span></span><span class="p">,</span>
+</span><span id="__span-0-7"><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="ninja_aio.models.serializers.ModelSerializerT">ModelSerializerT</span></span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -4145,7 +4155,13 @@ running any query.</p>
   </span>
 
 <a href="#ninja_aio.models.serializers.ModelSerializer.aget" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="language-python doc-signature highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-0-1"><span class="nf">aget</span><span class="p">(</span><span class="n">pk</span><span class="p">:</span> <span class="n"><span title="ninja_aio.types.PrimaryKey">PrimaryKey</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">request</span><span class="p">:</span> <span class="n"><span title="django.http.HttpRequest">HttpRequest</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">optimize_for</span><span class="p">:</span> <span class="n"><span title="ninja_aio.types.QueryPurpose">QueryPurpose</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">lookups</span><span class="p">:</span> <span class="n"><span title="typing.Any">Any</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="ninja_aio.models.serializers.ModelSerializerT">ModelSerializerT</span></span>
+<div class="language-python doc-signature highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-0-1"><span class="nf">aget</span><span class="p">(</span>
+</span><span id="__span-0-2">    <span class="n">pk</span><span class="p">:</span> <span class="n"><span title="ninja_aio.types.PrimaryKey">PrimaryKey</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-3">    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-4">    <span class="n">request</span><span class="p">:</span> <span class="n"><span title="django.http.HttpRequest">HttpRequest</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-5">    <span class="n">optimize_for</span><span class="p">:</span> <span class="n"><span title="ninja_aio.types.QueryPurpose">QueryPurpose</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-6">    <span class="o">**</span><span class="n">lookups</span><span class="p">:</span> <span class="n"><span title="typing.Any">Any</span></span><span class="p">,</span>
+</span><span id="__span-0-7"><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="ninja_aio.models.serializers.ModelSerializerT">ModelSerializerT</span></span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -4169,7 +4185,12 @@ running any query.</p>
   </span>
 
 <a href="#ninja_aio.models.serializers.ModelSerializer.update" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="language-python doc-signature highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-0-1"><span class="nf">update</span><span class="p">(</span><span class="n">target</span><span class="p">:</span> <span class="n"><span title="ninja_aio.models.serializers.ModelSerializerT">ModelSerializerT</span></span> <span class="o">|</span> <span class="n"><span title="ninja_aio.types.PrimaryKey">PrimaryKey</span></span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n"><span title="ninja_aio.types.InputData">InputData</span></span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">request</span><span class="p">:</span> <span class="n"><span title="django.http.HttpRequest">HttpRequest</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="ninja_aio.models.serializers.ModelSerializerT">ModelSerializerT</span></span>
+<div class="language-python doc-signature highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-0-1"><span class="nf">update</span><span class="p">(</span>
+</span><span id="__span-0-2">    <span class="n">target</span><span class="p">:</span> <span class="n"><span title="ninja_aio.models.serializers.ModelSerializerT">ModelSerializerT</span></span> <span class="o">|</span> <span class="n"><span title="ninja_aio.types.PrimaryKey">PrimaryKey</span></span><span class="p">,</span>
+</span><span id="__span-0-3">    <span class="n">data</span><span class="p">:</span> <span class="n"><span title="ninja_aio.types.InputData">InputData</span></span><span class="p">,</span>
+</span><span id="__span-0-4">    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-5">    <span class="n">request</span><span class="p">:</span> <span class="n"><span title="django.http.HttpRequest">HttpRequest</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-6"><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="ninja_aio.models.serializers.ModelSerializerT">ModelSerializerT</span></span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -4194,7 +4215,12 @@ running any query.</p>
   </span>
 
 <a href="#ninja_aio.models.serializers.ModelSerializer.aupdate" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="language-python doc-signature highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-0-1"><span class="nf">aupdate</span><span class="p">(</span><span class="n">target</span><span class="p">:</span> <span class="n"><span title="ninja_aio.models.serializers.ModelSerializerT">ModelSerializerT</span></span> <span class="o">|</span> <span class="n"><span title="ninja_aio.types.PrimaryKey">PrimaryKey</span></span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n"><span title="ninja_aio.types.InputData">InputData</span></span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">request</span><span class="p">:</span> <span class="n"><span title="django.http.HttpRequest">HttpRequest</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="ninja_aio.models.serializers.ModelSerializerT">ModelSerializerT</span></span>
+<div class="language-python doc-signature highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-0-1"><span class="nf">aupdate</span><span class="p">(</span>
+</span><span id="__span-0-2">    <span class="n">target</span><span class="p">:</span> <span class="n"><span title="ninja_aio.models.serializers.ModelSerializerT">ModelSerializerT</span></span> <span class="o">|</span> <span class="n"><span title="ninja_aio.types.PrimaryKey">PrimaryKey</span></span><span class="p">,</span>
+</span><span id="__span-0-3">    <span class="n">data</span><span class="p">:</span> <span class="n"><span title="ninja_aio.types.InputData">InputData</span></span><span class="p">,</span>
+</span><span id="__span-0-4">    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-5">    <span class="n">request</span><span class="p">:</span> <span class="n"><span title="django.http.HttpRequest">HttpRequest</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-6"><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="ninja_aio.models.serializers.ModelSerializerT">ModelSerializerT</span></span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -4218,7 +4244,11 @@ running any query.</p>
   </span>
 
 <a href="#ninja_aio.models.serializers.ModelSerializer.destroy" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="language-python doc-signature highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-0-1"><span class="nf">destroy</span><span class="p">(</span><span class="n">target</span><span class="p">:</span> <span class="n"><span title="ninja_aio.models.serializers.ModelSerializerT">ModelSerializerT</span></span> <span class="o">|</span> <span class="n"><span title="ninja_aio.types.PrimaryKey">PrimaryKey</span></span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">request</span><span class="p">:</span> <span class="n"><span title="django.http.HttpRequest">HttpRequest</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+<div class="language-python doc-signature highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-0-1"><span class="nf">destroy</span><span class="p">(</span>
+</span><span id="__span-0-2">    <span class="n">target</span><span class="p">:</span> <span class="n"><span title="ninja_aio.models.serializers.ModelSerializerT">ModelSerializerT</span></span> <span class="o">|</span> <span class="n"><span title="ninja_aio.types.PrimaryKey">PrimaryKey</span></span><span class="p">,</span>
+</span><span id="__span-0-3">    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-4">    <span class="n">request</span><span class="p">:</span> <span class="n"><span title="django.http.HttpRequest">HttpRequest</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-5"><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -4243,7 +4273,11 @@ running any query.</p>
   </span>
 
 <a href="#ninja_aio.models.serializers.ModelSerializer.adestroy" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="language-python doc-signature highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-0-1"><span class="nf">adestroy</span><span class="p">(</span><span class="n">target</span><span class="p">:</span> <span class="n"><span title="ninja_aio.models.serializers.ModelSerializerT">ModelSerializerT</span></span> <span class="o">|</span> <span class="n"><span title="ninja_aio.types.PrimaryKey">PrimaryKey</span></span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">request</span><span class="p">:</span> <span class="n"><span title="django.http.HttpRequest">HttpRequest</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+<div class="language-python doc-signature highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-0-1"><span class="nf">adestroy</span><span class="p">(</span>
+</span><span id="__span-0-2">    <span class="n">target</span><span class="p">:</span> <span class="n"><span title="ninja_aio.models.serializers.ModelSerializerT">ModelSerializerT</span></span> <span class="o">|</span> <span class="n"><span title="ninja_aio.types.PrimaryKey">PrimaryKey</span></span><span class="p">,</span>
+</span><span id="__span-0-3">    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-4">    <span class="n">request</span><span class="p">:</span> <span class="n"><span title="django.http.HttpRequest">HttpRequest</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-5"><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -4267,7 +4301,12 @@ running any query.</p>
   </span>
 
 <a href="#ninja_aio.models.serializers.ModelSerializer.model_dump" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="language-python doc-signature highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-0-1"><span class="nf">model_dump</span><span class="p">(</span><span class="n">instance</span><span class="p">:</span> <span class="n"><span title="ninja_aio.models.serializers.ModelSerializerT">ModelSerializerT</span></span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">schema</span><span class="p">:</span> <span class="n"><span title="ninja_aio.types.SchemaType">SchemaType</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">strict</span><span class="p">:</span> <span class="n"><span title="bool">bool</span></span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="dict">dict</span></span><span class="p">[</span><span class="n"><span title="str">str</span></span><span class="p">,</span> <span class="n"><span title="typing.Any">Any</span></span><span class="p">]</span>
+<div class="language-python doc-signature highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-0-1"><span class="nf">model_dump</span><span class="p">(</span>
+</span><span id="__span-0-2">    <span class="n">instance</span><span class="p">:</span> <span class="n"><span title="ninja_aio.models.serializers.ModelSerializerT">ModelSerializerT</span></span><span class="p">,</span>
+</span><span id="__span-0-3">    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-4">    <span class="n">schema</span><span class="p">:</span> <span class="n"><span title="ninja_aio.types.SchemaType">SchemaType</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-5">    <span class="n">strict</span><span class="p">:</span> <span class="n"><span title="bool">bool</span></span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+</span><span id="__span-0-6"><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="dict">dict</span></span><span class="p">[</span><span class="n"><span title="str">str</span></span><span class="p">,</span> <span class="n"><span title="typing.Any">Any</span></span><span class="p">]</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -4292,7 +4331,11 @@ running any query.</p>
   </span>
 
 <a href="#ninja_aio.models.serializers.ModelSerializer.amodel_dump" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="language-python doc-signature highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-0-1"><span class="nf">amodel_dump</span><span class="p">(</span><span class="n">instance</span><span class="p">:</span> <span class="n"><span title="ninja_aio.models.serializers.ModelSerializerT">ModelSerializerT</span></span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">schema</span><span class="p">:</span> <span class="n"><span title="ninja_aio.types.SchemaType">SchemaType</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="dict">dict</span></span><span class="p">[</span><span class="n"><span title="str">str</span></span><span class="p">,</span> <span class="n"><span title="typing.Any">Any</span></span><span class="p">]</span>
+<div class="language-python doc-signature highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-0-1"><span class="nf">amodel_dump</span><span class="p">(</span>
+</span><span id="__span-0-2">    <span class="n">instance</span><span class="p">:</span> <span class="n"><span title="ninja_aio.models.serializers.ModelSerializerT">ModelSerializerT</span></span><span class="p">,</span>
+</span><span id="__span-0-3">    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-4">    <span class="n">schema</span><span class="p">:</span> <span class="n"><span title="ninja_aio.types.SchemaType">SchemaType</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-5"><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="dict">dict</span></span><span class="p">[</span><span class="n"><span title="str">str</span></span><span class="p">,</span> <span class="n"><span title="typing.Any">Any</span></span><span class="p">]</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -4316,7 +4359,13 @@ running any query.</p>
   </span>
 
 <a href="#ninja_aio.models.serializers.ModelSerializer.model_dumps" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="language-python doc-signature highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-0-1"><span class="nf">model_dumps</span><span class="p">(</span><span class="n">instances</span><span class="p">:</span> <span class="n"><span title="collections.abc.Iterable">Iterable</span></span><span class="p">[</span><span class="n"><span title="ninja_aio.models.serializers.ModelSerializerT">ModelSerializerT</span></span><span class="p">]</span> <span class="o">|</span> <span class="n"><span title="django.db.models.QuerySet">QuerySet</span></span><span class="p">[</span><span class="n"><span title="ninja_aio.models.serializers.ModelSerializerT">ModelSerializerT</span></span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">schema</span><span class="p">:</span> <span class="n"><span title="ninja_aio.types.SchemaType">SchemaType</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">strict</span><span class="p">:</span> <span class="n"><span title="bool">bool</span></span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="list">list</span></span><span class="p">[</span><span class="n"><span title="dict">dict</span></span><span class="p">[</span><span class="n"><span title="str">str</span></span><span class="p">,</span> <span class="n"><span title="typing.Any">Any</span></span><span class="p">]]</span>
+<div class="language-python doc-signature highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-0-1"><span class="nf">model_dumps</span><span class="p">(</span>
+</span><span id="__span-0-2">    <span class="n">instances</span><span class="p">:</span> <span class="n"><span title="collections.abc.Iterable">Iterable</span></span><span class="p">[</span><span class="n"><span title="ninja_aio.models.serializers.ModelSerializerT">ModelSerializerT</span></span><span class="p">]</span>
+</span><span id="__span-0-3">    <span class="o">|</span> <span class="n"><span title="django.db.models.QuerySet">QuerySet</span></span><span class="p">[</span><span class="n"><span title="ninja_aio.models.serializers.ModelSerializerT">ModelSerializerT</span></span><span class="p">],</span>
+</span><span id="__span-0-4">    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-5">    <span class="n">schema</span><span class="p">:</span> <span class="n"><span title="ninja_aio.types.SchemaType">SchemaType</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-6">    <span class="n">strict</span><span class="p">:</span> <span class="n"><span title="bool">bool</span></span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+</span><span id="__span-0-7"><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="list">list</span></span><span class="p">[</span><span class="n"><span title="dict">dict</span></span><span class="p">[</span><span class="n"><span title="str">str</span></span><span class="p">,</span> <span class="n"><span title="typing.Any">Any</span></span><span class="p">]]</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -4341,7 +4390,12 @@ running any query.</p>
   </span>
 
 <a href="#ninja_aio.models.serializers.ModelSerializer.amodel_dumps" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="language-python doc-signature highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-0-1"><span class="nf">amodel_dumps</span><span class="p">(</span><span class="n">instances</span><span class="p">:</span> <span class="n"><span title="collections.abc.Iterable">Iterable</span></span><span class="p">[</span><span class="n"><span title="ninja_aio.models.serializers.ModelSerializerT">ModelSerializerT</span></span><span class="p">]</span> <span class="o">|</span> <span class="n"><span title="django.db.models.QuerySet">QuerySet</span></span><span class="p">[</span><span class="n"><span title="ninja_aio.models.serializers.ModelSerializerT">ModelSerializerT</span></span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">schema</span><span class="p">:</span> <span class="n"><span title="ninja_aio.types.SchemaType">SchemaType</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="list">list</span></span><span class="p">[</span><span class="n"><span title="dict">dict</span></span><span class="p">[</span><span class="n"><span title="str">str</span></span><span class="p">,</span> <span class="n"><span title="typing.Any">Any</span></span><span class="p">]]</span>
+<div class="language-python doc-signature highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-0-1"><span class="nf">amodel_dumps</span><span class="p">(</span>
+</span><span id="__span-0-2">    <span class="n">instances</span><span class="p">:</span> <span class="n"><span title="collections.abc.Iterable">Iterable</span></span><span class="p">[</span><span class="n"><span title="ninja_aio.models.serializers.ModelSerializerT">ModelSerializerT</span></span><span class="p">]</span>
+</span><span id="__span-0-3">    <span class="o">|</span> <span class="n"><span title="django.db.models.QuerySet">QuerySet</span></span><span class="p">[</span><span class="n"><span title="ninja_aio.models.serializers.ModelSerializerT">ModelSerializerT</span></span><span class="p">],</span>
+</span><span id="__span-0-4">    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-5">    <span class="n">schema</span><span class="p">:</span> <span class="n"><span title="ninja_aio.types.SchemaType">SchemaType</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-6"><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="list">list</span></span><span class="p">[</span><span class="n"><span title="dict">dict</span></span><span class="p">[</span><span class="n"><span title="str">str</span></span><span class="p">,</span> <span class="n"><span title="typing.Any">Any</span></span><span class="p">]]</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
