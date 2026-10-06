@@ -1,22 +1,42 @@
+import asyncio
 import logging
-from functools import wraps
+from functools import partial, wraps
 
-from django.db.transaction import Atomic
-from asgiref.sync import sync_to_async
+from django.db import transaction
+from asgiref.sync import async_to_sync, sync_to_async
 
 logger = logging.getLogger("ninja_aio.decorators")
+_CANCELLED = object()
 
 
-class AsyncAtomicContextManager(Atomic):
-    def __init__(self, using=None, savepoint=True, durable=False):
-        super().__init__(using, savepoint, durable)
+async def _await_call(func, args, kwargs):
+    return await func(*args, **kwargs)
 
-    async def __aenter__(self):
-        await sync_to_async(super().__enter__)()
-        return self
 
-    async def __aexit__(self, exc_type, exc_value, traceback):
-        await sync_to_async(super().__exit__)(exc_type, exc_value, traceback)
+def _run_atomic(func, args, kwargs, using):
+    try:
+        with transaction.atomic(using=using):
+            return async_to_sync(_await_call)(func, args, kwargs)
+    except asyncio.CancelledError:
+        # Complete rollback before propagating cancellation on the event loop.
+        # A CancelledError on the executor's Future can otherwise be left
+        # unconsumed when sync_to_async cancels its shielded await.
+        return _CANCELLED
+
+
+async def arun_atomic(func, *args, using=None, **kwargs):
+    """Run a coroutine with transaction ownership held by its database worker.
+
+    Bridging only Atomic.__enter__/__exit__ lets unrelated tasks interleave
+    writes on the same connection. Hold the worker for the entire operation;
+    async_to_sync routes this coroutine's ORM calls back to that worker while
+    sibling operations wait on its original executor. Nested calls retain
+    Django's savepoint semantics and hooks still run on the caller's event loop.
+    """
+    result = await sync_to_async(_run_atomic)(func, args, kwargs, using)
+    if result is _CANCELLED:
+        raise asyncio.CancelledError
+    return result
 
 
 def aatomic(func):
@@ -31,8 +51,8 @@ def aatomic(func):
         func (Callable): The asynchronous function to wrap.
 
     Returns:
-        Callable: A new async function that, when awaited, runs inside an
-        AsyncAtomicContextManager transaction.
+        Callable: A new async function that, when awaited, runs inside a
+        database transaction owned by a synchronous worker.
 
     Behavior:
         - Opens an async atomic transaction before invoking the wrapped coroutine.
@@ -45,17 +65,15 @@ def aatomic(func):
             # Perform multiple related DB writes atomically
             ...
 
-    Notes:
-        - Ensure AsyncAtomicContextManager is properly implemented to integrate with
-          your async ORM / database backend.
-        - Only use on async functions.
+    Operations sharing a database worker run sequentially. Hooks must not wait
+    for an independent database operation queued on that same worker.
+    Only use on async functions.
     """
 
     @wraps(func)
     async def wrapper(*args, **kwargs):
         logger.debug(f"Entering atomic transaction for {func.__qualname__}")
-        async with AsyncAtomicContextManager():
-            return await func(*args, **kwargs)
+        return await arun_atomic(partial(func, *args, **kwargs))
 
     return wrapper
 

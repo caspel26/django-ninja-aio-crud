@@ -1627,7 +1627,11 @@ class BaseSerializer:
             )
         if isinstance(data, schema):
             return data
-        payload = data.model_dump(by_alias=True) if isinstance(data, Schema) else data
+        payload = (
+            data.model_dump(by_alias=True, exclude_unset=kind == "update")
+            if isinstance(data, Schema)
+            else data
+        )
         try:
             return schema.model_validate(payload)
         except ValidationError as exc:

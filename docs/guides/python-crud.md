@@ -208,6 +208,10 @@ the write, like `post_create`, `custom_actions`, `after_save`,
 `@on_delete` hooks, or nested writes. If one of these hooks raises, the write
 is rolled back.
 
+Async transactions reserve their database worker for the entire operation,
+including hooks. Independent calls sharing that worker run sequentially, so
+a hook must not wait for a sibling database operation on the same worker.
+
 Wrap the calls in `transaction.atomic()` when several steps must succeed or
 fail together:
 

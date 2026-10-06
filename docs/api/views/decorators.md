@@ -114,6 +114,11 @@ async def import_articles(self, request):
     ...
 ```
 
+Async transactions keep their database worker until the function and its hooks
+finish. Independent operations sharing that worker run sequentially; a hook
+must not wait for another operation queued on the same worker. Nested
+`aatomic` calls use savepoints, and cancellation rolls back the transaction.
+
 !!! deprecated "Deprecated in 3.0"
 
     `@api_get`, `@api_post`, `@api_put`, `@api_patch`, `@api_delete`, `@api_options` and `@api_head` are replaced by `@action`. See [Route decorators](../../migration/deprecations.md#route-decorators).

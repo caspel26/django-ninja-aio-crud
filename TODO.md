@@ -43,6 +43,9 @@
 | 33 | ~~Nested writes~~ | `models/serializers.py`, `models/utils.py` | v2.35.0 | `CreateSerializer.nested` creates owned reverse-FK children atomically, including grandchildren, validation, hooks, and per-parent rollback in bulk calls. Create-only. |
 | 34 | ~~Auto admin inlines~~ | `admin.py` | v2.35.0 | Reverse FK/O2O inlines with explicit `fk_name`, editable child fields, standard M2M widgets, and deferred relation discovery during app startup. |
 | 35 | ~~Configurable error schema~~ | `views/api.py`, `views/mixins.py`, `helpers/api.py` | v2.36.0 | `API.error_schema` (default `GenericMessageSchema`) replaces the hardcoded schema in every generated CRUD/M2M endpoint's error responses — override once on a shared base class to document a project's own error contract. |
+| 36 | ~~M2M serializer queryset scope~~ | `helpers/api.py` | v3.0.1 | Add/remove validation and related lists honor the configured serializer's request scope in both execution modes. |
+| 37 | ~~Async transaction ownership~~ | `decorators/views.py`, `models/utils.py` | v3.0.1 | Reserve the database worker through writes and hooks, preserving independent rollback, nested savepoints and cancellation. |
+| 38 | ~~Custom PATCH supplied fields~~ | `models/serializers.py` | v3.0.1 | Preserve supplied-field information when revalidating custom update schemas, leaving omitted defaults unchanged. |
 
 ---
 

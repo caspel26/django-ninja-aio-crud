@@ -1,5 +1,48 @@
 # 📋 Release Notes
 
+## 🏷️ [v3.0.1] - 2026-10-07
+
+---
+
+### 🔧 Improvements
+
+#### 🔐 Many-to-Many Queryset Scope
+> `ninja_aio/helpers/api.py`
+
+Related endpoints now honor the configured serializer's request-scoped queryset in both execution modes. Add/remove validation rejects records outside that scope, including when a custom query handler is configured. Related lists apply the scope before counting and pagination, preventing records from another tenant from being exposed or linked.
+
+#### 🛡️ Async Transaction Ownership
+> `ninja_aio/decorators/views.py`, `ninja_aio/models/utils.py`
+
+Async CRUD, nested writes, bulk operations and `aatomic` now keep the database worker for the entire transaction, including hooks. A failing operation cannot roll back an independent successful write on the same worker. Nested calls retain savepoint behavior, and cancellation completes rollback before releasing the worker.
+
+Independent operations sharing a worker run sequentially. Hooks must not wait for a sibling database operation queued on that same worker. Transaction bodies use named methods instead of nested helper functions.
+
+#### 📝 Custom PATCH Schema Fields
+> `ninja_aio/models/serializers.py`
+
+Revalidating a custom input schema now preserves which update fields were supplied. Omitted defaults no longer overwrite stored values; explicitly supplied values, including `null` when allowed by the update schema, remain part of the update.
+
+---
+
+### 📚 Documentation
+
+Documented async transaction scheduling and updated the release workflow's documentation version choices. Documentation fixes since 3.0.0 restore complete release history, correct homepage response previews, and improve theme icons and legacy page styling.
+
+---
+
+### 🎯 Summary
+
+This patch fixes three reproduced regressions, with 16 additional regression tests covering sync/async behavior, concurrent writes, nested rollback and cancellation.
+
+**Key benefits:**
+
+- 🔐 Related endpoints preserve the serializer's queryset scope.
+- 🛡️ Independent writes cannot share an async transaction's rollback.
+- 📝 Custom PATCH schemas leave omitted fields unchanged.
+
+---
+
 ## 🏷️ [v3.0.0] - 2026-09-27
 
 ---

@@ -24,7 +24,7 @@ from ninja_aio.exceptions import (
     OperationValidationError,
     SerializeError,
 )
-from ninja_aio.decorators.views import AsyncAtomicContextManager
+from ninja_aio.decorators.views import arun_atomic
 from ninja_aio.models.hooks import resolve_async_hook, resolve_sync_hook
 from ninja_aio.types import (
     BulkFailure,
@@ -160,8 +160,11 @@ async def arun_bulk(
         pk = None
         try:
             pk, payload = prepare(item)
-            async with AsyncAtomicContextManager(using=using) if atomic else nullcontext():
-                result.succeeded.append(await operation(payload))
+            value = (
+                await arun_atomic(operation, payload, using=using)
+                if atomic else await operation(payload)
+            )
+            result.succeeded.append(value)
         except Exception as exc:
             result.failed.append(bulk_failure(index, exc, pk))
     return result
@@ -1541,17 +1544,16 @@ class ModelUtil(Generic[ModelT]):
             from ninja_aio.models.hooks import get_hooks
 
             hooks = get_hooks(self.serializer_class or self.model)
-            atomic = (
-                AsyncAtomicContextManager(using=router.db_for_write(self.model))
-                if self._needs_atomic(hooks)
-                else nullcontext()
-            )
             # Like the sync path: resolve input and foreign keys before the transaction.
             parsed = await self.aparse_input_data(request, data, fk_cache)
-            async with atomic:
-                return await self._persist_instance(
-                    request, data, fk_cache, extra_fields, parsed=parsed
+            if self._needs_atomic(hooks):
+                return await arun_atomic(
+                    self._persist_instance, request, data, fk_cache, extra_fields,
+                    parsed=parsed, using=router.db_for_write(self.model),
                 )
+            return await self._persist_instance(
+                request, data, fk_cache, extra_fields, parsed=parsed
+            )
         using = router.db_for_write(self.model)
         if any(
             router.db_for_write(child) != using
@@ -1560,23 +1562,34 @@ class ModelUtil(Generic[ModelT]):
             raise ImproperlyConfigured(
                 "Nested writes require one database for the owned graph"
             )
-        async with AsyncAtomicContextManager(using=using):
-            obj = await self._persist_instance(request, data, fk_cache, extra_fields)
-            for name, (child_model, fk_name) in self.nested_fields.items():
-                child_util = ModelUtil(child_model)
-                child_schema = child_model.generate_nested_child_schema(fk_name)
-                # Sequential writes ensure no child task survives a rollback.
-                for child_data in getattr(data, name, ()):
-                    if not isinstance(child_data, child_schema):
-                        child_data = child_schema.model_validate(
-                            child_data.model_dump(by_alias=True)
-                            if isinstance(child_data, Schema)
-                            else child_data
-                        )
-                    await child_util.acreate_instance(
-                        request, child_data, extra_fields={fk_name: obj}
+        return await arun_atomic(
+            self._acreate_graph, request, data, fk_cache, extra_fields, using=using
+        )
+
+    async def _acreate_graph(
+        self,
+        request: HttpRequest | None,
+        data: Schema,
+        fk_cache: dict[tuple[type, Any], Any] | None,
+        extra_fields: dict[str, Any] | None,
+    ) -> ModelT:
+        """Persist the parent and its children inside the caller's transaction."""
+        obj = await self._persist_instance(request, data, fk_cache, extra_fields)
+        for name, (child_model, fk_name) in self.nested_fields.items():
+            child_util = ModelUtil(child_model)
+            child_schema = child_model.generate_nested_child_schema(fk_name)
+            # Sequential writes ensure no child task survives a rollback.
+            for child_data in getattr(data, name, ()):
+                if not isinstance(child_data, child_schema):
+                    child_data = child_schema.model_validate(
+                        child_data.model_dump(by_alias=True)
+                        if isinstance(child_data, Schema)
+                        else child_data
                     )
-            return obj
+                await child_util.acreate_instance(
+                    request, child_data, extra_fields={fk_name: obj}
+                )
+        return obj
 
     async def _persist_instance(
         self,
@@ -1861,11 +1874,8 @@ class ModelUtil(Generic[ModelT]):
         """
         from ninja_aio.models.hooks import (
             OperationContext,
-            ainvoke_hook,
-            asuppress_signals,
             get_hooks,
             detect_changed_fields,
-            afire_update_hooks,
         )
 
         logger.info(f"Updating {self.model.__name__} (pk={pk})")
@@ -1891,31 +1901,42 @@ class ModelUtil(Generic[ModelT]):
         )
         context.changed_fields = changed_fields
 
-        atomic = (
-            AsyncAtomicContextManager(using=router.db_for_write(self.model))
-            if self._needs_atomic(hooks)
-            else nullcontext()
-        )
-        async with atomic:
-            for k, v in payload.items():
-                setattr(obj, k, v)
-
-            if self.with_serializer:
-                await ainvoke_hook(context, "custom_actions", customs, obj)
-            elif isinstance(self.model, ModelSerializerMeta):
-                await ainvoke_hook(context, "custom_actions", customs)
-            async with asuppress_signals():
-                if self.with_serializer:
-                    await self.serializer._asave_instance(obj)
-                else:
-                    await obj.asave()
-
-            if hooks:
-                target, hook_instance = self._reactive_target(obj)
-                await afire_update_hooks(target, changed_fields, hooks, hook_instance)
+        if self._needs_atomic(hooks):
+            await arun_atomic(
+                self._apersist_update, context, customs, hooks,
+                using=router.db_for_write(self.model),
+            )
+        else:
+            await self._apersist_update(context, customs, hooks)
 
         logger.debug(f"Updated {self.model.__name__} (pk={pk})")
         return obj
+
+    async def _apersist_update(
+        self, context, customs: dict, hooks: dict | None
+    ) -> None:
+        """Apply an update and its hooks inside the caller's transaction."""
+        from ninja_aio.models.hooks import (
+            ainvoke_hook,
+            asuppress_signals,
+            afire_update_hooks,
+        )
+
+        obj = context.instance
+        for name, value in context.data.items():
+            setattr(obj, name, value)
+        if self.with_serializer:
+            await ainvoke_hook(context, "custom_actions", customs, obj)
+        elif isinstance(self.model, ModelSerializerMeta):
+            await ainvoke_hook(context, "custom_actions", customs)
+        async with asuppress_signals():
+            if self.with_serializer:
+                await self.serializer._asave_instance(obj)
+            else:
+                await obj.asave()
+        if hooks:
+            target, hook_instance = self._reactive_target(obj)
+            await afire_update_hooks(target, context.changed_fields, hooks, hook_instance)
 
     async def update_s(
         self,
@@ -1988,31 +2009,36 @@ class ModelUtil(Generic[ModelT]):
         -------
         None
         """
-        from ninja_aio.models.hooks import (
-            asuppress_signals,
-            get_hooks,
-            aexecute_reactive_hooks,
-            _is_overridden,
-        )
+        from ninja_aio.models.hooks import get_hooks
 
         logger.info(f"Deleting {self.model.__name__} (pk={pk})")
         obj = instance if instance is not None else await self.aget_object(request, pk)
         hooks = get_hooks(self.serializer_class or self.model)
-        atomic = (
-            AsyncAtomicContextManager(using=router.db_for_write(self.model))
-            if self._needs_atomic(hooks)
-            else nullcontext()
-        )
-        async with atomic:
-            async with asuppress_signals():
-                await obj.adelete()
-            logger.debug(f"Deleted {self.model.__name__} (pk={pk})")
-            if self.with_serializer and _is_overridden(self.serializer, "on_delete"):
-                await sync_to_async(self.serializer.on_delete)(obj)
+        if self._needs_atomic(hooks):
+            await arun_atomic(
+                self._adestroy_with_hooks, obj, hooks,
+                using=router.db_for_write(self.model),
+            )
+        else:
+            await self._adestroy_with_hooks(obj, hooks)
 
-            if hooks and hooks["delete"]:
-                target, hook_instance = self._reactive_target(obj)
-                await aexecute_reactive_hooks(target, hooks["delete"], hook_instance)
+    async def _adestroy_with_hooks(self, obj: ModelT, hooks: dict | None) -> None:
+        """Delete an object and run its hooks inside the caller's transaction."""
+        from ninja_aio.models.hooks import (
+            asuppress_signals,
+            aexecute_reactive_hooks,
+            _is_overridden,
+        )
+
+        pk = obj.pk
+        async with asuppress_signals():
+            await obj.adelete()
+        logger.debug(f"Deleted {self.model.__name__} (pk={pk})")
+        if self.with_serializer and _is_overridden(self.serializer, "on_delete"):
+            await sync_to_async(self.serializer.on_delete)(obj)
+        if hooks and hooks["delete"]:
+            target, hook_instance = self._reactive_target(obj)
+            await aexecute_reactive_hooks(target, hooks["delete"], hook_instance)
 
     @staticmethod
     def _split_target(target: ModelT | PrimaryKey) -> tuple[PrimaryKey, ModelT | None]:

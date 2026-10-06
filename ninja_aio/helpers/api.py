@@ -247,6 +247,12 @@ class ManyToManyAPI:
         self.path_schema = self.view_set.path_schema
         self.default_auth = self.view_set.m2m_auth
         self.related_model_util = self.view_set.model_util
+        self._relation_utils = {
+            relation.related_name: ModelUtil(
+                relation.model, serializer_class=relation.serializer_class
+            )
+            for relation in relations
+        }
         self.relations_filters_schemas = self._generate_m2m_filters_schemas()
         self._paginator = self.pagination_class()
         self._validate_handlers()
@@ -325,19 +331,21 @@ class ManyToManyAPI:
         rel_obj_pks = {rel_obj.pk async for rel_obj in related_manager.all()}
         query_handler = self._get_query_handler(related_name)
         pk_field = related_model._meta.pk
+        qs = await self._relation_utils[related_name].aget_objects(request)
 
         if query_handler:
             # Custom query handler: must validate per-PK (cannot batch)
             resolved = {}
             for obj_pk in objs_pks:
                 rel_obj = await (
-                    await query_handler(request, obj_pk, instance)
+                    (await query_handler(request, obj_pk, instance)).filter(
+                        pk__in=qs.values("pk")
+                    )
                 ).afirst()
                 resolved[self._normalize_pk(pk_field, obj_pk)] = rel_obj
         else:
             # No custom handler: single batched query for all PKs
             pk_name = pk_field.attname
-            qs = await ModelUtil(related_model).aget_objects(request)
             resolved = {}
             async for obj in qs.filter(**{f"{pk_name}__in": objs_pks}):
                 resolved[obj.pk] = obj
@@ -358,16 +366,16 @@ class ManyToManyAPI:
         rel_obj_pks = {rel_obj.pk for rel_obj in related_manager.all()}
         query_handler = self._get_query_handler(related_name)
         pk_field = related_model._meta.pk
+        qs = self._relation_utils[related_name].get_objects(request)
 
         if query_handler:
             resolved = {
                 self._normalize_pk(pk_field, obj_pk): query_handler(
                     request, obj_pk, instance
-                ).first()
+                ).filter(pk__in=qs.values("pk")).first()
                 for obj_pk in objs_pks
             }
         else:
-            qs = ModelUtil(related_model).get_objects(request)
             resolved = {
                 obj.pk: obj
                 for obj in qs.filter(**{f"{pk_field.attname}__in": objs_pks})
@@ -540,7 +548,9 @@ class ManyToManyAPI:
     ) -> Status:
         """List related objects synchronously."""
         obj = self._relation_owner(request, pk, "retrieve")
-        related_qs = getattr(obj, related_name).all()
+        related_qs = getattr(obj, related_name).filter(
+            pk__in=rel_util.get_objects(request).values("pk")
+        )
         query_handler = self._get_query_params_handler(related_name)
         if filters is not None and query_handler:
             related_qs = query_handler(related_qs, filters.model_dump())
@@ -566,7 +576,8 @@ class ManyToManyAPI:
     ) -> Status:
         """List related objects asynchronously."""
         obj = await self._arelation_owner(request, pk, "retrieve")
-        related_qs = getattr(obj, related_name).all()
+        scoped_qs = await rel_util.aget_objects(request)
+        related_qs = getattr(obj, related_name).filter(pk__in=scoped_qs.values("pk"))
         query_handler = self._get_query_params_handler(related_name)
         if filters is not None and query_handler:
             if inspect.iscoroutinefunction(query_handler):
@@ -743,7 +754,7 @@ class ManyToManyAPI:
     def _build_views(self, relation: M2MRelationSchema):
         model = relation.model
         related_name = relation.related_name
-        rel_util = ModelUtil(model, serializer_class=relation.serializer_class)
+        rel_util = self._relation_utils[related_name]
         rel_path = relation.path or rel_util.verbose_name_path_resolver()
         related_schema = relation.related_schema
         m2m_add, m2m_remove, m2m_get = relation.add, relation.remove, relation.get
