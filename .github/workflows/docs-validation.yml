@@ -54,7 +54,7 @@ jobs:
           fi
       - name: Save browser reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: docs-validation
           path: |
@@ -63,7 +63,7 @@ jobs:
           retention-days: 7
       - name: Save regenerated Linux baselines
         if: inputs.update_snapshots
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: docs-linux-baselines
           path: docs-tests/baselines/linux/
