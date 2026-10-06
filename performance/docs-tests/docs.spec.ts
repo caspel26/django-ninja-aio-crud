@@ -72,6 +72,34 @@ test("header exposes a labelled theme toggle and search", async ({ page }) => {
   await expect(page.locator('.md-header__option label[for^="__palette"]').first()).toHaveAttribute("title", /Switch to/);
 });
 
+test("install command reports a successful clipboard write", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: async () => undefined }, configurable: true,
+    });
+  });
+  await page.goto(PAGES.home);
+  const button = page.locator("[data-nac-copy]");
+  await button.click();
+  await expect(button.locator(".nac-install__state")).toHaveText("Copied");
+});
+
+test("install command keeps Copy when the clipboard rejects the write", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: async () => { throw new Error("Clipboard denied"); } },
+      configurable: true,
+    });
+  });
+  await page.goto(PAGES.home);
+  const button = page.locator("[data-nac-copy]");
+  await button.click();
+  await expect(button.locator(".nac-install__state")).toHaveText("Copy");
+  expect(errors).toEqual([]);
+});
+
 test("theme icon stays centered when switching palettes", async ({ page }) => {
   await page.goto(PAGES.installation);
   const toggle = page.locator(".nac-header .md-header__option label.md-header__button:visible");
