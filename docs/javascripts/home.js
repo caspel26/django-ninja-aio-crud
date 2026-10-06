@@ -150,8 +150,12 @@
 
   const setupCopy = (button) => {
     const state = button.querySelector(".nac-install__state");
-    button.addEventListener("click", () => {
-      navigator.clipboard?.writeText(button.dataset.nacCopy);
+    button.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(button.dataset.nacCopy);
+      } catch {
+        return;
+      }
       button.classList.add("is-copied");
       state.textContent = "Copied";
       setTimeout(() => {

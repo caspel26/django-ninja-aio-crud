@@ -121,12 +121,14 @@ def _inline_fields(child_model: type, fk_field_name: str) -> tuple[str, ...] | N
                 field = child_model._meta.get_field(name)
             except FieldDoesNotExist:
                 continue
+            supported = field.concrete or (
+                isinstance(field, ManyToManyField) and _is_plain_m2m(field)
+            )
             if (
                 name != fk_field_name
                 and field.editable
                 and not field.primary_key
-                and (field.concrete or isinstance(field, ManyToManyField))
-                and (not isinstance(field, ManyToManyField) or _is_plain_m2m(field))
+                and supported
             ):
                 names.append(name)
         if names:

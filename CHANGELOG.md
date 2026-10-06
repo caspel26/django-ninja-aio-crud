@@ -29,6 +29,8 @@ Revalidating a custom input schema now preserves which update fields were suppli
 
 Documented async transaction scheduling and updated the release workflow's documentation version choices. Documentation fixes since 3.0.0 restore complete release history, correct homepage response previews, and improve theme icons and legacy page styling.
 
+The homepage copy button now waits for the clipboard write to succeed before showing "Copied" and handles failures. Version-menu loading explicitly runs in the background. Admin inline field selection was simplified without changing its editable-field contract.
+
 ---
 
 ### 🎯 Summary

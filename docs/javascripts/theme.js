@@ -234,7 +234,7 @@
   }
 
   function init() {
-    initVersion(document);
+    void initVersion(document);
     initMenus(document);
     initScrollState();
     initSearchHint(document);
