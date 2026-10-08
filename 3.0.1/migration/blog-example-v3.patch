@@ -1,0 +1,969 @@
+From 149fac9614339b0b9ac2f0e3e349e287545c460e Mon Sep 17 00:00:00 2001
+From: caspel26 <giuseppework26@gmail.com>
+Date: Sun, 27 Sep 2026 08:12:50 +0200
+Subject: [PATCH] Migrate blog example to the v3 API and verify authenticated
+ HTTP flows
+
+---
+ README.md                           |  52 +++++---
+ blog/api/auth.py                    |  26 +---
+ blog/api/migrations/0001_initial.py |  90 +++++++++++++
+ blog/api/migrations/__init__.py     |   0
+ blog/api/models.py                  | 138 ++++++++------------
+ blog/api/tests.py                   | 172 ++++++++++++++++++++++++-
+ blog/api/views.py                   | 187 ++++++++++++----------------
+ blog/blog/settings.py               |   3 +-
+ requirements.txt                    |  20 +--
+ 9 files changed, 440 insertions(+), 248 deletions(-)
+ create mode 100644 blog/api/migrations/0001_initial.py
+ create mode 100644 blog/api/migrations/__init__.py
+
+diff --git a/README.md b/README.md
+index 4a2cefc..42298a5 100644
+--- a/README.md
++++ b/README.md
+@@ -1,6 +1,6 @@
+ # Ninja AIO Blog Example
+ 
+-A minimal, production-oriented example demonstrating integration of the django-ninja-aio-crud framework within a Django 6 project. This repository showcases a blog API with JWT (RS256) authentication, including authors, posts, comments, tags, and categories, plus a management command to seed demo data.
++A blog example migrated to the django-ninja-aio-crud v3 API on Django 5.2 or 6.0. This repository showcases a blog API with JWT (RS256) authentication, including authors, posts, comments, tags, and categories, plus a management command to seed demo data.
+ 
+ - **[Docs](https://django-ninja-aio.com)**
+ - **[Framework repository](https://github.com/caspel26/django-ninja-aio-crud)**
+@@ -24,9 +24,10 @@ A minimal, production-oriented example demonstrating integration of the django-n
+ 
+ See [requirements.txt](requirements.txt). Key packages:
+ 
+-- Django 6.0
+-- django-ninja 1.5.1
+-- django-ninja-aio-crud 2.2.0
++- Python 3.10–3.14
++- Django 5.2 or 6.0
++- django-ninja 1.7.x
++- django-ninja-aio-crud from the `feat/v3-api-redesign` checkout (v3 is not released yet)
+ - joserfc (RSA keys handling)
+ 
+ ## Configuration
+@@ -46,6 +47,7 @@ API root is mounted at `/api/` in [`blog.blog.urls`](blog/blog/urls.py).
+ 2. Install dependencies:
+    ```sh
+    pip install -r requirements.txt
++   pip install -e /path/to/django-ninja-aio-crud
+    ```
+ 3. Apply migrations:
+    ```sh
+@@ -94,29 +96,29 @@ Defined in [`api.views`](blog/api/views.py) using NinjaAIO.
+ 
+ - Authors
+ 
+-  - GET `/api/author/me` → current author details
+-  - CRUD on `/api/author/` (create is open, retrieve disabled)
++  - GET `/api/authors/me` → current author details
++  - CRUD on `/api/authors/` (create is open, retrieve disabled)
+ 
+ - Posts
+ 
+-  - CRUD on `/api/post/` with m2m relations to tags/categories
+-  - GET `/api/post/by-author/{author_id}`
+-  - GET `/api/post/by-me` (authenticated)
++  - CRUD on `/api/posts/` with m2m relations to tags/categories
++  - GET `/api/posts/by-author/{author_id}`
++  - GET `/api/posts/by-me` (authenticated)
+ 
+ - Comments
+ 
+-  - CRUD on `/api/comment/`
+-  - GET `/api/comment/by-author/{author_id}`
+-  - GET `/api/comment/by-me` (authenticated)
++  - CRUD on `/api/comments/`
++  - GET `/api/comments/by-author/{author_id}`
++  - GET `/api/comments/by-me` (authenticated)
+ 
+ - Tags
+ 
+-  - CRUD on `/api/tag/` (filter by `name`)
++  - CRUD on `/api/tags/` (filter by `name`)
+ 
+ - Categories
+-  - CRUD on `/api/category/` (filter by `name`)
++  - CRUD on `/api/categories/` (filter by `name`)
+ 
+-Pagination is enabled via Ninja’s `paginate` decorator where applicable.
++List responses return `items` and `count`. Custom post/comment lists use `?page=` and `?page_size=` and keep the authenticated author scope. With `NINJA_AIO_APPEND_SLASH=False`, CRUD and auth paths have no trailing slash; the M2M paths explicitly keep their trailing slash.
+ 
+ ## Models
+ 
+@@ -133,3 +135,23 @@ Admin registrations are in [`api.admin`](blog/api/admin.py).
+ ## Future Ideas
+ 
+ - Add a functional frontend using Django templates
++
++## Migration validation
++
++```sh
++python -W error::DeprecationWarning blog/manage.py check
++python -W error::DeprecationWarning blog/manage.py test api
++```
++
++Seven HTTP tests cover signup and password hashing, public login, refresh,
++invalid credentials, partial updates, conflicts, both FK input spellings,
++owner-scoped custom lists, M2M links, comments, and password changes.
++
++Schemas use `Schemas`/`SchemaConfig`; async hooks and facade calls use the `a`
++prefix. JWT lookup uses `Author.aget`, custom views use `@action`, and handlers
++return dicts or `Status` instead of deprecated response tuples. The migration
++also fixes inherited authentication on the login endpoint and hashing on the
++password-change endpoint.
++
++Use `BLOG_SQLITE_PATH=/tmp/blog-v3.sqlite3` to try setup against a separate,
++fresh SQLite database. These instructions do not publish a release or deploy.
+diff --git a/blog/api/auth.py b/blog/api/auth.py
+index 8131ee0..29b3c28 100644
+--- a/blog/api/auth.py
++++ b/blog/api/auth.py
+@@ -1,11 +1,9 @@
+-from ninja_aio.models import ModelUtil
+-from ninja_aio.auth import AsyncJwtBearer
+-from ninja_aio.schemas import ObjectQuerySchema
+ from django.conf import settings
++from ninja_aio.auth import AsyncJwtBearer
++from ninja_aio.exceptions import NotFoundError
+ 
+ from api.models import Author
+ 
+-
+ JWT_PUBLIC = settings.JWT_PUBLIC_KEY
+ ESSENTIAL_CLAIM = {"essential": True}
+ ALLOW_BLANK_CLAIM = {"allow_blank": True}
+@@ -30,14 +28,8 @@ class AuthorAuth(AsyncJwtBearer):
+ 
+     async def auth_handler(self, request):
+         try:
+-            util = ModelUtil(Author)
+-            request.author = await util.get_object(
+-                request,
+-                query_data=ObjectQuerySchema(
+-                    getters={"username": self.dcd.claims["sub"]}
+-                ),
+-            )
+-        except Author.DoesNotExist:
++            request.author = await Author.aget(username=self.dcd.claims["sub"])
++        except NotFoundError:
+             return False
+         return request.author
+ 
+@@ -49,13 +41,7 @@ class RefreshAuth(AsyncJwtBearer):
+ 
+     async def auth_handler(self, request):
+         try:
+-            util = ModelUtil(Author)
+-            request.author = await util.get_object(
+-                request,
+-                query_data=ObjectQuerySchema(
+-                    getters={"username": self.dcd.claims["sub"]}
+-                ),
+-            )
+-        except Author.DoesNotExist:
++            request.author = await Author.aget(username=self.dcd.claims["sub"])
++        except NotFoundError:
+             return False
+         return request.author
+diff --git a/blog/api/migrations/0001_initial.py b/blog/api/migrations/0001_initial.py
+new file mode 100644
+index 0000000..329ad81
+--- /dev/null
++++ b/blog/api/migrations/0001_initial.py
+@@ -0,0 +1,90 @@
++import django.db.models.deletion
++import ninja_aio.models.serializers
++import uuid
++from django.db import migrations, models
++
++
++class Migration(migrations.Migration):
++
++    initial = True
++
++    dependencies = [
++    ]
++
++    operations = [
++        migrations.CreateModel(
++            name='Author',
++            fields=[
++                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
++                ('created_at', models.DateTimeField(auto_now_add=True)),
++                ('updated_at', models.DateTimeField(auto_now=True)),
++                ('first_name', models.CharField(max_length=100)),
++                ('last_name', models.CharField(max_length=100)),
++                ('username', models.CharField(max_length=100, unique=True)),
++                ('email', models.EmailField(max_length=254, unique=True)),
++                ('password', models.CharField(max_length=128)),
++            ],
++            options={
++                'abstract': False,
++            },
++            bases=(models.Model, ninja_aio.models.serializers.BaseSerializer),
++        ),
++        migrations.CreateModel(
++            name='Post',
++            fields=[
++                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
++                ('created_at', models.DateTimeField(auto_now_add=True)),
++                ('updated_at', models.DateTimeField(auto_now=True)),
++                ('title', models.CharField(max_length=200)),
++                ('content', models.TextField()),
++                ('author', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='%(class)ss', to='api.author')),
++            ],
++            options={
++                'abstract': False,
++            },
++            bases=(models.Model, ninja_aio.models.serializers.BaseSerializer),
++        ),
++        migrations.CreateModel(
++            name='Comment',
++            fields=[
++                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
++                ('created_at', models.DateTimeField(auto_now_add=True)),
++                ('updated_at', models.DateTimeField(auto_now=True)),
++                ('content', models.TextField()),
++                ('author', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='%(class)ss', to='api.author')),
++                ('post', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='comments', to='api.post')),
++            ],
++            options={
++                'abstract': False,
++            },
++            bases=(models.Model, ninja_aio.models.serializers.BaseSerializer),
++        ),
++        migrations.CreateModel(
++            name='Category',
++            fields=[
++                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
++                ('created_at', models.DateTimeField(auto_now_add=True)),
++                ('updated_at', models.DateTimeField(auto_now=True)),
++                ('name', models.CharField(max_length=50, unique=True)),
++                ('posts', models.ManyToManyField(related_name='categories', to='api.post')),
++            ],
++            options={
++                'verbose_name_plural': 'categories',
++            },
++            bases=(models.Model, ninja_aio.models.serializers.BaseSerializer),
++        ),
++        migrations.CreateModel(
++            name='Tag',
++            fields=[
++                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
++                ('created_at', models.DateTimeField(auto_now_add=True)),
++                ('updated_at', models.DateTimeField(auto_now=True)),
++                ('name', models.CharField(max_length=50, unique=True)),
++                ('posts', models.ManyToManyField(related_name='%(class)ss', to='api.post')),
++            ],
++            options={
++                'abstract': False,
++            },
++            bases=(models.Model, ninja_aio.models.serializers.BaseSerializer),
++        ),
++    ]
+diff --git a/blog/api/migrations/__init__.py b/blog/api/migrations/__init__.py
+new file mode 100644
+index 0000000..e69de29
+diff --git a/blog/api/models.py b/blog/api/models.py
+index ce448aa..8dc5ece 100644
+--- a/blog/api/models.py
++++ b/blog/api/models.py
+@@ -1,12 +1,12 @@
+ import uuid
+ 
+-from ninja_aio.models import ModelSerializer
+-from ninja_aio.exceptions import NotFoundError, AuthError
++from django.conf import settings
++from django.contrib.auth.hashers import acheck_password, make_password
+ from django.db import models
+ from django.http import HttpRequest
+-from django.conf import settings
+-from django.contrib.auth.hashers import make_password, acheck_password
++from ninja_aio import ModelSerializer, SchemaConfig
+ from ninja_aio.auth import encode_jwt
++from ninja_aio.exceptions import AuthError, NotFoundError
+ 
+ 
+ class AuthorAuthenticatedRequest(HttpRequest):
+@@ -21,8 +21,8 @@ class Base(ModelSerializer):
+     class Meta:
+         abstract = True
+ 
+-    class ReadSerialzer:
+-        fields = ["id", "created_at", "updated_at"]
++    class Schemas:
++        read = SchemaConfig(fields=["id", "created_at", "updated_at"])
+ 
+ 
+ class BaseAuthorRelated(Base):
+@@ -33,19 +33,16 @@ class BaseAuthorRelated(Base):
+     class Meta:
+         abstract = True
+ 
+-    class ReadSerializer:
+-        fields = Base.ReadSerialzer.fields + [
+-            "author",
+-        ]
+-
+-    class CreateSerializer:
+-        fields = [
+-            "author",
+-        ]
++    class Schemas:
++        read = SchemaConfig(fields=Base.Schemas.read.fields + ["author"])
++        create = SchemaConfig(fields=["author"])
+ 
+     @classmethod
+-    async def queryset_request(cls, request: AuthorAuthenticatedRequest):
+-        return (await super().queryset_request(request)).filter(author=request.author)
++    async def aqueryset_request(cls, request: AuthorAuthenticatedRequest):
++        queryset = await super().aqueryset_request(request)
++        return (
++            queryset.filter(author=request.author) if request is not None else queryset
++        )
+ 
+ 
+ class BasePostRelated(Base):
+@@ -68,29 +65,22 @@ class Author(Base):
+     def full_name(self):
+         return f"{self.first_name} {self.last_name}"
+ 
+-    class ReadSerializer:
+-        fields = Base.ReadSerialzer.fields + [
+-            "username",
+-            "email",
+-        ]
+-        customs = [("full_name", str, "")]
+-
+-    class CreateSerializer:
+-        fields = [
+-            "first_name",
+-            "last_name",
+-            "username",
+-            "email",
+-            "password",
+-        ]
+-
+-    class UpdateSerializer:
+-        optionals = [
+-            ("first_name", str),
+-            ("last_name", str),
+-            ("email", str),
+-            ("username", str),
+-        ]
++    class Schemas:
++        read = SchemaConfig(
++            fields=Base.Schemas.read.fields + ["username", "email"],
++            customs=[("full_name", str, "")],
++        )
++        create = SchemaConfig(
++            fields=["first_name", "last_name", "username", "email", "password"]
++        )
++        update = SchemaConfig(
++            optionals=[
++                ("first_name", str),
++                ("last_name", str),
++                ("email", str),
++                ("username", str),
++            ]
++        )
+ 
+     @classmethod
+     async def authenticate(cls, username: str, password: str):
+@@ -108,11 +98,7 @@ class Author(Base):
+         return True
+ 
+     def _additional_jwt_claims(self) -> dict:
+-        return {
+-            "sub": self.username,
+-            "email": self.email,
+-            "name": self.full_name,
+-        }
++        return {"sub": self.username, "email": self.email, "name": self.full_name}
+ 
+     def create_access_token(self) -> str:
+         return encode_jwt(
+@@ -127,7 +113,7 @@ class Author(Base):
+         )
+ 
+     def create_jwt_tokens(self) -> tuple[str, str]:
+-        return self.create_access_token(), self.create_refresh_token()
++        return (self.create_access_token(), self.create_refresh_token())
+ 
+     def on_create_before_save(self):
+         self.password = make_password(self.password)
+@@ -140,17 +126,13 @@ class Post(BaseAuthorRelated):
+     title = models.CharField(max_length=200)
+     content = models.TextField()
+ 
+-    class ReadSerializer:
+-        fields = BaseAuthorRelated.ReadSerializer.fields + [
+-            "title",
+-            "content",
+-        ]
+-
+-    class CreateSerializer:
+-        fields = BaseAuthorRelated.CreateSerializer.fields + [
+-            "title",
+-            "content",
+-        ]
++    class Schemas:
++        read = SchemaConfig(
++            fields=BaseAuthorRelated.Schemas.read.fields + ["title", "content"]
++        )
++        create = SchemaConfig(
++            fields=BaseAuthorRelated.Schemas.create.fields + ["title", "content"]
++        )
+ 
+     def __str__(self):
+         return f"{self.title} by {self.author.username}"
+@@ -160,17 +142,13 @@ class Comment(BaseAuthorRelated):
+     post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="comments")
+     content = models.TextField()
+ 
+-    class ReadSerializer:
+-        fields = BaseAuthorRelated.ReadSerializer.fields + [
+-            "post",
+-            "content",
+-        ]
+-
+-    class CreateSerializer:
+-        fields = BaseAuthorRelated.CreateSerializer.fields + [
+-            "post",
+-            "content",
+-        ]
++    class Schemas:
++        read = SchemaConfig(
++            fields=BaseAuthorRelated.Schemas.read.fields + ["post", "content"]
++        )
++        create = SchemaConfig(
++            fields=BaseAuthorRelated.Schemas.create.fields + ["post", "content"]
++        )
+ 
+     def __str__(self):
+         return f"Comment by {self.author.username} on {self.post.title}"
+@@ -179,15 +157,9 @@ class Comment(BaseAuthorRelated):
+ class Tag(BasePostRelated):
+     name = models.CharField(max_length=50, unique=True)
+ 
+-    class ReadSerializer:
+-        fields = Base.ReadSerialzer.fields + [
+-            "name",
+-        ]
+-
+-    class CreateSerializer:
+-        fields = [
+-            "name",
+-        ]
++    class Schemas:
++        read = SchemaConfig(fields=Base.Schemas.read.fields + ["name"])
++        create = SchemaConfig(fields=["name"])
+ 
+     def __str__(self):
+         return self.name
+@@ -199,15 +171,9 @@ class Category(BasePostRelated):
+         Post, related_name="categories"
+     )
+ 
+-    class ReadSerializer:
+-        fields = Base.ReadSerialzer.fields + [
+-            "name",
+-        ]
+-
+-    class CreateSerializer:
+-        fields = [
+-            "name",
+-        ]
++    class Schemas:
++        read = SchemaConfig(fields=Base.Schemas.read.fields + ["name"])
++        create = SchemaConfig(fields=["name"])
+ 
+     class Meta:
+         verbose_name_plural = "categories"
+diff --git a/blog/api/tests.py b/blog/api/tests.py
+index 7ce503c..a495a98 100644
+--- a/blog/api/tests.py
++++ b/blog/api/tests.py
+@@ -1,3 +1,173 @@
++from django.contrib.auth.hashers import check_password
+ from django.test import TestCase
+ 
+-# Create your tests here.
++from api.models import Author, Category, Comment, Post, Tag
++
++
++class BlogMigrationTests(TestCase):
++    @classmethod
++    def setUpTestData(cls):
++        cls.author = Author.objects.create(
++            first_name="Ada",
++            last_name="Lovelace",
++            username="ada",
++            email="ada@example.com",
++            password="old-password",
++        )
++        cls.other = Author.objects.create(
++            first_name="Grace",
++            last_name="Hopper",
++            username="grace",
++            email="grace@example.com",
++            password="other-password",
++        )
++        cls.post = Post.objects.create(
++            author=cls.author, title="Owned post", content="Original"
++        )
++        cls.other_post = Post.objects.create(
++            author=cls.other, title="Other post", content="Private"
++        )
++        cls.tag = Tag.objects.create(name="django")
++        cls.category = Category.objects.create(name="Programming")
++
++    def headers(self, *, refresh=False):
++        token = (
++            self.author.create_refresh_token()
++            if refresh
++            else self.author.create_access_token()
++        )
++        return {"Authorization": f"Bearer {token}"}
++
++    async def test_signup_hashes_the_password_and_returns_public_fields(self):
++        response = await self.async_client.post(
++            "/api/authors",
++            data={
++                "first_name": "Linus",
++                "last_name": "Torvalds",
++                "username": "linus",
++                "email": "linus@example.com",
++                "password": "signup-password",
++            },
++            content_type="application/json",
++        )
++        self.assertEqual(response.status_code, 201, response.content)
++        self.assertNotIn("password", response.json())
++        author = await Author.objects.aget(username="linus")
++        self.assertTrue(check_password("signup-password", author.password))
++
++    async def test_anonymous_login_and_refresh(self):
++        login = await self.async_client.post(
++            "/api/login",
++            data={"username": "ada", "password": "old-password"},
++            content_type="application/json",
++        )
++        self.assertEqual(login.status_code, 200, login.content)
++        me = await self.async_client.get(
++            "/api/authors/me",
++            headers={"Authorization": f"Bearer {login.json()['access_token']}"},
++        )
++        self.assertEqual(me.status_code, 200, me.content)
++        self.assertEqual(me.json()["username"], "ada")
++        refresh = await self.async_client.post(
++            "/api/login/refresh", headers=self.headers(refresh=True)
++        )
++        self.assertEqual(refresh.status_code, 200, refresh.content)
++        self.assertIn("access_token", refresh.json())
++
++    async def test_bad_password_and_missing_token_are_rejected(self):
++        bad = await self.async_client.post(
++            "/api/login",
++            data={"username": "ada", "password": "wrong"},
++            content_type="application/json",
++        )
++        self.assertEqual(bad.status_code, 401)
++        missing = await self.async_client.get("/api/posts")
++        self.assertEqual(missing.status_code, 401)
++
++    async def test_patch_preserves_unsent_fields_and_duplicate_signup_is_a_conflict(
++        self,
++    ):
++        patch = await self.async_client.patch(
++            f"/api/authors/{self.author.pk}",
++            data={"first_name": "Augusta"},
++            content_type="application/json",
++            headers=self.headers(),
++        )
++        self.assertEqual(patch.status_code, 200, patch.content)
++        self.assertEqual(patch.json()["full_name"], "Augusta Lovelace")
++        duplicate = await self.async_client.post(
++            "/api/authors",
++            data={
++                "first_name": "Ada",
++                "last_name": "Lovelace",
++                "username": "ada",
++                "email": "duplicate@example.com",
++                "password": "x",
++            },
++            content_type="application/json",
++        )
++        self.assertEqual(duplicate.status_code, 409, duplicate.content)
++
++    async def test_posts_accept_fk_spellings_and_custom_lists_keep_owner_scope(self):
++        for field in ("author", "author_id"):
++            response = await self.async_client.post(
++                "/api/posts",
++                data={field: str(self.author.pk), "title": field, "content": "body"},
++                content_type="application/json",
++                headers=self.headers(),
++            )
++            self.assertEqual(response.status_code, 201, response.content)
++        for endpoint in (
++            "/api/posts",
++            "/api/posts/by-me",
++            f"/api/posts/by-author/{self.author.pk}",
++        ):
++            response = await self.async_client.get(endpoint, headers=self.headers())
++            self.assertEqual(response.status_code, 200, response.content)
++            self.assertEqual(response.json()["count"], 3)
++            self.assertNotIn(
++                "Other post", [item["title"] for item in response.json()["items"]]
++            )
++        hidden = await self.async_client.get(
++            f"/api/posts/{self.other_post.pk}", headers=self.headers()
++        )
++        self.assertEqual(hidden.status_code, 404)
++
++    async def test_m2m_and_comments_survive_the_migration(self):
++        response = await self.async_client.post(
++            f"/api/posts/{self.post.pk}/tags/",
++            data={"add": [str(self.tag.pk)]},
++            content_type="application/json",
++            headers=self.headers(),
++        )
++        self.assertEqual(response.status_code, 200, response.content)
++        self.assertTrue(await self.post.tags.filter(pk=self.tag.pk).aexists())
++        comment = await self.async_client.post(
++            "/api/comments",
++            data={
++                "author": str(self.author.pk),
++                "post": str(self.post.pk),
++                "content": "Nice",
++            },
++            content_type="application/json",
++            headers=self.headers(),
++        )
++        self.assertEqual(comment.status_code, 201, comment.content)
++        self.assertTrue(await Comment.objects.filter(content="Nice").aexists())
++
++    async def test_password_change_remains_usable_for_login(self):
++        change = await self.async_client.post(
++            "/api/login/change-password",
++            data={"old_password": "old-password", "new_password": "new-password"},
++            content_type="application/json",
++            headers=self.headers(),
++        )
++        self.assertEqual(change.status_code, 200, change.content)
++        author = await Author.objects.aget(pk=self.author.pk)
++        self.assertTrue(check_password("new-password", author.password))
++        login = await self.async_client.post(
++            "/api/login",
++            data={"username": "ada", "password": "new-password"},
++            content_type="application/json",
++        )
++        self.assertEqual(login.status_code, 200, login.content)
+diff --git a/blog/api/views.py b/blog/api/views.py
+index c440b85..69c17dd 100644
+--- a/blog/api/views.py
++++ b/blog/api/views.py
+@@ -1,13 +1,11 @@
+ from uuid import UUID
+-from ninja_aio import NinjaAIO
+-from ninja_aio.views import APIViewSet, APIView, mixins
+-from ninja_aio.schemas import (
+-    M2MRelationSchema,
+-    GenericMessageSchema,
+-    ObjectsQuerySchema,
+-)
+-from ninja.pagination import paginate
+-from ninja_aio.decorators import unique_view, decorate_view, api_get, api_post
++
++from asgiref.sync import sync_to_async
++from django.contrib.auth.hashers import make_password
++from ninja import Query, Schema
++from ninja_aio import NinjaAIO, action
++from ninja_aio.schemas import GenericMessageSchema, M2MRelationSchema
++from ninja_aio.views import APIView, APIViewSet, mixins
+ 
+ from api import models, schema
+ from api.auth import AuthorAuth, RefreshAuth
+@@ -15,107 +13,93 @@ from api.auth import AuthorAuth, RefreshAuth
+ api = NinjaAIO(title="Blog API", version="1.0.0", auth=AuthorAuth())
+ 
+ 
++class ArticlePage(Schema):
++    items: list[dict]
++    count: int
++
++
+ class BaseAuthorRelatedAPI(APIViewSet):
+-    def views(self):
+-        @self.router.get(
+-            "/by-author/{author_id}",
+-            response={200: list[self.schema_out], 404: GenericMessageSchema},
+-        )
+-        @decorate_view(
+-            unique_view(self),
+-            paginate(self.pagination_class),
+-        )
+-        async def get_by_author(request, author_id: UUID):
+-            """Retrieve all instances related to a specific author."""
+-            return await self.model_util.list_read_s(
+-                self.schema_out,
+-                request,
+-                query_data=ObjectsQuerySchema(
+-                    filters={"author__id": author_id},
+-                ),
+-                is_for_read=True,
+-            )
+-
+-        @self.api.get(
+-            f"{self.api_route_path}/by-me",
+-            response={200: list[self.schema_out], 404: GenericMessageSchema},
+-            auth=AuthorAuth(),
+-            tags=[self.router_tag],
+-        )
+-        @decorate_view(
+-            unique_view(self),
+-            paginate(self.pagination_class),
+-        )
+-        async def get_by_me(request: models.AuthorAuthenticatedRequest):
+-            """Retrieve all instances related to the authenticated author."""
+-            return await self.model_util.list_read_s(
+-                self.schema_out,
+-                request,
+-                query_data=ObjectsQuerySchema(
+-                    filters={"author": request.author},
+-                ),
+-                is_for_read=True,
+-            )
++    async def _page(self, queryset, page, page_size):
++        count = await queryset.acount()
++        offset = (page - 1) * page_size
++        items = [
++            obj
++            async for obj in queryset.order_by("created_at")[
++                offset : offset + page_size
++            ]
++        ]
++        return {
++            "items": await self.model.amodel_dumps(items, schema=self.schema_out),
++            "count": count,
++        }
++
++    @action(detail=False, url_path="by-author/{author_id}", response=ArticlePage)
++    async def get_by_author(
++        self,
++        request,
++        author_id: UUID,
++        page: int = Query(1, ge=1),
++        page_size: int = Query(100, ge=1, le=100),
++    ):
++        queryset = await self.model.aget_queryset(request=request, optimize_for="read")
++        return await self._page(queryset.filter(author_id=author_id), page, page_size)
++
++    @action(detail=False, url_path="by-me", response=ArticlePage, auth=AuthorAuth())
++    async def get_by_me(
++        self,
++        request: models.AuthorAuthenticatedRequest,
++        page: int = Query(1, ge=1),
++        page_size: int = Query(100, ge=1, le=100),
++    ):
++        queryset = await self.model.aget_queryset(request=request, optimize_for="read")
++        return await self._page(queryset.filter(author=request.author), page, page_size)
+ 
+ 
+ @api.view("/login", tags=["Authentication"])
+ class LoginAPI(APIView):
+-    @api_post(
+-        "",
+-        response={
+-            200: schema.LoginSchemaOut,
+-            404: GenericMessageSchema,
+-            401: GenericMessageSchema,
+-        },
++    @action(
++        detail=False,
++        methods=["post"],
++        url_path="",
++        auth=None,
++        response=schema.LoginSchemaOut,
+     )
+     async def login(self, request, data: schema.LoginSchemaIn):
+-        """Authenticate an author and return JWT tokens."""
+         author = await models.Author.authenticate(**data.model_dump())
+         access_token, refresh_token = author.create_jwt_tokens()
+-        return 200, {
+-            "access_token": access_token,
+-            "refresh_token": refresh_token,
+-        }
++        return {"access_token": access_token, "refresh_token": refresh_token}
+ 
+-    @api_post(
+-        "/refresh",
+-        response={
+-            200: schema.RefeshSchemaOut,
+-            404: GenericMessageSchema,
+-            401: GenericMessageSchema,
+-        },
++    @action(
++        detail=False,
++        methods=["post"],
++        url_path="refresh",
+         auth=RefreshAuth(),
++        response=schema.RefeshSchemaOut,
+     )
+     async def refresh_token(self, request: models.AuthorAuthenticatedRequest):
+-        """Refresh JWT tokens using a valid refresh token."""
+-        return 200, {
+-            "access_token": request.author.create_access_token(),
+-        }
++        return {"access_token": request.author.create_access_token()}
+ 
+-    @api_post(
+-        "/change-password",
+-        response={
+-            200: GenericMessageSchema,
+-            404: GenericMessageSchema,
+-            401: GenericMessageSchema,
+-        },
++    @action(
++        detail=False,
++        methods=["post"],
++        url_path="change-password",
++        response=GenericMessageSchema,
+     )
+     async def change_password(
+         self,
+         request: models.AuthorAuthenticatedRequest,
+         data: schema.ChangePasswordSchemaIn,
+     ):
+-        """Change the authenticated author's password."""
+         author = request.author
+         await author.check_password(data.old_password)
+-        author.password = data.new_password
+-        await author.asave()
++        author.password = await sync_to_async(make_password)(data.new_password)
++        await author.asave(update_fields=["password", "updated_at"])
+         return {"message": "Password changed successfully."}
+ 
+ 
+ @api.viewset(models.Author)
+ class AuthorAPI(mixins.IcontainsFilterViewSetMixin):
+-    post_auth = None  # Allow unauthenticated access to create authors
++    post_auth = None
+     disable = ["retrieve"]
+     query_params = {
+         "username": (str, ""),
+@@ -124,37 +108,25 @@ class AuthorAPI(mixins.IcontainsFilterViewSetMixin):
+         "last_name": (str, ""),
+     }
+ 
+-    @api_get(
+-        "/me",
+-        response={200: models.Author.generate_read_s(), 400: GenericMessageSchema},
++    @action(
++        detail=False,
++        url_path="me",
++        response=models.Author.read_schema,
+         auth=AuthorAuth(),
+     )
+     async def get_me(self, request: models.AuthorAuthenticatedRequest):
+-        """Retrieve the authenticated author's details."""
+-        return await self.model_util.read_s(
+-            self.schema_out,
+-            request,
+-            request.author,
+-        )
++        return await models.Author.amodel_dump(request.author, schema=self.schema_out)
+ 
+ 
+ @api.viewset(models.Post)
+ class PostAPI(mixins.IcontainsFilterViewSetMixin, BaseAuthorRelatedAPI):
+     m2m_relations = [
++        M2MRelationSchema(model=models.Tag, related_name="tags", append_slash=True),
+         M2MRelationSchema(
+-            model=models.Tag,
+-            related_name="tags",
+-            append_slash=True,
+-        ),
+-        M2MRelationSchema(
+-            model=models.Category,
+-            related_name="categories",
+-            append_slash=True,
++            model=models.Category, related_name="categories", append_slash=True
+         ),
+     ]
+-    query_params = {
+-        "title": (str, ""),
+-    }
++    query_params = {"title": (str, "")}
+ 
+ 
+ @api.viewset(models.Comment)
+@@ -164,14 +136,9 @@ class CommentAPI(BaseAuthorRelatedAPI):
+ 
+ @api.viewset(models.Category)
+ class CategoryAPI(mixins.IcontainsFilterViewSetMixin):
+-    query_params = {
+-        "name": (str, ""),
+-    }
++    query_params = {"name": (str, "")}
+ 
+ 
+ @api.viewset(models.Tag)
+ class TagAPI(mixins.IcontainsFilterViewSetMixin):
+-    model = models.Tag
+-    query_params = {
+-        "name": (str, ""),
+-    }
++    query_params = {"name": (str, "")}
+diff --git a/blog/blog/settings.py b/blog/blog/settings.py
+index 9710da9..476eb97 100644
+--- a/blog/blog/settings.py
++++ b/blog/blog/settings.py
+@@ -10,6 +10,7 @@ For the full list of settings and their values, see
+ https://docs.djangoproject.com/en/5.2/ref/settings/
+ """
+ 
++import os
+ from pathlib import Path
+ from joserfc import jwk
+ 
+@@ -79,7 +80,7 @@ WSGI_APPLICATION = 'blog.wsgi.application'
+ DATABASES = {
+     'default': {
+         'ENGINE': 'django.db.backends.sqlite3',
+-        'NAME': BASE_DIR / 'db.sqlite3',
++        'NAME': os.environ.get('BLOG_SQLITE_PATH', str(BASE_DIR / 'db.sqlite3')),
+     }
+ }
+ 
+diff --git a/requirements.txt b/requirements.txt
+index 04fe628..b4ded40 100644
+--- a/requirements.txt
++++ b/requirements.txt
+@@ -1,15 +1,5 @@
+-annotated-types==0.7.0
+-asgiref==3.11.0
+-cffi==2.0.0
+-cryptography==46.0.3
+-Django==6.0
+-django-ninja==1.5.1
+-django-ninja-aio-crud==2.3.0
+-joserfc==1.4.1
+-orjson==3.11.4
+-pycparser==2.23
+-pydantic==2.12.4
+-pydantic_core==2.41.5
+-sqlparse==0.5.3
+-typing-inspection==0.4.2
+-typing_extensions==4.15.0
++Django>=5.2,<6.1
++django-ninja>=1.7,<1.8
++# Until v3 is released, install the framework from the v3 checkout (see README).
++joserfc>=1.0,<1.5
++orjson>=3.10.7,<4
+-- 
+2.50.1 (Apple Git-155)
+

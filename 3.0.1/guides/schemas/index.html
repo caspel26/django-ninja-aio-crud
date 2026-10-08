@@ -1,0 +1,3538 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Choose which fields each endpoint accepts and returns with the Schemas class.">
+      
+      
+      
+        <link rel="canonical" href="https://django-ninja-aio.com/3.0.1/guides/schemas/">
+      
+      
+        <link rel="prev" href="../../tutorial/production/">
+      
+      
+        <link rel="next" href="../validation/">
+      
+      
+      <link rel="icon" href="../../images/favicon.ico">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.22">
+    
+    
+      
+        <title>Schemas - django-ninja-aio-crud</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.84d31ad4.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/tokens.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/shell.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/components.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/pages.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+<meta name="theme-color" content="#0b0a10" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#fbfafc" media="(prefers-color-scheme: light)">
+<script>document.documentElement.classList.add("js")</script>
+
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#schemas" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+          <aside class="md-banner md-banner--warning">
+            <div class="md-banner__inner md-grid md-typeset">
+              
+<strong>You are reading documentation for a version that is not the latest release.</strong>
+<a href="../../..">Go to the latest docs</a>
+
+            </div>
+            <script>var el=document.querySelector("[data-md-component=outdated]"),base=new URL("../..",location),outdated=__md_get("__outdated",sessionStorage,base);outdated===true&&el&&(el.hidden=false)</script>
+          </aside>
+        
+      </div>
+    
+    
+      
+
+<header class="md-header nac-header" data-md-component="header">
+  <nav class="nac-header__inner" aria-label="Header">
+    <label class="md-header__button md-icon nac-header__drawer" for="__drawer" aria-label="Navigation">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </label>
+    <a href="../.." class="nac-brand md-logo" aria-labelledby="nac-brand-name" data-md-component="logo">
+      <img class="nac-mark nac-mark--dark" src="../../images/brand/mark-dark-64.png" alt="django-ninja-aio-crud" width="32" height="32">
+<img class="nac-mark nac-mark--light" src="../../images/brand/mark-light-64.png" alt="" width="32" height="32">
+      <span id="nac-brand-name" class="nac-brand__name">django-ninja-aio-crud</span>
+    </a><div class="md-header__title nac-hidden" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic"><span class="md-ellipsis">django-ninja-aio-crud</span></div>
+        <div class="md-header__topic" data-md-component="header-topic"><span class="md-ellipsis">Schemas</span></div>
+      </div>
+    </div>
+    <div class="nac-version" data-nac-version data-current="3.0" data-remote="https://django-ninja-aio.com/3.0.1">
+      <button type="button" class="nac-version__button" aria-haspopup="true" aria-expanded="false" aria-label="Documentation version">
+        <span class="nac-version__label">v3.0</span>
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="nac-version__menu" hidden>
+        <p class="nac-version__heading">Documentation versions</p>
+        <ul class="nac-version__list"></ul>
+      </div>
+    </div>
+    <ul class="nac-nav">
+      
+        
+      
+        
+        
+        <li class="nac-nav__item">
+          <a class="nac-nav__link" href="../../getting_started/installation/" aria-haspopup="true">Get started</a>
+          <div class="nac-menu">
+            <div class="nac-menu__panel">
+              
+                <div class="nac-menu__group">
+                  <a class="nac-menu__link" href="../../getting_started/installation/">
+    <span class="nac-menu__title">Installation</span><span class="nac-menu__desc">Install django-ninja-aio-crud and check the supported Python and Django Ninja versions.</span>
+  </a><a class="nac-menu__link" href="../../getting_started/quick_start/">
+    <span class="nac-menu__title">Quick start</span><span class="nac-menu__desc">Build a working CRUD API with django-ninja-aio-crud in five minutes.</span>
+  </a><a class="nac-menu__link" href="../../getting_started/choosing-a-serializer/">
+    <span class="nac-menu__title">Choosing a serializer</span><span class="nac-menu__desc">Pick between ModelSerializer and Serializer. Both give you the same API.</span>
+  </a>
+                </div>
+              
+            </div>
+          </div>
+        </li>
+        
+      
+        
+        
+        <li class="nac-nav__item">
+          <a class="nac-nav__link" href="../../tutorial/" aria-haspopup="true">Tutorial</a>
+          <div class="nac-menu">
+            <div class="nac-menu__panel">
+              
+                <div class="nac-menu__group">
+                  <a class="nac-menu__link" href="../../tutorial/model/">
+    <span class="nac-menu__title">1. Define the model</span><span class="nac-menu__desc">Create the Article model and describe what each operation reads and writes.</span>
+  </a><a class="nac-menu__link" href="../../tutorial/crud/">
+    <span class="nac-menu__title">2. Create the CRUD API</span><span class="nac-menu__desc">Expose the Article endpoints with a viewset and add custom actions.</span>
+  </a><a class="nac-menu__link" href="../../tutorial/relations/">
+    <span class="nac-menu__title">3. Add relations</span><span class="nac-menu__desc">Link articles to categories, return related objects and accept them as input.</span>
+  </a><a class="nac-menu__link" href="../../tutorial/authentication/">
+    <span class="nac-menu__title">4. Add authentication</span><span class="nac-menu__desc">Protect the write endpoints with JWT tokens.</span>
+  </a><a class="nac-menu__link" href="../../tutorial/permissions/">
+    <span class="nac-menu__title">5. Add permissions</span><span class="nac-menu__desc">Decide who can see and change each article.</span>
+  </a><a class="nac-menu__link" href="../../tutorial/filtering/">
+    <span class="nac-menu__title">6. Filter, search and sort</span><span class="nac-menu__desc">Add query parameters to filter, search, sort and paginate the article list.</span>
+  </a><a class="nac-menu__link" href="../../tutorial/production/">
+    <span class="nac-menu__title">7. Go to production</span><span class="nac-menu__desc">Check, test and deploy your API.</span>
+  </a>
+                </div>
+              
+            </div>
+          </div>
+        </li>
+        
+      
+        
+        
+        <li class="nac-nav__item is-active">
+          <a class="nac-nav__link" href="./" aria-haspopup="true">Guides</a>
+          <div class="nac-menu nac-menu--wide">
+            <div class="nac-menu__panel">
+              
+                
+                  <div class="nac-menu__group">
+                    
+                      <p class="nac-menu__heading">Data</p>
+                      <a class="nac-menu__link is-active" href="./">
+    <span class="nac-menu__title">Schemas</span>
+  </a><a class="nac-menu__link" href="../validation/">
+    <span class="nac-menu__title">Validation</span>
+  </a><a class="nac-menu__link" href="../python-crud/">
+    <span class="nac-menu__title">Use from Python</span>
+  </a><a class="nac-menu__link" href="../dumping/">
+    <span class="nac-menu__title">Serialize objects</span>
+  </a><a class="nac-menu__link" href="../relations/">
+    <span class="nac-menu__title">Relations</span>
+  </a><a class="nac-menu__link" href="../nested-writes/">
+    <span class="nac-menu__title">Nested writes</span>
+  </a><a class="nac-menu__link" href="../bulk-operations/">
+    <span class="nac-menu__title">Bulk operations</span>
+  </a><a class="nac-menu__link" href="../query-optimization/">
+    <span class="nac-menu__title">Query optimization</span>
+  </a>
+                    
+                  </div>
+                
+                  <div class="nac-menu__group">
+                    
+                      <p class="nac-menu__heading">Endpoints</p>
+                      <a class="nac-menu__link" href="../viewsets/">
+    <span class="nac-menu__title">Viewsets</span>
+  </a><a class="nac-menu__link" href="../custom-actions/">
+    <span class="nac-menu__title">Custom actions</span>
+  </a><a class="nac-menu__link" href="../routers/">
+    <span class="nac-menu__title">Routers</span>
+  </a><a class="nac-menu__link" href="../filtering/">
+    <span class="nac-menu__title">Filtering</span>
+  </a><a class="nac-menu__link" href="../pagination/">
+    <span class="nac-menu__title">Pagination</span>
+  </a><a class="nac-menu__link" href="../field-selection/">
+    <span class="nac-menu__title">Field selection</span>
+  </a><a class="nac-menu__link" href="../soft-delete/">
+    <span class="nac-menu__title">Soft delete</span>
+  </a>
+                    
+                  </div>
+                
+                  <div class="nac-menu__group">
+                    
+                      <p class="nac-menu__heading">Security</p>
+                      <a class="nac-menu__link" href="../authentication/">
+    <span class="nac-menu__title">JWT authentication</span>
+  </a><a class="nac-menu__link" href="../cookie-authentication/">
+    <span class="nac-menu__title">Cookie authentication</span>
+  </a><a class="nac-menu__link" href="../permissions/">
+    <span class="nac-menu__title">Permissions</span>
+  </a>
+                    
+                  </div>
+                
+                  <div class="nac-menu__group">
+                    
+                      <p class="nac-menu__heading">Behavior</p>
+                      <a class="nac-menu__link" href="../hooks/">
+    <span class="nac-menu__title">Hooks</span>
+  </a><a class="nac-menu__link" href="../errors/">
+    <span class="nac-menu__title">Errors</span>
+  </a>
+                    
+                  </div>
+                
+                  <div class="nac-menu__group">
+                    
+                      <p class="nac-menu__heading">Integrations</p>
+                      <a class="nac-menu__link" href="../admin/">
+    <span class="nac-menu__title">Django admin</span>
+  </a><a class="nac-menu__link" href="../mcp/">
+    <span class="nac-menu__title">AI agents (MCP)</span>
+  </a><a class="nac-menu__link" href="../swagger-ui/">
+    <span class="nac-menu__title">Swagger UI</span>
+  </a><a class="nac-menu__link" href="../logging/">
+    <span class="nac-menu__title">Logging</span>
+  </a><a class="nac-menu__link" href="../type-hints/">
+    <span class="nac-menu__title">Type hints</span>
+  </a>
+                    
+                  </div>
+                
+              
+            </div>
+          </div>
+        </li>
+        
+      
+        
+        
+        <li class="nac-nav__item">
+          <a class="nac-nav__link" href="../../concepts/" aria-haspopup="true">Concepts</a>
+          <div class="nac-menu">
+            <div class="nac-menu__panel">
+              
+                <div class="nac-menu__group">
+                  <a class="nac-menu__link" href="../../concepts/serializer-first/">
+    <span class="nac-menu__title">Serializer first</span><span class="nac-menu__desc">One serializer gives you the REST endpoints and a Python CRUD API with the same rules.</span>
+  </a><a class="nac-menu__link" href="../../concepts/sync-and-async/">
+    <span class="nac-menu__title">Sync and async</span><span class="nac-menu__desc">How the sync and async execution modes relate, and which code runs in each.</span>
+  </a><a class="nac-menu__link" href="../../concepts/lifecycle/">
+    <span class="nac-menu__title">Request lifecycle</span><span class="nac-menu__desc">What runs, and in which order, when a request reaches a generated endpoint.</span>
+  </a><a class="nac-menu__link" href="../../concepts/transactions/">
+    <span class="nac-menu__title">Transactions</span><span class="nac-menu__desc">When your changes are saved together and when they are rolled back.</span>
+  </a><a class="nac-menu__link" href="../../concepts/schema-generation/">
+    <span class="nac-menu__title">Schema generation</span><span class="nac-menu__desc">How the input and output schemas are built from your Schemas class, and when.</span>
+  </a>
+                </div>
+              
+            </div>
+          </div>
+        </li>
+        
+      
+        
+        
+        <li class="nac-nav__item">
+          <a class="nac-nav__link" href="../../api/" aria-haspopup="true">Reference</a>
+          <div class="nac-menu">
+            <div class="nac-menu__panel">
+              
+                <div class="nac-menu__group">
+                  <a class="nac-menu__link" href="../../api/models/model_serializer/">
+    <span class="nac-menu__title">ModelSerializer</span><span class="nac-menu__desc">Lookup page for ModelSerializer schemas, Python methods, hooks and options.</span>
+  </a><a class="nac-menu__link" href="../../api/models/serializers/">
+    <span class="nac-menu__title">Serializer</span><span class="nac-menu__desc">Lookup page for the Meta-driven Serializer, its options, methods and hooks.</span>
+  </a><a class="nac-menu__link" href="../../api/schema-config/">
+    <span class="nac-menu__title">SchemaConfig</span><span class="nac-menu__desc">Lookup page for the SchemaConfig fields, the schema kinds and the startup checks that validate them.</span>
+  </a><a class="nac-menu__link" href="../../api/views/api_view_set/">
+    <span class="nac-menu__title">APIViewSet</span><span class="nac-menu__desc">Lookup page for APIViewSet arguments, class attributes, endpoints, methods and hooks.</span>
+  </a><a class="nac-menu__link" href="../../api/views/api_view/">
+    <span class="nac-menu__title">APIView</span><span class="nac-menu__desc">Lookup page for APIView registration, class attributes, custom routes and hooks.</span>
+  </a><a class="nac-menu__link" href="../../api/views/router/">
+    <span class="nac-menu__title">NinjaAIORouter</span><span class="nac-menu__desc">Lookup page for NinjaAIORouter decorators, nesting and attaching it to the API.</span>
+  </a><a class="nac-menu__link" href="../../api/views/decorators/">
+    <span class="nac-menu__title">Decorators</span><span class="nac-menu__desc">Lookup page for the @action and @on decorators, HttpMethod and the view decorators.</span>
+  </a><a class="nac-menu__link" href="../../api/views/mixins/">
+    <span class="nac-menu__title">Mixins</span><span class="nac-menu__desc">Lookup page for the viewset mixins and the filter schemas they use.</span>
+  </a><a class="nac-menu__link" href="../../api/authentication/">
+    <span class="nac-menu__title">Authentication</span><span class="nac-menu__desc">Lookup page for the JWT auth classes and the token and cookie helpers.</span>
+  </a><a class="nac-menu__link" href="../../api/exceptions/">
+    <span class="nac-menu__title">Exceptions</span><span class="nac-menu__desc">Lookup page for the exception classes, their response bodies and the handlers NinjaAIO registers.</span>
+  </a><a class="nac-menu__link" href="../../api/pagination/">
+    <span class="nac-menu__title">Pagination</span><span class="nac-menu__desc">Lookup page for the pagination classes and query parameters of the list endpoint.</span>
+  </a><a class="nac-menu__link" href="../../api/renderers/orjson_renderer/">
+    <span class="nac-menu__title">JSON renderer</span><span class="nac-menu__desc">Lookup page for the orjson renderer and parser that NinjaAIO uses by default.</span>
+  </a><a class="nac-menu__link" href="../../api/types/">
+    <span class="nac-menu__title">Types</span><span class="nac-menu__desc">Lookup page for the helper types you pass to or get back from the framework.</span>
+  </a><a class="nac-menu__link" href="../../api/settings/">
+    <span class="nac-menu__title">Settings</span><span class="nac-menu__desc">Lookup page for every Django setting the framework reads.</span>
+  </a>
+                </div>
+              
+            </div>
+          </div>
+        </li>
+        
+      
+        
+        
+        <li class="nac-nav__item">
+          <a class="nac-nav__link" href="../../migration/" aria-haspopup="true">Migration</a>
+          <div class="nac-menu">
+            <div class="nac-menu__panel">
+              
+                <div class="nac-menu__group">
+                  <a class="nac-menu__link" href="../../migration/breaking-changes/">
+    <span class="nac-menu__title">Breaking changes</span><span class="nac-menu__desc">Behavior that changes in 3.0 without a deprecation warning, and what to do.</span>
+  </a><a class="nac-menu__link" href="../../migration/deprecations/">
+    <span class="nac-menu__title">Deprecations</span><span class="nac-menu__desc">Version 2 names that still work in 3.0, and what to use instead.</span>
+  </a><a class="nac-menu__link" href="../../migration/recipes/">
+    <span class="nac-menu__title">Recipes</span><span class="nac-menu__desc">Before and after code for the most common changes from version 2 to 3.0.</span>
+  </a><a class="nac-menu__link" href="../../migration/validated-example/">
+    <span class="nac-menu__title">A tested blog migration</span><span class="nac-menu__desc">A real v2 blog application migrated and tested against the unreleased v3 branch.</span>
+  </a>
+                </div>
+              
+            </div>
+          </div>
+        </li>
+        
+      
+        
+        
+        <li class="nac-nav__item">
+          <a class="nac-nav__link" href="../../release_notes/" aria-haspopup="true">Project</a>
+          <div class="nac-menu">
+            <div class="nac-menu__panel">
+              
+                <div class="nac-menu__group">
+                  <a class="nac-menu__link" href="../../release_notes/">
+    <span class="nac-menu__title">Release notes</span>
+  </a><a class="nac-menu__link" href="../../deployment/">
+    <span class="nac-menu__title">Deployment</span><span class="nac-menu__desc">Run your API in production with the right server, settings and database setup.</span>
+  </a><a class="nac-menu__link" href="../../troubleshooting/">
+    <span class="nac-menu__title">Troubleshooting</span><span class="nac-menu__desc">Fix the most common problems with schemas, sync and async code, authentication and errors.</span>
+  </a><a class="nac-menu__link" href="../../comparison/">
+    <span class="nac-menu__title">Framework comparison</span><span class="nac-menu__desc">Compare django-ninja-aio-crud with Django Ninja, ADRF and FastAPI on code size and speed.</span>
+  </a><a class="nac-menu__link" href="../../performance/">
+    <span class="nac-menu__title">Performance</span><span class="nac-menu__desc">Run the performance benchmarks, read the results and find the live report.</span>
+  </a><a class="nac-menu__link" href="../../contributing/">
+    <span class="nac-menu__title">Contributing</span><span class="nac-menu__desc">Set up the project locally, run the tests and send your first pull request.</span>
+  </a>
+                </div>
+              
+            </div>
+          </div>
+        </li>
+        
+      
+    </ul>
+    <div class="nac-header__actions">
+      
+      
+        
+        
+          
+            <label class="md-header__button md-icon nac-search-toggle" for="__search" aria-label="Search">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+            </label>
+          
+          <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+        
+      
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light theme"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light theme" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark theme"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark theme" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+</form>
+      
+      
+        <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+      
+      
+        <a class="nac-header__icon" href="https://github.com/caspel26/django-ninja-aio-crud" aria-label="GitHub repository" title="GitHub">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.56-1.11-4.56-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2Z"/></svg>
+        </a>
+      
+    </div>
+  </nav>
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="django-ninja-aio-crud" class="md-nav__button md-logo" aria-label="django-ninja-aio-crud" data-md-component="logo">
+      <img class="nac-mark nac-mark--dark" src="../../images/brand/mark-dark-64.png" alt="django-ninja-aio-crud" width="32" height="32">
+<img class="nac-mark nac-mark--light" src="../../images/brand/mark-light-64.png" alt="" width="32" height="32">
+    </a>
+    django-ninja-aio-crud
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/caspel26/django-ninja-aio-crud" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    caspel26/django-ninja-aio-crud
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Home
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Get started
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Get started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting_started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Installation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting_started/quick_start/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Quick start
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting_started/choosing-a-serializer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Choosing a serializer
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../tutorial/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    Tutorial
+    
+  </span>
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Tutorial
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorial/model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    1. Define the model
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorial/crud/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    2. Create the CRUD API
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorial/relations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    3. Add relations
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorial/authentication/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    4. Add authentication
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorial/permissions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    5. Add permissions
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorial/filtering/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    6. Filter, search and sort
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorial/production/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    7. Go to production
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    Guides
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Guides
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_1" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4_1" id="__nav_4_1_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    Data
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_1_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4_1">
+            <span class="md-nav__icon md-icon"></span>
+            Data
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Schemas
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    Schemas
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#declare-the-schemas" class="md-nav__link">
+    <span class="md-ellipsis">
+      Declare the schemas
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#schemaconfig-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      SchemaConfig options
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#accept-extra-input-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      Accept extra input values
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#return-computed-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      Return computed values
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#change-the-schema-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      Change the schema settings
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#use-the-generated-schemas" class="md-nav__link">
+    <span class="md-ellipsis">
+      Use the generated schemas
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#schema-names-in-openapi" class="md-nav__link">
+    <span class="md-ellipsis">
+      Schema names in OpenAPI
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#catch-mistakes-at-startup" class="md-nav__link">
+    <span class="md-ellipsis">
+      Catch mistakes at startup
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      See also
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Validation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../python-crud/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Use from Python
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dumping/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Serialize objects
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../relations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Relations
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../nested-writes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Nested writes
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bulk-operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Bulk operations
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../query-optimization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Query optimization
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_2" id="__nav_4_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    Endpoints
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_2">
+            <span class="md-nav__icon md-icon"></span>
+            Endpoints
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../viewsets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Viewsets
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../custom-actions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Custom actions
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../routers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Routers
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../filtering/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Filtering
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pagination/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Pagination
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../field-selection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Field selection
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../soft-delete/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Soft delete
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_3" id="__nav_4_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    Security
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_3">
+            <span class="md-nav__icon md-icon"></span>
+            Security
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../authentication/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    JWT authentication
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cookie-authentication/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Cookie authentication
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../permissions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Permissions
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_4" id="__nav_4_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    Behavior
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_4">
+            <span class="md-nav__icon md-icon"></span>
+            Behavior
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Hooks
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../errors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Errors
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_5" id="__nav_4_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    Integrations
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_5">
+            <span class="md-nav__icon md-icon"></span>
+            Integrations
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Django admin
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mcp/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    AI agents (MCP)
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../swagger-ui/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Swagger UI
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../logging/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Logging
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../type-hints/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Type hints
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../concepts/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    Concepts
+    
+  </span>
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Concepts
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/serializer-first/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Serializer first
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/sync-and-async/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Sync and async
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Request lifecycle
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/transactions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Transactions
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/schema-generation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Schema generation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../api/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    Reference
+    
+  </span>
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_6" id="__nav_6_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Reference
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/models/model_serializer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    ModelSerializer
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/models/serializers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Serializer
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/schema-config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    SchemaConfig
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/views/api_view_set/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    APIViewSet
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/views/api_view/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    APIView
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/views/router/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    NinjaAIORouter
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/views/decorators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Decorators
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/views/mixins/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Mixins
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/authentication/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Authentication
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Exceptions
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/pagination/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Pagination
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/renderers/orjson_renderer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    JSON renderer
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/types/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Types
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Settings
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../migration/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    Migration
+    
+  </span>
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            Migration
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migration/breaking-changes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Breaking changes
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migration/deprecations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Deprecations
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migration/recipes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Recipes
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migration/validated-example/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    A tested blog migration
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Project
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            Project
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release_notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Release notes
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Deployment
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Troubleshooting
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Framework comparison
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../performance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Performance
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Contributing
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#declare-the-schemas" class="md-nav__link">
+    <span class="md-ellipsis">
+      Declare the schemas
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#schemaconfig-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      SchemaConfig options
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#accept-extra-input-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      Accept extra input values
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#return-computed-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      Return computed values
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#change-the-schema-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      Change the schema settings
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#use-the-generated-schemas" class="md-nav__link">
+    <span class="md-ellipsis">
+      Use the generated schemas
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#schema-names-in-openapi" class="md-nav__link">
+    <span class="md-ellipsis">
+      Schema names in OpenAPI
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#catch-mistakes-at-startup" class="md-nav__link">
+    <span class="md-ellipsis">
+      Catch mistakes at startup
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      See also
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+  
+  
+
+
+
+
+  <div class="nac-kicker" data-type="guide">
+    <span class="nac-kicker__type">Guide</span>
+    
+    
+  </div>
+
+
+<h1 id="schemas">Schemas<a class="headerlink" href="#schemas" title="Permanent link">&para;</a></h1>
+<p>Schemas decide which fields your API accepts and returns. This page shows how
+to declare them, every <code>SchemaConfig</code> option, and how to use the generated
+schemas in your own code.</p>
+<h2 id="declare-the-schemas">Declare the schemas<a class="headerlink" href="#declare-the-schemas" title="Permanent link">&para;</a></h2>
+<p>Add a <code>Schemas</code> class to your model with one <code>SchemaConfig</code> for each kind:</p>
+<div class="language-python highlight"><span class="filename">blog/models.py</span><pre><span></span><code><span id="__span-0-1"><span class="kn">from</span><span class="w"> </span><span class="nn">django.db</span><span class="w"> </span><span class="kn">import</span> <span class="n">models</span>
+</span><span id="__span-0-2"><span class="kn">from</span><span class="w"> </span><span class="nn">ninja_aio</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModelSerializer</span><span class="p">,</span> <span class="n">SchemaConfig</span>
+</span><span id="__span-0-3">
+</span><span id="__span-0-4">
+</span><span id="__span-0-5"><span class="k">class</span><span class="w"> </span><span class="nc">Article</span><span class="p">(</span><span class="n">ModelSerializer</span><span class="p">):</span>
+</span><span id="__span-0-6">    <span class="n">title</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">CharField</span><span class="p">(</span><span class="n">max_length</span><span class="o">=</span><span class="mi">200</span><span class="p">)</span>
+</span><span id="__span-0-7">    <span class="n">body</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">TextField</span><span class="p">()</span>
+</span><span id="__span-0-8">    <span class="n">is_published</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">BooleanField</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</span><span id="__span-0-9">    <span class="n">views</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">PositiveIntegerField</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+</span><span id="__span-0-10">    <span class="n">created_at</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">DateTimeField</span><span class="p">(</span><span class="n">auto_now_add</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span><span id="__span-0-11">    <span class="n">category</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">ForeignKey</span><span class="p">(</span>
+</span><span id="__span-0-12">        <span class="n">Category</span><span class="p">,</span> <span class="n">on_delete</span><span class="o">=</span><span class="n">models</span><span class="o">.</span><span class="n">CASCADE</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s2">"articles"</span>
+</span><span id="__span-0-13">    <span class="p">)</span>
+</span><span id="__span-0-14">
+</span><span id="__span-0-15">    <span class="k">class</span><span class="w"> </span><span class="nc">Schemas</span><span class="p">:</span>
+</span><span id="__span-0-16">        <span class="n">create</span> <span class="o">=</span> <span class="n">SchemaConfig</span><span class="p">(</span>
+</span><span id="__span-0-17">            <span class="n">fields</span><span class="o">=</span><span class="p">[</span><span class="s2">"title"</span><span class="p">,</span> <span class="s2">"body"</span><span class="p">,</span> <span class="s2">"category"</span><span class="p">],</span>
+</span><span id="__span-0-18">            <span class="n">optionals</span><span class="o">=</span><span class="p">[(</span><span class="s2">"is_published"</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)],</span>
+</span><span id="__span-0-19">        <span class="p">)</span>
+</span><span id="__span-0-20">        <span class="n">update</span> <span class="o">=</span> <span class="n">SchemaConfig</span><span class="p">(</span>
+</span><span id="__span-0-21">            <span class="n">optionals</span><span class="o">=</span><span class="p">[(</span><span class="s2">"title"</span><span class="p">,</span> <span class="nb">str</span><span class="p">),</span> <span class="p">(</span><span class="s2">"body"</span><span class="p">,</span> <span class="nb">str</span><span class="p">),</span> <span class="p">(</span><span class="s2">"is_published"</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)],</span>
+</span><span id="__span-0-22">        <span class="p">)</span>
+</span><span id="__span-0-23">        <span class="n">read</span> <span class="o">=</span> <span class="n">SchemaConfig</span><span class="p">(</span><span class="n">fields</span><span class="o">=</span><span class="p">[</span><span class="s2">"id"</span><span class="p">,</span> <span class="s2">"title"</span><span class="p">,</span> <span class="s2">"category"</span><span class="p">,</span> <span class="s2">"created_at"</span><span class="p">])</span>
+</span><span id="__span-0-24">        <span class="n">detail</span> <span class="o">=</span> <span class="n">SchemaConfig</span><span class="p">(</span>
+</span><span id="__span-0-25">            <span class="n">fields</span><span class="o">=</span><span class="p">[</span><span class="s2">"id"</span><span class="p">,</span> <span class="s2">"title"</span><span class="p">,</span> <span class="s2">"body"</span><span class="p">,</span> <span class="s2">"is_published"</span><span class="p">,</span> <span class="s2">"views"</span><span class="p">,</span> <span class="s2">"category"</span><span class="p">,</span> <span class="s2">"created_at"</span><span class="p">],</span>
+</span><span id="__span-0-26">        <span class="p">)</span>
+</span></code></pre></div>
+<p>Each kind is used by these endpoints:</p>
+<table>
+<thead>
+<tr>
+<th>Kind</th>
+<th>Used for</th>
+<th>When you omit it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>create</code></td>
+<td>The body of <code>POST /api/articles/</code></td>
+<td>No create endpoint</td>
+</tr>
+<tr>
+<td><code>update</code></td>
+<td>The body of <code>PATCH /api/articles/{id}/</code></td>
+<td>No update endpoint</td>
+</tr>
+<tr>
+<td><code>read</code></td>
+<td>List items, and the create and update responses</td>
+<td>No list or retrieve endpoints</td>
+</tr>
+<tr>
+<td><code>detail</code></td>
+<td>The response of <code>GET /api/articles/{id}</code></td>
+<td>The <code>read</code> fields are used</td>
+</tr>
+</tbody>
+</table>
+<p>With a <code>Serializer</code>, the <code>Schemas</code> class is the same. Only the <code>Meta</code> class
+is added:</p>
+<div class="language-python highlight"><span class="filename">blog/serializers.py</span><pre><span></span><code><span id="__span-1-1"><span class="kn">from</span><span class="w"> </span><span class="nn">ninja_aio</span><span class="w"> </span><span class="kn">import</span> <span class="n">Serializer</span><span class="p">,</span> <span class="n">SchemaConfig</span>
+</span><span id="__span-1-2">
+</span><span id="__span-1-3"><span class="kn">from</span><span class="w"> </span><span class="nn">.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">Article</span>
+</span><span id="__span-1-4">
+</span><span id="__span-1-5">
+</span><span id="__span-1-6"><span class="k">class</span><span class="w"> </span><span class="nc">ArticleSerializer</span><span class="p">(</span><span class="n">Serializer</span><span class="p">[</span><span class="n">Article</span><span class="p">]):</span>
+</span><span id="__span-1-7">    <span class="k">class</span><span class="w"> </span><span class="nc">Meta</span><span class="p">:</span>
+</span><span id="__span-1-8">        <span class="n">model</span> <span class="o">=</span> <span class="n">Article</span>
+</span><span id="__span-1-9">
+</span><span id="__span-1-10">    <span class="k">class</span><span class="w"> </span><span class="nc">Schemas</span><span class="p">:</span>
+</span><span id="__span-1-11">        <span class="n">create</span> <span class="o">=</span> <span class="n">SchemaConfig</span><span class="p">(</span><span class="n">fields</span><span class="o">=</span><span class="p">[</span><span class="s2">"title"</span><span class="p">,</span> <span class="s2">"body"</span><span class="p">,</span> <span class="s2">"category"</span><span class="p">])</span>
+</span><span id="__span-1-12">        <span class="n">read</span> <span class="o">=</span> <span class="n">SchemaConfig</span><span class="p">(</span><span class="n">fields</span><span class="o">=</span><span class="p">[</span><span class="s2">"id"</span><span class="p">,</span> <span class="s2">"title"</span><span class="p">,</span> <span class="s2">"category"</span><span class="p">,</span> <span class="s2">"created_at"</span><span class="p">])</span>
+</span></code></pre></div>
+<h2 id="schemaconfig-options">SchemaConfig options<a class="headerlink" href="#schemaconfig-options" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>fields</code></td>
+<td>Model fields to include. Input fields are required</td>
+</tr>
+<tr>
+<td><code>optionals</code></td>
+<td>Fields the client may leave out, as <code>(name, type)</code> pairs. They default to <code>None</code></td>
+</tr>
+<tr>
+<td><code>customs</code></td>
+<td>Extra values that are not model fields, as <code>(name, type)</code> for required values or <code>(name, type, default)</code></td>
+</tr>
+<tr>
+<td><code>excludes</code></td>
+<td>Include every model field except these</td>
+</tr>
+<tr>
+<td><code>relations_as_id</code></td>
+<td>Return these relations as their primary key. <code>read</code> and <code>detail</code> only</td>
+</tr>
+<tr>
+<td><code>nested</code></td>
+<td>Create related objects in the same request, like <code>{"comments": Comment}</code>. <code>create</code> on <code>ModelSerializer</code> only</td>
+</tr>
+<tr>
+<td><code>model_config</code></td>
+<td>A Pydantic <code>ConfigDict</code> for the generated schema</td>
+</tr>
+</tbody>
+</table>
+<p>An optional field that the client leaves out is skipped. On create the model
+default is used, and <code>null</code> is treated the same. On update the current value
+is kept: an update only touches the fields the client sent. An explicit <code>null</code>
+is saved when the type allows it, like <code>optionals=[("note", str | None)]</code> on a
+nullable field.</p>
+<p>A foreign key in <code>create</code> fields becomes <code>&lt;name&gt;_id</code> in the request body, like
+<code>"category_id": 1</code>. In <code>update</code>, declare it as <code>optionals=[("category", int)]</code>,
+or <code>("category", int | None)</code> for a nullable foreign key the client may clear.
+See <a href="../relations/">Relations</a> and <a href="../nested-writes/">Nested writes</a>.</p>
+<h2 id="accept-extra-input-values">Accept extra input values<a class="headerlink" href="#accept-extra-input-values" title="Permanent link">&para;</a></h2>
+<p>Use <code>customs</code> for values the client sends that are not saved on the model:</p>
+<div class="language-python highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-2-1"><span class="n">create</span> <span class="o">=</span> <span class="n">SchemaConfig</span><span class="p">(</span>
+</span><span id="__span-2-2">    <span class="n">fields</span><span class="o">=</span><span class="p">[</span><span class="s2">"title"</span><span class="p">,</span> <span class="s2">"body"</span><span class="p">,</span> <span class="s2">"category"</span><span class="p">],</span>
+</span><span id="__span-2-3">    <span class="n">customs</span><span class="o">=</span><span class="p">[(</span><span class="s2">"notify_editors"</span><span class="p">,</span> <span class="nb">bool</span><span class="p">,</span> <span class="kc">False</span><span class="p">)],</span>
+</span><span id="__span-2-4"><span class="p">)</span>
+</span></code></pre></div>
+<p>The request accepts <code>notify_editors</code>. Read its value in the <code>custom_actions</code>
+hook, see <a href="../hooks/">Hooks</a>.</p>
+<h2 id="return-computed-values">Return computed values<a class="headerlink" href="#return-computed-values" title="Permanent link">&para;</a></h2>
+<p>In <code>read</code> and <code>detail</code>, a custom value comes from the attribute or property
+with the same name on the object:</p>
+<div class="language-python highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-3-1"><span class="k">class</span><span class="w"> </span><span class="nc">Article</span><span class="p">(</span><span class="n">ModelSerializer</span><span class="p">):</span>
+</span><span id="__span-3-2">    <span class="c1"># fields as above</span>
+</span><span id="__span-3-3">
+</span><span id="__span-3-4">    <span class="nd">@property</span>
+</span><span id="__span-3-5">    <span class="k">def</span><span class="w"> </span><span class="nf">summary</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+</span><span id="__span-3-6">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">body</span><span class="p">[:</span><span class="mi">100</span><span class="p">]</span>
+</span><span id="__span-3-7">
+</span><span id="__span-3-8">    <span class="k">class</span><span class="w"> </span><span class="nc">Schemas</span><span class="p">:</span>
+</span><span id="__span-3-9">        <span class="n">read</span> <span class="o">=</span> <span class="n">SchemaConfig</span><span class="p">(</span>
+</span><span id="__span-3-10">            <span class="n">fields</span><span class="o">=</span><span class="p">[</span><span class="s2">"id"</span><span class="p">,</span> <span class="s2">"title"</span><span class="p">],</span>
+</span><span id="__span-3-11">            <span class="n">customs</span><span class="o">=</span><span class="p">[(</span><span class="s2">"summary"</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="s2">""</span><span class="p">)],</span>
+</span><span id="__span-3-12">        <span class="p">)</span>
+</span></code></pre></div>
+<p>When the object has no such attribute, the default is returned.</p>
+<p>You can also put the tuple straight into <code>fields</code>:</p>
+<div class="language-python highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-4-1"><span class="n">read</span> <span class="o">=</span> <span class="n">SchemaConfig</span><span class="p">(</span><span class="n">fields</span><span class="o">=</span><span class="p">[</span><span class="s2">"id"</span><span class="p">,</span> <span class="s2">"title"</span><span class="p">,</span> <span class="p">(</span><span class="s2">"summary"</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="s2">""</span><span class="p">)])</span>
+</span></code></pre></div>
+<p>This works in <code>create</code> and <code>update</code> too, like
+<code>fields=["title", ("source", str, "web")]</code>. There the value is not saved on the
+model: read it in <code>custom_actions</code>, like any value in <code>customs</code>.</p>
+<h2 id="change-the-schema-settings">Change the schema settings<a class="headerlink" href="#change-the-schema-settings" title="Permanent link">&para;</a></h2>
+<p>Pass a Pydantic <code>ConfigDict</code> to <code>model_config</code>:</p>
+<div class="language-python highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-5-1"><span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">ConfigDict</span>
+</span><span id="__span-5-2">
+</span><span id="__span-5-3"><span class="n">create</span> <span class="o">=</span> <span class="n">SchemaConfig</span><span class="p">(</span>
+</span><span id="__span-5-4">    <span class="n">fields</span><span class="o">=</span><span class="p">[</span><span class="s2">"title"</span><span class="p">,</span> <span class="s2">"body"</span><span class="p">,</span> <span class="s2">"category"</span><span class="p">],</span>
+</span><span id="__span-5-5">    <span class="n">model_config</span><span class="o">=</span><span class="n">ConfigDict</span><span class="p">(</span><span class="n">str_strip_whitespace</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+</span><span id="__span-5-6"><span class="p">)</span>
+</span></code></pre></div>
+<p>Here <code>"  Hello  "</code> is saved as <code>"Hello"</code>.</p>
+<h2 id="use-the-generated-schemas">Use the generated schemas<a class="headerlink" href="#use-the-generated-schemas" title="Permanent link">&para;</a></h2>
+<p>Each kind is available as a class attribute:</p>
+<div class="language-python highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-6-1"><span class="n">Article</span><span class="o">.</span><span class="n">create_schema</span>
+</span><span id="__span-6-2"><span class="n">Article</span><span class="o">.</span><span class="n">update_schema</span>
+</span><span id="__span-6-3"><span class="n">Article</span><span class="o">.</span><span class="n">read_schema</span>
+</span><span id="__span-6-4"><span class="n">Article</span><span class="o">.</span><span class="n">detail_schema</span>
+</span></code></pre></div>
+<p><code>Article.get_schema("read")</code> returns the same class as <code>Article.read_schema</code>.
+A kind without a <code>SchemaConfig</code> returns <code>None</code>, except <code>detail</code>, which falls
+back to the <code>read</code> fields.</p>
+<p>Use them like any Pydantic model:</p>
+<div class="language-python highlight"><span class="filename">Python</span><pre><span></span><code><span id="__span-7-1"><span class="n">data</span> <span class="o">=</span> <span class="n">Article</span><span class="o">.</span><span class="n">create_schema</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">"Hello"</span><span class="p">,</span> <span class="n">body</span><span class="o">=</span><span class="s2">"..."</span><span class="p">,</span> <span class="n">category_id</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+</span></code></pre></div>
+<h2 id="schema-names-in-openapi">Schema names in OpenAPI<a class="headerlink" href="#schema-names-in-openapi" title="Permanent link">&para;</a></h2>
+<p>The schemas appear in the OpenAPI document with the model name in lowercase:</p>
+<table>
+<thead>
+<tr>
+<th>Kind</th>
+<th>Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>create</code></td>
+<td><code>articleSchemaIn</code></td>
+</tr>
+<tr>
+<td><code>update</code></td>
+<td><code>articleSchemaPatch</code></td>
+</tr>
+<tr>
+<td><code>read</code></td>
+<td><code>articleSchemaOut</code></td>
+</tr>
+<tr>
+<td><code>detail</code></td>
+<td><code>articleDetailSchemaOut</code></td>
+</tr>
+<tr>
+<td>List response</td>
+<td><code>PaginatedarticleSchemaOut</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="catch-mistakes-at-startup">Catch mistakes at startup<a class="headerlink" href="#catch-mistakes-at-startup" title="Permanent link">&para;</a></h2>
+<p>Django checks your <code>Schemas</code> when the project starts. Run the checks
+yourself with:</p>
+<div class="language-bash highlight"><span class="filename">Bash</span><pre><span></span><code><span id="__span-8-1">python<span class="w"> </span>manage.py<span class="w"> </span>check
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Problem</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ninja_aio.E001</code></td>
+<td>An attribute of <code>Schemas</code> is not <code>create</code>, <code>update</code>, <code>read</code> or <code>detail</code></td>
+</tr>
+<tr>
+<td><code>ninja_aio.E002</code></td>
+<td>A kind is not a <code>SchemaConfig</code></td>
+</tr>
+<tr>
+<td><code>ninja_aio.E003</code></td>
+<td>A name in <code>fields</code>, <code>optionals</code>, <code>excludes</code>, <code>relations_as_id</code> or <code>nested</code> is not a field of the model</td>
+</tr>
+<tr>
+<td><code>ninja_aio.E004</code></td>
+<td>A field is listed in both <code>fields</code> and <code>optionals</code></td>
+</tr>
+<tr>
+<td><code>ninja_aio.E005</code></td>
+<td><code>relations_as_id</code> or <code>nested</code> is set on a kind that does not support it</td>
+</tr>
+<tr>
+<td><code>ninja_aio.E006</code></td>
+<td>A <code>relations_as_id</code> entry is not a relation</td>
+</tr>
+</tbody>
+</table>
+<h2 id="see-also">See also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../../tutorial/model/">Define the model</a></li>
+<li><a href="../validation/">Validation</a></li>
+<li><a href="../relations/">Relations</a></li>
+<li><a href="../nested-writes/">Nested writes</a></li>
+<li><a href="../../getting_started/choosing-a-serializer/">Choosing a serializer</a></li>
+</ul>
+
+
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../../tutorial/production/" class="md-footer__link md-footer__link--prev" aria-label="Previous: 7. Go to production">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                7. Go to production
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../validation/" class="md-footer__link md-footer__link--next" aria-label="Next: Validation">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Validation
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024 – 2026 caspel26
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+    <a href="https://github.com/caspel26/django-ninja-aio-crud" target="_blank" rel="noopener" title="GitHub" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+    
+    
+    
+    
+    <a href="https://pypi.org/project/django-ninja-aio-crud/" target="_blank" rel="noopener" title="PyPI" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.8 200.5c-7.7-30.9-22.3-54.2-53.4-54.2h-40.1v47.4c0 36.8-31.2 67.8-66.8 67.8H172.7c-29.2 0-53.4 25-53.4 54.3v101.8c0 29 25.2 46 53.4 54.3 33.8 9.9 66.3 11.7 106.8 0 26.9-7.8 53.4-23.5 53.4-54.3v-40.7H226.2v-13.6h160.2c31.1 0 42.6-21.7 53.4-54.2 11.2-33.5 10.7-65.7 0-108.6M286.2 444.7a20.4 20.4 0 1 1 0-40.7 20.4 20.4 0 1 1 0 40.7M167.8 248.1h106.8c29.7 0 53.4-24.5 53.4-54.3V91.9c0-29-24.4-50.7-53.4-55.6-35.8-5.9-74.7-5.6-106.8.1-45.2 8-53.4 24.7-53.4 55.6v40.7h106.9v13.6h-147c-31.1 0-58.3 18.7-66.8 54.2-9.8 40.7-10.2 66.1 0 108.6 7.6 31.6 25.7 54.2 56.8 54.2H101v-48.8c0-35.3 30.5-66.4 66.8-66.4m-6.6-183.4a20.4 20.4 0 1 1 0 40.8 20.4 20.4 0 1 1 0-40.8"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.top", "navigation.footer", "navigation.sections", "navigation.indexes", "navigation.expand", "navigation.path", "toc.follow", "content.code.copy", "content.code.select", "content.code.annotate", "content.tabs.link", "content.tooltips", "content.footnote.tooltips", "search.suggest", "search.highlight", "search.share"], "search": "../../assets/javascripts/workers/search.973d3a69.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"alias": true, "default": "latest", "provider": "mike", "repo": "caspel26/django-ninja-aio-crud"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.f55a23d4.min.js"></script>
+      
+        <script src="../../javascripts/theme.js"></script>
+      
+        <script src="../../javascripts/a11y.js"></script>
+      
+        <script src="../../javascripts/home.js"></script>
+      
+    
+  </body>
+</html>
