@@ -511,7 +511,7 @@ def generate_html(data: dict) -> str:
 </head>
 <body>
     <div class="header">
-        <a href="https://django-ninja-aio.com/">django-ninja-aio-crud</a>
+        <a href="https://ninja-aio.caspel.dev/">django-ninja-aio-crud</a>
         <span>&middot;</span>
         <span>Performance Benchmarks</span>
     </div>

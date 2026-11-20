@@ -211,7 +211,7 @@ class LegacyDocsIntegrationTests(SimpleTestCase):
             self.assertEqual((worktree / "main.py").read_text(), (ROOT / "main.py").read_text())
             self.assertEqual((worktree / "CHANGELOG.md").read_text(), (ROOT / "CHANGELOG.md").read_text())
             self.assertEqual((worktree / "docs/release_notes.md").read_text(), (ROOT / "docs/release_notes.md").read_text())
-            self.assertEqual(config["site_url"], "https://django-ninja-aio.com/2.36/")
+            self.assertEqual(config["site_url"], "https://ninja-aio.caspel.dev/2.36/")
             self.assertFalse((worktree / "docs/extra.css").exists())
             self.assertFalse((worktree / "overrides/home.html").exists())
             self.assertIn("Legacy landing", (worktree / "docs/index.md").read_text())
