@@ -426,7 +426,7 @@ def generate_html_report(results_file: Path, output_file: Path) -> None:
 </head>
 <body>
     <div class="header">
-        <a href="https://django-ninja-aio.com/">Django Ninja AIO</a>
+        <a href="https://ninja-aio.caspel.dev/">Django Ninja AIO</a>
         <span>&middot;</span>
         <span>Framework Comparison</span>
     </div>

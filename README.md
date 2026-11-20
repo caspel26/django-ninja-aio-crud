@@ -18,9 +18,9 @@
 </p>
 
 <p align="center">
-  <a href="https://django-ninja-aio.com">Documentation</a> ·
+  <a href="https://ninja-aio.caspel.dev">Documentation</a> ·
   <a href="https://pypi.org/project/django-ninja-aio-crud/">PyPI</a> ·
-  <a href="https://django-ninja-aio.com/comparison/">Framework Comparison</a> ·
+  <a href="https://ninja-aio.caspel.dev/comparison/">Framework Comparison</a> ·
   <a href="https://caspel26.github.io/django-ninja-aio-crud/">Performance Benchmarks</a> ·
   <a href="https://github.com/caspel26/ninja-aio-blog-example">Example Project</a> ·
   <a href="https://github.com/caspel26/django-ninja-aio-crud/issues">Issues</a>
@@ -229,15 +229,15 @@ Invalid input returns `422` with the error message.
 Version 3 replaces the inner `ReadSerializer`/`CreateSerializer` classes and
 `Meta.schema_in`/`schema_out` with a single `class Schemas`, adds sync
 viewsets and the Python CRUD API. Follow the
-[migration guide](https://django-ninja-aio.com/migration/) to upgrade.
+[migration guide](https://ninja-aio.caspel.dev/migration/) to upgrade.
 
 ## Links
 
-- [Documentation](https://django-ninja-aio.com)
-- [Tutorial](https://django-ninja-aio.com/tutorial/)
-- [Guides](https://django-ninja-aio.com/guides/schemas/)
-- [Release notes](https://django-ninja-aio.com/release_notes/)
-- [Contributing](https://django-ninja-aio.com/contributing/)
+- [Documentation](https://ninja-aio.caspel.dev)
+- [Tutorial](https://ninja-aio.caspel.dev/tutorial/)
+- [Guides](https://ninja-aio.caspel.dev/guides/schemas/)
+- [Release notes](https://ninja-aio.caspel.dev/release_notes/)
+- [Contributing](https://ninja-aio.caspel.dev/contributing/)
 
 ## Support
 
