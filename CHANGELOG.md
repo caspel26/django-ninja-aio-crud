@@ -1,5 +1,24 @@
 # 📋 Release Notes
 
+## 🏷️ [v3.0.2] - 2026-11-20
+
+---
+
+### 📚 Documentation
+
+#### 🌐 New Documentation Domain
+> `mkdocs.yml`, `docs/CNAME`, `pyproject.toml`, `README.md`
+
+The documentation now lives at **https://ninja-aio.caspel.dev**. `site_url`, the GitHub Pages `CNAME`, the package's `Documentation` project URL and every link in the README point to the new domain, so the PyPI page links to the right place.
+
+---
+
+### 🎯 Summary
+
+A metadata and documentation release: no runtime code changed.
+
+---
+
 ## 🏷️ [v3.0.1] - 2026-10-07
 
 ---
